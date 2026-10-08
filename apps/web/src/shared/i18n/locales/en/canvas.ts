@@ -109,11 +109,11 @@ export default {
     renameSuccess: 'Canvas renamed.',
     duplicateNameWarning: 'Name already exists.',
     renameFailedWarning: 'Rename failed.',
-    conflictReloadedError: 'Name conflict. Canvas list reloaded.',
+    conflictReloadedError: 'Sync conflict. Canvas list reloaded.',
     syncFailedRestoredError: 'Rename sync failed. Original name restored.',
     conflictRestoredRefreshFailedError:
-      'Name conflict. Original name restored, but the remote list refresh failed. Please reload.',
-    conflictRestoreFailedError: 'Name conflict and restore failed. Please reload the canvas list.',
+      'Sync conflict. Original name restored, but the remote list refresh failed. Please reload.',
+    conflictRestoreFailedError: 'Sync conflict and restore failed. Please reload the canvas list.',
     syncFailedRestoreFailedError:
       'Rename sync failed. Original name could not be restored. Please reload the canvas list.',
     catalogReloadedSuccess: 'Canvas list reloaded.',
@@ -315,8 +315,8 @@ export default {
       'Saved locally. Remote sync failed; it will retry once the network recovers.',
     savedLocallyServerFailed:
       'Saved locally. Remote sync failed (HTTP {code}); it will retry on your next edit.',
-    nameConflictSavedLocally:
-      'Saved locally, but this board name already exists. Please choose another name.',
+    syncConflictSavedLocally:
+      'Saved locally. A newer version exists on the server; reload the list and try again.',
     boardDataInvalid:
       'Canvas data validation failed. Your current canvas was kept. Please try again later.',
     importSnapshotFailed: 'Failed to load the canvas snapshot. Please try again later.',

@@ -17,7 +17,7 @@ type RenameValidationFailure = Extract<
 >
 type RenameSyncFailure = Extract<
   FailedRenameResult,
-  { reason: 'remote-name-conflict' | 'sync-failed' }
+  { reason: 'revision-conflict' | 'idempotency-conflict' | 'sync-failed' }
 >
 type FailedDuplicateResult = Extract<BoardDuplicateResult, { ok: false }>
 type FailedDeleteResult = Extract<BoardDeleteResult, { ok: false }>
@@ -40,8 +40,8 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
   return {
     createFailed(result) {
       appToast.error(
-        result.reason === 'name-conflict'
-          ? t('workspace.feedback.createNameConflict')
+        result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
+          ? t('workspace.feedback.createSyncConflict')
           : t('workspace.feedback.createSyncFailed'),
       )
     },
@@ -53,8 +53,10 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
       )
     },
     renameSyncFailed(result) {
-      if (result.reason === 'remote-name-conflict' && result.hydrate?.ok) {
-        appToast.error(t('workspace.feedback.renameConflictReloaded'))
+      const isConflict =
+        result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
+      if (isConflict && result.hydrate?.ok) {
+        appToast.error(t('workspace.feedback.renameSyncConflictReloaded'))
         return
       }
       if (result.reason === 'sync-failed' && result.rollback.ok) {
@@ -62,8 +64,8 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
         return
       }
       appToast.error(
-        result.reason === 'remote-name-conflict'
-          ? t('workspace.feedback.renameConflictRecoveryIncomplete')
+        isConflict
+          ? t('workspace.feedback.renameSyncConflictRecoveryIncomplete')
           : t('workspace.feedback.renameSyncFailedNoRollback'),
       )
     },
@@ -76,8 +78,8 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
         return
       }
       appToast.error(
-        result.reason === 'name-conflict'
-          ? t('workspace.feedback.duplicateNameConflict')
+        result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
+          ? t('workspace.feedback.duplicateSyncConflict')
           : t('workspace.feedback.duplicateSyncFailed'),
       )
     },

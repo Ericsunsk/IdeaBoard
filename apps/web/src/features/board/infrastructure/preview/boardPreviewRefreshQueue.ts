@@ -7,7 +7,7 @@ import {
 } from '../../infrastructure/persistence'
 import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
-import { isBoardNameConflictError, syncBoardToServer } from '../../application/sync/boardSync'
+import { isBoardSyncConflictError, syncBoardToServer } from '../../application/sync/boardSync'
 import type { BoardMeta } from '../../application/catalog/boards'
 import { isDarkModeActive } from '../../../../shared/theme/composables/useTheme'
 import { getStoredPreviewTheme, setStoredPreviewTheme } from './boardPreviewThemeStorage'
@@ -23,7 +23,7 @@ export interface BoardPreviewRefreshQueueDependencies {
   ) => BoardState | null
   renderPreview: (state: BoardState, options?: { isDark?: boolean }) => Promise<string>
   syncBoard: (boardId: string) => Promise<unknown>
-  isNameConflictError: (error: unknown) => boolean
+  isSyncConflictError: (error: unknown) => boolean
   rendererVersion: number
   now: () => number
   warn: (...data: unknown[]) => void
@@ -47,7 +47,7 @@ const defaultDependencies: BoardPreviewRefreshQueueDependencies = {
   setPreviewSnapshot: setBoardPreviewSnapshot,
   renderPreview: renderBoardPreviewDataUrl,
   syncBoard: syncBoardToServer,
-  isNameConflictError: isBoardNameConflictError,
+  isSyncConflictError: isBoardSyncConflictError,
   rendererVersion: BOARD_PREVIEW_RENDERER_VERSION,
   now: Date.now,
   warn: console.warn,
@@ -270,7 +270,7 @@ export function createBoardPreviewRefreshQueue(
 
     if (isContentStale) {
       void deps.syncBoard(boardId).catch((error) => {
-        if (deps.isNameConflictError(error)) return
+        if (deps.isSyncConflictError(error)) return
         deps.warn('[boards] failed to sync refreshed preview', boardId, error)
       })
     }

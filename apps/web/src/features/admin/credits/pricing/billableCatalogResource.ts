@@ -20,6 +20,7 @@ import type {
 import {
   buildControlMutationHeaders,
   requireOperatorReason,
+  type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
@@ -63,10 +64,7 @@ export type BillableItemAvailability = {
   updated_at: string
 }
 
-export type BillableCatalogMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type BillableCatalogMutationOptions = ControlMutationOptions
 
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>

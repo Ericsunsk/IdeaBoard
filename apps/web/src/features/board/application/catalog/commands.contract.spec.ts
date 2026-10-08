@@ -32,8 +32,14 @@ function makeDeps(): BoardCommandDependencies {
     syncRenameBoard: vi.fn(async () => undefined),
     syncDeleteBoard: vi.fn(async () => undefined),
     hydrateBoards: vi.fn(async () => ({ ok: true as const })),
-    isNameConflictError: vi.fn((error: unknown) => {
-      return typeof error === 'object' && !!error && 'status' in error && error.status === 409
+    getSyncConflictKind: vi.fn((error: unknown) => {
+      if (typeof error !== 'object' || !error) return null
+      const record = error as { status?: unknown; code?: unknown }
+      if (record.code === 'board_idempotency_conflict') return 'idempotency-conflict' as const
+      if (record.status === 409 || record.code === 'board_revision_conflict') {
+        return 'revision-conflict' as const
+      }
+      return null
     }),
     isNotFoundError: vi.fn((error: unknown) => {
       return typeof error === 'object' && !!error && 'status' in error && error.status === 404
@@ -125,8 +131,8 @@ describe('boardCommands', () => {
     expect(deps.syncBoard).not.toHaveBeenCalled()
   })
 
-  it('rolls back rename by hydrating the conflict target when remote reports a name conflict', async () => {
-    const error = { status: 409, msg: '画布名称已存在' }
+  it('rolls back rename by hydrating the conflict target on revision conflicts', async () => {
+    const error = { status: 409, code: 'board_revision_conflict', msg: '看板版本已变更' }
     vi.mocked(deps.syncRenameBoard).mockRejectedValueOnce(error)
     const commands = createBoardCommands(deps)
 
@@ -135,7 +141,7 @@ describe('boardCommands', () => {
       nextName: 'Taken',
     })) as BoardRenameResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'remote-name-conflict' })
+    expect(result).toMatchObject({ ok: false, reason: 'revision-conflict' })
     expect(deps.isNameTaken).toHaveBeenCalledWith('Taken', 'board-a')
     expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'Taken')
     expect(deps.syncRenameBoard).toHaveBeenCalledWith('board-a', 'Taken')
@@ -172,8 +178,8 @@ describe('boardCommands', () => {
     expect(deps.syncBoard).not.toHaveBeenCalled()
   })
 
-  it('keeps optimistic rename local when remote conflict needs caller recovery', async () => {
-    const error = { status: 409, msg: '画布名称已存在' }
+  it('keeps optimistic rename local when a revision conflict needs caller recovery', async () => {
+    const error = { status: 409, code: 'board_revision_conflict', msg: '看板版本已变更' }
     vi.mocked(deps.syncRenameBoard).mockRejectedValueOnce(error)
     const commands = createBoardCommands(deps)
 
@@ -185,7 +191,7 @@ describe('boardCommands', () => {
 
     await expect(result.confirm()).resolves.toMatchObject({
       ok: false,
-      reason: 'remote-name-conflict',
+      reason: 'revision-conflict',
       boardId: 'board-a',
       board: { id: 'board-a', name: 'Taken Remote' },
       previousBoard: { id: 'board-a', name: 'Board' },
@@ -270,8 +276,19 @@ describe('boardCommands', () => {
     expect(deps.syncBoard).not.toHaveBeenCalled()
   })
 
-  it('cleans local duplicate state and hydrates on duplicate remote name conflict', async () => {
-    const error = { status: 409, msg: '画布名称已存在' }
+  it('maps idempotency mismatches to idempotency-conflict on create', async () => {
+    const error = { status: 409, code: 'board_idempotency_conflict', msg: '幂等冲突' }
+    vi.mocked(deps.createServerBoard!).mockRejectedValueOnce(error)
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.create()) as BoardCreateResult
+
+    expect(result).toMatchObject({ ok: false, reason: 'idempotency-conflict' })
+    expect(deps.hydrateBoards).toHaveBeenCalledWith()
+  })
+
+  it('cleans local duplicate state and hydrates on duplicate revision conflict', async () => {
+    const error = { status: 409, code: 'board_revision_conflict', msg: '看板版本已变更' }
     vi.mocked(deps.syncBoard).mockRejectedValueOnce(error)
     const commands = createBoardCommands(deps)
 
@@ -279,7 +296,7 @@ describe('boardCommands', () => {
       sourceBoardId: 'source-board',
     })) as BoardDuplicateResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'name-conflict' })
+    expect(result).toMatchObject({ ok: false, reason: 'revision-conflict' })
     expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoardState).toHaveBeenCalledWith('board-server-1')
     expect(deps.hydrateBoards).toHaveBeenCalledWith()

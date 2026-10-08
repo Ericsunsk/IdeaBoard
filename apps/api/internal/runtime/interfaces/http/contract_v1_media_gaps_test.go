@@ -26,8 +26,12 @@ import (
 
 // fakeAvatarUID is a deterministic V1AvatarUIDDirectory for tests.
 type fakeAvatarUID struct {
-	uid string
-	err error
+	uid          string
+	err          error
+	avatar       string
+	avatarUserID int64
+	writeErr     error
+	writes       int
 }
 
 func (f *fakeAvatarUID) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
@@ -38,6 +42,22 @@ func (f *fakeAvatarUID) GetStorageUIDByUserID(ctx context.Context, userID int64)
 		return "", errV1AvatarUIDUnavailable
 	}
 	return f.uid, nil
+}
+
+func (f *fakeAvatarUID) GetUserAvatar(ctx context.Context, userID int64) (string, error) {
+	if f.avatarUserID != userID {
+		return "", nil
+	}
+	return f.avatar, nil
+}
+
+func (f *fakeAvatarUID) UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.avatar, f.avatarUserID = avatar, userID
+	f.writes++
+	return nil
 }
 
 type v1MediaGapsFixture struct {
@@ -77,6 +97,9 @@ func newV1MediaGapsFixture(t *testing.T, withRenderer bool, avatarUID V1AvatarUI
 	}
 	store.SeedWorkspaceMember(ws2.PublicID, owner, tenancy.RoleMember)
 	deps := ContractV1Deps{Media: media, MediaObjects: objects, AvatarUID: avatarUID}
+	if profile, ok := avatarUID.(V1AvatarProfileDirectory); ok {
+		deps.AvatarProfile = profile
+	}
 	if withRenderer {
 		deps.MediaRenderer = &fakeV1MediaRenderer{}
 	}
@@ -400,7 +423,8 @@ func TestV1PutUploadBytesValidation(t *testing.T) {
 // size validation, static-namespace keying, idempotency, and the
 // fail-closed seams.
 func TestV1AvatarUpload(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, &fakeAvatarUID{uid: "AVTR01"})
+	profile := &fakeAvatarUID{uid: "AVTR01"}
+	f := newV1MediaGapsFixture(t, false, profile)
 	avatar := v1GapsPNGBytes(2048)
 	put := func(body []byte, userID int64, key, contentType string) (int, map[string]any) {
 		headers := map[string]string{"Idempotency-Key": key}
@@ -420,6 +444,17 @@ func TestV1AvatarUpload(t *testing.T) {
 	if url != "/uploads/profile/AVTR01/avatar/avatar.png" {
 		t.Fatalf("avatar_url = %q, want the static profile-avatar namespace", url)
 	}
+	if profile.avatar != url || profile.avatarUserID != f.owner {
+		t.Fatalf("avatar projection = %q for %d, want %q for owner", profile.avatar, profile.avatarUserID, url)
+	}
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})
+	if status != http.StatusOK || v1Data(t, payload).(map[string]any)["avatar"] != url {
+		t.Fatalf("user avatar projection = %d %v, want persisted URL", status, payload)
+	}
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.other})
+	if _, leaked := v1Data(t, payload).(map[string]any)["avatar"]; status != http.StatusOK || leaked {
+		t.Fatalf("cross-user avatar = %d %v, want no avatar", status, payload)
+	}
 	// The staged object is readable through the byte seam at that key.
 	object, err := f.objects.ReadObjectAtProfile(context.Background(), workspacemedia.DefaultStorageProfile,
 		"uploads/profile/AVTR01/avatar/avatar.png", v1AvatarMaxBytes)
@@ -430,6 +465,9 @@ func TestV1AvatarUpload(t *testing.T) {
 	// Replay converges; a different body under the same key conflicts.
 	if status, _ := put(avatar, f.owner, "avatar-1", "image/png"); status != http.StatusOK {
 		t.Fatalf("avatar replay = %d, want 200", status)
+	}
+	if profile.writes != 1 {
+		t.Fatalf("replay avatar writes = %d, want 1", profile.writes)
 	}
 	if status, payload := put(v1GapsPNGBytes(1024), f.owner, "avatar-1", "image/png"); status != http.StatusConflict ||
 		v1ErrorCode(t, payload) != string(contract.CodeMediaIdempotencyConflict) {

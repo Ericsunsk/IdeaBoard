@@ -5346,18 +5346,12 @@ CREATE INDEX idx_control_audit_records_correlation ON control_audit_records (req
 -- (method + route template + target + raw body); a key reused with a
 -- different hash is a 409 conflict, never a second execution.
 --
--- Lifecycle is purely transactional: the guard INSERTs the in-progress
--- claim INSIDE its guard-owned transaction before running the handler,
--- so concurrent same-key claimants block on the primary key until the
--- winner commits or rolls back. In-progress rows are therefore never
--- committed: a crash aborts the transaction and the retry re-executes
--- with no orphan lease to reap and no expiry clock to race. Only 2xx
--- outcomes flip the row to completed (carrying the response for replay);
--- business failures delete the claim so the retry re-executes, and
--- completed rows replay for 24h (ReplayTTL) before expiring.
--- Operator identity is the public subject only (usr_* or service
--- subject); there is deliberately no users FK so internal-worker
--- operators share the same guarantee.
+-- Atomic mutations keep the claim, business writes and response in one
+-- transaction. Detached mutations commit settlement_unknown before external
+-- I/O: uncertain outcomes cannot be reclaimed merely because time elapsed.
+-- attempt_token fences every settlement and lease takeover. Only completed
+-- responses expire after 24h. Public operator subjects deliberately have no
+-- users FK so internal-worker operators use the same guarantee.
 CREATE TABLE control_idempotency_records (
   operator_identity TEXT NOT NULL,
   operation TEXT NOT NULL,
@@ -5372,10 +5366,13 @@ CREATE TABLE control_idempotency_records (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at TIMESTAMPTZ NULL,
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '24 hours'),
+  attempt_token TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  settlement_unknown BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT control_idempotency_records_pkey PRIMARY KEY (operator_identity, operation, target_type, target_id, idempotency_key),
   CONSTRAINT ck_control_idempotency_records_operation CHECK (char_length(btrim(operation)) BETWEEN 1 AND 64),
   CONSTRAINT ck_control_idempotency_records_key CHECK (char_length(btrim(idempotency_key)) BETWEEN 1 AND 128),
   CONSTRAINT ck_control_idempotency_records_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT ck_control_idempotency_records_attempt_token CHECK (length(btrim(attempt_token)) > 0),
   CONSTRAINT ck_control_idempotency_records_response CHECK (
     (NOT completed AND response_status IS NULL AND completed_at IS NULL) OR
     (completed AND response_status BETWEEN 200 AND 299 AND completed_at IS NOT NULL)

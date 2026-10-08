@@ -9,8 +9,6 @@ export type AdminStorageFeedback = {
   missingEditableTarget: () => void
   saveDraftSucceeded: (message?: string) => void
   saveDraftFailed: (error: unknown) => void
-  saveAndApplySucceeded: () => void
-  saveAndApplyFailed: (error: unknown) => void
   applyCurrentSucceeded: (message?: string) => void
   applyCurrentFailed: (error: unknown) => void
   testConnectionSucceeded: (message?: string) => void
@@ -47,12 +45,6 @@ function createAdminStorageFeedback(toast: AdminToastPort): AdminStorageFeedback
     },
     saveDraftFailed(error) {
       toast.error(formatAdminDisplayError(error, '保存失败'))
-    },
-    saveAndApplySucceeded() {
-      toast.success('已保存并设为当前存储')
-    },
-    saveAndApplyFailed(error) {
-      toast.error(formatAdminDisplayError(error, '设为当前失败'))
     },
     applyCurrentSucceeded(message) {
       toast.success(message || '已设为当前存储')

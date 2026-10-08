@@ -24,7 +24,7 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `useBoardRepository()` / `createBoardRepository()` — single cross-layer catalog entry (via `catalog/index.ts`); local store plus CRUD commands plus server hydrate.
 - `hydrateBoardsFromServer` — server hydrate entry in `application/sync`.
 - `syncBoardToServer` — revision-gated document-only save entry in `application/sync` (PUT document with `If-Match`, never PATCHes the name); `syncBoardRenameToServer` is the sole explicit rename entry (PATCH name, no document write).
-- `isBoardNameConflictError` — conflict classifier in `application/sync`.
+- `getBoardSyncConflictKind` / `isBoardSyncConflictError` — sync conflict classifiers in `application/sync` (revision/idempotency vs ordinary failure; archived is separate via `isBoardArchivedError`). v1 has no board-name uniqueness: only local `isBoardNameTaken` gates names.
 - `joinSharedBoardByToken` — share-join workflow entry in `application/collaboration`.
 - `boardsResource.ts` — sole generated-query `public/boards` adapter in `infrastructure/api`: `fetchWorkspaceBoards`, `fetchWorkspaceBoardDocument`, `createWorkspaceBoard`, `saveWorkspaceBoard` (document-only PUT with `If-Match`), `renameWorkspaceBoard` (explicit PATCH rename, no document write), `archiveWorkspaceBoard` / `restoreWorkspaceBoard`, `joinWorkspaceBoardByShareToken`, plus fail-closed `requireBoardWorkspaceId` (selection store, personal default; no selection throws `BoardWorkspaceUnavailableError` before any network call).
 - `serializeBoardState` / `parseBoardState` — serialization and version-migration adapters (via `persistence/index.ts`) in `infrastructure/persistence`.

@@ -30,9 +30,15 @@ import { useWorkspaceSelection } from '../../workspace'
 import { type SearchResult, type VisionReference } from '../domain/models'
 import { useSearchSession } from './useSearchSession'
 import {
+  isSavePopoverController,
   type SearchSavePopoverController,
   type SearchSavePopoverRequest,
-} from '../presentation/components/SearchSavePopover.vue'
+} from '../presentation/browser/savePopoverContract'
+import {
+  attachSearchDragImage,
+  resolveDragAnchor,
+  SEARCH_LIBRARY_AUTO_OPEN_DELAY_MS,
+} from '../presentation/browser/dragGhost'
 
 type SearchScreenRuntimeOptions = {
   userPublicID: Readonly<Ref<string | undefined>>
@@ -321,7 +327,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
         session().library.close()
       },
       openSavePopover(event: Event, result: SearchResult) {
-        const anchor = event.currentTarget as HTMLElement | null
+        const anchor = resolveDragAnchor(event)
         if (!anchor) return
         savePopoverAnchor.value = anchor
         const request: SearchSavePopoverRequest = {
@@ -350,16 +356,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
         const dataTransfer = event.dataTransfer
         if (!dataTransfer) return
         writeSearchReferenceTransfer(dataTransfer, session().toLibraryReference(result))
-        const ghost = document.createElement('div')
-        ghost.style.cssText =
-          'position:fixed;top:-9999px;left:-9999px;width:58px;height:44px;border-radius:8px;overflow:hidden;box-shadow:var(--primitive-shadow-xl);transform:rotate(-3deg);z-index:9999'
-        const image = document.createElement('img')
-        image.src = result.thumbnail_url || result.preview_url
-        image.style.cssText = 'width:100%;height:100%;object-fit:cover'
-        ghost.appendChild(image)
-        document.body.appendChild(ghost)
-        dataTransfer.setDragImage(ghost, 29, 22)
-        setTimeout(() => ghost.remove(), 0)
+        attachSearchDragImage(dataTransfer, result)
       },
       handleCardDragEnd() {
         clearAutoOpenTimer()
@@ -373,7 +370,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
           autoOpenTimer = setTimeout(() => {
             session().library.open.value = true
             autoOpenTimer = null
-          }, 280)
+          }, SEARCH_LIBRARY_AUTO_OPEN_DELAY_MS)
         }
       },
       handleTriggerDragLeave() {
@@ -423,15 +420,4 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
   })
 
   return { view, commands, savePopoverAnchor, workspaceId }
-}
-
-function isSavePopoverController(value: unknown): value is SearchSavePopoverController {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'toggle' in value &&
-    typeof value.toggle === 'function' &&
-    'hide' in value &&
-    typeof value.hide === 'function'
-  )
 }

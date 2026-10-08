@@ -1,5 +1,31 @@
 # ExecPlans
 
+## Archived Audit and Acceptance for #904–#914
+
+- Status (2026-10-08): implementation and cleanup verification complete. Git
+  history and issue acceptance comments record the commit and closure.
+
+- Goal: fix the six audit defects, remove confirmed redundancy, verify the batch,
+  commit on the current branch and close accepted issues.
+- Scope: current batch files only. Fence Control attempts and unknown dispatch
+  outcomes; restore Library's original schema/recovery scope; complete policy
+  parity, persisted avatar projection and actual-folder Search feedback. Remove
+  unused wrappers, duplicate gates, unreachable checks and stale descriptions.
+- Success criteria: uncertain external effects never restart automatically; old
+  attempts cannot settle newer claims; runtime policy matches the spec; avatar
+  survives cold login; deduplicated saves report their actual folder. Preserve
+  ownership seams and behavior tests, pass affected checks, commit and close issues.
+- Verification: parallel Standards/Spec review; focused Control/Library/avatar/
+  Search tests; frontend test typecheck/build/lint and backend build; relevant
+  PostgreSQL tests; sqlc/schema/migration/API drift and formatting checks.
+- Results: batch verification passed 504 frontend tests and 106 fixture-related
+  tests plus relevant PostgreSQL tests and schema/generated gates. After cleanup,
+  92 frontend tests, typecheck/lint/build, targeted Go tests, backend build,
+  generated API drift and formatting checks passed.
+- Rollback: revert the batch commit; retain additive database columns and the
+  unknown-outcome fence. Reopen issues if acceptance is invalidated; never revert
+  persistent databases automatically.
+
 ## Archived Image Catalog Structure
 
 - Goal: concentrate existing Unsplash/Pexels knowledge and supplier HTTP handling.

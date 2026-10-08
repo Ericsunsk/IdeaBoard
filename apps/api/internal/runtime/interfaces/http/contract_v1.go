@@ -13,7 +13,6 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
-	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -95,19 +94,11 @@ type ContractV1Deps struct {
 	// EventBus publishes v1 envelopes to NATS JetStream (event layer,
 	// not a queue). Nil disables cross-instance fanout (single-process
 	// tests); production wires the shared bus.
-	EventBus *events.NATSJetStreamEventBus
-	// libraryMaterializer is the internal remote-fetch seam for the
-	// library read-through (media/assets.LibraryMaterializer fetch
-	// contract). Nil normalizes to the production remote fetcher
-	// (shared outbound downloader: SSRF allowlist, timeout, size cap);
-	// tests inject stubs. Unexported: production never overrides it.
-	libraryMaterializer materializerassets.LibrarySourceFetcher
-	// libraryMaterializeSpawn runs the read-through fetch off the
-	// request path. Nil normalizes to a fire-and-forget goroutine;
-	// tests inject an inline runner for determinism. Unexported:
-	// production never overrides it.
-	libraryMaterializeSpawn func(func())
-	SupportChannels         settings.SupportChannelsSettingProvider
+	EventBus        *events.NATSJetStreamEventBus
+	SupportChannels settings.SupportChannelsSettingProvider
+	// AvatarProfile persists uploads and projects the user record on session reads.
+	// Nil omits the read projection and fails avatar uploads closed with 503.
+	AvatarProfile V1AvatarProfileDirectory
 }
 
 // requireV1IdempotencyKey enforces the shared header-only idempotency contract
@@ -129,6 +120,16 @@ func requireV1IdempotencyKey(c *gin.Context) (string, bool) {
 type V1UserDirectory interface {
 	ResolveUserID(ctx context.Context, publicID uuid.UUID) (int64, error)
 	GetUserPublicID(ctx context.Context, userID int64) (uuid.UUID, error)
+}
+
+// V1AvatarProfileDirectory owns the persisted avatar projection, independent of session principals.
+type V1AvatarProfileDirectory interface {
+	GetUserAvatar(ctx context.Context, userID int64) (string, error)
+	UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error
+}
+
+func NewV1AvatarProfileDirectory(repo identityports.UserRepository) V1AvatarProfileDirectory {
+	return usersRepositoryDirectory{repo: repo}
 }
 
 // usersRepositoryDirectory adapts identityports.UserRepository to
@@ -165,6 +166,24 @@ func (d usersRepositoryDirectory) GetUserPublicID(ctx context.Context, userID in
 	return user.PublicID, nil
 }
 
+func (d usersRepositoryDirectory) GetUserAvatar(ctx context.Context, userID int64) (string, error) {
+	if d.repo == nil || userID <= 0 {
+		return "", tenancy.ErrNotFound
+	}
+	user, err := d.repo.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		return "", tenancy.ErrNotFound
+	}
+	return strings.TrimSpace(user.Avatar), nil
+}
+
+func (d usersRepositoryDirectory) UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error {
+	if d.repo == nil || userID <= 0 {
+		return tenancy.ErrNotFound
+	}
+	return d.repo.UpdateAvatarByID(ctx, userID, avatar)
+}
+
 func (d *ContractV1Deps) normalize() {
 	if d.Tasks != nil {
 		if d.TaskLifecycle == nil {
@@ -186,12 +205,6 @@ func (d *ContractV1Deps) normalize() {
 	}
 	if d.Webhooks == nil {
 		d.Webhooks = events.NewWebhookStore(events.NewHTTPSender(), nil)
-	}
-	if d.libraryMaterializer == nil {
-		d.libraryMaterializer = materializerassets.RemoteLibrarySourceFetcher{}
-	}
-	if d.libraryMaterializeSpawn == nil {
-		d.libraryMaterializeSpawn = func(fn func()) { go fn() }
 	}
 }
 
@@ -348,6 +361,7 @@ type v1UserDTO struct {
 	DisplayName         string  `json:"display_name"`
 	Role                string  `json:"role"`
 	PersonalWorkspaceID *string `json:"personal_workspace_id,omitempty"`
+	Avatar              string  `json:"avatar,omitempty"`
 }
 
 func (h *contractV1Handler) getUser(c *gin.Context) {
@@ -359,6 +373,15 @@ func (h *contractV1Handler) getUser(c *gin.Context) {
 		ID:          tenancy.FormatUserPublicID(identityPrincipal.PublicID()),
 		DisplayName: identityPrincipal.DisplayName(),
 		Role:        identityPrincipal.Role().String(),
+	}
+	if h.deps.AvatarProfile != nil {
+		avatar, err := h.deps.AvatarProfile.GetUserAvatar(c.Request.Context(), identityPrincipal.UserID())
+		if err != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
+			c.Abort()
+			return
+		}
+		dto.Avatar = strings.TrimSpace(avatar)
 	}
 	// Personal workspace auto-provision hook: idempotent and
 	// concurrent-safe; a provision failure never fails /user itself.

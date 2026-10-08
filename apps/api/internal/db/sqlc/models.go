@@ -198,6 +198,8 @@ type ControlIdempotencyRecord struct {
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
 	ExpiresAt           pgtype.Timestamptz `json:"expires_at"`
+	AttemptToken        string             `json:"attempt_token"`
+	SettlementUnknown   bool               `json:"settlement_unknown"`
 }
 
 type CreditAccount struct {

@@ -4,7 +4,7 @@ package events
 //
 // Scheduling: Dispatch enqueues one webhook_deliver job per
 // (subscription, envelope) delivery; River's native attempts drive the
-// 8-attempt budget (taskqueue.RiverMaxAttemptsWebhookDeliver) with a
+// 8-attempt budget (riverpolicy.RiverMaxAttemptsWebhookDeliver) with a
 // worker-level NextRetry that keeps the 30s-base doubling curve capped
 // at 1h and adds +/-10% jitter (the custom ring had no jitter, so
 // simultaneous failures retried in lockstep). The job args carry the
@@ -29,7 +29,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -67,8 +67,8 @@ type WebhookEnqueuer interface {
 // duplicate Dispatches of the same (subscription, delivery) pair.
 func WebhookDeliveryInsertOpts(args WebhookDeliveryArgs) *river.InsertOpts {
 	return &river.InsertOpts{
-		Queue:       taskqueue.RiverQueueWebhookDeliver,
-		MaxAttempts: taskqueue.RiverMaxAttemptsWebhookDeliver,
+		Queue:       riverpolicy.RiverQueueWebhookDeliver,
+		MaxAttempts: riverpolicy.RiverMaxAttemptsWebhookDeliver,
 		Tags:        []string{args.SubscriptionID},
 		UniqueOpts:  river.UniqueOpts{ByArgs: true},
 	}
@@ -88,7 +88,7 @@ func NewWebhookDeliverWorker(store *WebhookStore) *WebhookDeliverWorker {
 // Timeout pins the per-attempt budget: one signed POST under the 5s
 // send ceiling plus store bookkeeping.
 func (*WebhookDeliverWorker) Timeout(*river.Job[WebhookDeliveryArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutWebhookDeliver
+	return riverpolicy.RiverJobTimeoutWebhookDeliver
 }
 
 // NextRetry keeps the 30s-base doubling curve (1h cap) and adds jitter

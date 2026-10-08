@@ -1,33 +1,4 @@
-package queue
-
-// River retry matrix (issue #772). Retry/timeout policy is code-owned per
-// the backend context rules: these constants are the single source of truth
-// for per-queue MaxAttempts. Insert sites in the worker packages must
-// reference them instead of repeating literals, so a tuning change lands in
-// one place and the runbook table (docs/runbooks/backend-metrics.md) stays
-// accurate.
-//
-// Backoff between attempts is River's default exponential backoff with
-// jitter; the drawing queue additionally layers worker-level policy on top:
-// transient provider failures (429/5xx/timeout/network after gateway-internal
-// retries) requeue at most twice per task (tasks.retry_count bound) before
-// converging terminally. Deterministic failures never retry.
-const (
-	RiverMaxAttemptsCreditReconciliation        = 5
-	RiverMaxAttemptsPaymentReconciliation       = 8
-	RiverMaxAttemptsPaymentCheckoutShutdown     = 8
-	RiverMaxAttemptsTaskRetention               = 3
-	RiverMaxAttemptsVisionBilling               = 5
-	RiverMaxAttemptsMediaReclamation            = 10
-	RiverMaxAttemptsWebhookDeliver              = 8
-	RiverMaxAttemptsIdentityAdminReconciliation = 5
-	// RiverMaxAttemptsTaskSettlementSweep budgets the final-timeout
-	// convergence sweep. A poisoned sweep (a task whose ledger row is
-	// un-releasable, a database blip) must surface as a failed River job an
-	// operator can see instead of churning for 25 attempts: the sweep is
-	// idempotent, so the next scheduled run converges the same batch anyway.
-	RiverMaxAttemptsTaskSettlementSweep = 5
-)
+package riverpolicy
 
 // QueueRetryPolicy pins the retry budget of one River queue.
 type QueueRetryPolicy struct {
@@ -62,7 +33,7 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			Notes:       "never calls a provider; retries only durable terminal convergence",
 		},
 		{
-			Queue:       "credit_reconciliation",
+			Queue:       RiverQueueCreditReconciliation,
 			MaxAttempts: RiverMaxAttemptsCreditReconciliation,
 			Worker:      "CreditReconciliationWorker",
 			Notes:       "daily scheduled run; small budget so a stuck run pages instead of churning",
@@ -74,31 +45,31 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			Notes:       "settlement-only convergence of abandoned Credit Holds; per-task failures are isolated, so the job only fails on a sweep-level fault",
 		},
 		{
-			Queue:       "payment_reconciliation",
+			Queue:       RiverQueuePaymentReconciliation,
 			MaxAttempts: RiverMaxAttemptsPaymentReconciliation,
 			Worker:      "PaymentReconciliationWorker",
 			Notes:       "Stripe order reconciliation; transient Stripe/DB faults retry, poisoned jobs surface after 8",
 		},
 		{
-			Queue:       "payment_checkout_shutdown",
+			Queue:       RiverQueuePaymentCheckoutShutdown,
 			MaxAttempts: RiverMaxAttemptsPaymentCheckoutShutdown,
 			Worker:      "PaymentCheckoutShutdownWorker",
 			Notes:       "checkout session shutdown sweep; same budget as payment reconciliation",
 		},
 		{
-			Queue:       "task_retention",
+			Queue:       RiverQueueTaskRetention,
 			MaxAttempts: RiverMaxAttemptsTaskRetention,
 			Worker:      "TaskRetentionWorker (serial single-worker queue)",
 			Notes:       "purge runs are serial by design; failures must surface immediately, not retry into the next window",
 		},
 		{
-			Queue:       "vision_billing",
+			Queue:       RiverQueueVisionBilling,
 			MaxAttempts: RiverMaxAttemptsVisionBilling,
 			Worker:      "VisionBillingReconciliationWorker",
 			Notes:       "vision-search billing reconciliation against immutable snapshots",
 		},
 		{
-			Queue:       "media_reclamation",
+			Queue:       RiverQueueMediaReclamation,
 			MaxAttempts: RiverMaxAttemptsMediaReclamation,
 			Worker:      "ReclaimWorker / ScheduleWorker",
 			Notes:       "storage consistency scan; storage blips are transient so the budget exceeds other maintenance queues",
@@ -110,13 +81,13 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			Notes:       "one job per delivery preserves the 8-attempt budget; discarded rows are the durable DLQ fact",
 		},
 		{
-			Queue:       "identity_admin_reconciliation",
+			Queue:       RiverQueueIdentityAdminReconciliation,
 			MaxAttempts: RiverMaxAttemptsIdentityAdminReconciliation,
 			Worker:      "IdentityReconciliationExecuteWorker",
 			Notes:       "daily dry-run identity drift scan; bounded retries surface a poisoned run without indefinite churn",
 		},
 		{
-			Queue:       "identity_admin_reconciliation",
+			Queue:       RiverQueueIdentityAdminReconciliation,
 			MaxAttempts: RiverMaxAttemptsIdentityAdminReconciliation,
 			Worker:      "IdentityReconciliationScheduleWorker",
 			Notes:       "schedule and catch-up writes are idempotent and share the reconciliation queue budget",

@@ -1,4 +1,7 @@
-import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
+import {
+  buildControlMutationHeaders,
+  type ControlMutationOptions,
+} from '../shared/lib/controlMutation'
 import {
   applyControlStorageProfile,
   createControlStorageProfile,
@@ -9,7 +12,7 @@ import {
   testControlStorageProfile,
   updateControlStorageProfile,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import { newRequestId, requireContractData } from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 import { withControlCopy } from '../shared/lib/controlCopy'
 
@@ -62,18 +65,13 @@ export type SaveStorageProfileInput =
   | {
       id?: undefined
       payload: StorageProfilePayload
-      apply?: boolean | undefined
     }
   | {
       id: string
       payload: StorageProfilePayload
-      apply?: boolean | undefined
     }
 
-export type StorageProfileMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type StorageProfileMutationOptions = ControlMutationOptions
 
 export type StorageProfileCommandResult = {
   profile: StorageProfile
@@ -151,7 +149,6 @@ async function saveAdminStorageProfile(
   input: SaveStorageProfileInput,
   options: StorageProfileMutationOptions,
 ): Promise<StorageProfileCommandResult> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   const headers = buildControlMutationHeaders(options)
   const payload = { ...(input.payload as unknown as Record<string, unknown>) }
   let body: unknown
@@ -170,15 +167,6 @@ async function saveAdminStorageProfile(
     body,
     '保存存储配置失败',
   )
-  // The legacy `?apply=true` save-and-apply rides the query string, which
-  // the generated Control functions do not expose; apply explicitly with
-  // the same reason instead of inventing a second command API.
-  if (input.apply) {
-    return applyAdminStorageProfileRecord(saved.profile.id, {
-      operatorReason,
-      idempotencyKey: newRequestId(),
-    })
-  }
   return {
     message: saved.message,
     profile: normalizeGeneratedProfile(saved.profile),

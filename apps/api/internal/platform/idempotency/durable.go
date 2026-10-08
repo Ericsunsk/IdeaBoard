@@ -8,25 +8,14 @@
 // with the canonical request_hash pinning the request identity
 // (method + route template + target + raw body).
 //
-// The guard claims the in-progress row INSIDE its guard-owned
-// transaction before running the handler, so concurrent same-key
-// claimants block on the primary key until the winner commits or rolls
-// back: exactly one winner executes the business side effect, across
-// processes and across restarts. In-progress rows are therefore never
-// committed (a crash aborts them with the transaction, so there is no
-// orphan lease to reap and no expiry clock to race). Only 2xx outcomes
-// flip the row to completed, carrying the response for replay after a
-// restart or a commit-after-response-loss retry; business failures
-// delete the claim so the retry re-executes. Completed rows replay for
-// ReplayTTL and are then treated as misses (PurgeExpired reclaims them;
-// callers invoke it best-effort after a successful commit).
-//
-// Operator identity is the public subject only (usr_* or the stable
-// service subject); there is deliberately no users FK so
-// internal-worker operators share the same guarantee. Methods take
-// context.Context first and execute participant writes on the
-// caller-owned pgx.Tx: the claim, the business outcome, and the audit
-// row commit or roll back atomically.
+// Atomic mutations keep the claim, business writes, response and audit in
+// one caller-owned transaction. Detached mutations commit dispatch intent
+// before external I/O and settle in a second bounded transaction. Each claim
+// has a unique fencing token: previous owners cannot affect a later attempt.
+// Unknown external outcomes stay unavailable until resolved, without lease
+// re-execution. Completed responses replay for ReplayTTL; known failures
+// abandon their fenced attempt. The durable operator is a public subject,
+// without a users FK so internal-worker subjects use the same guarantee.
 package idempotency
 
 import (
@@ -36,6 +25,7 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,12 +35,13 @@ import (
 // (Operator, Operation, TargetType, TargetID, Key) plus the canonical
 // RequestHash compared on key reuse.
 type ControlClaim struct {
-	Operator    string
-	Operation   string
-	TargetType  string
-	TargetID    string
-	Key         string
-	RequestHash string
+	Operator     string
+	Operation    string
+	TargetType   string
+	TargetID     string
+	Key          string
+	RequestHash  string
+	AttemptToken string
 }
 
 // ControlResult is the stored 2xx response replayed on key reuse.
@@ -62,10 +53,12 @@ type ControlResult struct {
 
 // ControlRecord is the committed fact a losing claimant observes.
 type ControlRecord struct {
-	RequestHash string
-	Completed   bool
-	Expired     bool
-	Result      ControlResult
+	RequestHash       string
+	Completed         bool
+	Expired           bool
+	Result            ControlResult
+	AttemptToken      string
+	SettlementUnknown bool
 }
 
 // ControlStore is the PostgreSQL durable idempotency fact store for
@@ -89,13 +82,17 @@ func NewControlStore(db *pgxpool.Pool) *ControlStore {
 // the handler) or must follow Existing (replay on same hash, 409 on a
 // different hash).
 type ClaimResult struct {
-	Winner   bool
-	Existing *ControlRecord
+	Winner       bool
+	Existing     *ControlRecord
+	AttemptToken string
 }
 
 // errNotWired fails closed when the store has no pool: the guard
 // treats the failure as retryable instead of executing unfenced.
 var errNotWired = errors.New("idempotency: durable control store is not wired")
+
+// ErrControlAttemptLost means a stale caller no longer owns the durable attempt.
+var ErrControlAttemptLost = errors.New("idempotency: control attempt no longer owns the claim")
 
 func controlClaimParams(claim ControlClaim) dbsqlc.ClaimControlIdempotencyParams {
 	return dbsqlc.ClaimControlIdempotencyParams{
@@ -105,6 +102,7 @@ func controlClaimParams(claim ControlClaim) dbsqlc.ClaimControlIdempotencyParams
 		TargetID:         claim.TargetID,
 		IdempotencyKey:   claim.Key,
 		RequestHash:      claim.RequestHash,
+		AttemptToken:     claim.AttemptToken,
 	}
 }
 
@@ -115,6 +113,7 @@ func controlKeyParams(claim ControlClaim) dbsqlc.DeleteControlIdempotencyRecordP
 		TargetType:       claim.TargetType,
 		TargetID:         claim.TargetID,
 		IdempotencyKey:   claim.Key,
+		AttemptToken:     claim.AttemptToken,
 	}
 }
 
@@ -132,10 +131,11 @@ func (s *ControlStore) Claim(ctx context.Context, tx pgx.Tx, claim ControlClaim)
 	if tx == nil {
 		return ClaimResult{}, errors.New("idempotency: control claim requires the guard transaction")
 	}
+	claim.AttemptToken = uuid.NewString()
 	q := s.q.WithTx(tx)
 	_, err := q.ClaimControlIdempotency(ctx, controlClaimParams(claim))
 	if err == nil {
-		return ClaimResult{Winner: true}, nil
+		return ClaimResult{Winner: true, AttemptToken: claim.AttemptToken}, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return ClaimResult{}, err
@@ -152,9 +152,11 @@ func (s *ControlStore) Claim(ctx context.Context, tx pgx.Tx, claim ControlClaim)
 	if existing.Expired {
 		// Retention expiry reads as a miss: remove the stale fact and
 		// take the key over in the same transaction.
+		claim.AttemptToken = existing.AttemptToken
 		if err := q.DeleteControlIdempotencyRecord(ctx, controlKeyParams(claim)); err != nil {
 			return ClaimResult{}, err
 		}
+		claim.AttemptToken = uuid.NewString()
 		return s.reclaim(ctx, q, claim)
 	}
 	return ClaimResult{Existing: existing}, nil
@@ -167,7 +169,7 @@ func (s *ControlStore) Claim(ctx context.Context, tx pgx.Tx, claim ControlClaim)
 func (s *ControlStore) reclaim(ctx context.Context, q *dbsqlc.Queries, claim ControlClaim) (ClaimResult, error) {
 	_, err := q.ClaimControlIdempotency(ctx, controlClaimParams(claim))
 	if err == nil {
-		return ClaimResult{Winner: true}, nil
+		return ClaimResult{Winner: true, AttemptToken: claim.AttemptToken}, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return ClaimResult{}, err
@@ -196,17 +198,25 @@ func (s *ControlStore) Complete(ctx context.Context, tx pgx.Tx, claim ControlCla
 	if result.Status < 200 || result.Status >= 300 {
 		return errors.New("idempotency: only 2xx control responses are retained")
 	}
-	return s.q.WithTx(tx).CompleteControlIdempotency(ctx, dbsqlc.CompleteControlIdempotencyParams{
+	rows, err := s.q.WithTx(tx).CompleteControlIdempotency(ctx, dbsqlc.CompleteControlIdempotencyParams{
 		OperatorIdentity:    claim.Operator,
 		Operation:           claim.Operation,
 		TargetType:          claim.TargetType,
 		TargetID:            claim.TargetID,
 		IdempotencyKey:      claim.Key,
+		AttemptToken:        claim.AttemptToken,
 		ResponseStatus:      pgtype.Int4{Int32: int32(result.Status), Valid: true},
 		ResponseContentType: result.ContentType,
 		ResponseBody:        result.Body,
 		ExpiresAt:           pgtype.Timestamptz{Time: time.Now().UTC().Add(ReplayTTL), Valid: true},
 	})
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return ErrControlAttemptLost
+	}
+	return nil
 }
 
 // Abandon deletes the winner's in-progress claim inside the same
@@ -226,7 +236,35 @@ func (s *ControlStore) Abandon(ctx context.Context, tx pgx.Tx, claim ControlClai
 		TargetType:       claim.TargetType,
 		TargetID:         claim.TargetID,
 		IdempotencyKey:   claim.Key,
+		AttemptToken:     claim.AttemptToken,
 	})
+}
+
+// MarkUnknown records the dispatch intent before an external effect starts.
+// The uncertain attempt cannot be reclaimed by the stale lease; only its
+// fenced owner may Complete it or Abandon after a known failure.
+func (s *ControlStore) MarkUnknown(ctx context.Context, tx pgx.Tx, claim ControlClaim) error {
+	if s == nil || s.q == nil {
+		return errNotWired
+	}
+	if tx == nil {
+		return errors.New("idempotency: unknown settlement requires a transaction")
+	}
+	rows, err := s.q.WithTx(tx).MarkUnknownControlIdempotency(ctx, dbsqlc.MarkUnknownControlIdempotencyParams{
+		OperatorIdentity: claim.Operator,
+		Operation:        claim.Operation,
+		TargetType:       claim.TargetType,
+		TargetID:         claim.TargetID,
+		IdempotencyKey:   claim.Key,
+		AttemptToken:     claim.AttemptToken,
+	})
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return ErrControlAttemptLost
+	}
+	return nil
 }
 
 // PurgeExpired reclaims expired completed rows in autocommit (outside
@@ -240,6 +278,38 @@ func (s *ControlStore) PurgeExpired(ctx context.Context) (int64, error) {
 		ctx = context.Background()
 	}
 	return s.q.PurgeExpiredControlIdempotency(ctx)
+}
+
+// TryAbandonStale deletes a stale in-progress claim older than before
+// (detached winner-lease recovery). It reports true when one row was
+// removed, letting the caller reclaim the key in the same transaction.
+// Only the observed token with no dispatch intent can be removed.
+// Fresh in-progress rows (active winners) are never touched: a false
+// return means the caller must render retryable 503, not execute
+// unfenced. Completed rows are never matched. A nil tx fails closed.
+func (s *ControlStore) TryAbandonStale(ctx context.Context, tx pgx.Tx, claim ControlClaim, before time.Time) (bool, error) {
+	if s == nil || s.q == nil {
+		return false, errNotWired
+	}
+	if tx == nil {
+		return false, errors.New("idempotency: stale takeover requires a transaction")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	rows, err := s.q.WithTx(tx).TryAbandonStaleControlIdempotency(ctx, dbsqlc.TryAbandonStaleControlIdempotencyParams{
+		OperatorIdentity: claim.Operator,
+		Operation:        claim.Operation,
+		TargetType:       claim.TargetType,
+		TargetID:         claim.TargetID,
+		IdempotencyKey:   claim.Key,
+		AttemptToken:     claim.AttemptToken,
+		CreatedAt:        pgtype.Timestamptz{Time: before, Valid: true},
+	})
+	if err != nil {
+		return false, err
+	}
+	return rows == 1, nil
 }
 
 func (s *ControlStore) get(ctx context.Context, q *dbsqlc.Queries, claim ControlClaim) (*ControlRecord, error) {
@@ -257,8 +327,10 @@ func (s *ControlStore) get(ctx context.Context, q *dbsqlc.Queries, claim Control
 		return nil, err
 	}
 	record := &ControlRecord{
-		RequestHash: row.RequestHash,
-		Completed:   row.Completed,
+		RequestHash:       row.RequestHash,
+		Completed:         row.Completed,
+		AttemptToken:      row.AttemptToken,
+		SettlementUnknown: row.SettlementUnknown,
 	}
 	if row.Completed {
 		record.Expired = !row.ExpiresAt.Valid || !time.Now().UTC().Before(row.ExpiresAt.Time)

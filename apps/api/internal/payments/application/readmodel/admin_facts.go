@@ -1,8 +1,6 @@
 package readmodel
 
 import (
-	"ideaboard/api/internal/db/dbutil"
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 )
@@ -36,12 +34,12 @@ func paymentDisputeIDs(disputes []paymentsdomain.PaymentDispute) map[string]stru
 	return ids
 }
 
-func appendAdminPaymentOrderWebhookFacts(detail *AdminPaymentOrderDetailRecord, events []dbsqlc.ListAdminPaymentOrderWebhookEventsRow, refundIDs, disputeIDs map[string]struct{}) {
+func appendAdminPaymentOrderWebhookFacts(detail *AdminPaymentOrderDetailRecord, events []AdminPaymentWebhookEventRecord, refundIDs, disputeIDs map[string]struct{}) {
 	for _, event := range events {
-		receivedAt := dbutil.TimeValue(event.ReceivedAt)
+		receivedAt := event.ReceivedAt
 		updatedAt := &receivedAt
-		if event.ProcessedAt.Valid {
-			processedAt := event.ProcessedAt.Time
+		if event.ProcessedAt != nil {
+			processedAt := *event.ProcessedAt
 			updatedAt = &processedAt
 		}
 		switch event.EventType {

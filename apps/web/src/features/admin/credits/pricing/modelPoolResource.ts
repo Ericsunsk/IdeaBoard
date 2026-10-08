@@ -7,6 +7,7 @@ import { createAdminGatewayResource } from '../../models/infrastructure/adminGat
 import {
   buildControlMutationHeaders,
   requireOperatorReason,
+  type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 import {
@@ -38,10 +39,7 @@ const MODEL_POOL_CONTROL_MESSAGES = {
 // The add-from-catalog list reuses the existing Model catalog resource
 // (no second catalog): entries are matched by catalog id. The lister is
 // injectable so tests pass a fake without MSW.
-export type ModelPoolMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type ModelPoolMutationOptions = ControlMutationOptions
 
 export type ModelPoolReplaceInput = {
   version: number

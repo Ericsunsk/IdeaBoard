@@ -30,7 +30,7 @@ import (
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -527,7 +527,7 @@ func TestStalledSettlementThresholdCannotKillAHealthyTask(t *testing.T) {
 	if workspacetasks.StalledSettlementThreshold < 24*time.Hour {
 		t.Fatalf("threshold = %s, want at least 24h", workspacetasks.StalledSettlementThreshold)
 	}
-	if want := 24 * taskqueue.RiverJobTimeoutDrawing; workspacetasks.StalledSettlementThreshold < want {
+	if want := 24 * riverpolicy.RiverJobTimeoutDrawing; workspacetasks.StalledSettlementThreshold < want {
 		t.Fatalf("threshold = %s, want >= 24x the longest attempt (%s)", workspacetasks.StalledSettlementThreshold, want)
 	}
 	// Matches the Credits stale-hold window so the audit signal and the

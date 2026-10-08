@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/payments/application/credentials"
 	"ideaboard/api/internal/payments/domain"
@@ -57,7 +58,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.Cre
 	if err != nil {
 		return domain.PaymentRefund{}, err
 	}
-	s.publish(refund.UserID)
+	s.publish(ctx, refund.UserID)
 	if refund.StripeRefundID != "" {
 		return refund, nil
 	}
@@ -71,7 +72,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.Cre
 		if markErr != nil {
 			return domain.PaymentRefund{}, errors.Join(err, markErr)
 		}
-		s.publish(failed.UserID)
+		s.publish(ctx, failed.UserID)
 		return failed, err
 	}
 	if strings.TrimSpace(providerRefund.ID) == "" {
@@ -108,13 +109,13 @@ func (s *Service) Converge(ctx context.Context, refund domain.PaymentRefund, pro
 	case ports.StripeRefundSucceeded:
 		settled, settleErr := s.store.MarkPaymentRefundSucceeded(ctx, updated.ID, s.now().UTC())
 		if settleErr == nil && updated.Status == domain.PaymentRefundPending {
-			s.publish(settled.UserID)
+			s.publish(ctx, settled.UserID)
 		}
 		return settled, settleErr
 	case ports.StripeRefundFailed, ports.StripeRefundCanceled:
 		failed, failErr := s.store.MarkPaymentRefundFailed(ctx, updated.ID, "Stripe refund failed", s.now().UTC())
 		if failErr == nil && updated.Status == domain.PaymentRefundPending {
-			s.publish(failed.UserID)
+			s.publish(ctx, failed.UserID)
 		}
 		return failed, failErr
 	default:
@@ -142,10 +143,26 @@ func (s *Service) RefundAPIKeyForOrder(ctx context.Context, orderID string) (str
 	return apiKey, nil
 }
 
-func (s *Service) publish(userID int64) {
-	if s != nil && s.events != nil {
-		s.events.Publish(userID, ports.PaymentEvent{Status: ports.PaymentEventRefundUpdated})
+func (s *Service) publish(ctx context.Context, userID int64) {
+	if s == nil || s.events == nil {
+		return
 	}
+	event := ports.PaymentEvent{Status: ports.PaymentEventRefundUpdated}
+	// #889 post-commit announcements (task cancel parity): on the
+	// guard-owned transaction the flip has not committed yet (the
+	// reservation/settlement use their own transactions, but the guard
+	// audit + durable outcome still pend), so defer the hint to the
+	// post-commit hooks instead of publishing a fact the guard can
+	// still fail. An audit or commit failure drops the hook and
+	// announces nothing; the retry re-publishes on its own commit.
+	// Without a registry (owned settlement, River recovery, unwired
+	// callers) keep the synchronous publish.
+	if dbutil.DeferAmbientPostCommit(ctx, func(hookCtx context.Context) {
+		s.events.Publish(userID, event)
+	}) {
+		return
+	}
+	s.events.Publish(userID, event)
 }
 
 func (s *Service) refundAPIKey(ctx context.Context, orderNumber string) (string, error) {

@@ -34,7 +34,7 @@ import (
 	"log/slog"
 	"time"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/riverqueue/river"
@@ -85,12 +85,12 @@ func NewTaskSettlementSweepWorker(store TaskSettlementSweepStore, settler TaskSe
 // Timeout pins the sweep's River budget from the code-owned matrix (it must
 // never silently inherit the drawing budget, which is 4x larger).
 func (*TaskSettlementSweepWorker) Timeout(*river.Job[taskSettlementSweepArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutTaskSettlementSweep
+	return riverpolicy.RiverJobTimeoutTaskSettlementSweep
 }
 
 // MaxAttempts pins the sweep's retry budget from the code-owned matrix.
 func (*TaskSettlementSweepWorker) MaxAttempts(*river.Job[taskSettlementSweepArgs]) int {
-	return taskqueue.RiverMaxAttemptsTaskSettlementSweep
+	return riverpolicy.RiverMaxAttemptsTaskSettlementSweep
 }
 
 // Work runs one bounded sweep.
@@ -147,8 +147,8 @@ func (taskSettlementSweepSchedule) Next(current time.Time) time.Time {
 // matrix constants would only be pinned indirectly.
 func taskSettlementSweepInsert() (river.JobArgs, *river.InsertOpts) {
 	return taskSettlementSweepArgs{}, &river.InsertOpts{
-		Queue:       taskqueue.RiverQueueTaskSettlementSweep,
-		MaxAttempts: taskqueue.RiverMaxAttemptsTaskSettlementSweep,
+		Queue:       riverpolicy.RiverQueueTaskSettlementSweep,
+		MaxAttempts: riverpolicy.RiverMaxAttemptsTaskSettlementSweep,
 		Priority:    4,
 	}
 }

@@ -57,6 +57,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	libraryapplication "ideaboard/api/internal/library/application"
 	librarydomain "ideaboard/api/internal/library/domain"
 	libraryports "ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/platform/contract"
@@ -88,12 +89,18 @@ type V1BillingQuoter interface {
 }
 
 // ContractV1LibraryDeps wires the workspace library handlers. Zero values
-// fail closed; production supplies the store. The V1BillingQuoter/
+// fail closed; production supplies the store plus the read-through
+// orchestrator. The V1BillingQuoter/
 // V1CreditSettler interfaces below stay defined here because the search
 // surface still settles through them.
 type ContractV1LibraryDeps struct {
 	Store       libraryports.WorkspaceLibraryStore
 	Idempotency *contract.IdempotencyStore
+	// ReadThrough owns library materialization lifecycle + replay
+	// orchestration (issue #908). Nil keeps the Canvas import read
+	// path fail-closed (404 without spawning); composition injects
+	// the typed service built over the store/materializer/executor.
+	ReadThrough *libraryapplication.ReadThroughService
 }
 
 func (d *ContractV1LibraryDeps) normalize() {

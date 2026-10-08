@@ -5,9 +5,11 @@ import (
 	"testing"
 )
 
-// Taskqueue owns the River/capacity/lease adapter seam. It may depend on the
-// tasks domain and platform vocabulary, but never on sibling application
-// packages or the Runtime worker implementation.
+// Taskqueue owns the River/capacity/lease adapter seam (enqueue defaults and
+// runtime store). Retry/timeout policy lives in
+// internal/platform/riverpolicy; this package only consumes its defaults.
+// It may depend on the tasks domain and platform vocabulary, but never on
+// sibling application packages or the Runtime worker implementation.
 var forbiddenTaskqueueImports = []string{
 	"ideaboard/api/internal/runtime",
 	"ideaboard/api/internal/tasking/application/task",

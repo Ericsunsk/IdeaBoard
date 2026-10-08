@@ -2,13 +2,16 @@ import { type ExternalImageProvider } from '../../../shared/domain/externalImage
 import type { SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
 import { inject, provide, toValue, type InjectionKey, type MaybeRefOrGetter } from 'vue'
 import {
+  buildLibraryAssetRemovedOutcome,
+  buildLibraryAssetSavedOutcome,
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
-  libraryAssetKey,
   listAllWorkspaceLibraryFolders,
   removeWorkspaceSearchReference,
   requireWorkspaceId,
   saveWorkspaceSearchReference,
+  type WorkspaceLibraryAsset,
+  type WorkspaceLibraryFolder,
 } from '../../library'
 import type { LibrarySearchReference } from '../domain/authAction'
 
@@ -38,34 +41,48 @@ export function createSearchLibraryCoordinator(
     reference: LibrarySearchReference,
     folderID?: string,
     newFolderName?: string,
-  ) {
-    const asset = await saveWorkspaceSearchReference(
+  ): Promise<{ asset: WorkspaceLibraryAsset; createdFolder?: WorkspaceLibraryFolder | undefined }> {
+    // The committed save result owns the actual target: `affectedFolderKeys`
+    // must come from `result` (asset + created folder), never from the input
+    // `folderID`. `galleryEffect` stays a Search-surface policy.
+    const result = await saveWorkspaceSearchReference(
       resolveWorkspaceId(),
       reference,
       folderID,
       newFolderName,
     )
     await mutationPublisher.publishMutation({
-      kind: 'asset-saved',
-      provider: asset.provider,
-      sourceID: asset.sourceId,
-      assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-      affectedFolderKeys: ['all', ...(folderID ? [folderID] : [])],
-      galleryEffect: 'reload-current',
+      ...buildLibraryAssetSavedOutcome(result.asset, 'reload-current'),
+      affectedFolderKeys: result.affectedFolderKeys,
     })
-    return asset
+    return {
+      asset: result.asset,
+      ...(result.createdFolder == null ? {} : { createdFolder: result.createdFolder }),
+    }
   }
 
-  async function removeReference(provider: ExternalImageProvider, sourceID: string) {
-    await removeWorkspaceSearchReference(resolveWorkspaceId(), provider, sourceID)
-    await mutationPublisher.publishMutation({
-      kind: 'asset-removed',
-      provider,
-      sourceID,
-      assetKey: libraryAssetKey(provider, sourceID),
-      affectedFolderKeys: ['all'],
-      galleryEffect: 'reload-current',
-    })
+  async function removeReference(
+    provider: ExternalImageProvider,
+    sourceID: string,
+  ): Promise<{ asset: WorkspaceLibraryAsset | null }> {
+    // Removal resolves the owned asset first: the outcome carries the actual
+    // deleted folders. An unresolved reference deletes nothing and affects
+    // only the `all` aggregate.
+    const removed = await removeWorkspaceSearchReference(resolveWorkspaceId(), provider, sourceID)
+    if (removed) {
+      await mutationPublisher.publishMutation({
+        ...buildLibraryAssetRemovedOutcome(removed.asset, 'reload-current'),
+        affectedFolderKeys: removed.affectedFolderKeys,
+      })
+      return { asset: removed.asset }
+    }
+    await mutationPublisher.publishMutation(
+      buildLibraryAssetRemovedOutcome(
+        { provider, sourceId: sourceID, folderId: undefined },
+        'reload-current',
+      ),
+    )
+    return { asset: null }
   }
 
   async function saveReferences(references: LibrarySearchReference[]) {
@@ -77,12 +94,8 @@ export function createSearchLibraryCoordinator(
       result.status === 'fulfilled'
         ? [
             {
-              kind: 'asset-saved' as const,
-              provider: result.value.provider,
-              sourceID: result.value.sourceId,
-              assetKey: libraryAssetKey(result.value.provider, result.value.sourceId),
-              affectedFolderKeys: ['all'],
-              galleryEffect: 'reload-current' as const,
+              ...buildLibraryAssetSavedOutcome(result.value.asset, 'reload-current'),
+              affectedFolderKeys: result.value.affectedFolderKeys,
             },
           ]
         : [],

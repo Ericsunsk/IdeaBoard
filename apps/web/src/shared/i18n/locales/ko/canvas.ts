@@ -111,12 +111,12 @@ export default {
     renameSuccess: '캔버스 이름이 변경되었습니다.',
     duplicateNameWarning: '이미 존재하는 이름입니다.',
     renameFailedWarning: '이름 변경에 실패했습니다.',
-    conflictReloadedError: '이름 충돌로 캔버스 목록을 새로고침했습니다.',
+    conflictReloadedError: '동기화 충돌로 캔버스 목록을 새로고침했습니다.',
     syncFailedRestoredError: '이름 변경 동기화에 실패하여 원래 이름으로 복원했습니다.',
     conflictRestoredRefreshFailedError:
-      '이름 충돌로 원래 이름을 복원했지만 원격 목록 새로고침에 실패했습니다. 새로고침해 주세요.',
+      '동기화 충돌로 원래 이름을 복원했지만 원격 목록 새로고침에 실패했습니다. 새로고침해 주세요.',
     conflictRestoreFailedError:
-      '이름 충돌 및 복원에 실패했습니다. 캔버스 목록을 새로고침해 주세요.',
+      '동기화 충돌 및 복원에 실패했습니다. 캔버스 목록을 새로고침해 주세요.',
     syncFailedRestoreFailedError:
       '이름 변경 동기화에 실패했고 원래 이름을 복원할 수 없습니다. 캔버스 목록을 새로고침해 주세요.',
     catalogReloadedSuccess: '캔버스 목록을 새로고침했습니다.',
@@ -324,8 +324,8 @@ export default {
       '로컬에 저장되었습니다. 원격 동기화에 실패하여 네트워크가 복구되면 다시 시도합니다.',
     savedLocallyServerFailed:
       '로컬에 저장되었습니다. 원격 동기화에 실패했습니다(HTTP {code}). 다음 편집 시 다시 시도합니다.',
-    nameConflictSavedLocally:
-      '로컬에 저장되었지만 이미 존재하는 보드 이름입니다. 다른 이름을 선택해 주세요.',
+    syncConflictSavedLocally:
+      '로컬에 저장했습니다. 서버에 최신 버전이 있으니 목록을 새로고침한 뒤 다시 시도해 주세요.',
     boardDataInvalid:
       '캔버스 데이터 검증에 실패했습니다. 현재 캔버스는 유지되었습니다. 나중에 다시 시도해 주세요.',
     importSnapshotFailed: '캔버스 스냅샷을 불러오지 못했습니다. 나중에 다시 시도해 주세요.',

@@ -190,8 +190,8 @@ export function useSearchSession(options: SearchSessionOptions) {
 
   async function saveReferenceToQuickSaves(reference: LibrarySearchReference): Promise<boolean> {
     try {
-      await libraryCoordinator.saveReference(reference)
-      feed.markSavedKey(libraryAssetKey(reference.provider, reference.id))
+      const saved = await libraryCoordinator.saveReference(reference)
+      feed.markSavedKey(libraryAssetKey(saved.asset.provider, saved.asset.sourceId))
       toast.success(
         i18n.global.t('search.toasts.savedToQuickSaves', {
           title: reference.title || i18n.global.t('search.fallbackImageTitle'),
@@ -216,11 +216,9 @@ export function useSearchSession(options: SearchSessionOptions) {
     }
     const outcomes = await libraryCoordinator.saveReferences(items.map(toLibraryReference))
     let successCount = 0
-    for (const [index, outcome] of outcomes.entries()) {
+    for (const outcome of outcomes) {
       if (outcome.status !== 'fulfilled') continue
-      const item = items[index]
-      if (!item) continue
-      feed.markSavedKey(libraryAssetKey(item.provider, item.id))
+      feed.markSavedKey(libraryAssetKey(outcome.value.asset.provider, outcome.value.asset.sourceId))
       successCount += 1
     }
     const failureCount = outcomes.length - successCount

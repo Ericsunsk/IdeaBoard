@@ -71,6 +71,24 @@ type RechargeHistoryCursor struct {
 	OrderID    string `json:"order_id"`
 }
 
+// RechargeHistoryRecord is the application-owned history row projected by the
+// postgres adapter. It carries only the facts actually rendered by the
+// recharge history read model: the keyset position, the raw order status,
+// nullable paid facts, receipt reference, and settled refund aggregates.
+// Derived user-facing status (credited/cancelled/refunded overlay),
+// pagination (limit+1/cursor), and sorting stay in the application service.
+type RechargeHistoryRecord struct {
+	OrderID              uuid.UUID
+	OccurredAt           time.Time
+	IdeaQuantity         int64
+	Status               string
+	PaidTotalMinor       *int64
+	PaidCurrency         string
+	ReceiptURL           string
+	RefundedIdeaQuantity int64
+	RefundedAmountMinor  int64
+}
+
 func DecodeRechargeHistoryCursor(value string) (*RechargeHistoryCursor, error) {
 	// The legacy codec stays as the expand-phase seam: callers keep using
 	// this function while the transport integrity checks live in the shared

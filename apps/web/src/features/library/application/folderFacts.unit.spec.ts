@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createLibraryFolderFacts, createLibraryMutationPublisher } from './folderFacts'
+import {
+  buildLibraryAssetMovedOutcome,
+  buildLibraryAssetRemovedOutcome,
+  buildLibraryAssetSavedOutcome,
+  buildLibraryFolderOutcome,
+  createLibraryFolderFacts,
+  createLibraryMutationPublisher,
+  LIBRARY_ALL_FOLDER_KEY,
+  libraryAffectedFolderKeysForAsset,
+  uniqueLibraryFolderKeys,
+} from './folderFacts'
 import type { WorkspaceLibraryFolder } from '../domain/validators'
 
 const fetchFolders = vi.fn<() => Promise<WorkspaceLibraryFolder[]>>()
@@ -127,6 +137,92 @@ describe('Library Folder facts', () => {
 
     expect(outcomes).toEqual([
       { kind: 'folder-renamed', affectedFolderKeys: ['lfolder_folder0007'], galleryEffect: 'none' },
+    ])
+  })
+})
+
+describe('Library mutation-fact builders', () => {
+  it('derives saved/removed folders from the stored asset with the caller policy intact', () => {
+    expect(
+      buildLibraryAssetSavedOutcome(
+        { provider: 'unsplash', sourceId: 'u1', folderId: 'lfolder_folder0001' },
+        'reload-current',
+      ),
+    ).toEqual({
+      kind: 'asset-saved',
+      provider: 'unsplash',
+      sourceID: 'u1',
+      assetKey: 'unsplash:u1',
+      affectedFolderKeys: ['all', 'lfolder_folder0001'],
+      galleryEffect: 'reload-current',
+    })
+    expect(
+      buildLibraryAssetRemovedOutcome(
+        { provider: 'pexels', sourceId: 'p1', folderId: undefined },
+        'reload-current',
+      ),
+    ).toEqual({
+      kind: 'asset-removed',
+      provider: 'pexels',
+      sourceID: 'p1',
+      assetKey: 'pexels:p1',
+      affectedFolderKeys: ['all'],
+      galleryEffect: 'reload-current',
+    })
+    // `selection-will-reload` stays a distinct caller-driven policy.
+    expect(
+      buildLibraryAssetSavedOutcome(
+        { provider: 'unsplash', sourceId: 'u1', folderId: undefined },
+        'selection-will-reload',
+      ).galleryEffect,
+    ).toBe('selection-will-reload')
+  })
+
+  it('covers both Folder ends for a move without duplicates', () => {
+    expect(
+      buildLibraryAssetMovedOutcome(
+        {
+          previousFolderId: 'lfolder_folder0003',
+          asset: { provider: 'unsplash', sourceId: 'u1', folderId: 'lfolder_folder0007' },
+        },
+        'none',
+      ),
+    ).toEqual({
+      kind: 'asset-moved',
+      affectedFolderKeys: ['all', 'lfolder_folder0003', 'lfolder_folder0007'],
+      galleryEffect: 'none',
+    })
+    expect(
+      buildLibraryAssetMovedOutcome(
+        {
+          previousFolderId: 'lfolder_folder0007',
+          asset: { provider: 'unsplash', sourceId: 'u1', folderId: 'lfolder_folder0007' },
+        },
+        'none',
+      ).affectedFolderKeys,
+    ).toEqual(['all', 'lfolder_folder0007'])
+  })
+
+  it('builds Folder outcomes from the committed Folder id', () => {
+    expect(
+      buildLibraryFolderOutcome('folder-created', 'lfolder_folder0009', 'selection-will-reload'),
+    ).toEqual({
+      kind: 'folder-created',
+      affectedFolderKeys: ['lfolder_folder0009'],
+      galleryEffect: 'selection-will-reload',
+    })
+  })
+
+  it('always includes the virtual all aggregate for filed assets', () => {
+    expect(LIBRARY_ALL_FOLDER_KEY).toBe('all')
+    expect(libraryAffectedFolderKeysForAsset('lfolder_folder0001')).toEqual([
+      'all',
+      'lfolder_folder0001',
+    ])
+    expect(libraryAffectedFolderKeysForAsset(undefined)).toEqual(['all'])
+    expect(uniqueLibraryFolderKeys(['all', 'all', 'lfolder_folder0001', undefined])).toEqual([
+      'all',
+      'lfolder_folder0001',
     ])
   })
 })

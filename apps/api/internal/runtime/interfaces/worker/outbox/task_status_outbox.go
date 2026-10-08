@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 
 	"github.com/riverqueue/river"
 )
@@ -26,11 +26,11 @@ type Worker struct {
 func NewWorker(replayer *events.TaskStatusOutboxReplayer) *Worker { return &Worker{Replayer: replayer} }
 
 func (*Worker) Timeout(*river.Job[taskStatusOutboxArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutTaskSettlementSweep
+	return riverpolicy.RiverJobTimeoutTaskSettlementSweep
 }
 
 func (*Worker) MaxAttempts(*river.Job[taskStatusOutboxArgs]) int {
-	return taskqueue.RiverMaxAttemptsTaskSettlementSweep
+	return riverpolicy.RiverMaxAttemptsTaskSettlementSweep
 }
 
 func (w *Worker) Work(ctx context.Context, _ *river.Job[taskStatusOutboxArgs]) error {
@@ -45,7 +45,7 @@ type schedule struct{}
 func (schedule) Next(current time.Time) time.Time { return current.Add(taskStatusOutboxPeriod) }
 
 func insert() (river.JobArgs, *river.InsertOpts) {
-	return taskStatusOutboxArgs{}, &river.InsertOpts{Queue: taskqueue.RiverQueueTaskSettlementSweep, MaxAttempts: taskqueue.RiverMaxAttemptsTaskSettlementSweep, Priority: 4}
+	return taskStatusOutboxArgs{}, &river.InsertOpts{Queue: riverpolicy.RiverQueueTaskSettlementSweep, MaxAttempts: riverpolicy.RiverMaxAttemptsTaskSettlementSweep, Priority: 4}
 }
 
 func PeriodicJobs() []*river.PeriodicJob {

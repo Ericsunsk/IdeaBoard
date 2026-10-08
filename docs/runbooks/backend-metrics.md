@@ -20,7 +20,7 @@
 | `ideaboard_river_queue_lag_seconds` | Gauge | `queue` | 最老等待 job 的年龄（秒），15s 刷新 |
 | `outbound_requests_total` / `outbound_retries_total` | Counter | `target, outcome/reason` | 标准 outbound 客户端计数（网关走 `target=ai-gateway`，vision 走 `vision-search`） |
 
-实现位置：`internal/runtime/infrastructure/metrics`（RED Set + River 刷新器）、`internal/runtime/interfaces/http/metrics.go`（中间件）、`internal/tasking/infrastructure/queue.RiverQueue.QueueStats`（lag SQL 事实源，River 即 task queue 事实源）。
+实现位置：`internal/runtime/infrastructure/metrics`（RED Set + River 刷新器）、`internal/runtime/interfaces/http/metrics.go`（中间件）、`internal/tasking/infrastructure/queue.RiverQueue.QueueStats`（仅 enqueue/monitor 缝；policy 见 `platform/riverpolicy`）。
 
 ## 常用查询（PromQL）
 
@@ -93,7 +93,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 
 ## River 重试矩阵（[backend-hardening] 08）
 
-重试/超时 policy 由 Worker 代码持有（`internal/tasking/infrastructure/queue.RiverRetryMatrix` 为事实源，insert 点引用同包常量）。attempt 间隔为 River 默认指数 backoff + jitter；网关内部 sends 默认 3 次（hard 上限 5，backoff 500ms→5s，仅 408/429/5xx 重试），Cloudflare 侧 `MaxFailCount=5`，worker 层 transient 整任务重投最多 2 次（`tasks.retry_count` 为界）。
+重试/超时 policy 由 Worker 代码持有（`internal/platform/riverpolicy.RiverRetryMatrix` 为事实源，insert 点引用同包常量）。attempt 间隔为 River 默认指数 backoff + jitter；网关内部 sends 默认 3 次（hard 上限 5，backoff 500ms→5s，仅 408/429/5xx 重试），Cloudflare 侧 `MaxFailCount=5`，worker 层 transient 整任务重投最多 2 次（`tasks.retry_count` 为界）。
 
 | Queue | MaxAttempts | 排障含义 |
 |-------|-------------|----------|
@@ -110,7 +110,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 
 ## River 超时矩阵（#783）
 
-超时 policy 由 Worker 代码持有（`internal/tasking/infrastructure/queue.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：13 个生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
+超时 policy 由 Worker 代码持有（`internal/platform/riverpolicy.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：所有生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
 
 | Queue | Worker | Timeout | 排障含义 |
 |-------|--------|---------|----------|
@@ -126,6 +126,8 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `media_reclamation` | ScheduleWorker | 2min | scan（上限 100）+ 入队扇出；超时看 DB 慢查询 |
 | `webhook_deliver` | WebhookDeliverWorker | 1min | 单次签名 POST 投递；超时看目标端点可达性 |
 | `task_settlement_sweep` | TaskSettlementSweepWorker | 4min | 单次有界 sweep（发现上限 100 + 逐任务 settle 事务），无 provider 调用；低于 15min 调度周期，超时看 DB 慢查询与 settle 事务锁等待 |
+| `identity_admin_reconciliation` | IdentityReconciliationExecuteWorker | 4min | 有界 identity drift scan 与 finding 写入；超时看 Identity 对账与 DB 慢查询 |
+| `identity_admin_reconciliation` | IdentityReconciliationScheduleWorker | 1min | 单次幂等 schedule/catch-up 写入与事务内 enqueue；超时看 DB 故障 |
 
 ## 告警建议阈值（初始值，按线上观察调优）
 

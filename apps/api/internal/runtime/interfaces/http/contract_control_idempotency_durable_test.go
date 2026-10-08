@@ -249,8 +249,15 @@ func TestControlDurableTargetConflictBeforeSideEffect(t *testing.T) {
 	if got := h.identity.callCount("ban"); got != 1 {
 		t.Fatalf("ban calls = %d, want 1 (conflict runs no side effect)", got)
 	}
-	record, ok := h.audit.last()
-	if !ok || record.Outcome != ControlAuditFailed || record.Status != http.StatusConflict {
+	// The conflict never commits, so its trail lives only in the detached
+	// sink (failTx rolls the guard transaction back); the TxAudit stub
+	// still holds the first request's committed success record.
+	records := h.sink.Records()
+	if len(records) == 0 {
+		t.Fatalf("conflict audit missing from detached sink")
+	}
+	record := records[len(records)-1]
+	if record.Outcome != ControlAuditFailed || record.Status != http.StatusConflict {
 		t.Fatalf("conflict audit = %+v, want failed 409", record)
 	}
 }
@@ -330,6 +337,14 @@ func (s *failingDurableControlStore) Complete(_ context.Context, _ pgx.Tx, _ ide
 
 func (s *failingDurableControlStore) Abandon(_ context.Context, _ pgx.Tx, _ idempotency.ControlClaim) error {
 	return s.err
+}
+
+func (s *failingDurableControlStore) MarkUnknown(_ context.Context, _ pgx.Tx, _ idempotency.ControlClaim) error {
+	return s.err
+}
+
+func (s *failingDurableControlStore) TryAbandonStale(_ context.Context, _ pgx.Tx, _ idempotency.ControlClaim, _ time.Time) (bool, error) {
+	return false, s.err
 }
 
 func (s *failingDurableControlStore) PurgeExpired(_ context.Context) (int64, error) {

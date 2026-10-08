@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
@@ -20,7 +21,7 @@ func (r *Repository) ListPaymentRechargeHistory(
 	cutoff time.Time,
 	cursor *paymentreadmodel.RechargeHistoryCursor,
 	limit int,
-) ([]dbsqlc.ListPaymentRechargeHistoryRow, error) {
+) ([]paymentreadmodel.RechargeHistoryRecord, error) {
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("payments repository: database unavailable")
 	}
@@ -42,5 +43,23 @@ func (r *Repository) ListPaymentRechargeHistory(
 	if err != nil {
 		return nil, fmt.Errorf("list payment recharge history: %w", err)
 	}
-	return rows, nil
+	records := make([]paymentreadmodel.RechargeHistoryRecord, 0, len(rows))
+	for _, row := range rows {
+		records = append(records, decodeRechargeHistoryRecord(row))
+	}
+	return records, nil
+}
+
+func decodeRechargeHistoryRecord(row dbsqlc.ListPaymentRechargeHistoryRow) paymentreadmodel.RechargeHistoryRecord {
+	return paymentreadmodel.RechargeHistoryRecord{
+		OrderID:              uuid.UUID(row.ID.Bytes),
+		OccurredAt:           dbutil.TimeValue(row.OccurredAt),
+		IdeaQuantity:         row.IdeaQuantity,
+		Status:               row.Status,
+		PaidTotalMinor:       NullInt64Pointer(row.PaidTotalMinor),
+		PaidCurrency:         strings.ToLower(row.PaidCurrency),
+		ReceiptURL:           row.ReceiptUrl,
+		RefundedIdeaQuantity: row.RefundedIdeaQuantity,
+		RefundedAmountMinor:  row.RefundedAmountMinor,
+	}
 }

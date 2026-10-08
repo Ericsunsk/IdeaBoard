@@ -39,6 +39,7 @@ CREATE TABLE library_materializations (
   media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
   error_message TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_library_materializations_public_id UNIQUE (public_id),
   CONSTRAINT chk_library_materializations_public_id CHECK (public_id LIKE 'lmat\_%'),

@@ -32,7 +32,10 @@ function stableLocalUserNumber(publicID?: string) {
 function getUserIdentity() {
   return {
     userId: stableLocalUserNumber(userStore.user?.public_id),
-    userUid: `${userStore.user?.storage_namespace ?? ''}`.trim(),
+    // Collab identity has no authoritative per-user UID source (the server
+    // never projected storage_namespace); keep empty rather than inventing
+    // one. Restoring a real UID is a product decision, not a default.
+    userUid: '',
   }
 }
 </script>

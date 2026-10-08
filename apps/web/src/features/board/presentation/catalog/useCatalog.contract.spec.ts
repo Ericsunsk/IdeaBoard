@@ -33,10 +33,10 @@ describe('Boards Catalog public interface', () => {
       })
       .mockResolvedValueOnce({
         ok: false as const,
-        reason: 'remote-name-conflict' as const,
+        reason: 'revision-conflict' as const,
         boardId: 'board-1',
         previousBoard: makeBoard('board-1', 'Renamed', 40),
-        error: new Error('conflict'),
+        error: { status: 409, code: 'board_revision_conflict' },
         rollback: { ok: true as const, board: makeBoard('board-1', 'Renamed', 40) },
         hydrate: { ok: false as const, error: new Error('recovery failed') },
       })

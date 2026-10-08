@@ -19,7 +19,7 @@ import (
 	"sync"
 	"testing"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -282,7 +282,7 @@ func TestSettlementFailureAfterBilledSendDoesNotReenterProvider(t *testing.T) {
 
 	// River redelivers the same job up to its budget: the task is terminal,
 	// so nothing reaches the provider again.
-	for i := 0; i < taskqueue.RiverMaxAttemptsDefault; i++ {
+	for i := 0; i < riverpolicy.RiverMaxAttemptsDefault; i++ {
 		if err := worker.Work(ctx, workerJobFor(created)); err != nil {
 			t.Fatalf("redelivery %d returned %v, want nil", i, err)
 		}

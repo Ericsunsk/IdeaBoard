@@ -3,7 +3,7 @@ package river
 import (
 	"testing"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 )
 
 // TestRiverClientFallbackPinsTimeoutMatrix proves the client-level
@@ -11,7 +11,7 @@ import (
 // and settlement-only final-failure workers are deleted (#783 pins live on
 // the timeout matrix itself).
 func TestRiverClientFallbackPinsTimeoutMatrix(t *testing.T) {
-	if got := defaultRiverJobTimeout; got != taskqueue.RiverJobTimeoutDrawing {
-		t.Fatalf("client fallback timeout = %s, want matrix drawing %s", got, taskqueue.RiverJobTimeoutDrawing)
+	if got := defaultRiverJobTimeout; got != riverpolicy.RiverJobTimeoutDrawing {
+		t.Fatalf("client fallback timeout = %s, want matrix drawing %s", got, riverpolicy.RiverJobTimeoutDrawing)
 	}
 }

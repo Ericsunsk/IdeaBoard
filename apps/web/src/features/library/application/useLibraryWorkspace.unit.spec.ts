@@ -274,4 +274,43 @@ describe('useLibraryWorkspace', () => {
       },
     ])
   })
+
+  it('publishes both Folder ends for a move from the committed asset', async () => {
+    const source = folder('lfolder_folder0003', 'Source')
+    const destination = folder('lfolder_folder0007', 'Destination')
+    const facts = createLibraryFolderFacts(vi.fn(async () => [source, destination]))
+    const outcomes: unknown[] = []
+    const publisher = {
+      publishMutation: vi.fn(async (outcome: unknown) => {
+        outcomes.push(outcome)
+      }),
+      publishMutations: vi.fn(async () => {}),
+      subscribe: vi.fn(() => () => {}),
+    }
+    mocks.listAssets.mockResolvedValue({ items: [], nextCursor: '', hasMore: false })
+    const workspace = useLibraryWorkspace({
+      workspaceId: WORKSPACE_ID,
+      autoLoad: false,
+      syncRoute: false,
+      folderFacts: facts,
+      mutationPublisher: publisher,
+    })
+    await workspace.loadFolders()
+    workspace.assets.value = [asset({ id: 'lasset_asset0009', folderId: source.id })]
+    const moved = asset({ id: 'lasset_asset0009', folderId: destination.id })
+    mocks.moveAsset.mockResolvedValue(moved)
+
+    const ok = await workspace.moveSelectedAsset('lasset_asset0009', destination.id)
+
+    expect(ok).toBe(true)
+    // Both ends come from the pre-move fact and the committed move result.
+    expect(outcomes).toEqual([
+      {
+        kind: 'asset-moved',
+        affectedFolderKeys: ['all', source.id, destination.id],
+        galleryEffect: 'none',
+      },
+    ])
+    expect(workspace.assets.value).toEqual([moved])
+  })
 })

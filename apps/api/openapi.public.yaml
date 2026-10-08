@@ -86,6 +86,15 @@ paths:
                 $ref: '#/components/schemas/UserEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Profile projection unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /user/avatar:
     put:
       tags: [User]
@@ -3525,6 +3534,9 @@ components:
           enum: [user, admin]
         personal_workspace_id:
           $ref: '#/components/schemas/WorkspaceId'
+        avatar:
+          type: string
+          description: Persisted profile avatar URL; omitted when no avatar is set.
     Workspace:
       type: object
       required: [id, name, created_at]

@@ -68,6 +68,7 @@ export default {
     noMatchingFolders: 'No hay carpetas coincidentes',
     quickSaves: 'Guardados rápidos',
     savedToast: '¡Guardado en "{name}" en su Biblioteca personal!',
+    savedToLibraryToast: '¡Guardado en su Biblioteca personal!',
     removedToast: 'Eliminado de su Biblioteca',
     loadFoldersFailed: 'No se pudieron cargar las carpetas de la Biblioteca. Inténtelo de nuevo.',
   },

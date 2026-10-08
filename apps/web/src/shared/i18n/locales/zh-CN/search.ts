@@ -66,6 +66,7 @@ export default {
     noMatchingFolders: '无匹配文件夹',
     quickSaves: '快速收藏',
     savedToast: '已保存至个人素材库的 "{name}"！',
+    savedToLibraryToast: '已保存至个人素材库！',
     removedToast: '已从素材库移除',
     loadFoldersFailed: '无法加载素材库文件夹，请重试。',
   },

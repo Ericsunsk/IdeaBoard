@@ -22,4 +22,6 @@ export interface User {
   display_name?: string
   role?: UserRole
   personal_workspace_id?: WorkspaceId
+  /** Persisted profile avatar URL; omitted when no avatar is set. */
+  avatar?: string
 }

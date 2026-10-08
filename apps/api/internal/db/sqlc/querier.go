@@ -32,14 +32,10 @@ type Querier interface {
 	// no cancel_reason column, so the reason is recorded in the
 	// workflow_input envelope for read-back parity.
 	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
-	// Control Plane durable idempotency facts (#891). The guard claims the
-	// in-progress row INSIDE its guard-owned transaction before running the
-	// handler: concurrent same-key claimants block on the primary key until
-	// the winner commits or rolls back, so exactly one winner executes the
-	// business side effect. In-progress rows are therefore never committed
-	// (a crash aborts them with the transaction); only 2xx outcomes flip
-	// the row to completed with the response for replay. Business failures
-	// delete the claim so the retry re-executes.
+	// Control idempotency authority. A unique attempt_token fences all writes.
+	// Atomic mutations commit completion with business writes; detached mutations
+	// commit settlement_unknown before external I/O, excluding lease takeover.
+	// Only completed responses expire; unknown outcomes never automatically retry.
 	ClaimControlIdempotency(ctx context.Context, arg ClaimControlIdempotencyParams) (ClaimControlIdempotencyRow, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
 	ClaimPaymentWebhookEvent(ctx context.Context, stripeEventID string) (int64, error)
@@ -92,7 +88,7 @@ type Querier interface {
 	// GetWorkspaceTaskByPublicID path.
 	ClaimWorkspaceTaskWithAttempt(ctx context.Context, arg ClaimWorkspaceTaskWithAttemptParams) (ClaimWorkspaceTaskWithAttemptRow, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
-	CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) error
+	CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) (int64, error)
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
 	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
@@ -520,6 +516,7 @@ type Querier interface {
 	MarkPaymentOrderFailed(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	MarkPaymentWebhookEventProcessed(ctx context.Context, arg MarkPaymentWebhookEventProcessedParams) (int64, error)
 	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
+	MarkUnknownControlIdempotency(ctx context.Context, arg MarkUnknownControlIdempotencyParams) (int64, error)
 	// MarkUploadSessionTransferring signals transfer start (first read
 	// after create). Zero rows means already moved or invisible; the
 	// caller distinguishes via GetUploadSessionByPublicID.
@@ -549,6 +546,7 @@ type Querier interface {
 	SumWorkspaceTaskBillingQuantity(ctx context.Context) (int64, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
 	TouchWorkspaceBoard(ctx context.Context, internalID int64) error
+	TryAbandonStaleControlIdempotency(ctx context.Context, arg TryAbandonStaleControlIdempotencyParams) (int64, error)
 	UpdateBoardDocument(ctx context.Context, arg UpdateBoardDocumentParams) (int64, error)
 	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 	// (read-modify-write merge: unknown keys from other writers survive).

@@ -290,6 +290,19 @@ type controlRoute struct {
 	// Mutation marks high-risk writes: reason + header Idempotency-Key
 	// are required and the outcome is success/failed.
 	Mutation bool
+	// Detached keeps a Mutation on the detached guard path (reason +
+	// header Idempotency-Key + L1 fast-path + durable winner election
+	// through short independent transactions + observer audit) instead
+	// of the atomic guard transaction. Set it for external side effects
+	// that cannot join a database transaction by construction (Auth mail
+	// calls, Stripe prepare/publish): the audit row stays an observer so
+	// an audit failure cannot imply the external send was revoked, and
+	// no long database transaction ever wraps the external call. The
+	// durable claim commits before the external call and completes (2xx)
+	// or abandons (known failure) after it, so retries replay
+	// cross-process without re-sending. Failed settlement keeps uncertainty
+	// instead of repeating an external effect.
+	Detached bool
 	// Target extracts the audit target (public ids only) from the
 	// request and buffered body. Nil means no target.
 	Target func(c *gin.Context, body []byte) (targetType, targetID string)

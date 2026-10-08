@@ -39,10 +39,7 @@ async function renderHost(
       makeSessionUser({
         public_id: '00000000-0000-0000-0000-000000000001',
         display_name: 'mock-user',
-        storage_namespace: 'USM001',
         avatar: '',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-02T00:00:00Z',
       }),
     )
   let overlay: AccountOverlay | undefined
@@ -149,10 +146,7 @@ describe('AccountDialogHost', () => {
       makeSessionUser({
         public_id: '00000000-0000-0000-0000-000000000001',
         display_name: 'mock-user',
-        storage_namespace: 'USM001',
         avatar: '',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-02T00:00:00Z',
       }),
     )
 

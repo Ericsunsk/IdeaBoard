@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"ideaboard/api/internal/platform/riverpolicy"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/riverqueue/river"
@@ -59,7 +61,7 @@ func TestQueueStatsForRejectsEmptyQueueName(t *testing.T) {
 		t.Skipf("lazy pool unavailable: %v", err)
 	}
 	defer db.Close()
-	queue := NewRiverQueueWithClient(&fakeRiverClient{}, db, RiverQueueDefault, RiverMaxAttemptsDefault)
+	queue := NewRiverQueueWithClient(&fakeRiverClient{}, db, riverpolicy.RiverQueueDefault, riverpolicy.RiverMaxAttemptsDefault)
 	if _, _, err := queue.QueueStatsFor(context.Background(), "   "); err == nil {
 		t.Fatal("QueueStatsFor with empty queue succeeded, want error")
 	}
@@ -67,7 +69,7 @@ func TestQueueStatsForRejectsEmptyQueueName(t *testing.T) {
 
 func TestQueueStatsForNilMonitorStaysSilent(t *testing.T) {
 	var queue *RiverQueue
-	depth, lag, err := queue.QueueStatsFor(context.Background(), RiverQueueDefault)
+	depth, lag, err := queue.QueueStatsFor(context.Background(), riverpolicy.RiverQueueDefault)
 	if err != nil || depth != 0 || lag != 0 {
 		t.Fatalf("nil QueueStatsFor = (%d, %v, %v), want zeros", depth, lag, err)
 	}

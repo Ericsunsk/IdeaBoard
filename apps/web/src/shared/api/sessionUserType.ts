@@ -1,21 +1,14 @@
-// Session user view type (issue #809).
+// Session view: /user provides principal fields and the persisted avatar URL.
+// Wire `id` maps to `public_id`; optional workspace ID comes from provisioning.
+// Email is hydrated separately from Better Auth by the session store.
+// Browser snapshots cache these projections and never override a fresh server read.
 //
-// This type lives in its own leaf module (zero imports) on purpose: the
-// dependency-cruiser `no-circular` rule counts even type-only edges, and
-// `shared/api/userSession` (runtime: generated `getUser` transport) sits
-// downstream of `shared/api/client`. Importing this type from `userSession`
-// would close a client → utils/auth → userSession → orvalMutator → client
-// cycle. Feature code keeps importing this `User` view type (never generated
-// code directly).
+// Keep this type in a leaf module: importing it from the runtime userSession
+// transport would close the client → utils/auth → transport import cycle.
 export type User = {
   public_id: string
   display_name?: string
   avatar?: string
   role?: string | null
-  email?: string
   personal_workspace_id?: string
-  storage_namespace?: string
-  status?: number
-  created_at?: string
-  updated_at?: string
 }

@@ -9,12 +9,7 @@ import {
   type AccountOverlay,
   type CreditWalletState,
 } from '../../account'
-import {
-  authTransport,
-  createAuthOverlay,
-  provideAuthOverlay,
-  type AuthOverlay,
-} from '../../auth'
+import { authTransport, createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth'
 import { useWorkspaceAccountControls } from './useWorkspaceAccountControls'
 import { makeSessionUser } from '../../../test/factories'
 
@@ -96,18 +91,17 @@ describe('useWorkspaceAccountControls', () => {
     currentUser.value = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
       avatar: 'https://example.test/avatar.png',
-      email: 'demo@example.test',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     sessionEmail.value = null
     vi.mocked(authTransport.getSessionUser).mockReset().mockResolvedValue(null)
     walletState.value = { status: 'ready', availableCredits: 1280 }
   })
 
-  it('exposes typed balance, avatar and regular-user controls without a credits menu item', () => {
+  it('exposes typed balance, avatar and session email without a credits menu item', () => {
+    // Menu email comes from the Better Auth session store (issue #913),
+    // never from the business principal projection.
+    sessionEmail.value = 'demo@example.test'
     const { controls } = renderAccountControls({
       navigation: { navigate: vi.fn(), logout: vi.fn() },
     })
@@ -131,9 +125,6 @@ describe('useWorkspaceAccountControls', () => {
     currentUser.value = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     sessionEmail.value = 'session@example.test'
     const { controls } = renderAccountControls({
@@ -147,9 +138,6 @@ describe('useWorkspaceAccountControls', () => {
     currentUser.value = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     vi.mocked(authTransport.getSessionUser).mockResolvedValue({ email: 'alice@example.test' })
     const { controls } = renderAccountControls({
@@ -233,11 +221,8 @@ describe('useWorkspaceAccountControls', () => {
     currentUser.value = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
       avatar: 'https://example.test/avatar.png',
       role: 'admin',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     const navigate = vi.fn()
     const logout = vi.fn()

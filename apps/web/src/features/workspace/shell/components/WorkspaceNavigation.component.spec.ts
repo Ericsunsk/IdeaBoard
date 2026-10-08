@@ -61,10 +61,7 @@ describe('WorkspaceNavigation', () => {
     session.user = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
       avatar: 'https://example.test/avatar.png',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     session.ensureSession.mockResolvedValue(null)
     const { overlay, router, view } = await renderNavigation()
@@ -81,10 +78,7 @@ describe('WorkspaceNavigation', () => {
     session.user = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
       avatar: 'https://example.test/avatar.png',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     session.ensureSession.mockRejectedValue(new Error('session unavailable'))
     const { overlay, router, view } = await renderNavigation()
@@ -100,10 +94,7 @@ describe('WorkspaceNavigation', () => {
     const user = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',
       display_name: 'demo-user',
-      storage_namespace: 'USR001',
       avatar: 'https://example.test/avatar.png',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
     })
     session.user = user
     session.ensureSession.mockResolvedValue(user)

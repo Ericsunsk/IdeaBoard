@@ -66,6 +66,7 @@ export default {
     noMatchingFolders: 'No matching folders',
     quickSaves: 'Quick Saves',
     savedToast: 'Saved to "{name}" in your Personal Library!',
+    savedToLibraryToast: 'Saved to your Personal Library!',
     removedToast: 'Removed from your Library',
     loadFoldersFailed: 'Unable to load Library folders. Please try again.',
   },

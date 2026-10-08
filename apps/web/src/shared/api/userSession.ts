@@ -2,14 +2,8 @@ import { getUser } from './generated-query/public/user/user'
 import { i18n } from '../i18n'
 import type { User } from './sessionUserType'
 
-// Session principal owned by the shared API boundary (issue #809).
-//
-// The legacy `generated-query/user` + `apiResponse` transport is gone; the
-// Public Data Plane serves the principal at `GET /api/v1/user` (`UserEnvelope`).
-// The `User` view type lives in `./sessionUserType` (import it from there, never
-// from here: this module's runtime transport sits downstream of the shared
-// API client and a type edge back would close an import cycle); unknown
-// envelope fields fail closed to `undefined`.
+// /user projects principal fields and the persisted avatar URL.
+// Better Auth owns email; storage and operational fields stay outside this view.
 
 function asTrimmedString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
@@ -20,7 +14,10 @@ function asTrimmedString(value: unknown): string | undefined {
 export function toSessionUser(raw: unknown): User | null {
   if (!raw || typeof raw !== 'object') return null
   const record = raw as Record<string, unknown>
-  const publicId = asTrimmedString(record.public_id ?? record.id)
+  // Wire-boundary conversion: the canonical `User` schema keys the public
+  // identifier as `id`. A `public_id` key never arrives on this surface
+  // (no caller sends it), so only `id` is read — no legacy fallback.
+  const publicId = asTrimmedString(record.id)
   if (!publicId) return null
   const user: User = { public_id: publicId }
   const displayName = asTrimmedString(record.display_name)
@@ -29,17 +26,8 @@ export function toSessionUser(raw: unknown): User | null {
   if (avatar !== undefined) user.avatar = avatar
   const role = asTrimmedString(record.role)
   if (role !== undefined) user.role = role
-  const email = asTrimmedString(record.email)
-  if (email !== undefined) user.email = email
   const personalWorkspaceId = asTrimmedString(record.personal_workspace_id)
   if (personalWorkspaceId !== undefined) user.personal_workspace_id = personalWorkspaceId
-  const storageNamespace = asTrimmedString(record.storage_namespace)
-  if (storageNamespace !== undefined) user.storage_namespace = storageNamespace
-  if (typeof record.status === 'number') user.status = record.status
-  const createdAt = asTrimmedString(record.created_at)
-  if (createdAt !== undefined) user.created_at = createdAt
-  const updatedAt = asTrimmedString(record.updated_at)
-  if (updatedAt !== undefined) user.updated_at = updatedAt
   return user
 }
 

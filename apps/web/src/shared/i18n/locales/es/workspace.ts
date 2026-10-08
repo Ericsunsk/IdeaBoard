@@ -12,20 +12,21 @@ export default {
     deleting: 'Eliminando…',
   },
   feedback: {
-    createNameConflict: 'Ya existe un lienzo con este nombre. Inténtelo de nuevo.',
+    createSyncConflict: 'Se produjo un conflicto de sincronización. Inténtelo de nuevo.',
     createSyncFailed: 'No se pudo crear el lienzo. Inténtelo de nuevo más tarde.',
     nameAlreadyExists: 'El nombre ya existe',
     nameEmpty: 'El nombre del lienzo no puede estar vacío',
-    renameConflictReloaded: 'Conflicto de nombre. Se ha recargado la lista de lienzos.',
+    renameSyncConflictReloaded: 'Conflicto de sincronización. Se ha recargado la lista de lienzos.',
     renameSyncFailedRolledBack:
       'Error al sincronizar el cambio de nombre. Se restauró el nombre original.',
-    renameConflictRecoveryIncomplete:
-      'Conflicto de nombre y recuperación incompleta. Recargue la lista de lienzos.',
+    renameSyncConflictRecoveryIncomplete:
+      'Conflicto de sincronización y recuperación incompleta. Recargue la lista de lienzos.',
     renameSyncFailedNoRollback:
       'Error al sincronizar el cambio de nombre y no se pudo restaurar. Recargue la lista de lienzos.',
     renamed: 'Lienzo renombrado',
     copyFailed: 'Error al copiar',
-    duplicateNameConflict: 'Ya existe un lienzo con el nombre copiado. Inténtelo de nuevo.',
+    duplicateSyncConflict:
+      'Se produjo un conflicto de sincronización al copiar. Inténtelo de nuevo.',
     duplicateSyncFailed: 'Error al sincronizar la copia. Inténtelo de nuevo más tarde.',
     duplicated: 'Lienzo copiado',
     deleteSyncFailed: 'Error al eliminar. Inténtelo de nuevo más tarde.',

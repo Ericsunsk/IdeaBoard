@@ -37,24 +37,22 @@ describe('useStorageProfileEditor', () => {
     const providers = ref([makeS3Provider()])
     const providerMap = computed(() => toProviderMetaMap(providers.value))
     const storages = ref<StorageCard[]>([])
-    const saveProfile = vi.fn(
-      async (input: { payload: StorageProfilePayload; apply?: boolean | undefined }) => ({
-        message: 'saved',
-        profile: {
-          id: 'profile-1',
-          name: input.payload.name,
-          provider: input.payload.provider,
-          enabled: input.payload.enabled,
-          is_current: Boolean(input.apply),
-          builtin: false,
-          secret_configured: true,
-          config: {
-            ...input.payload.config,
-            secret_access_key: 'server-secret',
-          },
+    const saveProfile = vi.fn(async (input: { payload: StorageProfilePayload }) => ({
+      message: 'saved',
+      profile: {
+        id: 'profile-1',
+        name: input.payload.name,
+        provider: input.payload.provider,
+        enabled: input.payload.enabled,
+        is_current: false,
+        builtin: false,
+        secret_configured: true,
+        config: {
+          ...input.payload.config,
+          secret_access_key: 'server-secret',
         },
-      }),
-    )
+      },
+    }))
 
     const editor = useStorageProfileEditor({
       creatableProviders: computed(() =>
@@ -63,9 +61,6 @@ describe('useStorageProfileEditor', () => {
       providerMap,
       storages,
       saveProfile,
-      applyProfile: vi.fn(),
-      testProfile: vi.fn(),
-      deleteProfile: vi.fn(),
       fetchBucketDomains: vi.fn(),
     })
 
@@ -74,7 +69,7 @@ describe('useStorageProfileEditor', () => {
     editor.updateConfigValue('bucket_name', 'images')
     editor.updateConfigValue('access_key_id', 'key')
     editor.updateConfigValue('secret_access_key', 'secret')
-    await editor.saveAndApply()
+    await editor.saveDraft()
 
     expect(saveProfile).toHaveBeenCalledWith({
       id: undefined,
@@ -88,10 +83,30 @@ describe('useStorageProfileEditor', () => {
           secret_access_key: 'secret',
         }),
       }),
-      apply: true,
     })
     expect(editor.form.value.secretConfigured).toBe(true)
     expect(editor.form.value.config.secret_access_key).toBe('')
+  })
+
+  it('exposes no workspace-owned operation commands or pending refs', () => {
+    const providers = ref([makeS3Provider()])
+    const providerMap = computed(() => toProviderMetaMap(providers.value))
+
+    const editor = useStorageProfileEditor({
+      creatableProviders: computed(() => providers.value),
+      providerMap,
+      storages: ref<StorageCard[]>([]),
+      saveProfile: vi.fn(),
+      fetchBucketDomains: vi.fn(),
+    })
+
+    expect(editor).not.toHaveProperty('saveAndApply')
+    expect(editor).not.toHaveProperty('applyStorage')
+    expect(editor).not.toHaveProperty('handleTest')
+    expect(editor).not.toHaveProperty('removeProfile')
+    expect(editor).not.toHaveProperty('applyingId')
+    expect(editor).not.toHaveProperty('testingId')
+    expect(editor).not.toHaveProperty('savingAndApplying')
   })
 
   it('omits an existing secret value when saving an edited profile with the secret field left blank', async () => {
@@ -143,9 +158,6 @@ describe('useStorageProfileEditor', () => {
       providerMap,
       storages: ref([savedProfile]),
       saveProfile,
-      applyProfile: vi.fn(),
-      testProfile: vi.fn(),
-      deleteProfile: vi.fn(),
       fetchBucketDomains: vi.fn(),
     })
 
@@ -160,7 +172,6 @@ describe('useStorageProfileEditor', () => {
           secret_access_key: expect.anything(),
         }),
       }),
-      apply: undefined,
     })
   })
 
@@ -207,9 +218,6 @@ describe('useStorageProfileEditor', () => {
       providerMap,
       storages: ref([savedProfile]),
       saveProfile,
-      applyProfile: vi.fn(),
-      testProfile: vi.fn(),
-      deleteProfile: vi.fn(),
       fetchBucketDomains,
     })
 

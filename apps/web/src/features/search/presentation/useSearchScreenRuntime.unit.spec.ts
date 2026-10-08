@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick, ref } from 'vue'
 import { mockAppToast } from '../../../test/toast'
 import { useSearchScreenRuntime } from '../application/useSearchScreenRuntime'
+import { readSearchReferenceTransfer, writeSearchReferenceTransfer } from '../../library'
+import type { SearchResult } from '../domain/models'
 
 const mocks = vi.hoisted(() => ({
   authOpen: vi.fn(),
@@ -154,6 +156,23 @@ function mountRuntime(isAuthenticated: boolean, references: { key: string }[] = 
   }
 }
 
+function dragResult(): SearchResult {
+  return {
+    id: 'photo-1',
+    provider: 'unsplash',
+    title: 'Warm light',
+    author: 'IdeaBoard',
+    author_url: 'https://example.com/author',
+    source_url: 'https://example.com/photo-1',
+    thumbnail_url: 'https://images.example/photo-1-thumb.jpg',
+    preview_url: 'https://images.example/photo-1-preview.jpg',
+    original_url: 'https://images.example/photo-1-original.jpg',
+    width: 1200,
+    height: 800,
+    media_kind: 'image',
+  }
+}
+
 describe('useSearchScreenRuntime', () => {
   beforeEach(() => {
     mockAppToast()
@@ -161,6 +180,7 @@ describe('useSearchScreenRuntime', () => {
     mocks.sessions = []
     mocks.authOpen.mockReset()
     mocks.setPendingSearchAuthAction.mockReset()
+    mocks.peekPendingSearchAuthAction.mockReset()
     mocks.libraryCoordinator.reset.mockReset()
     mocks.libraryCoordinator.dispose.mockReset()
     mocks.libraryCoordinator.subscribe.mockImplementation((listener) => {
@@ -170,6 +190,8 @@ describe('useSearchScreenRuntime', () => {
       }
     })
     mocks.mutationListener = null
+    vi.mocked(writeSearchReferenceTransfer).mockReset()
+    vi.mocked(readSearchReferenceTransfer).mockReset()
   })
 
   it('owns the Auth gate for protected Library actions', async () => {
@@ -248,6 +270,95 @@ describe('useSearchScreenRuntime', () => {
     })
 
     expect(session.library.markAssetUnsaved).toHaveBeenCalledWith('unsplash:removed-image')
+    unmount()
+  })
+
+  it('writes the Search reference payload and cleans up the drag ghost', () => {
+    vi.useFakeTimers()
+    try {
+      const { runtime, unmount } = mountRuntime(true)
+      const result = dragResult()
+      const dataTransfer = { setDragImage: vi.fn() }
+
+      runtime.commands.library.handleCardDragStart({ dataTransfer } as unknown as DragEvent, result)
+
+      expect(writeSearchReferenceTransfer).toHaveBeenCalledWith(dataTransfer, result)
+      expect(dataTransfer.setDragImage).toHaveBeenCalledOnce()
+      const ghost = vi.mocked(dataTransfer.setDragImage).mock.calls[0]?.[0] as HTMLElement
+      expect(ghost.isConnected).toBe(true)
+
+      vi.runAllTimers()
+      expect(ghost.isConnected).toBe(false)
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('anchors the save popover to the event currentTarget', () => {
+    const { runtime, unmount } = mountRuntime(true)
+    const toggle = vi.fn()
+    const hide = vi.fn()
+    runtime.commands.library.registerSavePopover({ toggle, hide })
+    const anchor = document.createElement('button')
+    document.body.appendChild(anchor)
+    try {
+      const result = dragResult()
+      runtime.commands.library.openSavePopover(
+        { currentTarget: anchor } as unknown as Event,
+        result,
+      )
+
+      expect(runtime.savePopoverAnchor.value).toBe(anchor)
+      expect(toggle).toHaveBeenCalledOnce()
+      const request = toggle.mock.calls[0]?.[1] as { result: unknown; authenticated: boolean }
+      expect(request.result).toBe(result)
+      expect(request.authenticated).toBe(true)
+    } finally {
+      anchor.remove()
+      unmount()
+    }
+  })
+
+  it('auto-opens the Library on hover and cancels on drag leave', () => {
+    vi.useFakeTimers()
+    try {
+      const { runtime, unmount } = mountRuntime(true)
+      const session = mocks.sessions[0]!
+      expect(session.library.open.value).toBe(false)
+
+      const dataTransfer = { dropEffect: '' }
+      runtime.commands.library.handleTriggerDragOver({ dataTransfer } as unknown as DragEvent)
+      expect(dataTransfer.dropEffect).toBe('copy')
+      expect(runtime.view.library.isDropTarget.value).toBe(true)
+
+      runtime.commands.library.handleTriggerDragLeave()
+      expect(runtime.view.library.isDropTarget.value).toBe(false)
+      vi.advanceTimersByTime(280)
+      expect(session.library.open.value).toBe(false)
+
+      runtime.commands.library.handleTriggerDragOver({ dataTransfer } as unknown as DragEvent)
+      vi.advanceTimersByTime(280)
+      expect(session.library.open.value).toBe(true)
+
+      runtime.commands.library.handleCardDragEnd()
+      expect(runtime.view.library.isDropTarget.value).toBe(false)
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops the transferred reference into Quick Saves', async () => {
+    const { runtime, unmount } = mountRuntime(true)
+    const session = mocks.sessions[0]!
+    const reference = { provider: 'unsplash', id: 'photo-1' }
+    vi.mocked(readSearchReferenceTransfer).mockReturnValue(reference as never)
+
+    await runtime.commands.library.handleTriggerDrop({} as unknown as DragEvent)
+
+    expect(session.library.saveReferenceToQuickSaves).toHaveBeenCalledWith(reference)
+    expect(runtime.view.library.isDropTarget.value).toBe(false)
     unmount()
   })
 })

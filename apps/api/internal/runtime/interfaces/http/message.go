@@ -186,7 +186,6 @@ const (
 	msgRenderLibraryError3             = "素材来源非法"                      // RenderLibraryError @ contract_v1_library.go
 	msgRenderLibraryError4             = "素材引用非法"                      // RenderLibraryError @ contract_v1_library.go
 	msgServiceUnavailable49            = "素材库服务暂不可用"                   // CodeServiceUnavailable
-	msgPackage                         = "素材转存失败，请稍后重试"                // Package @ contract_v1_library_readthrough.go
 	msgUploadExpired                   = "上传会话已过期，请重新创建"               // CodeUploadExpired
 	msgUploadStateConflict             = "上传会话状态不允许此操作"                // CodeUploadStateConflict
 	msgUploadNotFound                  = "上传会话不存在"                     // CodeUploadNotFound

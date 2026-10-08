@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentreadmodel "ideaboard/api/internal/payments/application/readmodel"
@@ -16,21 +15,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func (r *Repository) ListAdminPaymentOrders(ctx context.Context, filters paymentreadmodel.AdminPaymentOrderFilters) (paymentcontracts.AdminPaymentOrderPage, error) {
+func (r *Repository) ListAdminPaymentOrders(ctx context.Context, filters paymentreadmodel.AdminPaymentOrderFilters) ([]paymentreadmodel.AdminPaymentOrderRecord, int64, error) {
 	if r == nil || r.db == nil {
-		return paymentcontracts.AdminPaymentOrderPage{}, fmt.Errorf("payments repository: database unavailable")
+		return nil, 0, fmt.Errorf("payments repository: database unavailable")
 	}
 	db := r.dbWithContext(ctx)
-	var page paymentcontracts.AdminPaymentOrderPage
+	var records []paymentreadmodel.AdminPaymentOrderRecord
+	var total int64
 	err := db.withReadSnapshot(func(q *dbsqlc.Queries) error {
 		params := dbsqlc.CountAdminPaymentOrdersParams{
 			OrderNumber: filters.OrderNumber, HasUserPublicID: filters.UserPublicID != uuid.Nil, UserPublicID: pgtype.UUID{Bytes: filters.UserPublicID, Valid: filters.UserPublicID != uuid.Nil}, DisplayName: filters.DisplayName,
 			Status: filters.Status, AnomalyOnly: filters.AnomalyOnly,
 		}
-		total, err := q.CountAdminPaymentOrders(ctx, params)
+		count, err := q.CountAdminPaymentOrders(ctx, params)
 		if err != nil {
 			return fmt.Errorf("count admin payment orders: %w", err)
 		}
+		total = count
 		listParams := dbsqlc.ListAdminPaymentOrdersParams{
 			OrderNumber: filters.OrderNumber, HasUserPublicID: filters.UserPublicID != uuid.Nil, UserPublicID: pgtype.UUID{Bytes: filters.UserPublicID, Valid: filters.UserPublicID != uuid.Nil}, DisplayName: filters.DisplayName,
 			Status: filters.Status, AnomalyOnly: filters.AnomalyOnly, PageLimit: int32(filters.Limit + 1),
@@ -52,24 +53,16 @@ func (r *Repository) ListAdminPaymentOrders(ctx context.Context, filters payment
 		if err != nil {
 			return fmt.Errorf("list admin payment orders: %w", err)
 		}
-		page = paymentcontracts.AdminPaymentOrderPage{Orders: make([]paymentcontracts.AdminPaymentOrderSummary, 0, min(filters.Limit, len(rows))), Total: total}
-		if len(rows) > filters.Limit {
-			last := rows[filters.Limit-1]
-			page.NextCursor, err = paymentreadmodel.EncodeAdminPaymentOrderCursor(dbutil.TimeValue(last.CreatedAt), uuid.UUID(last.ID.Bytes))
-			if err != nil {
-				return fmt.Errorf("encode admin payment order cursor: %w", err)
-			}
-			rows = rows[:filters.Limit]
-		}
+		records = make([]paymentreadmodel.AdminPaymentOrderRecord, 0, len(rows))
 		for _, row := range rows {
-			page.Orders = append(page.Orders, adminPaymentOrderSummary(row))
+			records = append(records, decodeAdminPaymentOrderRecord(row))
 		}
 		return nil
 	})
 	if err != nil {
-		return paymentcontracts.AdminPaymentOrderPage{}, err
+		return nil, 0, err
 	}
-	return page, nil
+	return records, total, nil
 }
 
 func (db paymentContextDB) withReadSnapshot(run func(*dbsqlc.Queries) error) (resultErr error) {
@@ -94,24 +87,28 @@ func (db paymentContextDB) withReadSnapshot(run func(*dbsqlc.Queries) error) (re
 	return nil
 }
 
-func (r *Repository) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (paymentreadmodel.AdminPaymentOrderDetailRecord, []dbsqlc.ListAdminPaymentOrderWebhookEventsRow, error) {
+func (r *Repository) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (paymentreadmodel.AdminPaymentOrderDetailFacts, []paymentreadmodel.AdminPaymentWebhookEventRecord, error) {
 	if r == nil || r.db == nil {
-		return paymentreadmodel.AdminPaymentOrderDetailRecord{}, nil, fmt.Errorf("payments repository: database unavailable")
+		return paymentreadmodel.AdminPaymentOrderDetailFacts{}, nil, fmt.Errorf("payments repository: database unavailable")
 	}
 	queries := r.dbWithContext(ctx).queries()
 	row, err := queries.GetAdminPaymentOrder(ctx, orderNumber)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return paymentreadmodel.AdminPaymentOrderDetailRecord{}, nil, paymentcontracts.ErrAdminPaymentOrderNotFound
+		return paymentreadmodel.AdminPaymentOrderDetailFacts{}, nil, paymentcontracts.ErrAdminPaymentOrderNotFound
 	}
 	if err != nil {
-		return paymentreadmodel.AdminPaymentOrderDetailRecord{}, nil, fmt.Errorf("get admin payment order: %w", err)
+		return paymentreadmodel.AdminPaymentOrderDetailFacts{}, nil, fmt.Errorf("get admin payment order: %w", err)
 	}
 	events, err := queries.ListAdminPaymentOrderWebhookEvents(ctx, dbsqlc.ListAdminPaymentOrderWebhookEventsParams{
 		PaymentOrderID: row.ID,
 		RowLimit:       50,
 	})
 	if err != nil {
-		return paymentreadmodel.AdminPaymentOrderDetailRecord{}, nil, fmt.Errorf("list admin payment order provider events: %w", err)
+		return paymentreadmodel.AdminPaymentOrderDetailFacts{}, nil, fmt.Errorf("list admin payment order provider events: %w", err)
 	}
-	return adminPaymentOrderDetail(row), events, nil
+	records := make([]paymentreadmodel.AdminPaymentWebhookEventRecord, 0, len(events))
+	for _, event := range events {
+		records = append(records, decodeAdminPaymentWebhookEventRecord(event))
+	}
+	return decodeAdminPaymentOrderDetailFacts(row), records, nil
 }

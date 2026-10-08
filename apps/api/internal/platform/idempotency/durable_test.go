@@ -2,6 +2,7 @@ package idempotency
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -42,6 +43,7 @@ func TestControlClaimWinnerCompletesAndReplays(t *testing.T) {
 		t.Fatalf("begin: %v", err)
 	}
 	result, err := store.Claim(ctx, tx, claim)
+	claim.AttemptToken = result.AttemptToken
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Claim: %v", err)
@@ -91,10 +93,12 @@ func TestControlClaimConflictOnDifferentHash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	if _, err := store.Claim(ctx, tx, claim); err != nil {
+	claimed, err := store.Claim(ctx, tx, claim)
+	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Claim: %v", err)
 	}
+	claim.AttemptToken = claimed.AttemptToken
 	if err := store.Complete(ctx, tx, claim, ControlResult{Status: 200, ContentType: "application/json", Body: "{}"}); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Complete: %v", err)
@@ -134,10 +138,12 @@ func TestControlClaimAbandonLetsRetryReExecute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	if _, err := store.Claim(ctx, tx, claim); err != nil {
+	claimed, err := store.Claim(ctx, tx, claim)
+	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Claim: %v", err)
 	}
+	claim.AttemptToken = claimed.AttemptToken
 	// Business failure: abandon the claim in the same transaction, then
 	// commit (the failure audit row commits alongside in the guard).
 	if err := store.Abandon(ctx, tx, claim); err != nil {
@@ -215,6 +221,7 @@ func TestControlClaimConcurrentSameKeySingleWinner(t *testing.T) {
 	for i := 0; i < callers; i++ {
 		wg.Add(1)
 		go func() {
+			claim := claim
 			defer wg.Done()
 			tx, err := pool.Begin(ctx)
 			if err != nil {
@@ -223,6 +230,7 @@ func TestControlClaimConcurrentSameKeySingleWinner(t *testing.T) {
 			}
 			defer tx.Rollback(ctx)
 			result, err := store.Claim(ctx, tx, claim)
+			claim.AttemptToken = result.AttemptToken
 			if err != nil {
 				errs <- err
 				return
@@ -288,10 +296,12 @@ func TestControlClaimExpiredCompletedReadsAsMiss(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	if _, err := store.Claim(ctx, tx, claim); err != nil {
+	claimed, err := store.Claim(ctx, tx, claim)
+	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Claim: %v", err)
 	}
+	claim.AttemptToken = claimed.AttemptToken
 	if err := store.Complete(ctx, tx, claim, ControlResult{Status: 200, ContentType: "application/json", Body: "{}"}); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Complete: %v", err)
@@ -333,10 +343,12 @@ func TestControlPurgeExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	if _, err := store.Claim(ctx, tx, keep); err != nil {
+	keptClaim, err := store.Claim(ctx, tx, keep)
+	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Claim keep: %v", err)
 	}
+	keep.AttemptToken = keptClaim.AttemptToken
 	if err := store.Complete(ctx, tx, keep, ControlResult{Status: 200, ContentType: "application/json", Body: "{}"}); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Complete keep: %v", err)
@@ -350,10 +362,12 @@ func TestControlPurgeExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin stale: %v", err)
 	}
-	if _, err := store.Claim(ctx, tx, stale); err != nil {
+	staleClaim, err := store.Claim(ctx, tx, stale)
+	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Claim stale: %v", err)
 	}
+	stale.AttemptToken = staleClaim.AttemptToken
 	if err := store.Complete(ctx, tx, stale, ControlResult{Status: 200, ContentType: "application/json", Body: "{}"}); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Complete stale: %v", err)
@@ -428,6 +442,7 @@ func TestControlClaimKeyIncludesTarget(t *testing.T) {
 			t.Fatalf("begin %d: %v", i, err)
 		}
 		result, err := store.Claim(ctx, tx, claim)
+		claim.AttemptToken = result.AttemptToken
 		if err != nil {
 			_ = tx.Rollback(ctx)
 			t.Fatalf("Claim %d: %v", i, err)
@@ -450,5 +465,104 @@ func TestControlClaimKeyIncludesTarget(t *testing.T) {
 	}
 	if count != 2 {
 		t.Fatalf("facts = %d, want 2 (one per target scope)", count)
+	}
+}
+
+func TestControlDetachedAttemptFencingAndUnknownSettlement(t *testing.T) {
+	store, pool := openControlStore(t)
+	ctx := t.Context()
+	claim := testControlClaim("fenced-detached-1", testControlHashA)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := store.Claim(ctx, tx, claim)
+	if err != nil || !first.Winner {
+		t.Fatalf("claim: %+v %v", first, err)
+	}
+	claim.AttemptToken = first.AttemptToken
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE control_idempotency_records SET created_at = now() - INTERVAL '5 minutes' WHERE idempotency_key = $1`, claim.Key); err != nil {
+		t.Fatal(err)
+	}
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	taken, err := store.TryAbandonStale(ctx, tx, claim, time.Now().Add(-time.Minute))
+	if err != nil || !taken {
+		t.Fatalf("takeover: %v %v", taken, err)
+	}
+	next, err := store.Claim(ctx, tx, claim)
+	if err != nil || !next.Winner {
+		t.Fatalf("next claim: %+v %v", next, err)
+	}
+	if next.AttemptToken == "" || next.AttemptToken == first.AttemptToken {
+		t.Fatalf("takeover reused token: %+v", next)
+	}
+	current := claim
+	current.AttemptToken = next.AttemptToken
+	if err := store.MarkUnknown(ctx, tx, current); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	result := ControlResult{Status: 200, ContentType: "application/json", Body: `{"data":{"ok":true}}`}
+	for _, operation := range []string{"complete", "mark", "abandon", "takeover"} {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch operation {
+		case "complete":
+			if err := store.Complete(ctx, tx, claim, result); !errors.Is(err, ErrControlAttemptLost) {
+				t.Fatalf("stale Complete: %v", err)
+			}
+		case "mark":
+			if err := store.MarkUnknown(ctx, tx, claim); !errors.Is(err, ErrControlAttemptLost) {
+				t.Fatalf("stale MarkUnknown: %v", err)
+			}
+		case "abandon":
+			if err := store.Abandon(ctx, tx, claim); err != nil {
+				t.Fatal(err)
+			}
+		case "takeover":
+			taken, err := store.TryAbandonStale(ctx, tx, claim, time.Now().Add(time.Hour))
+			if err != nil || taken {
+				t.Fatalf("stale token takeover: %v %v", taken, err)
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	existing, err := store.Claim(ctx, tx, current)
+	if err != nil || existing.Winner || existing.Existing == nil {
+		t.Fatalf("unknown claim: %+v %v", existing, err)
+	}
+	if existing.Existing.AttemptToken != current.AttemptToken || !existing.Existing.SettlementUnknown || existing.Existing.Completed {
+		t.Fatalf("new claim damaged: %+v", existing.Existing)
+	}
+	taken, err = store.TryAbandonStale(ctx, tx, current, time.Now().Add(time.Hour))
+	if err != nil || taken {
+		t.Fatalf("unknown takeover: %v %v", taken, err)
+	}
+	if err := store.Complete(ctx, tx, current, result); err != nil {
+		t.Fatal(err)
+	}
+	settled, err := store.get(ctx, store.q.WithTx(tx), current)
+	if err != nil || !settled.Completed || settled.SettlementUnknown || settled.Result != result {
+		t.Fatalf("settlement: %+v %v", settled, err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
 	}
 }

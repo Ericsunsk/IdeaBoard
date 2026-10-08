@@ -6,28 +6,13 @@ import (
 	"strings"
 	"sync"
 
+	"ideaboard/api/internal/platform/riverpolicy"
 	tasks "ideaboard/api/internal/tasking/domain"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
-)
-
-const (
-	RiverQueueDefault       = "drawing_default"
-	RiverMaxAttemptsDefault = 25
-	// RiverQueueWebhookDeliver carries signed webhook deliveries
-	// (issue #833). The events package owns the worker; this package
-	// owns the budget constants so RiverRetryMatrix stays the single
-	// source of truth for per-queue MaxAttempts.
-	RiverQueueWebhookDeliver = "webhook_deliver"
-	// RiverQueueTaskSettlementSweep carries the final-timeout convergence
-	// sweep (abandoned Credit Holds). Same ownership split as the webhook
-	// queue: the tasking worker package owns the worker, this package owns
-	// the queue name and its budget constants so the matrices stay the single
-	// source of truth.
-	RiverQueueTaskSettlementSweep = "task_settlement_sweep"
 )
 
 type riverClient interface {
@@ -43,15 +28,15 @@ type RiverQueue struct {
 }
 
 func NewRiverQueue(client *river.Client[pgx.Tx], db *pgxpool.Pool, maxRetry int) *RiverQueue {
-	return NewRiverQueueWithClient(client, db, RiverQueueDefault, maxRetry)
+	return NewRiverQueueWithClient(client, db, riverpolicy.RiverQueueDefault, maxRetry)
 }
 
 func NewRiverQueueWithClient(client riverClient, db *pgxpool.Pool, queueName string, maxRetry int) *RiverQueue {
 	if strings.TrimSpace(queueName) == "" {
-		queueName = RiverQueueDefault
+		queueName = riverpolicy.RiverQueueDefault
 	}
 	if maxRetry <= 0 {
-		maxRetry = RiverMaxAttemptsDefault
+		maxRetry = riverpolicy.RiverMaxAttemptsDefault
 	}
 	return &RiverQueue{
 		client:    client,
@@ -130,8 +115,8 @@ func (q *RiverQueue) QueueStats(ctx context.Context) (depth int64, lagSeconds fl
 // QueueStatsFor reports depth/lag for an explicit queue through this
 // monitor's database handle. The multi-queue RED refresher fans one
 // RiverQueue out to every known queue so each queue gets its own
-// ideaboard_river_queue_depth/_lag_seconds series (see RiverRetryMatrix for
-// the queue inventory). An empty queue name is a caller bug and fails fast
+// ideaboard_river_queue_depth/_lag_seconds series (see riverpolicy
+// RiverRetryMatrix for the queue inventory). An empty queue name is a caller bug and fails fast
 // so the refresher logs it instead of publishing under a wrong label.
 func (q *RiverQueue) QueueStatsFor(ctx context.Context, queue string) (depth int64, lagSeconds float64, err error) {
 	if q == nil || q.db == nil {

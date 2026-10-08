@@ -36,14 +36,14 @@ describe('createAdminStorageResource', () => {
         id: 'profile-created',
       },
     })
-    await expect(
-      resource.saveProfile({ id: 'profile-1', payload, apply: true }, reason),
-    ).resolves.toMatchObject({
-      message: 'applied',
-      profile: {
-        id: 'profile-applied',
+    await expect(resource.saveProfile({ id: 'profile-1', payload }, reason)).resolves.toMatchObject(
+      {
+        message: 'updated',
+        profile: {
+          id: 'profile-updated',
+        },
       },
-    })
+    )
     await expect(resource.testProfile('profile-1', reason)).resolves.toEqual({ message: 'tested' })
     await expect(resource.applyProfile('profile-1', reason)).resolves.toMatchObject({
       message: 'applied',
@@ -71,11 +71,6 @@ describe('createAdminStorageResource', () => {
         path: '/api/control/v1/platform/storage/profiles/profile-1',
         search: '',
         body: payload,
-      },
-      {
-        method: 'POST',
-        path: '/api/control/v1/platform/storage/profiles/profile-updated/apply',
-        search: '',
       },
       {
         method: 'POST',

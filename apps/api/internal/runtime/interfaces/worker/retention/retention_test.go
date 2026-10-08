@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/riverpolicy"
 	retentioncontracts "ideaboard/api/internal/tasking/ports/retention"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
-
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 )
 
 type retentionServiceStub struct {
@@ -87,7 +86,7 @@ func TestTaskRetentionDailyScheduleRunsAt0330Shanghai(t *testing.T) {
 }
 
 func TestTaskRetentionWorkerPinsTimeoutMatrix(t *testing.T) {
-	if got := (&TaskRetentionWorker{}).Timeout(nil); got != taskqueue.RiverJobTimeoutTaskRetention {
-		t.Fatalf("retention timeout = %s, want matrix %s", got, taskqueue.RiverJobTimeoutTaskRetention)
+	if got := (&TaskRetentionWorker{}).Timeout(nil); got != riverpolicy.RiverJobTimeoutTaskRetention {
+		t.Fatalf("retention timeout = %s, want matrix %s", got, riverpolicy.RiverJobTimeoutTaskRetention)
 	}
 }

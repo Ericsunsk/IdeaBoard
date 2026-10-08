@@ -423,14 +423,38 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 		}
 		outcome := ControlAuditRead
 		if route.Mutation {
-			// runIdempotent executes the handler, writes the response,
-			// and emits the audit record itself (including replay and
-			// conflict paths), so the guard returns here in all cases.
+			// runDetached/runAtomic/runIdempotent execute the handler,
+			// write the response, and emit the audit record itself
+			// (including replay and conflict paths), so the guard
+			// returns here in all cases.
 			// With TxScope+TxAudit wired the atomic variant runs
-			// instead: one guard-owned transaction carries the call and
-			// the audit row commits or rolls back with it (step 2).
-			if d.atomicAuditEnabled() {
+			// for joined mutations: one guard-owned transaction
+			// carries the call and the audit row commits or rolls
+			// back with it (step 2).
+			// Detached mutations (external side effects that cannot
+			// join a database transaction by construction: Auth
+			// mail/storage/Stripe probes and pre-checked config
+			// publishes) run on runDetached: the audit row stays an
+			// observer, no long guard transaction wraps the external
+			// call, and a rollback never implies the external effect
+			// was revoked. runDetached keeps the L1 fast path and
+			// adds the durable winner election through SHORT
+			// independent transactions (claim before the external
+			// call, complete/abandon after): successful settlement
+			// replays cross-process, known failures abandon, and
+			// failed settlement retains uncertainty without re-sending.
+			// Only completed 2xx responses are cached.
+			if d.atomicAuditEnabled() && !route.Detached {
 				d.runAtomic(c, p, route.Operation, record.IdempotencyKey, body, &record, handler, controlContext{
+					Operator: p,
+					Reason:   record.Reason,
+					IdemKey:  record.IdempotencyKey,
+					Body:     body,
+				})
+				return
+			}
+			if route.Detached && d.detachedDurableEnabled() {
+				d.runDetached(c, p, route.Operation, record.IdempotencyKey, body, &record, handler, controlContext{
 					Operator: p,
 					Reason:   record.Reason,
 					IdemKey:  record.IdempotencyKey,
@@ -554,6 +578,267 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 		record.Outcome = ControlAuditOK
 	}
 	emitControlAudit(c.Request.Context(), d.sink(), *record)
+}
+
+// detachedDurableEnabled reports whether detached mutations take the
+// durable winner-election path (M1). Short independent transactions
+// for the claim/outcome need the transaction scope plus the durable
+// authority; the participant audit writer is deliberately NOT required
+// (detached audit stays an observer). Nil keeps the legacy L1-only
+// path (tests and unwired deployments).
+func (d *ContractControlDeps) detachedDurableEnabled() bool {
+	return d != nil && d.TxScope != nil && d.IdempotencyDurable != nil
+}
+
+// The lease applies only to undispatched claims; elapsed time cannot prove
+// whether an external effect happened. Dispatch intent disables takeover.
+const detachedDurableStaleLease = 60 * time.Second
+const detachedDurableSettlementTimeout = 5 * time.Second
+const msgControlSettlementUnknown = "The operation outcome is uncertain. Retry with the same Idempotency-Key; the external operation will not be repeated automatically."
+
+// runDetached commits a fenced dispatch intent before external I/O, then
+// buffers the response until settlement commits in a separate transaction.
+// Unknown outcomes remain unavailable without re-execution. Audit is an
+// observer and cannot roll back an external effect. L1 caches completed 2xx.
+func (d *ContractControlDeps) runDetached(c *gin.Context, p principal.Principal, operation, key string, body []byte, record *ControlAuditRecord, handler controlHandler, ctx controlContext) {
+	store := d.idempotencyStore()
+	_, operatorID := controlOperatorIdentity(p)
+	scope := contract.IdempotencyScope(operatorID, "control:"+operation)
+	durable := controlDurableClaim(p, operation, key, record, c.Request.Method, c.FullPath(), body)
+	requestHash := durable.RequestHash
+	if existing, replayed, err := store.Lookup(scope, p.UserID(), key, requestHash); err != nil {
+		record.Status = http.StatusConflict
+		record.Outcome = ControlAuditFailed
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
+		return
+	} else if replayed {
+		stored, ok := existing.(controlStoredResponse)
+		if !ok {
+			record.Status = http.StatusConflict
+			record.Outcome = ControlAuditFailed
+			emitControlAudit(c.Request.Context(), d.sink(), *record)
+			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
+			return
+		}
+		if contentType := stored.Header["Content-Type"]; contentType != "" {
+			c.Header("Content-Type", contentType)
+		}
+		c.Data(stored.Status, stored.Header["Content-Type"], []byte(stored.Body))
+		record.Status = stored.Status
+		record.Outcome = ControlAuditOK
+		record.Replayed = true
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		return
+	}
+	claimCtx, cancelClaim := context.WithTimeout(c.Request.Context(), detachedDurableSettlementTimeout)
+	defer cancelClaim()
+	claimTxCtx, beginErr := d.TxScope.Begin(claimCtx)
+	if beginErr != nil {
+		record.Status = http.StatusServiceUnavailable
+		record.Outcome = ControlAuditFailed
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+		return
+	}
+	claimResult, claimErr := d.IdempotencyDurable.Claim(claimTxCtx, controlTxOf(claimTxCtx), durable)
+	if claimErr != nil {
+		d.TxScope.Rollback(claimTxCtx)
+		record.Status = http.StatusServiceUnavailable
+		record.Outcome = ControlAuditFailed
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+		return
+	}
+	if !claimResult.Winner {
+		d.TxScope.Rollback(claimTxCtx)
+		existing := claimResult.Existing
+		if existing == nil {
+			// Winner rolled back between our INSERT and SELECT: key
+			// free again, retryable rather than unfenced.
+			record.Status = http.StatusServiceUnavailable
+			record.Outcome = ControlAuditFailed
+			emitControlAudit(c.Request.Context(), d.sink(), *record)
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+			return
+		}
+		if existing.RequestHash != durable.RequestHash {
+			record.Status = http.StatusConflict
+			record.Outcome = ControlAuditFailed
+			emitControlAudit(c.Request.Context(), d.sink(), *record)
+			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
+			return
+		}
+		if !existing.Completed {
+			// Active winner running: 503 retryable. Stale orphan
+			// (crashed before committed dispatch intent) is taken
+			// over only before dispatch; uncertain effects are never
+			// repeated automatically.
+			durable.AttemptToken = existing.AttemptToken
+			if !existing.SettlementUnknown {
+				if token, taken := d.tryDetachedStaleTakeover(c.Request.Context(), durable); taken {
+					durable.AttemptToken = token
+					d.executeDetachedWinner(c, p, operation, key, record, handler, ctx, scope, durable, requestHash, store)
+					return
+				}
+			}
+			record.Status = http.StatusServiceUnavailable
+			record.Outcome = ControlAuditFailed
+			emitControlAudit(c.Request.Context(), d.sink(), *record)
+			message := msgServiceUnavailableAtomic
+			if existing.SettlementUnknown {
+				message = msgControlSettlementUnknown
+			}
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, message)
+			return
+		}
+		if existing.Expired {
+			// Retention expiry reads as a miss but Claim already
+			// takes expired over transparently; reaching here means
+			// a race (winner completed expiry takeover concurrently).
+			// Retryable rather than unfenced.
+			record.Status = http.StatusServiceUnavailable
+			record.Outcome = ControlAuditFailed
+			emitControlAudit(c.Request.Context(), d.sink(), *record)
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+			return
+		}
+		stored := controlStoredResponse{
+			Status:      existing.Result.Status,
+			Header:      map[string]string{"Content-Type": existing.Result.ContentType},
+			Body:        existing.Result.Body,
+			RequestHash: requestHash,
+		}
+		store.StoreResult(scope, p.UserID(), key, requestHash, stored)
+		if contentType := existing.Result.ContentType; contentType != "" {
+			c.Header("Content-Type", contentType)
+		}
+		c.Data(existing.Result.Status, existing.Result.ContentType, []byte(existing.Result.Body))
+		record.Status = existing.Result.Status
+		record.Outcome = ControlAuditOK
+		record.Replayed = true
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		return
+	}
+	durable.AttemptToken = claimResult.AttemptToken
+	if err := d.IdempotencyDurable.MarkUnknown(claimTxCtx, controlTxOf(claimTxCtx), durable); err != nil {
+		d.TxScope.Rollback(claimTxCtx)
+		record.Status = http.StatusServiceUnavailable
+		record.Outcome = ControlAuditFailed
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+		return
+	}
+	if commitErr := d.TxScope.Commit(claimTxCtx); commitErr != nil {
+		record.Status = http.StatusServiceUnavailable
+		record.Outcome = ControlAuditFailed
+		emitControlAudit(c.Request.Context(), d.sink(), *record)
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+		return
+	}
+	d.executeDetachedWinner(c, p, operation, key, record, handler, ctx, scope, durable, requestHash, store)
+}
+
+// executeDetachedWinner runs the handler after winning the detached
+// claim (initial claim or stale takeover) and records the outcome in a
+// second short transaction. The external call runs with NO guard
+// transaction held.
+func (d *ContractControlDeps) executeDetachedWinner(c *gin.Context, p principal.Principal, operation, key string, record *ControlAuditRecord, handler controlHandler, ctx controlContext, scope string, durable idempotency.ControlClaim, requestHash string, store *contract.IdempotencyStore) {
+	original := c.Writer
+	capture := &controlAtomicCaptureWriter{ResponseWriter: original, header: make(http.Header)}
+	c.Writer = capture
+	handler(c, ctx)
+	c.Writer = original
+	if reason := controlReasonFromContext(c); reason != "" {
+		if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
+			record.Reason = reason
+		}
+	}
+	status := capture.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	record.Status = status
+	record.Outcome = ControlAuditOK
+	if status >= 400 {
+		record.Outcome = ControlAuditFailed
+	}
+	// A disconnect must not prevent settlement, but PostgreSQL writes must
+	// remain bounded. The committed dispatch intent already prevents takeover
+	// even if Begin/Complete/Commit fails or this process exits now.
+	outcomeCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), detachedDurableSettlementTimeout)
+	defer cancel()
+	outcomeTxCtx, err := d.TxScope.Begin(outcomeCtx)
+	if err == nil {
+		if status >= 200 && status < 300 {
+			err = d.IdempotencyDurable.Complete(outcomeTxCtx, controlTxOf(outcomeTxCtx), durable, idempotency.ControlResult{
+				Status: status, ContentType: capture.header.Get("Content-Type"), Body: capture.body.String(),
+			})
+		} else {
+			err = d.IdempotencyDurable.Abandon(outcomeTxCtx, controlTxOf(outcomeTxCtx), durable)
+		}
+		if err != nil {
+			d.TxScope.Rollback(outcomeTxCtx)
+		} else {
+			err = d.TxScope.Commit(outcomeTxCtx)
+		}
+	}
+	if err != nil {
+		slog.Warn("control detached settlement failed", "operation", operation)
+		record.Status = http.StatusServiceUnavailable
+		record.Outcome = ControlAuditFailed
+		emitControlAudit(outcomeCtx, d.sink(), *record)
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgControlSettlementUnknown)
+		return
+	}
+	if status >= 200 && status < 300 {
+		store.StoreResult(scope, p.UserID(), key, requestHash, controlStoredResponse{
+			Status: status, Header: map[string]string{"Content-Type": capture.header.Get("Content-Type")},
+			Body: capture.body.String(), RequestHash: requestHash,
+		})
+		if _, err := d.IdempotencyDurable.PurgeExpired(outcomeCtx); err != nil {
+			slog.Warn("control durable idempotency purge failed")
+		}
+	}
+	emitControlAudit(outcomeCtx, d.sink(), *record)
+	capture.replayTo(original)
+}
+
+// tryDetachedStaleTakeover replaces only an undispatched, observed attempt.
+// Dispatch intent excludes lease recovery: an external outcome cannot safely
+// be inferred from elapsed time. The new attempt is marked before commit.
+func (d *ContractControlDeps) tryDetachedStaleTakeover(ctx context.Context, durable idempotency.ControlClaim) (string, bool) {
+	if d == nil || d.TxScope == nil || d.IdempotencyDurable == nil {
+		return "", false
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	takeoverCtx, cancel := context.WithTimeout(ctx, detachedDurableSettlementTimeout)
+	defer cancel()
+	txCtx, err := d.TxScope.Begin(takeoverCtx)
+	if err != nil {
+		return "", false
+	}
+	taken, err := d.IdempotencyDurable.TryAbandonStale(txCtx, controlTxOf(txCtx), durable, time.Now().UTC().Add(-detachedDurableStaleLease))
+	if err != nil || !taken {
+		d.TxScope.Rollback(txCtx)
+		return "", false
+	}
+	claimed, err := d.IdempotencyDurable.Claim(txCtx, controlTxOf(txCtx), durable)
+	if err != nil || !claimed.Winner {
+		d.TxScope.Rollback(txCtx)
+		return "", false
+	}
+	durable.AttemptToken = claimed.AttemptToken
+	if err := d.IdempotencyDurable.MarkUnknown(txCtx, controlTxOf(txCtx), durable); err != nil {
+		d.TxScope.Rollback(txCtx)
+		return "", false
+	}
+	if err := d.TxScope.Commit(txCtx); err != nil {
+		return "", false
+	}
+	return durable.AttemptToken, true
 }
 
 // atomicAuditEnabled reports whether the guarded mutations take the
@@ -750,6 +1035,7 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 			c.Data(durableReplay.Result.Status, durableReplay.Result.ContentType, []byte(durableReplay.Result.Body))
 			return
 		}
+		durable.AttemptToken = claimResult.AttemptToken
 		durableWinner = true
 	}
 	original := c.Writer

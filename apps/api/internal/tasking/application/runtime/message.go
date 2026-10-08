@@ -5,7 +5,7 @@ package runtime
 // sites reference these names so copy changes stay in one place.
 // Values are byte-identical to the previously inline literals.
 const (
-	msgMaterializeOne                   = "素材转存失败，请稍后重试"                            // MaterializeOne @ workspace_task_materializer.go
+	msgMaterializeOne                   = "素材转存失败，请稍后重试"                            // MaterializeOne @ workspace_task_materializer.go (intentional copy of library/application ReadThroughFailureMessage; change both together)
 	msgRenderOutputs                    = "任务结果渲染器未配置"                              // RenderOutputs @ workspace_task_renderer.go
 	msgRenderOutputs2                   = "任务标识缺失，无法渲染结果"                           // RenderOutputs @ workspace_task_renderer.go
 	msgRenderOutputs3                   = "provider 输出过多: 最多 %d"                    // RenderOutputs @ workspace_task_renderer.go

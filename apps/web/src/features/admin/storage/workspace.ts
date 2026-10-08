@@ -60,33 +60,12 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
   const testingPending = ref(false)
   const providers = ref<StorageProviderMeta[]>([])
   const storages = ref<StorageCard[]>([])
-  const searchKeyword = ref('')
   const providerMap = computed(() => toProviderMetaMap(providers.value))
   const creatableProviders = computed(() =>
     providers.value.filter((provider) => provider.create_allowed),
   )
 
   const cardViews = computed(() => storages.value.map(createStorageCardView))
-  const hasStorageSearch = computed(() => Boolean(searchKeyword.value.trim()))
-  const filteredStorageCards = computed(() => {
-    const keyword = searchKeyword.value.trim().toLowerCase()
-    if (!keyword) return cardViews.value
-    return cardViews.value.filter((card) => card.searchableText.includes(keyword))
-  })
-  const currentStorage = computed(
-    () => cardViews.value.find((card) => card.storage.isCurrent)?.storage || null,
-  )
-  const configuredStorageCount = computed(
-    () => cardViews.value.filter((card) => card.statusClass !== 'is-empty').length,
-  )
-  const storageCountLabel = computed(() =>
-    hasStorageSearch.value
-      ? `${filteredStorageCards.value.length} 匹配存储`
-      : `${storages.value.length} 存储`,
-  )
-  const emptyStorageMessage = computed(() =>
-    hasStorageSearch.value ? '无匹配存储' : '暂无存储配置',
-  )
 
   async function refreshStorageData() {
     const [nextProviders, nextProfiles] = await Promise.all([
@@ -130,6 +109,9 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     }
   }
 
+  // Workspace owns every storage mutation's confirmation, operator reason,
+  // and refresh-after-command. The profile editor only supplies form payloads
+  // through saveProfile; apply/test/delete/enable orchestration lives here.
   async function saveProfile(
     input: SaveStorageProfileInput,
   ): Promise<StorageProfileCommandResult | null> {
@@ -144,52 +126,20 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     return response
   }
 
-  async function applyProfile(id: string): Promise<StorageProfileCommandResult | null> {
-    const operatorReason = await confirmStorageWrite({
-      title: '设为当前存储',
-      message: '确定将该存储设为当前存储吗？该操作将记录操作人与原因。',
-      confirmLabel: '设为当前',
-    })
-    if (!operatorReason) return null
-    const response = await resource.applyProfile(id, { operatorReason })
-    await refreshAfterCommand()
-    return response
-  }
-
-  function testProfile(id: string) {
-    return testStorageById(id)
-  }
-
-  async function testStorageById(id: string) {
-    // Connectivity probes skip the confirm dialog (backend POST
-    // read-guard: no reason ceremony); the fixed probe note still lands on
-    // the audit record.
-    return resource.testProfile(id, { operatorReason: ADMIN_PROBE_OPERATOR_REASON })
-  }
-
-  async function deleteProfile(id: string) {
-    const operatorReason = await confirmStorageWrite(
-      {
-        title: '确认删除存储',
-        message: '确定删除该存储配置吗？此操作不可恢复，且将记录操作人与原因。',
-        confirmLabel: '确定删除',
-      },
-      'destructive',
-    )
-    if (!operatorReason) return null
-    const response = await resource.deleteProfile(id, { operatorReason })
-    await refreshAfterCommand()
-    return response
-  }
-
   async function applyStorage(target: StorageProfileCommandTarget) {
     const storage = resolveStorageTarget(target)
     if (!storage) return
 
     await options.runAsyncAction(
       async () => {
-        const response = await applyProfile(storage.id)
-        if (!response) return
+        const operatorReason = await confirmStorageWrite({
+          title: '设为当前存储',
+          message: '确定将该存储设为当前存储吗？该操作将记录操作人与原因。',
+          confirmLabel: '设为当前',
+        })
+        if (!operatorReason) return
+        const response = await resource.applyProfile(storage.id, { operatorReason })
+        await refreshAfterCommand()
         options.feedback.applyCurrentSucceeded(response.message)
       },
       {
@@ -238,7 +188,12 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     await options.runAsyncAction(
       async () => {
-        const response = await testStorageById(storage.id)
+        // Connectivity probes skip the confirm dialog (backend POST
+        // read-guard: no reason ceremony); the fixed probe note still lands
+        // on the audit record.
+        const response = await resource.testProfile(storage.id, {
+          operatorReason: ADMIN_PROBE_OPERATOR_REASON,
+        })
         if (!response) return
         options.feedback.testConnectionSucceeded(response.message)
       },
@@ -330,15 +285,6 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
       supportsTest: providerSupportsTest(storage.provider, providerMap.value),
       canTest: canTestProfile(storage, providerMap.value),
       canApply: canApplyProfile(storage, providerMap.value),
-      searchableText: [
-        storage.name,
-        providerName,
-        subtitle,
-        storageStatusText,
-        ...metaItems.flatMap((item) => [item.label, item.value]),
-      ]
-        .join(' ')
-        .toLowerCase(),
     }
   }
 
@@ -362,23 +308,11 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     creatableProviders,
     storages,
     cards: {
-      items: filteredStorageCards,
-      searchKeyword,
-      isEmpty: computed(() => filteredStorageCards.value.length === 0),
-      isLoading: computed(() => loading.value && storages.value.length === 0),
-      hasSearch: hasStorageSearch,
-      storageCountLabel,
-      emptyMessage: emptyStorageMessage,
-      currentStorage,
-      configuredStorageCount,
-      totalStorageCount: computed(() => storages.value.length),
+      items: cardViews,
     },
     loadData,
     refreshData,
     saveProfile,
-    applyProfile,
-    testProfile,
-    deleteProfile,
     applyStorage,
     toggleEnabled,
     testStorage,

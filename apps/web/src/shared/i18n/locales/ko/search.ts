@@ -68,6 +68,7 @@ export default {
     noMatchingFolders: '일치하는 폴더가 없습니다',
     quickSaves: '빠른 저장',
     savedToast: '"{name}"에 저장되었습니다!',
+    savedToLibraryToast: '개인 라이브러리에 저장되었습니다!',
     removedToast: '라이브러리에서 제거되었습니다',
     loadFoldersFailed: '라이브러리 폴더를 불러올 수 없습니다. 다시 시도해 주세요.',
   },

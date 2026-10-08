@@ -113,13 +113,15 @@ describe('mailConfigResource', () => {
   })
 
   it('tests through control with an operator reason', async () => {
-    let seen: { method: string; body: unknown; operatorReason: string } | undefined
+    let seen:
+      { method: string; body: unknown; operatorReason: string; idempotencyKey: string } | undefined
     useMswHandlers(
       http.post('/api/control/v1/platform/settings/mail/test', async ({ request }) => {
         seen = {
           method: request.method,
           body: await request.json(),
           operatorReason: request.headers.get('X-Operator-Reason') ?? '',
+          idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
         }
         return HttpResponse.json({ data: { sent: true } })
       }),
@@ -132,6 +134,11 @@ describe('mailConfigResource', () => {
     expect(seen?.method).toBe('POST')
     expect(seen?.body).toEqual({ recipient: 'ops@example.com', reason: 'verify sender' })
     expect(seen?.operatorReason).toBe('verify sender')
+    // Mail probe is a detached Control mutation (#909): the operator
+    // reason and a header-only Idempotency-Key are both required, so a
+    // same-key retry replays without resending and a divergent body
+    // conflicts server-side.
+    expect(seen?.idempotencyKey).toMatch(/.+/)
   })
 
   it('refuses to send mutations without an operator reason', async () => {

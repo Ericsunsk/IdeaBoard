@@ -1,4 +1,4 @@
-package queue
+package riverpolicy
 
 import (
 	"testing"
@@ -35,14 +35,15 @@ func TestRiverTimeoutMatrixIsSelfConsistent(t *testing.T) {
 	}
 	for _, want := range []string{
 		RiverQueueDefault,
-		"credit_reconciliation",
-		"payment_reconciliation",
-		"payment_checkout_shutdown",
-		"task_retention",
-		"vision_billing",
-		"media_reclamation",
+		RiverQueueCreditReconciliation,
+		RiverQueuePaymentReconciliation,
+		RiverQueuePaymentCheckoutShutdown,
+		RiverQueueTaskRetention,
+		RiverQueueVisionBilling,
+		RiverQueueMediaReclamation,
+		RiverQueueWebhookDeliver,
 		RiverQueueTaskSettlementSweep,
-		"identity_admin_reconciliation",
+		RiverQueueIdentityAdminReconciliation,
 	} {
 		if _, ok := seenQueues[want]; !ok {
 			t.Fatalf("matrix is missing queue %q", want)
@@ -61,6 +62,9 @@ func TestRiverTimeoutMatrixIsSelfConsistent(t *testing.T) {
 		"VisionBillingReconciliationWorker",
 		"ReclaimWorker",
 		"ScheduleWorker",
+		"WebhookDeliverWorker (webhook_deliver)",
+		"IdentityReconciliationExecuteWorker",
+		"IdentityReconciliationScheduleWorker",
 	} {
 		if _, ok := seenWorkers[want]; !ok {
 			t.Fatalf("matrix is missing worker %q", want)
@@ -92,6 +96,7 @@ func TestRiverTimeoutMatrixMatchesWorkerConstants(t *testing.T) {
 		"VisionBillingReconciliationWorker":                                  RiverJobTimeoutVisionBilling,
 		"ReclaimWorker":                                                      RiverJobTimeoutMediaReclamation,
 		"ScheduleWorker":                                                     RiverJobTimeoutMediaReclamationSchedule,
+		"WebhookDeliverWorker (webhook_deliver)":                             RiverJobTimeoutWebhookDeliver,
 		"IdentityReconciliationExecuteWorker":                                RiverJobTimeoutIdentityAdminReconciliation,
 		"IdentityReconciliationScheduleWorker":                               RiverJobTimeoutIdentityAdminReconciliationSchedule,
 	}
@@ -118,5 +123,30 @@ func TestRiverTimeoutMatrixPreservesSafetyBounds(t *testing.T) {
 	}
 	if RiverJobTimeoutMediaReclamation >= 5*time.Minute {
 		t.Fatalf("reclaim timeout = %s, must stay below the 5min claim lease", RiverJobTimeoutMediaReclamation)
+	}
+}
+
+// TestRiverMatricesShareQueueRoster guards the cross-matrix contract: retry
+// and timeout matrices must cover the same queue set so a queue never has a
+// retry budget without a timeout budget (or vice versa). A new queue means a
+// row in both matrices.
+func TestRiverMatricesShareQueueRoster(t *testing.T) {
+	retryQueues := map[string]struct{}{}
+	for _, policy := range RiverRetryMatrix() {
+		retryQueues[policy.Queue] = struct{}{}
+	}
+	timeoutQueues := map[string]struct{}{}
+	for _, policy := range RiverTimeoutMatrix() {
+		timeoutQueues[policy.Queue] = struct{}{}
+	}
+	for queue := range retryQueues {
+		if _, ok := timeoutQueues[queue]; !ok {
+			t.Fatalf("queue %q has a retry row but no timeout row", queue)
+		}
+	}
+	for queue := range timeoutQueues {
+		if _, ok := retryQueues[queue]; !ok {
+			t.Fatalf("queue %q has a timeout row but no retry row", queue)
+		}
 	}
 }

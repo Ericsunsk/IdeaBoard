@@ -12,19 +12,19 @@ export default {
     deleting: 'Deleting…',
   },
   feedback: {
-    createNameConflict: 'A canvas with this name already exists. Please try again.',
+    createSyncConflict: 'A sync conflict occurred. Please try again.',
     createSyncFailed: 'Could not create the canvas. Please try again later.',
     nameAlreadyExists: 'Name already exists',
     nameEmpty: 'Canvas name cannot be empty',
-    renameConflictReloaded: 'Name conflict. The canvas list has been reloaded.',
+    renameSyncConflictReloaded: 'Sync conflict. The canvas list has been reloaded.',
     renameSyncFailedRolledBack: 'Rename sync failed. The original name has been restored.',
-    renameConflictRecoveryIncomplete:
-      'Name conflict and recovery incomplete. Please reload the canvas list.',
+    renameSyncConflictRecoveryIncomplete:
+      'Sync conflict and recovery incomplete. Please reload the canvas list.',
     renameSyncFailedNoRollback:
       'Rename sync failed and could not be rolled back. Please reload the canvas list.',
     renamed: 'Canvas renamed',
     copyFailed: 'Copy failed',
-    duplicateNameConflict: 'A canvas with the copied name already exists. Please try again.',
+    duplicateSyncConflict: 'A sync conflict occurred while copying. Please try again.',
     duplicateSyncFailed: 'Copy sync failed. Please try again later.',
     duplicated: 'Canvas copied',
     deleteSyncFailed: 'Delete failed. Please try again later.',

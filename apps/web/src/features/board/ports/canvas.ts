@@ -109,8 +109,9 @@ export {
 export {
   fetchBoardArchivedAt,
   isBoardArchivedError,
-  isBoardNameConflictError,
+  isBoardSyncConflictError,
   markBoardArchivedLocally,
   syncBoardToServer,
   syncRestoreBoardToServer,
+  type BoardSyncConflictKind,
 } from '../application/sync'

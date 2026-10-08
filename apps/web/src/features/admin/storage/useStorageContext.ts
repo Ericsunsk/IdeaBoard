@@ -1,7 +1,7 @@
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import type { AdminStorageResource } from './resource'
-import { createAdminStorageWorkspace, type StorageProfileCommandTarget } from './workspace'
+import { createAdminStorageWorkspace } from './workspace'
 import { useStorageFeedback, type AdminStorageFeedback } from './useStorageFeedback'
 import { useStorageProfileEditor } from './useStorageProfileEditor'
 
@@ -11,6 +11,10 @@ export type UseAdminStorageContextOptions = {
   resource?: AdminStorageResource
 }
 
+// Ownership split: the profile editor owns form/draft, saving, and
+// bucket-domain detection; the workspace owns apply/test/delete/enable
+// orchestration (confirmation, operator reason, pending state). Each key is
+// assigned exactly once — no spread-then-override of same-name commands.
 export function useStorageContext(options: UseAdminStorageContextOptions) {
   const { runAsyncAction } = useAsyncAction()
   const storageFeedback = options.feedback ?? useStorageFeedback()
@@ -25,18 +29,34 @@ export function useStorageContext(options: UseAdminStorageContextOptions) {
     providerMap: workspace.providerMap,
     storages: workspace.storages,
     saveProfile: workspace.saveProfile,
-    applyProfile: workspace.applyProfile,
-    testProfile: workspace.testProfile,
-    deleteProfile: workspace.deleteProfile,
     fetchBucketDomains: workspace.fetchBucketDomains,
   })
 
-  async function requestRemoveProfile(target: StorageProfileCommandTarget) {
-    await workspace.requestRemoveProfile(target)
-  }
-
   return {
-    ...editor,
+    // Editor-owned: form/draft, saving, bucket-domain detection.
+    saving: editor.saving,
+    fetching: editor.fetching,
+    editorOpen: editor.editorOpen,
+    editorMode: editor.editorMode,
+    bucketDomains: editor.bucketDomains,
+    selectedVendorKey: editor.selectedVendorKey,
+    form: editor.form,
+    selectedProviderMeta: editor.selectedProviderMeta,
+    textFields: editor.textFields,
+    switchFields: editor.switchFields,
+    activeVendorPreset: editor.activeVendorPreset,
+    vendorSelectOptions: editor.vendorSelectOptions,
+    configTextValue: editor.configTextValue,
+    configBoolValue: editor.configBoolValue,
+    updateConfigValue: editor.updateConfigValue,
+    providerLabel: editor.providerLabel,
+    handleVendorSelect: editor.handleVendorSelect,
+    openCreate: editor.openCreate,
+    openEdit: editor.openEdit,
+    closeEditor: editor.closeEditor,
+    saveDraft: editor.saveDraft,
+    fetchBucketDomains: editor.fetchBucketDomains,
+    // Workspace-owned: apply/test/delete/enable orchestration.
     cards: workspace.cards,
     loading: workspace.loading,
     loadFailed: workspace.loadFailed,
@@ -48,7 +68,7 @@ export function useStorageContext(options: UseAdminStorageContextOptions) {
     toggleEnabled: workspace.toggleEnabled,
     applyStorage: workspace.applyStorage,
     handleTest: workspace.testStorage,
-    requestRemoveProfile,
+    requestRemoveProfile: workspace.requestRemoveProfile,
     loadData: workspace.loadData,
     refreshData: workspace.refreshData,
   }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/config"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,8 +20,8 @@ import (
 const (
 	// defaultRiverJobTimeout is the client-level fallback for unregistered or
 	// test-only workers. Production workers pin their budget explicitly via
-	// Timeout() against taskqueue.RiverTimeoutMatrix.
-	defaultRiverJobTimeout   = taskqueue.RiverJobTimeoutDrawing
+	// Timeout() against riverpolicy.RiverTimeoutMatrix.
+	defaultRiverJobTimeout   = riverpolicy.RiverJobTimeoutDrawing
 	riverSchemaLookupTimeout = 5 * time.Second
 )
 
@@ -84,7 +84,7 @@ func NewRiverClient(dbPool *pgxpool.Pool, opts RiverServerOptions) (*riverqueue.
 func normalizeRiverServerOptions(opts RiverServerOptions) (string, int, int, time.Duration) {
 	queueName := opts.QueueName
 	if queueName == "" {
-		queueName = taskqueue.RiverQueueDefault
+		queueName = riverpolicy.RiverQueueDefault
 	}
 	concurrency := opts.Concurrency
 	if concurrency <= 0 {
@@ -92,7 +92,7 @@ func normalizeRiverServerOptions(opts RiverServerOptions) (string, int, int, tim
 	}
 	maxRetry := opts.MaxRetry
 	if maxRetry <= 0 {
-		maxRetry = taskqueue.RiverMaxAttemptsDefault
+		maxRetry = riverpolicy.RiverMaxAttemptsDefault
 	}
 	jobTimeout := opts.JobTimeout
 	if jobTimeout <= 0 {

@@ -15,6 +15,7 @@ import {
 } from './commands'
 import {
   hydrateBoardsFromServer,
+  type BoardSyncConflictKind,
   type HydrateBoardsFromServerOptions,
   type HydrateBoardsFromServerResult,
 } from '../sync/boardSync'
@@ -29,7 +30,7 @@ export type BoardRepositoryRenameResult =
   | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
   | {
       ok: false
-      reason: 'remote-name-conflict' | 'sync-failed'
+      reason: BoardSyncConflictKind | 'sync-failed'
       boardId: string
       previousBoard: BoardMeta
       error: unknown
@@ -190,7 +191,7 @@ export function createBoardRepository(
           previousName: remote.previousBoard.name,
         })
         const hydrate =
-          remote.reason === 'remote-name-conflict'
+          remote.reason === 'revision-conflict' || remote.reason === 'idempotency-conflict'
             ? await deps.hydrate({
                 preserveLocalNewer: false,
                 rollbackBoardIds: [remote.boardId],

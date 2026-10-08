@@ -27,6 +27,7 @@ import {
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryFolder,
 } from '../domain/validators'
+import { LIBRARY_ALL_FOLDER_KEY, uniqueLibraryFolderKeys } from './folderFacts'
 import {
   WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS,
   workspaceLibraryApi,
@@ -88,42 +89,82 @@ export async function lookupWorkspaceSavedAssetKeys(
   return saved
 }
 
-/** Saves a Search reference; creates the folder first when a new name is given. */
+/** Committed save result: the stored asset plus where it actually landed. */
+export type WorkspaceLibrarySaveResult = {
+  asset: WorkspaceLibraryAsset
+  /** Present only when this call created the folder. */
+  createdFolder?: WorkspaceLibraryFolder | undefined
+  assetKey: string
+  affectedFolderKeys: string[]
+}
+
+/**
+ * Saves a Search reference; creates the folder first when a new name is given.
+ * The returned `affectedFolderKeys`/`createdFolder` are the committed write
+ * facts — callers must not rebuild the target from their input folder id.
+ */
 export async function saveWorkspaceSearchReference(
   workspaceId: string,
   reference: LibrarySearchReference,
   folderId?: string,
   newFolderName?: string,
   options: WorkspaceLibraryRequestOptions = {},
-): Promise<WorkspaceLibraryAsset> {
+): Promise<WorkspaceLibrarySaveResult> {
   let targetFolderId = folderId
+  let createdFolder: WorkspaceLibraryFolder | undefined
   const trimmedName = newFolderName?.trim()
   if (trimmedName) {
-    const folder = await workspaceLibraryApi.createFolder(workspaceId, trimmedName, options)
-    targetFolderId = folder.id
+    createdFolder = await workspaceLibraryApi.createFolder(workspaceId, trimmedName, options)
+    targetFolderId = createdFolder.id
   }
-  return workspaceLibraryApi.saveAsset(
+  const asset = await workspaceLibraryApi.saveAsset(
     workspaceId,
     toWorkspaceLibraryAssetInput(reference, targetFolderId),
     options,
   )
+  return {
+    asset,
+    ...(createdFolder == null ? {} : { createdFolder }),
+    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+    affectedFolderKeys: uniqueLibraryFolderKeys([
+      LIBRARY_ALL_FOLDER_KEY,
+      asset.folderId,
+      createdFolder?.id,
+    ]),
+  }
 }
 
-/** Removes a saved Search reference (resolve, then delete the owned asset). */
+/** Committed remove result, or `null` when the reference was never saved. */
+export type WorkspaceLibraryRemoveResult = {
+  asset: WorkspaceLibraryAsset
+  assetKey: string
+  affectedFolderKeys: string[]
+} | null
+
+/**
+ * Removes a saved Search reference (resolve, then delete the owned asset).
+ * Returns the deleted asset facts so callers publish the actual affected
+ * folders; `null` means the resolve found nothing and nothing was deleted.
+ */
 export async function removeWorkspaceSearchReference(
   workspaceId: string,
   provider: ExternalImageProvider,
   sourceId: string,
   options: WorkspaceLibraryRequestOptions = {},
-): Promise<void> {
+): Promise<WorkspaceLibraryRemoveResult> {
   const results = await workspaceLibraryApi.resolveAssets(
     workspaceId,
     [{ provider, sourceId }],
     options,
   )
   const asset = results.find((result) => result.status === 'resolved' && result.asset)?.asset
-  if (!asset) return
+  if (!asset) return null
   await workspaceLibraryApi.deleteAsset(workspaceId, asset.id, options)
+  return {
+    asset,
+    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+    affectedFolderKeys: uniqueLibraryFolderKeys([LIBRARY_ALL_FOLDER_KEY, asset.folderId]),
+  }
 }
 
 export type LibraryMaterializedMedia = {

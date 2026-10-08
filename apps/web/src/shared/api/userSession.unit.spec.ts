@@ -14,22 +14,55 @@ describe('user session API boundary', () => {
     vi.clearAllMocks()
   })
 
-  it('returns the session data without the transport envelope', async () => {
-    const me = {
-      id: 'usr_000000000000000000000007',
-      public_id: 'usr_000000000000000000000007',
-      display_name: 'Alice',
-      avatar: '',
-      role: 'user',
-    }
-    mocks.getUser.mockResolvedValue({ data: me })
+  it('maps the canonical principal with the wire id renamed to public_id', async () => {
+    mocks.getUser.mockResolvedValue({
+      data: {
+        id: 'usr_000000000000000000000007',
+        display_name: 'Alice',
+        role: 'user',
+        personal_workspace_id: 'ws_000000000000000000000001',
+      },
+    })
 
     await expect(fetchCurrentUserInfo()).resolves.toEqual({
       user: {
         public_id: 'usr_000000000000000000000007',
         display_name: 'Alice',
         role: 'user',
+        personal_workspace_id: 'ws_000000000000000000000001',
       },
+    })
+  })
+
+  it('ignores a legacy public_id key: only the canonical wire id converts', () => {
+    // No caller sends `public_id` on this surface; the old fallback is gone.
+    expect(toSessionUser({ public_id: 'usr_legacy' })).toBeNull()
+    expect(toSessionUser({ id: 'usr_1', public_id: 'usr_legacy', display_name: 'Alice' })).toEqual({
+      public_id: 'usr_1',
+      display_name: 'Alice',
+    })
+  })
+
+  it('projects the durable avatar while dropping unrelated wire fields', () => {
+    // avatar is now the authoritative profile projection; unrelated
+    // identity/storage fields remain outside this boundary.
+    expect(
+      toSessionUser({
+        id: 'usr_1',
+        display_name: 'Alice',
+        role: 'user',
+        avatar: 'https://cdn.example/a.png',
+        email: 'alice@example.test',
+        storage_namespace: 'USER0001',
+        status: 1,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-02T00:00:00.000Z',
+      }),
+    ).toEqual({
+      public_id: 'usr_1',
+      display_name: 'Alice',
+      role: 'user',
+      avatar: 'https://cdn.example/a.png',
     })
   })
 

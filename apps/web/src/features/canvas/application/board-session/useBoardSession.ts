@@ -1,7 +1,7 @@
 import { computed, type ComputedRef } from 'vue'
 import {
   isBoardArchivedError,
-  isBoardNameConflictError,
+  isBoardSyncConflictError,
   type BoardSnapshot,
 } from '../../../board/ports/canvas'
 import { i18n } from '../../../../shared/i18n'
@@ -81,7 +81,7 @@ export type BoardSessionTestOptions = UseBoardSessionOptions & {
 
 function classifyRemoteSyncFailure(error: unknown): BoardSessionRemoteSyncFailureReason {
   if (isBoardArchivedError(error)) return 'archived'
-  return isBoardNameConflictError(error) ? 'conflict' : 'sync-failed'
+  return isBoardSyncConflictError(error) ? 'conflict' : 'sync-failed'
 }
 
 export function useBoardSession(options: BoardSessionTestOptions): BoardSession {

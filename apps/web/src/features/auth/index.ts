@@ -7,6 +7,7 @@
 export { useAuthSession, useUserStore } from './session/userSession'
 export type { UserSessionStore } from './session/userSession'
 export { authTransport } from './session/transport'
+export { SESSION_TRUST_WINDOW_MS, isSessionFresh } from './session/freshness'
 export { createAuthOverlay, provideAuthOverlay, useAuthOverlay } from './overlay'
 export type { AuthOverlay, AuthOverlayMode } from './overlay'
 export { useAuthFeedback } from './useAuthFeedback'

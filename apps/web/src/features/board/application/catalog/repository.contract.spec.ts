@@ -249,10 +249,10 @@ describe('BoardRepository contract', () => {
     expect(catalog.viewModel.byId.value.get('board-1')?.name).toBe('Original')
   })
 
-  it('hydrates the remote winner after a conflict and exposes typed rollback and hydrate results', async () => {
+  it('hydrates the remote winner after a revision conflict and exposes typed rollback and hydrate results', async () => {
     const harness = createHarness()
     const catalog = createBoardRepository(harness.dependencies)
-    const conflict = { status: 409, msg: 'name conflict' }
+    const conflict = { status: 409, code: 'board_revision_conflict', msg: '看板版本已变更' }
     harness.renameOptimistic.mockImplementationOnce(
       ({ boardId, nextName }): BoardOptimisticRenameResult => {
         const current = harness.boards.value.find((item) => item.id === boardId)!
@@ -265,7 +265,7 @@ describe('BoardRepository contract', () => {
           previousBoard,
           confirm: vi.fn(async () => ({
             ok: false as const,
-            reason: 'remote-name-conflict' as const,
+            reason: 'revision-conflict' as const,
             boardId,
             board: { ...current },
             previousBoard,
@@ -284,7 +284,7 @@ describe('BoardRepository contract', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      reason: 'remote-name-conflict',
+      reason: 'revision-conflict',
       rollback: { ok: true, board: { name: 'Original' } },
       hydrate: { ok: true },
     })
@@ -293,5 +293,44 @@ describe('BoardRepository contract', () => {
       rollbackBoardIds: ['board-1'],
     })
     expect(catalog.viewModel.byId.value.get('board-1')?.name).toBe('Remote Winner')
+  })
+
+  it('hydrates after an idempotency conflict with the same rollback path', async () => {
+    const harness = createHarness()
+    const catalog = createBoardRepository(harness.dependencies)
+    const conflict = { status: 409, code: 'board_idempotency_conflict', msg: '幂等冲突' }
+    harness.renameOptimistic.mockImplementationOnce(
+      ({ boardId, nextName }): BoardOptimisticRenameResult => {
+        const current = harness.boards.value.find((item) => item.id === boardId)!
+        const previousBoard = { ...current }
+        current.name = nextName
+        harness.emit()
+        return {
+          ok: true,
+          board: { ...current },
+          previousBoard,
+          confirm: vi.fn(async () => ({
+            ok: false as const,
+            reason: 'idempotency-conflict' as const,
+            boardId,
+            board: { ...current },
+            previousBoard,
+            error: conflict,
+          })),
+        }
+      },
+    )
+
+    const result = await catalog.commands.rename({ boardId: 'board-1', nextName: 'Taken' })
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'idempotency-conflict',
+      rollback: { ok: true, board: { name: 'Original' } },
+    })
+    expect(harness.hydrate).toHaveBeenCalledWith({
+      preserveLocalNewer: false,
+      rollbackBoardIds: ['board-1'],
+    })
   })
 })

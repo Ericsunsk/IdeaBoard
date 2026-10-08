@@ -82,6 +82,7 @@ func TestControlIdempotencyClaimCommitsWithBusinessAndAudit(t *testing.T) {
 		t.Fatal("guard scope did not stage a carrier transaction")
 	}
 	claimed, err := store.Claim(txCtx, guardTx, claim)
+	claim.AttemptToken = claimed.AttemptToken
 	if err != nil {
 		scope.Rollback(txCtx)
 		t.Fatalf("Claim: %v", err)

@@ -8,14 +8,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 )
 
 // IdentityReconciliationQueue is the serial maintenance queue for the
 // Identity admin reconciliation job. MaxWorkers is 1 at registration:
 // overlapping scans would contend on the same finding fingerprints for no
-// throughput gain (admin surfaces are small).
-const IdentityReconciliationQueue = "identity_admin_reconciliation"
+// throughput gain (admin surfaces are small). The name is an alias of the
+// Platform-owned policy constant so inserts track the matrix with no copied
+// literal.
+const IdentityReconciliationQueue = riverpolicy.RiverQueueIdentityAdminReconciliation
 
 const riverPriority = 4
 
@@ -52,7 +54,7 @@ func (d *riverDispatcher) DispatchReconciliationRun(ctx context.Context, tx pgx.
 		return errInvalidReconciliationCommand
 	}
 	_, err := d.client.InsertTx(ctx, tx, executeArgs{RunID: runID}, &river.InsertOpts{
-		Queue: IdentityReconciliationQueue, MaxAttempts: taskqueue.RiverMaxAttemptsIdentityAdminReconciliation, Priority: riverPriority,
+		Queue: IdentityReconciliationQueue, MaxAttempts: riverpolicy.RiverMaxAttemptsIdentityAdminReconciliation, Priority: riverPriority,
 	})
 	return err
 }
@@ -78,7 +80,7 @@ func NewExecuteWorker(service executeService) *ExecuteWorker {
 
 // Timeout implements river.JobArgsWithTimeout.
 func (*ExecuteWorker) Timeout(*river.Job[executeArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutIdentityAdminReconciliation
+	return riverpolicy.RiverJobTimeoutIdentityAdminReconciliation
 }
 
 // Work implements river.Worker. A failed scan retries with the job (up to
@@ -184,7 +186,7 @@ func (dailySchedule) Next(current time.Time) time.Time {
 // schedule worker kind and queue, so no new River registration is needed.
 func PeriodicJobs() []*river.PeriodicJob {
 	insertOpts := func() *river.InsertOpts {
-		return &river.InsertOpts{Queue: IdentityReconciliationQueue, MaxAttempts: taskqueue.RiverMaxAttemptsIdentityAdminReconciliation, Priority: riverPriority}
+		return &river.InsertOpts{Queue: IdentityReconciliationQueue, MaxAttempts: riverpolicy.RiverMaxAttemptsIdentityAdminReconciliation, Priority: riverPriority}
 	}
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(
@@ -233,7 +235,7 @@ type ScheduleWorker struct {
 
 // Timeout implements river.JobArgsWithTimeout.
 func (*ScheduleWorker) Timeout(*river.Job[scheduleArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutIdentityAdminReconciliationSchedule
+	return riverpolicy.RiverJobTimeoutIdentityAdminReconciliationSchedule
 }
 
 // Work implements river.Worker.

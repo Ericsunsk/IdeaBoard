@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 	retentioncontracts "ideaboard/api/internal/tasking/ports/retention"
 
 	"github.com/riverqueue/river"
@@ -14,9 +14,11 @@ import (
 
 const (
 	// QueueName is a single-worker queue: purge runs are serial by design.
-	QueueName = "task_retention"
+	// It aliases the Platform-owned policy constant so inserts track the
+	// matrix with no copied literal.
+	QueueName = riverpolicy.RiverQueueTaskRetention
 	// The purge Timeout lives in the River timeout matrix
-	// (taskqueue.RiverJobTimeoutTaskRetention).
+	// (riverpolicy.RiverJobTimeoutTaskRetention).
 )
 
 // retentionLocation matches the other daily maintenance jobs so operators
@@ -59,7 +61,7 @@ func (w *TaskRetentionWorker) Work(ctx context.Context, job *river.Job[taskReten
 }
 
 func (*TaskRetentionWorker) Timeout(*river.Job[taskRetentionScheduleJobArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutTaskRetention
+	return riverpolicy.RiverJobTimeoutTaskRetention
 }
 
 type taskRetentionDailySchedule struct{}
@@ -75,7 +77,7 @@ func (taskRetentionDailySchedule) Next(current time.Time) time.Time {
 
 func PeriodicJobs() []*river.PeriodicJob {
 	insertOpts := func() *river.InsertOpts {
-		return &river.InsertOpts{Queue: QueueName, MaxAttempts: taskqueue.RiverMaxAttemptsTaskRetention, Priority: 4}
+		return &river.InsertOpts{Queue: QueueName, MaxAttempts: riverpolicy.RiverMaxAttemptsTaskRetention, Priority: 4}
 	}
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(

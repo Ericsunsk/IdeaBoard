@@ -9,10 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
-	"ideaboard/api/internal/db/dbutil"
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -24,9 +20,9 @@ type ConfigurationStore interface {
 }
 
 type CheckoutStore interface {
-	ListPaymentRechargeHistory(context.Context, int64, time.Time, *RechargeHistoryCursor, int) ([]dbsqlc.ListPaymentRechargeHistoryRow, error)
-	ListAdminPaymentOrders(context.Context, AdminPaymentOrderFilters) (paymentcontracts.AdminPaymentOrderPage, error)
-	GetAdminPaymentOrder(context.Context, string) (AdminPaymentOrderDetailRecord, []dbsqlc.ListAdminPaymentOrderWebhookEventsRow, error)
+	ListPaymentRechargeHistory(context.Context, int64, time.Time, *RechargeHistoryCursor, int) ([]RechargeHistoryRecord, error)
+	ListAdminPaymentOrders(context.Context, AdminPaymentOrderFilters) ([]AdminPaymentOrderRecord, int64, error)
+	GetAdminPaymentOrder(context.Context, string) (AdminPaymentOrderDetailFacts, []AdminPaymentWebhookEventRecord, error)
 }
 
 type ConvergenceStore interface {
@@ -60,7 +56,23 @@ func (s *Service) ListAdminPaymentOrders(ctx context.Context, input paymentcontr
 	if err != nil {
 		return paymentcontracts.AdminPaymentOrderPage{}, err
 	}
-	return s.checkoutStore.ListAdminPaymentOrders(ctx, filters)
+	records, total, err := s.checkoutStore.ListAdminPaymentOrders(ctx, filters)
+	if err != nil {
+		return paymentcontracts.AdminPaymentOrderPage{}, err
+	}
+	page := paymentcontracts.AdminPaymentOrderPage{Orders: make([]paymentcontracts.AdminPaymentOrderSummary, 0, min(filters.Limit, len(records))), Total: total}
+	if len(records) > filters.Limit {
+		last := records[filters.Limit-1]
+		page.NextCursor, err = EncodeAdminPaymentOrderCursor(last.CreatedAt, last.OrderID)
+		if err != nil {
+			return paymentcontracts.AdminPaymentOrderPage{}, fmt.Errorf("encode admin payment order cursor: %w", err)
+		}
+		records = records[:filters.Limit]
+	}
+	for _, record := range records {
+		page.Orders = append(page.Orders, AdminPaymentOrderSummaryFromRecord(record))
+	}
+	return page, nil
 }
 
 func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (paymentcontracts.AdminPaymentOrderDetail, error) {
@@ -68,10 +80,11 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 		return paymentcontracts.AdminPaymentOrderDetail{}, paymentcontracts.ErrAdminPaymentOrderFilter
 	}
 	orderNumber = strings.TrimSpace(orderNumber)
-	detail, events, err := s.checkoutStore.GetAdminPaymentOrder(ctx, orderNumber)
+	factsRow, events, err := s.checkoutStore.GetAdminPaymentOrder(ctx, orderNumber)
 	if err != nil {
 		return paymentcontracts.AdminPaymentOrderDetail{}, err
 	}
+	detail := AdminPaymentOrderDetailFromFacts(factsRow)
 	facts, err := s.loadAdminPaymentOrderFacts(ctx, orderNumber)
 	if err != nil {
 		return paymentcontracts.AdminPaymentOrderDetail{}, err
@@ -161,7 +174,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 	}
 	page := paymentcontracts.RechargeHistoryPage{Items: make([]paymentcontracts.RechargeHistoryItem, 0, min(limit, len(rows)))}
 	if len(rows) > limit {
-		page.NextCursor, err = EncodeRechargeHistoryCursor(dbutil.TimeValue(rows[limit-1].OccurredAt), uuid.UUID(rows[limit-1].ID.Bytes))
+		page.NextCursor, err = EncodeRechargeHistoryCursor(rows[limit-1].OccurredAt, rows[limit-1].OrderID)
 		if err != nil {
 			return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("encode recharge history cursor: %w", err)
 		}
@@ -177,7 +190,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 	return page, nil
 }
 
-func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontracts.RechargeHistoryItem, error) {
+func rechargeHistoryItem(row RechargeHistoryRecord) (paymentcontracts.RechargeHistoryItem, error) {
 	// The history status is a read-model derivation, not a durable
 	// lifecycle: credited/cancelled mirror the order row, refunded
 	// overlays full settlement. The wire words stay identical; the
@@ -185,19 +198,19 @@ func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontr
 	status, paidAmountMinor, paidCurrency := RechargeHistoryStatus(row.Status), int64(0), ""
 	switch row.Status {
 	case string(paymentsdomain.PaymentOrderCredited):
-		if !row.PaidTotalMinor.Valid || row.PaidCurrency == "" {
+		if row.PaidTotalMinor == nil || row.PaidCurrency == "" {
 			return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid credited payment order history row")
 		}
-		paidAmountMinor, paidCurrency = row.PaidTotalMinor.Int64, strings.ToLower(row.PaidCurrency)
+		paidAmountMinor, paidCurrency = *row.PaidTotalMinor, strings.ToLower(row.PaidCurrency)
 		if row.RefundedIdeaQuantity >= row.IdeaQuantity {
 			status = RechargeHistoryRefunded
 		}
 	case string(paymentsdomain.PaymentOrderCancelled):
-		if row.PaidTotalMinor.Valid || row.PaidCurrency != "" || row.ReceiptUrl != "" {
+		if row.PaidTotalMinor != nil || row.PaidCurrency != "" || row.ReceiptURL != "" {
 			return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid cancelled payment order history row")
 		}
 	default:
 		return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid payment order history status %q", row.Status)
 	}
-	return paymentcontracts.RechargeHistoryItem{OccurredAt: dbutil.TimeValue(row.OccurredAt), IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: string(status), RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl}, nil
+	return paymentcontracts.RechargeHistoryItem{OccurredAt: row.OccurredAt, IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: string(status), RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptURL}, nil
 }

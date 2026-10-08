@@ -1,11 +1,10 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { LibraryMutationPublisher } from '../application/folderFacts'
 import {
-  libraryAssetKey,
-  requireWorkspaceId,
-  type LibrarySearchReference,
-} from '../domain/validators'
+  buildLibraryAssetSavedOutcome,
+  type LibraryMutationPublisher,
+} from '../application/folderFacts'
+import { requireWorkspaceId, type LibrarySearchReference } from '../domain/validators'
 import { saveWorkspaceSearchReference } from '../application/libraryUseCases'
 import type { LibraryAssetView } from '../domain/transfer'
 import {
@@ -112,16 +111,14 @@ export function useLibraryIslandDnD(options: LibraryIslandDnDOptions) {
 
     try {
       const workspaceId = requireWorkspaceId(workspace.workspaceId.value)
-      const asset = await saveWorkspaceSearchReference(workspaceId, reference, targetFolderId)
+      const result = await saveWorkspaceSearchReference(workspaceId, reference, targetFolderId)
+      // The committed save owns the target: publish its actual folders and
+      // reload through the caller's own selection change.
       await mutationPublisher.publishMutation({
-        kind: 'asset-saved',
-        provider: asset.provider,
-        sourceID: asset.sourceId,
-        assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-        affectedFolderKeys: ['all', folderKey],
-        galleryEffect: 'selection-will-reload',
+        ...buildLibraryAssetSavedOutcome(result.asset, 'selection-will-reload'),
+        affectedFolderKeys: result.affectedFolderKeys,
       })
-      workspace.selectFolder(folderKey)
+      workspace.selectFolder(result.asset.folderId ?? LIBRARY_ALL_FOLDER_KEY)
     } catch (error) {
       toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
     }

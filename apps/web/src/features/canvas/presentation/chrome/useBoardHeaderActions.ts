@@ -153,11 +153,15 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
 
   type BoardRenameOutcome = Awaited<ReturnType<typeof boardRepository.commands.rename>>
 
+  function isSyncConflictReason(reason: string): boolean {
+    return reason === 'revision-conflict' || reason === 'idempotency-conflict'
+  }
+
   function selectRenameRestoreErrorMessage(reason: string, rollbackSucceeded: boolean): string {
-    if (reason === 'remote-name-conflict' && rollbackSucceeded) {
+    if (isSyncConflictReason(reason) && rollbackSucceeded) {
       return t('canvas.chrome.conflictRestoredRefreshFailedError')
     }
-    if (reason === 'remote-name-conflict') {
+    if (isSyncConflictReason(reason)) {
       return t('canvas.chrome.conflictRestoreFailedError')
     }
     return t('canvas.chrome.syncFailedRestoreFailedError')
@@ -185,7 +189,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     if (!('rollback' in result)) return
     const hydrateSucceeded = result.hydrate?.ok === true
     const rollbackSucceeded = result.rollback.ok
-    if (result.reason === 'remote-name-conflict' && hydrateSucceeded) {
+    if (isSyncConflictReason(result.reason) && hydrateSucceeded) {
       catalogRecovery.value = { status: 'idle' }
       options.message.error?.(t('canvas.chrome.conflictReloadedError'))
     } else if (rollbackSucceeded && result.reason === 'sync-failed') {

@@ -102,12 +102,13 @@ export function createCommandHandlers({
           clearRename(true)
           feedback.renameValidationFailed(result)
           return
-        case 'remote-name-conflict':
+        case 'revision-conflict':
+        case 'idempotency-conflict':
         case 'sync-failed':
           clearRename(true)
           feedback.renameSyncFailed(result)
           state.catalogRecoveryBoardId.value =
-            result.reason === 'remote-name-conflict'
+            result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
               ? result.hydrate?.ok === true
                 ? null
                 : boardId

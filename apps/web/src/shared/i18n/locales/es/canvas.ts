@@ -113,12 +113,12 @@ export default {
     renameSuccess: 'Lienzo renombrado.',
     duplicateNameWarning: 'El nombre ya existe.',
     renameFailedWarning: 'Error al renombrar.',
-    conflictReloadedError: 'Conflicto de nombres. Lista de lienzos recargada.',
+    conflictReloadedError: 'Conflicto de sincronización. Lista de lienzos recargada.',
     syncFailedRestoredError: 'Error de sincronización al renombrar. Nombre original restaurado.',
     conflictRestoredRefreshFailedError:
-      'Conflicto de nombres. Nombre original restaurado, pero falló la actualización remota. Recargue la página.',
+      'Conflicto de sincronización. Nombre original restaurado, pero falló la actualización remota. Recargue la página.',
     conflictRestoreFailedError:
-      'Conflicto de nombres y fallo al restaurar. Recargue la lista de lienzos.',
+      'Conflicto de sincronización y fallo al restaurar. Recargue la lista de lienzos.',
     syncFailedRestoreFailedError:
       'Error de sincronización al renombrar y no se pudo restaurar el nombre original. Recargue la lista de lienzos.',
     catalogReloadedSuccess: 'Lista de lienzos recargada.',
@@ -328,8 +328,8 @@ export default {
       'Guardado localmente. Falló la sincronización remota; se reintentará cuando se recupere la red.',
     savedLocallyServerFailed:
       'Guardado localmente. Falló la sincronización remota (HTTP {code}); se reintentará con tu próxima edición.',
-    nameConflictSavedLocally:
-      'Guardado localmente, pero ya existe este nombre de lienzo. Elija otro nombre.',
+    syncConflictSavedLocally:
+      'Guardado localmente. Existe una versión más reciente en el servidor; recargue la lista e inténtelo de nuevo.',
     boardDataInvalid:
       'Falló la validación de datos del lienzo. Se mantuvo su lienzo actual. Inténtelo de nuevo más tarde.',
     importSnapshotFailed:

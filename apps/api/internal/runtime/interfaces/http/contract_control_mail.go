@@ -108,6 +108,9 @@ func (d *ContractControlDeps) testControlMailSetting(c *gin.Context, ctx control
 	if !ok {
 		return
 	}
+	// reason/operator_note are tolerated so a body-carried operator note
+	// survives strict binding; the guard already enforced its presence
+	// (detached mutation: reason + Idempotency-Key required).
 	var req struct {
 		Recipient    string `json:"recipient"`
 		Reason       string `json:"reason"`
@@ -122,6 +125,13 @@ func (d *ContractControlDeps) testControlMailSetting(c *gin.Context, ctx control
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest19)
 		return
 	}
+	// External probe: the Auth send runs outside any guard-owned DB
+	// transaction (detached mutation). Only a nil error renders
+	// {sent:true}; delivery failures and unknown results map to
+	// non-2xx (never success) and are never cached by the idempotency
+	// seam, so a retry with the same key re-sends the probe. A
+	// transaction rollback elsewhere never implies the sent probe was
+	// revoked.
 	if err := mail.SendMailConfigTest(c.Request.Context(), recipient, ctx.Operator.UserID()); err != nil {
 		writeControlMailError(c, err)
 		return
@@ -131,8 +141,11 @@ func (d *ContractControlDeps) testControlMailSetting(c *gin.Context, ctx control
 
 // writeControlMailError maps the Auth mail seam failures onto the control
 // envelope. Auth validation (400) and missing-configuration (409) keep
-// their status; everything else fails closed as auth unavailable (503)
-// without leaking provider details.
+// their status; delivery failures and unknown results (Auth 502/500,
+// transport errors, invalid envelopes) fail closed as auth unavailable
+// (503) without leaking provider details and never as success. The
+// idempotency seam only caches 2xx, so these failures re-execute on
+// retry instead of replaying.
 func writeControlMailError(c *gin.Context, err error) {
 	var configErr *auth.MailConfigError
 	if errors.As(err, &configErr) {

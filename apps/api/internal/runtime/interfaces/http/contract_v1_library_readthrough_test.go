@@ -20,8 +20,10 @@ import (
 	"testing"
 	"time"
 
+	libraryapplication "ideaboard/api/internal/library/application"
 	librarydomain "ideaboard/api/internal/library/domain"
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
+	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/outbound"
@@ -131,11 +133,26 @@ func newV1ReadThroughFixture(t *testing.T, fetcher interface {
 		t.Fatal(err)
 	}
 	store.SeedWorkspaceMember(ws.PublicID, member, tenancy.RoleMember)
-	deps := ContractV1Deps{Media: media, MediaObjects: objects, Library: ContractV1LibraryDeps{Store: lib}}
-	deps.libraryMaterializer = fetcher
-	if inlineSpawn {
-		deps.libraryMaterializeSpawn = func(fn func()) { fn() }
+	// Composition-equivalent wiring: the typed read-through service
+	// owns lifecycle + replay; Media owns download + writes. The stub
+	// fetcher rides a real LibraryMaterializer so the tests keep
+	// covering the production download->ingest path with fake bytes.
+	replay := &libraryapplication.StoreReplay{Store: lib}
+	rawMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
+		Media: media, Objects: objects, Fetcher: fetcher, Replay: replay,
+	})
+	if err != nil {
+		t.Fatalf("NewLibraryMaterializer: %v", err)
 	}
+	var executor libraryapplication.Executor = libraryapplication.GoroutineExecutor{}
+	if inlineSpawn {
+		executor = libraryapplication.SpawnFunc(func(fn func()) { fn() })
+	}
+	readThrough := libraryapplication.NewReadThroughService(lib, rawMaterializer, executor, 0)
+	if readThrough == nil {
+		t.Fatal("NewReadThroughService returned nil for test deps")
+	}
+	deps := ContractV1Deps{Media: media, MediaObjects: objects, Library: ContractV1LibraryDeps{Store: lib, ReadThrough: readThrough}}
 	engine := newV1MediaTestEngine(store, dir, deps)
 	return &v1ReadThroughFixture{engine: engine, lib: lib, media: media, objects: objects, ws: ws, owner: owner, member: member}
 }

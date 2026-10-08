@@ -344,8 +344,12 @@ describe('workspace library use cases', () => {
         return HttpResponse.json({ data: assetFixture() }, { status: 201 })
       }),
     )
-    const asset = await saveWorkspaceSearchReference(WORKSPACE_ID, reference, undefined, 'fresh')
-    expect(asset.id).toBe(ASSET_ID)
+    const result = await saveWorkspaceSearchReference(WORKSPACE_ID, reference, undefined, 'fresh')
+    expect(result.asset.id).toBe(ASSET_ID)
+    // The committed facts carry the actually created Folder identity.
+    expect(result.createdFolder?.id).toBe(FOLDER_ID)
+    expect(result.assetKey).toBe('unsplash:u1')
+    expect(result.affectedFolderKeys).toEqual(['all', FOLDER_ID])
     expect(seenBodies).toHaveLength(1)
     expect(seenBodies[0]).toMatchObject({
       data: { provider: 'unsplash', source_id: 'u1', folder_id: FOLDER_ID },
@@ -360,8 +364,11 @@ describe('workspace library use cases', () => {
         return HttpResponse.json({ data: assetFixture({ folder_id: '' }) }, { status: 201 })
       }),
     )
-    const asset = await saveWorkspaceSearchReference(WORKSPACE_ID, reference)
-    expect(asset.folderId).toBeUndefined()
+    const result = await saveWorkspaceSearchReference(WORKSPACE_ID, reference)
+    expect(result.asset.folderId).toBeUndefined()
+    expect(result.createdFolder).toBeUndefined()
+    expect(result.assetKey).toBe('unsplash:u1')
+    expect(result.affectedFolderKeys).toEqual(['all'])
     expect(seenBodies[0]).toMatchObject({ data: { provider: 'unsplash', source_id: 'u1' } })
     expect((seenBodies[0] as { data: Record<string, unknown> }).data).not.toHaveProperty(
       'folder_id',
@@ -390,8 +397,31 @@ describe('workspace library use cases', () => {
         return HttpResponse.json({ data: { deleted: true } })
       }),
     )
-    await removeWorkspaceSearchReference(WORKSPACE_ID, 'unsplash', 'u1')
+    const removed = await removeWorkspaceSearchReference(WORKSPACE_ID, 'unsplash', 'u1')
     expect(deleted).toEqual([ASSET_ID])
+    // The removed facts come from the resolved asset, not the caller input.
+    expect(removed?.asset.id).toBe(ASSET_ID)
+    expect(removed?.assetKey).toBe('unsplash:u1')
+    expect(removed?.affectedFolderKeys).toEqual(['all', FOLDER_ID])
+  })
+
+  it('returns null when removing a reference that was never saved', async () => {
+    const deleted: string[] = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/asset-resolutions', async () => {
+        return HttpResponse.json({
+          data: { items: [{ provider: 'unsplash', source_id: 'ghost', status: 'unresolved' }] },
+        })
+      }),
+      http.delete('/api/v1/workspaces/:workspaceId/library/assets/:assetId', ({ params }) => {
+        deleted.push(String(params.assetId))
+        return HttpResponse.json({ data: { deleted: true } })
+      }),
+    )
+    await expect(
+      removeWorkspaceSearchReference(WORKSPACE_ID, 'unsplash', 'ghost'),
+    ).resolves.toBeNull()
+    expect(deleted).toEqual([])
   })
 
   it('looks up saved keys for the feed without fetching anything', async () => {

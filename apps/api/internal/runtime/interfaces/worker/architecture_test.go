@@ -12,9 +12,11 @@ func TestProviderExecutorImplementsRuntimePort(t *testing.T) {
 }
 
 // The worker implementation collaborates with Tasking exclusively through
-// task, execution, queue and media contracts (tasks, taskexecution, taskqueue, taskmedia).
-// It must never reach into persistence, facades or sibling application
-// packages; those seams belong to Tasking and Runtime wiring.
+// task, execution and media contracts. River retry/timeout policy comes
+// from the Platform-owned riverpolicy module; no worker may import the
+// Tasking concrete queue implementation just to read policy (issue #911).
+// Persistence, facades and sibling application packages stay forbidden;
+// those seams belong to Tasking and Runtime wiring.
 var forbiddenWorkerTaskingImports = []string{
 	"ideaboard/api/internal/tasking/infrastructure/postgres",
 	"ideaboard/api/internal/tasking/application/task",
@@ -22,6 +24,7 @@ var forbiddenWorkerTaskingImports = []string{
 	"ideaboard/api/internal/tasking/application/billing",
 	"ideaboard/api/internal/tasking/application/statistics",
 	"ideaboard/api/internal/tasking/application/retention",
+	"ideaboard/api/internal/tasking/infrastructure/queue",
 }
 
 func TestWorkerCollaboratesThroughTaskingPortsOnly(t *testing.T) {
@@ -37,10 +40,21 @@ func TestWorkerSubpackagesIsolation(t *testing.T) {
 		"ideaboard/api/internal/runtime/interfaces/worker/providers",
 		"ideaboard/api/internal/runtime/interfaces/worker/river",
 		"ideaboard/api/internal/runtime/interfaces/worker/retention",
+		"ideaboard/api/internal/tasking/infrastructure/queue",
 	})
 	archtest.AssertNoForbiddenImports(t, "retention", []string{
 		"ideaboard/api/internal/runtime/interfaces/worker/providers",
 		"ideaboard/api/internal/runtime/interfaces/worker/river",
 		"ideaboard/api/internal/runtime/interfaces/worker/billing",
+		"ideaboard/api/internal/tasking/infrastructure/queue",
+	})
+	archtest.AssertNoForbiddenImports(t, "visionbilling", []string{
+		"ideaboard/api/internal/tasking/infrastructure/queue",
+	})
+	archtest.AssertNoForbiddenImports(t, "outbox", []string{
+		"ideaboard/api/internal/tasking/infrastructure/queue",
+	})
+	archtest.AssertNoForbiddenImports(t, "river", []string{
+		"ideaboard/api/internal/tasking/infrastructure/queue",
 	})
 }

@@ -18,6 +18,7 @@ vi.mock('./sessionPersistence', () => ({
 }))
 
 import { createBrowserSessionTransition } from './browserSessionTransition'
+import { SESSION_TRUST_WINDOW_MS } from './freshness'
 import { makeSessionUser } from '../../../test/factories'
 
 function createHarness(
@@ -26,10 +27,12 @@ function createHarness(
     loaded: boolean
     validatedAt: number
   }> = {},
+  nowSource: number | (() => number) = 1_001,
 ) {
   let user = overrides.user ?? null
   let loaded = overrides.loaded ?? false
   let validatedAt = overrides.validatedAt ?? 0
+  const getNow = typeof nowSource === 'function' ? nowSource : () => nowSource
   const transport = {
     hasSession: vi.fn().mockResolvedValue(true),
     logout: vi.fn().mockResolvedValue(true),
@@ -43,7 +46,7 @@ function createHarness(
     commit: vi.fn((nextUser: User) => {
       user = nextUser
       loaded = true
-      validatedAt = 1_000
+      validatedAt = getNow()
     }),
     restore: vi.fn((storedUser: User) => {
       user = storedUser
@@ -60,7 +63,7 @@ function createHarness(
   const transition = createBrowserSessionTransition(state, {
     transport,
     loadUser,
-    now: () => 1_001,
+    now: getNow,
   })
   return { transition, transport, loadUser, state, getUser: () => user }
 }
@@ -225,5 +228,191 @@ describe('browser session transition', () => {
 
     expect(harness.state.clear).not.toHaveBeenCalled()
     expect(harness.getUser()).toEqual(makeSessionUser({ public_id: 'user-1' }))
+  })
+
+  it('reprobes when the session was validated exactly one trust window ago', async () => {
+    const now = 1_000_000
+    const harness = createHarness(
+      {
+        user: makeSessionUser({ public_id: 'user-1' }),
+        loaded: true,
+        validatedAt: now - SESSION_TRUST_WINDOW_MS,
+      },
+      now,
+    )
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
+
+    await expect(harness.transition.ensureSession()).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+
+    expect(harness.transport.hasSession).toHaveBeenCalledOnce()
+    expect(harness.loadUser).toHaveBeenCalledOnce()
+  })
+
+  it('reuses the cache one millisecond inside the trust window', async () => {
+    const now = 1_000_000
+    const harness = createHarness(
+      {
+        user: makeSessionUser({ public_id: 'user-1' }),
+        loaded: true,
+        validatedAt: now - SESSION_TRUST_WINDOW_MS + 1,
+      },
+      now,
+    )
+
+    await expect(harness.transition.ensureSession()).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+
+    expect(harness.transport.hasSession).not.toHaveBeenCalled()
+    expect(harness.loadUser).not.toHaveBeenCalled()
+  })
+
+  it('reprobes an unverified session instead of trusting it', async () => {
+    const harness = createHarness(
+      { user: makeSessionUser({ public_id: 'user-1' }), loaded: true, validatedAt: 0 },
+      1_000_000,
+    )
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
+
+    await expect(harness.transition.ensureSession()).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+
+    expect(harness.loadUser).toHaveBeenCalledOnce()
+  })
+
+  it('bypasses a fresh cache when fresh is requested', async () => {
+    const now = 1_000_000
+    const harness = createHarness(
+      {
+        user: makeSessionUser({ public_id: 'user-1' }),
+        loaded: true,
+        validatedAt: now - 60_000,
+      },
+      now,
+    )
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
+
+    await expect(harness.transition.ensureSession({ fresh: true })).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+
+    expect(harness.loadUser).toHaveBeenCalledOnce()
+  })
+
+  it('reuses the cache across navigations until the trust window lapses', async () => {
+    const clock = { now: 1_000_000 }
+    const harness = createHarness(
+      { user: makeSessionUser({ public_id: 'user-1' }), loaded: true, validatedAt: 0 },
+      () => clock.now,
+    )
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
+
+    await expect(harness.transition.ensureSession()).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+    expect(harness.loadUser).toHaveBeenCalledTimes(1)
+
+    clock.now += 60_000
+    await expect(harness.transition.ensureSession()).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+    expect(harness.loadUser).toHaveBeenCalledTimes(1)
+
+    clock.now += SESSION_TRUST_WINDOW_MS
+    await expect(harness.transition.ensureSession()).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+    expect(harness.loadUser).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears stale avatars when the server no longer has one', async () => {
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/old.png' }),
+      loaded: true,
+    })
+    mocks.readStoredSessionUser.mockReturnValue(
+      makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/old.png' }),
+    )
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
+
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
+    expect(mocks.persistSessionUser).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-1' }))
+  })
+
+  it('loads the server avatar on a cold start without a stored snapshot', async () => {
+    const harness = createHarness()
+    const serverUser = makeSessionUser({
+      public_id: 'user-1',
+      avatar: '/uploads/profile/U1/avatar.png',
+    })
+    harness.loadUser.mockResolvedValue({ user: serverUser })
+
+    await expect(harness.transition.ensureSession()).resolves.toEqual(serverUser)
+    expect(mocks.persistSessionUser).toHaveBeenCalledWith(serverUser)
+  })
+
+  it('recovers the server avatar after logout and login', async () => {
+    const serverUser = makeSessionUser({
+      public_id: 'user-1',
+      avatar: '/uploads/profile/U1/avatar.png',
+    })
+    const harness = createHarness({ user: serverUser, loaded: true })
+    await harness.transition.logout()
+    expect(harness.getUser()).toBeNull()
+    expect(mocks.clearPersistedSession).toHaveBeenCalled()
+    harness.loadUser.mockResolvedValue({ user: serverUser })
+
+    await expect(harness.transition.ensureSession()).resolves.toEqual(serverUser)
+  })
+
+  it('loads the server avatar after an OAuth callback without a client snapshot', async () => {
+    const harness = createHarness()
+    const serverUser = makeSessionUser({
+      public_id: 'user-1',
+      avatar: '/uploads/profile/U1/avatar.png',
+    })
+    harness.loadUser.mockResolvedValue({ user: serverUser })
+    const replace = vi.fn().mockResolvedValue(undefined)
+
+    await expect(harness.transition.completeOAuthCallback({ replace })).resolves.toBe(true)
+    expect(harness.getUser()).toEqual(serverUser)
+  })
+
+  it('never carries an avatar across identities', async () => {
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar.png' }),
+      loaded: true,
+    })
+    mocks.readStoredSessionUser.mockReturnValue(
+      makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar.png' }),
+    )
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-2' }) })
+
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-2' }),
+    )
+  })
+
+  it('keeps an explicitly committed avatar instead of merging', async () => {
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      loaded: true,
+    })
+
+    harness.transition.setAuth(
+      makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar-new.png' }),
+    )
+
+    expect(harness.getUser()).toEqual(
+      makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar-new.png' }),
+    )
+    expect(mocks.persistSessionUser).toHaveBeenCalledWith(
+      makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar-new.png' }),
+    )
   })
 })

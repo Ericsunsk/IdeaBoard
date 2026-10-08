@@ -10,17 +10,37 @@ describe('createBoardFeedback', () => {
     }
     const feedback = createBoardFeedback(appToast)
 
-    feedback.createFailed({ ok: false, reason: 'name-conflict', board: boardMeta(), error: null })
+    feedback.createFailed({
+      ok: false,
+      reason: 'revision-conflict',
+      board: boardMeta(),
+      error: null,
+    })
+    feedback.createFailed({
+      ok: false,
+      reason: 'idempotency-conflict',
+      board: boardMeta(),
+      error: null,
+    })
     feedback.createFailed({ ok: false, reason: 'sync-failed', board: boardMeta(), error: null })
     feedback.renameValidationFailed({ ok: false, reason: 'local-name-conflict' })
     feedback.renameValidationFailed({ ok: false, reason: 'invalid-name' })
     feedback.renameSyncFailed({
       ok: false,
-      reason: 'remote-name-conflict',
+      reason: 'revision-conflict',
       boardId: 'b1',
       previousBoard: boardMeta(),
       rollback: { ok: true, board: boardMeta() },
       hydrate: { ok: true },
+      error: null,
+    })
+    feedback.renameSyncFailed({
+      ok: false,
+      reason: 'idempotency-conflict',
+      boardId: 'b1',
+      previousBoard: boardMeta(),
+      rollback: { ok: true, board: boardMeta() },
+      hydrate: { ok: false, error: new Error('hydrate failed') },
       error: null,
     })
     feedback.renameSyncFailed({
@@ -32,7 +52,13 @@ describe('createBoardFeedback', () => {
       error: null,
     })
     feedback.copyFailed({ ok: false, reason: 'source-missing' })
-    feedback.copyFailed({ ok: false, reason: 'name-conflict', board: boardMeta(), error: null })
+    feedback.copyFailed({ ok: false, reason: 'revision-conflict', board: boardMeta(), error: null })
+    feedback.copyFailed({
+      ok: false,
+      reason: 'idempotency-conflict',
+      board: boardMeta(),
+      error: null,
+    })
     feedback.copyFailed({ ok: false, reason: 'sync-failed', board: boardMeta(), error: null })
     feedback.deleteFailed({ ok: false, reason: 'sync-failed', error: null })
     feedback.deleteFailed({ ok: false, reason: 'local-missing' })
@@ -44,12 +70,15 @@ describe('createBoardFeedback', () => {
       'Canvas name cannot be empty',
     ])
     expect(appToast.error.mock.calls.map(([message]) => message)).toEqual([
-      'A canvas with this name already exists. Please try again.',
+      'A sync conflict occurred. Please try again.',
+      'A sync conflict occurred. Please try again.',
       'Could not create the canvas. Please try again later.',
-      'Name conflict. The canvas list has been reloaded.',
+      'Sync conflict. The canvas list has been reloaded.',
+      'Sync conflict and recovery incomplete. Please reload the canvas list.',
       'Rename sync failed. The original name has been restored.',
       'Copy failed',
-      'A canvas with the copied name already exists. Please try again.',
+      'A sync conflict occurred while copying. Please try again.',
+      'A sync conflict occurred while copying. Please try again.',
       'Copy sync failed. Please try again later.',
       'Delete failed. Please try again later.',
       'Delete failed',

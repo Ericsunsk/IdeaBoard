@@ -6,12 +6,14 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/searchcatalog/application"
 	"ideaboard/api/internal/searchcatalog/domain"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 )
 
-const VisionBillingQueue = "vision_billing"
+// VisionBillingQueue aliases the Platform-owned policy constant so inserts
+// track the matrix with no copied literal.
+const VisionBillingQueue = riverpolicy.RiverQueueVisionBilling
 
 type visionBillingReconciliationArgs struct{}
 
@@ -27,7 +29,7 @@ func NewVisionBillingReconciliationWorker(service *application.VisionBillingServ
 }
 
 func (*VisionBillingReconciliationWorker) Timeout(*river.Job[visionBillingReconciliationArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutVisionBilling
+	return riverpolicy.RiverJobTimeoutVisionBilling
 }
 
 func (w *VisionBillingReconciliationWorker) Work(ctx context.Context, job *river.Job[visionBillingReconciliationArgs]) error {
@@ -47,7 +49,7 @@ func VisionBillingPeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
 		visionBillingReconciliationSchedule{},
 		func() (river.JobArgs, *river.InsertOpts) {
-			return visionBillingReconciliationArgs{}, &river.InsertOpts{Queue: VisionBillingQueue, MaxAttempts: taskqueue.RiverMaxAttemptsVisionBilling, Priority: 4}
+			return visionBillingReconciliationArgs{}, &river.InsertOpts{Queue: VisionBillingQueue, MaxAttempts: riverpolicy.RiverMaxAttemptsVisionBilling, Priority: 4}
 		},
 		&river.PeriodicJobOpts{ID: "vision-billing-reconciliation", RunOnStart: true},
 	)}

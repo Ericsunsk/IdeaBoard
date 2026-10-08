@@ -67,9 +67,9 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/platform/telemetry"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/riverqueue/river"
@@ -210,7 +210,7 @@ func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker,
 
 // Timeout bounds one workspace execution with the existing drawing budget.
 func (w *WorkspaceTaskWorker) Timeout(*river.Job[workspacetasks.WorkspaceTaskArgs]) time.Duration {
-	return taskqueue.RiverJobTimeoutDrawing
+	return riverpolicy.RiverJobTimeoutDrawing
 }
 
 // Work runs one attempt of the claim -> process -> complete loop. It returns

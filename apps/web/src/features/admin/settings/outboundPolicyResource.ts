@@ -1,4 +1,8 @@
-import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
+import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+  type ControlMutationOptions,
+} from '../shared/lib/controlMutation'
 import { useQuery } from '@tanstack/vue-query'
 import {
   getControlOutboundPolicy,
@@ -16,10 +20,7 @@ import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './outbo
 // gone; this module is the single transport.
 export const outboundPolicyQueryKey = ['admin', 'settings', 'outbound-policy'] as const
 
-export type OutboundPolicyMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type OutboundPolicyMutationOptions = ControlMutationOptions
 
 export function useOutboundPolicyResource() {
   const query = useQuery<OutboundPolicySetting, Error>({

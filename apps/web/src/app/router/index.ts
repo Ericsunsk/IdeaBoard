@@ -3,14 +3,9 @@ import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../../features/auth'
 import { dismissAppToasts, useAppToast } from '../../shared/composables/useAppToast'
 import { i18n } from '../../shared/i18n'
-import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/navigationMeta'
 import { adminRoutes } from '../../features/admin/app/routes'
-import {
-  WORKSPACE_DEFAULT_PATH,
-  workspaceRoutes,
-} from '../../features/workspace/routes/workspaceRoutes'
+import { workspaceRoutes } from '../../features/workspace/routes/workspaceRoutes'
 import { ADMIN_ROOT_PATH, HOME_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
-import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
 import { applyRouteSeo } from '../../shared/seo/routeSeo'
 import {
   readSessionStorageItem,
@@ -18,7 +13,7 @@ import {
   writeSessionStorageItem,
 } from '../../shared/utils/storage'
 import { CHUNK_RELOAD_GUARD_KEY, isChunkLoadFailure, resolveScrollPosition } from './routeRecovery'
-import { SESSION_FRESH_THRESHOLD_MS } from '../../shared/config/timing'
+import { resolveAuthGateRedirect, resolveAuthSessionRefresh } from './authGate'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -56,35 +51,22 @@ router.onError((error) => {
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
   const isAdminRoute = isPathUnderRoute(to.path, ADMIN_ROOT_PATH)
-  // Admin routes revalidate at most every 5 min: single-team surface with
-  // no role-flip threat, so a recently validated session is trusted between
-  // navigations instead of reprobing on every admin navigation.
-  const needsFreshSession =
-    isAdminRoute && Date.now() - userStore.sessionValidatedAt > SESSION_FRESH_THRESHOLD_MS
-  const shouldRefreshSession = needsFreshSession || !!to.meta.requiresAuth || !!to.meta.guest
-  const user = shouldRefreshSession
-    ? await userStore.ensureSession({ fresh: needsFreshSession })
-    : userStore.user
+  const { shouldRefresh, needsFresh } = resolveAuthSessionRefresh({
+    isAdminRoute,
+    requiresAuth: to.meta.requiresAuth,
+    guest: to.meta.guest,
+    validatedAt: userStore.sessionValidatedAt,
+  })
+  const user = shouldRefresh ? await userStore.ensureSession({ fresh: needsFresh }) : userStore.user
 
-  const isLoggedIn = !!user
-
-  if (to.meta.requiresAuth && !isLoggedIn) {
-    return buildLoginRedirectPath(to.path, to.fullPath)
-  }
-
-  if (to.meta.guest && isLoggedIn) {
-    if (isAdminRoute) {
-      return user?.role === 'admin' ? ADMIN_DEFAULT_PATH : WORKSPACE_DEFAULT_PATH
-    } else {
-      return WORKSPACE_DEFAULT_PATH
-    }
-  }
-
-  if (isAdminRoute && user && user.role !== 'admin') {
-    return WORKSPACE_DEFAULT_PATH
-  }
-
-  return true
+  return resolveAuthGateRedirect({
+    isAdminRoute,
+    requiresAuth: to.meta.requiresAuth,
+    guest: to.meta.guest,
+    user,
+    currentPath: to.path,
+    currentFullPath: to.fullPath,
+  })
 })
 
 router.afterEach((to, from) => {

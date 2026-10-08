@@ -10,11 +10,12 @@ import {
 } from './boards'
 import {
   clearPendingBoardSyncRollback,
+  getBoardSyncConflictKind,
   hydrateBoardsFromServer,
-  isBoardNameConflictError,
   syncBoardRenameToServer,
   syncBoardToServer,
   syncDeleteBoardToServer,
+  type BoardSyncConflictKind,
   type HydrateBoardsFromServerOptions,
   type HydrateBoardsFromServerResult,
 } from '../sync/boardSync'
@@ -30,7 +31,12 @@ export type BoardScopeChangedResult = { ok: false; reason: 'scope-changed' }
 
 export type BoardCreateResult =
   | { ok: true; board: BoardMeta }
-  | { ok: false; reason: 'name-conflict' | 'sync-failed'; board: BoardMeta; error: unknown }
+  | {
+      ok: false
+      reason: BoardSyncConflictKind | 'sync-failed'
+      board: BoardMeta
+      error: unknown
+    }
   | BoardScopeChangedResult
 
 export type BoardRenameResult =
@@ -38,7 +44,7 @@ export type BoardRenameResult =
   | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
   | {
       ok: false
-      reason: 'remote-name-conflict' | 'sync-failed'
+      reason: BoardSyncConflictKind | 'sync-failed'
       boardId: string
       error: unknown
     }
@@ -48,7 +54,7 @@ export type BoardRenameRemoteResult =
   | { ok: true; board: BoardMeta }
   | {
       ok: false
-      reason: 'remote-name-conflict' | 'sync-failed'
+      reason: BoardSyncConflictKind | 'sync-failed'
       boardId: string
       board: BoardMeta
       previousBoard: BoardMeta
@@ -73,7 +79,12 @@ export type BoardRollbackRenameResult =
 export type BoardDuplicateResult =
   | { ok: true; board: BoardMeta }
   | { ok: false; reason: 'source-missing'; error?: undefined }
-  | { ok: false; reason: 'name-conflict' | 'sync-failed'; board: BoardMeta; error: unknown }
+  | {
+      ok: false
+      reason: BoardSyncConflictKind | 'sync-failed'
+      board: BoardMeta
+      error: unknown
+    }
   | BoardScopeChangedResult
 
 export type BoardDeleteResult =
@@ -95,7 +106,7 @@ export interface BoardCommandDependencies {
   syncRenameBoard(boardId: string, nextName: string): Promise<void>
   syncDeleteBoard(boardId: string): Promise<void>
   hydrateBoards(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
-  isNameConflictError(error: unknown): boolean
+  getSyncConflictKind(error: unknown): BoardSyncConflictKind | null
   isNotFoundError(error: unknown): boolean
   clearSyncRollback(boardId: string): void
   isMutationCurrent(): boolean
@@ -134,7 +145,7 @@ const defaultDependencies: BoardCommandDependencies = {
   syncRenameBoard: syncBoardRenameToServer,
   syncDeleteBoard: syncDeleteBoardToServer,
   hydrateBoards: hydrateBoardsFromServer,
-  isNameConflictError: isBoardNameConflictError,
+  getSyncConflictKind: getBoardSyncConflictKind,
   isNotFoundError: isBoardNotFoundError,
   clearSyncRollback: clearPendingBoardSyncRollback,
   isMutationCurrent: () => true,
@@ -170,7 +181,12 @@ async function archiveServerBoardAfterScopeChange(
 
 type SyncRegisteredBoardResult =
   | { ok: true; board: BoardMeta }
-  | { ok: false; reason: 'name-conflict' | 'sync-failed'; board: BoardMeta; error: unknown }
+  | {
+      ok: false
+      reason: BoardSyncConflictKind | 'sync-failed'
+      board: BoardMeta
+      error: unknown
+    }
   | BoardScopeChangedResult
 
 // Shared document-sync confirmation for server-minted boards (create and
@@ -188,9 +204,10 @@ async function syncRegisteredBoard(
     if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
     deps.deleteBoard(board.id)
     deps.deleteBoardState(board.id)
-    if (deps.isNameConflictError(error)) {
+    const conflictKind = deps.getSyncConflictKind(error)
+    if (conflictKind) {
       await deps.hydrateBoards()
-      return { ok: false as const, reason: 'name-conflict' as const, board, error }
+      return { ok: false as const, reason: conflictKind, board, error }
     }
     return { ok: false as const, reason: 'sync-failed' as const, board, error }
   }
@@ -213,7 +230,7 @@ export function createBoardCommands(
       .then(() => ({ ok: true as const, board }))
       .catch((error) => ({
         ok: false as const,
-        reason: deps.isNameConflictError(error) ? 'remote-name-conflict' : 'sync-failed',
+        reason: deps.getSyncConflictKind(error) ?? ('sync-failed' as const),
         boardId,
         board,
         previousBoard,
@@ -295,9 +312,10 @@ export function createBoardCommands(
       // board stays in its own scope and the new scope is never touched.
       if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
       cleanupLocal()
-      if (deps.isNameConflictError(error)) {
+      const conflictKind = deps.getSyncConflictKind(error)
+      if (conflictKind) {
         await deps.hydrateBoards()
-        return { ok: false, reason: 'name-conflict', board: localBoard, error }
+        return { ok: false, reason: conflictKind, board: localBoard, error }
       }
       return { ok: false, reason: 'sync-failed', board: localBoard, error }
     }
@@ -344,13 +362,14 @@ export function createBoardCommands(
       if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
       if (remote.ok) return { ok: true, board: remote.board }
       {
-        const isConflict = remote.reason === 'remote-name-conflict'
+        const isConflict =
+          remote.reason === 'revision-conflict' || remote.reason === 'idempotency-conflict'
         await deps.hydrateBoards(
           isConflict ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] } : undefined,
         )
         return {
           ok: false,
-          reason: isConflict ? 'remote-name-conflict' : 'sync-failed',
+          reason: remote.reason,
           boardId,
           error: remote.error,
         }
@@ -366,11 +385,15 @@ export function createBoardCommands(
       if (!copy) {
         return { ok: false, reason: 'source-missing' }
       }
-      return createServerBoardAndSync(copy, () => {
-        deps.deleteBoard(copy.id)
-      }, (registeredBoardId) => {
-        deps.duplicateBoardState(sourceBoardId, registeredBoardId)
-      })
+      return createServerBoardAndSync(
+        copy,
+        () => {
+          deps.deleteBoard(copy.id)
+        },
+        (registeredBoardId) => {
+          deps.duplicateBoardState(sourceBoardId, registeredBoardId)
+        },
+      )
     },
 
     async delete({ boardId }) {

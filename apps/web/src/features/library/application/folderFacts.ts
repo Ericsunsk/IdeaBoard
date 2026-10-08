@@ -1,9 +1,12 @@
 import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
 import { i18n } from '../../../shared/i18n'
-import type { WorkspaceLibraryFolder } from '../domain/validators'
+import { libraryAssetKey, type WorkspaceLibraryFolder } from '../domain/validators'
 
 export type LibraryFolderView = WorkspaceLibraryFolder
+
+/** Virtual aggregate key for the unfiled-inclusive gallery view. */
+export const LIBRARY_ALL_FOLDER_KEY = 'all'
 
 export type LibraryFolderFacts = {
   folders: Readonly<ShallowRef<LibraryFolderView[]>>
@@ -53,6 +56,81 @@ export type LibraryMutationPublisher = {
   publishMutation: (outcome: LibraryMutationOutcome) => Promise<void>
   publishMutations: (outcomes: LibraryMutationOutcome[]) => Promise<void>
   subscribe: (listener: (outcome: LibraryMutationOutcome) => void) => () => void
+}
+
+// Committed writes own asset identities and affected folders.
+// Surfaces choose galleryEffect: reload-current, selection-will-reload, or none.
+
+export type LibraryAssetFact = {
+  provider: ExternalImageProvider
+  sourceId: string
+  folderId?: string | null | undefined
+}
+
+/** `all` plus the concrete folder when the asset is filed. */
+export function libraryAffectedFolderKeysForAsset(folderId?: string | null | undefined): string[] {
+  return folderId ? [LIBRARY_ALL_FOLDER_KEY, folderId] : [LIBRARY_ALL_FOLDER_KEY]
+}
+
+/** Deduplicates folder keys while keeping first-seen order. */
+export function uniqueLibraryFolderKeys(keys: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>()
+  for (const key of keys) {
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+  }
+  return [...seen]
+}
+
+export function buildLibraryAssetSavedOutcome(
+  asset: LibraryAssetFact,
+  galleryEffect: LibraryGalleryEffect,
+): LibraryMutationOutcome {
+  return {
+    kind: 'asset-saved',
+    provider: asset.provider,
+    sourceID: asset.sourceId,
+    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+    affectedFolderKeys: libraryAffectedFolderKeysForAsset(asset.folderId),
+    galleryEffect,
+  }
+}
+
+export function buildLibraryAssetRemovedOutcome(
+  asset: LibraryAssetFact,
+  galleryEffect: LibraryGalleryEffect,
+): LibraryMutationOutcome {
+  return {
+    kind: 'asset-removed',
+    provider: asset.provider,
+    sourceID: asset.sourceId,
+    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+    affectedFolderKeys: libraryAffectedFolderKeysForAsset(asset.folderId),
+    galleryEffect,
+  }
+}
+
+export function buildLibraryAssetMovedOutcome(
+  input: { previousFolderId?: string | null | undefined; asset: LibraryAssetFact },
+  galleryEffect: LibraryGalleryEffect,
+): LibraryMutationOutcome {
+  return {
+    kind: 'asset-moved',
+    affectedFolderKeys: uniqueLibraryFolderKeys([
+      LIBRARY_ALL_FOLDER_KEY,
+      input.previousFolderId,
+      input.asset.folderId,
+    ]),
+    galleryEffect,
+  }
+}
+
+export function buildLibraryFolderOutcome(
+  kind: 'folder-created' | 'folder-renamed' | 'folder-deleted',
+  folderId: string,
+  galleryEffect: LibraryGalleryEffect,
+): LibraryMutationOutcome {
+  return { kind, affectedFolderKeys: [folderId], galleryEffect }
 }
 
 export function createLibraryMutationPublisher(

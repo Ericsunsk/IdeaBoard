@@ -1146,6 +1146,11 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	if h.deps.AvatarProfile == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
+		c.Abort()
+		return
+	}
 	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, v1AvatarMaxBytes+1))
 	if readErr != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgRequireEmptyV1BillingActionBody)
@@ -1202,7 +1207,11 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 		if putErr := h.deps.MediaObjects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, objectKey, data, mime); putErr != nil {
 			return nil, errV1MediaBytesStoreUnavailable
 		}
-		return &v1AvatarDTO{AvatarURL: "/" + objectKey}, nil
+		avatarURL := "/" + objectKey
+		if writeErr := h.deps.AvatarProfile.UpdateUserAvatar(ctx, identityPrincipal.UserID(), avatarURL); writeErr != nil {
+			return nil, writeErr
+		}
+		return &v1AvatarDTO{AvatarURL: avatarURL}, nil
 	})
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {

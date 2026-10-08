@@ -15,7 +15,9 @@ import (
 	"ideaboard/api/internal/identity/users/application/administration"
 	"ideaboard/api/internal/identity/users/application/authsync"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
+	libraryapplication "ideaboard/api/internal/library/application"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
+	materializerassets "ideaboard/api/internal/media/assets"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
@@ -24,6 +26,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/idempotency"
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/prompts"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	"ideaboard/api/internal/runtime/adapters/webdist"
@@ -110,6 +113,24 @@ func newAppRouter(
 	if err := router.SetTrustedProxies(cfg.App.TrustedProxies); err != nil {
 		return nil, fmt.Errorf("invalid trusted proxies %v: %w", cfg.App.TrustedProxies, err)
 	}
+	// Library materialization read-through (issue #908): composition
+	// injects the typed store/materializer/executor seams. Media owns
+	// remote download + managed-media writes; Library application owns
+	// lifecycle + replay orchestration; HTTP only translates
+	// requests/responses. A materializer build failure fails startup
+	// (fail closed) instead of serving silent 404s.
+	libraryStore := librarypostgres.NewService(repos.db)
+	libraryMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
+		Media: taskServices.workspaceTaskMedia, Objects: services.storageService,
+		Fetcher:  materializerassets.RemoteLibrarySourceFetcher{},
+		Renderer: taskruntime.WorkspaceTaskDerivativeRenderer{},
+		Replay:   &libraryapplication.StoreReplay{Store: libraryStore},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize library materializer: %w", err)
+	}
+	libraryReadThrough := libraryapplication.NewReadThroughService(
+		libraryStore, libraryMaterializer, libraryapplication.GoroutineExecutor{}, libraryapplication.DefaultReadThroughTimeout)
 	// Panic recovery, access logging and request IDs are registered in
 	// registerGlobalMiddleware so every route shares the error envelope.
 	registerHTTPRoutes(router, httpapi.Dependencies{
@@ -118,15 +139,19 @@ func newAppRouter(
 			SupportChannels: services.runtimeSettings,
 			Store:           tenancypg.NewStore(repos.db),
 			Users:           httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			AvatarUID:       httpapi.NewV1AvatarDirectory(repos.userRepo),
+			AvatarProfile:   httpapi.NewV1AvatarProfileDirectory(repos.userRepo),
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
 			Boards: boards.NewPostgresWorkspaceBoardStore(repos.db),
 			// Workspace library and media stores are live. Library
 			// materialization is internal-only (owner hard cut): no
 			// public materialization route or emitter is wired here;
-			// only the library Store is supplied.
+			// the read-through orchestrator rides the typed
+			// store/materializer/executor seams built above.
 			Library: httpapi.ContractV1LibraryDeps{
-				Store: librarypostgres.NewService(repos.db),
+				Store:       libraryStore,
+				ReadThrough: libraryReadThrough,
 			},
 			Media: taskServices.workspaceTaskMedia,
 			// Binary reads ride the storage service. Upload completion
@@ -314,7 +339,7 @@ func newControlMonitorHandler(db *pgxpool.Pool) *statisticshttp.Handler {
 		return nil
 	}
 	store := taskpostgres.NewStatisticsStore(db)
-	monitor := taskqueue.NewRiverQueue(nil, db, taskqueue.RiverMaxAttemptsDefault)
+	monitor := taskqueue.NewRiverQueue(nil, db, riverpolicy.RiverMaxAttemptsDefault)
 	return statisticshttp.NewHandler(statisticsapp.NewService(store), monitor)
 }
 

@@ -65,8 +65,14 @@ function makeDeps(states: Record<string, BoardState | null>): BoardPreviewRefres
     ),
     renderPreview: vi.fn(async () => 'data:image/png;base64,preview'),
     syncBoard: vi.fn(async () => undefined),
-    isNameConflictError: vi.fn((error: unknown) => {
-      return typeof error === 'object' && !!error && 'status' in error && error.status === 409
+    isSyncConflictError: vi.fn((error: unknown) => {
+      if (typeof error !== 'object' || !error) return false
+      const record = error as { status?: unknown; code?: unknown }
+      return (
+        record.status === 409 ||
+        record.code === 'board_revision_conflict' ||
+        record.code === 'board_idempotency_conflict'
+      )
     }),
     rendererVersion: 8,
     now: vi.fn(() => 500),
@@ -363,18 +369,49 @@ describe('boardPreviewRefreshQueue', () => {
     )
   })
 
-  it('ignores name conflict errors from background sync', async () => {
+  it('ignores sync-conflict errors from background sync', async () => {
     const states = {
       boardA: makeState({ updatedAt: 100 }),
     }
     const deps = makeDeps(states)
-    vi.mocked(deps.syncBoard).mockRejectedValueOnce({ status: 409 })
+    vi.mocked(deps.syncBoard).mockRejectedValueOnce({
+      status: 409,
+      code: 'board_revision_conflict',
+    })
     const queue = createBoardPreviewRefreshQueue(deps)
 
     queue.schedule([makeBoard('boardA')])
     await flushPromises()
 
-    expect(deps.isNameConflictError).toHaveBeenCalledWith({ status: 409 })
+    expect(deps.isSyncConflictError).toHaveBeenCalledWith({
+      status: 409,
+      code: 'board_revision_conflict',
+    })
+    expect(deps.warn).not.toHaveBeenCalledWith(
+      '[boards] failed to sync refreshed preview',
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  it('ignores idempotency conflicts from background sync', async () => {
+    const states = {
+      boardA: makeState({ updatedAt: 100 }),
+    }
+    const deps = makeDeps(states)
+    vi.mocked(deps.syncBoard).mockRejectedValueOnce({
+      status: 409,
+      code: 'board_idempotency_conflict',
+    })
+    const queue = createBoardPreviewRefreshQueue(deps)
+
+    queue.schedule([makeBoard('boardA')])
+    await flushPromises()
+
+    expect(deps.isSyncConflictError).toHaveBeenCalledWith({
+      status: 409,
+      code: 'board_idempotency_conflict',
+    })
     expect(deps.warn).not.toHaveBeenCalledWith(
       '[boards] failed to sync refreshed preview',
       expect.anything(),

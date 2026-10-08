@@ -17,8 +17,9 @@ import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persis
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
 import {
   hydrateBoardsFromServer,
+  getBoardSyncConflictKind,
   isBoardArchivedError,
-  isBoardNameConflictError,
+  isBoardSyncConflictError,
   syncBoardRenameToServer,
   syncBoardToServer,
   syncDeleteBoardToServer,
@@ -127,12 +128,8 @@ function primeAuthenticatedWorkspace() {
   setStoredAuth({
     public_id: '00000000-0000-0000-0000-000000000001',
     display_name: 'tester',
-    storage_namespace: 'ABC123',
     avatar: '',
     role: 'user',
-    status: 1,
-    created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:00:00.000Z',
   })
   resetWorkspaceSelectionStore()
   getWorkspaceSelectionStore().select(WORKSPACE_ID)
@@ -322,12 +319,8 @@ describe('boardSync', () => {
     setStoredAuth({
       public_id: '00000000-0000-0000-0000-000000000002',
       display_name: 'other-user',
-      storage_namespace: 'XYZ789',
       avatar: '',
       role: 'user',
-      status: 1,
-      created_at: '2026-01-01T00:00:00.000Z',
-      updated_at: '2026-01-01T00:00:00.000Z',
     })
     replaceBoards([boardMeta('board-b', 'User B Board', 3_000)])
     resolveRequest(apiState.boardsResponse)
@@ -771,7 +764,7 @@ describe('boardSync', () => {
 
     expect(apiState.savedCalls.filter((call) => call.method === 'PUT')).toEqual([])
     expect(isBoardArchivedError(renameError)).toBe(true)
-    expect(isBoardNameConflictError(renameError)).toBe(false)
+    expect(isBoardSyncConflictError(renameError)).toBe(false)
   })
 
   it('sends the observed revision as If-Match and stores the server revision', async () => {
@@ -931,7 +924,7 @@ describe('boardSync', () => {
       code: 'board_archived',
     })
     expect(isBoardArchivedError(apiState.saveError)).toBe(true)
-    expect(isBoardNameConflictError(apiState.saveError)).toBe(false)
+    expect(isBoardSyncConflictError(apiState.saveError)).toBe(false)
   })
 
   it('restores an archived board on the v1 restore path', async () => {
@@ -957,6 +950,54 @@ describe('boardSync', () => {
     expect(call).toBeTruthy()
     expect(apiState.archivedBoardIds).toEqual([])
     expect(meta.archivedAt).toBeUndefined()
+  })
+})
+
+describe('board sync conflict classifier', () => {
+  it('distinguishes revision conflicts from ordinary sync failures', () => {
+    const error = { status: 409, code: 'board_revision_conflict', msg: '看板版本已变更' }
+
+    expect(getBoardSyncConflictKind(error)).toBe('revision-conflict')
+    expect(isBoardSyncConflictError(error)).toBe(true)
+    expect(isBoardArchivedError(error)).toBe(false)
+  })
+
+  it('distinguishes idempotency conflicts from ordinary sync failures', () => {
+    const error = { status: 409, code: 'board_idempotency_conflict', msg: '幂等冲突' }
+
+    expect(getBoardSyncConflictKind(error)).toBe('idempotency-conflict')
+    expect(isBoardSyncConflictError(error)).toBe(true)
+    expect(isBoardArchivedError(error)).toBe(false)
+  })
+
+  it('resolves canonical codes through wrapped causes', () => {
+    const revisionCause = { status: 409, code: 'board_revision_conflict' }
+    const idempotencyCause = { status: 409, code: 'board_idempotency_conflict' }
+
+    expect(getBoardSyncConflictKind(new Error('save failed', { cause: revisionCause }))).toBe(
+      'revision-conflict',
+    )
+    expect(getBoardSyncConflictKind(new Error('create failed', { cause: idempotencyCause }))).toBe(
+      'idempotency-conflict',
+    )
+    expect(isBoardSyncConflictError(new Error('wrapped', { cause: revisionCause }))).toBe(true)
+  })
+
+  it('falls back to revision-conflict for a code-less 409', () => {
+    expect(getBoardSyncConflictKind({ status: 409 })).toBe('revision-conflict')
+    expect(isBoardSyncConflictError({ status: 409 })).toBe(true)
+    expect(isBoardSyncConflictError(new Error('transport 409', { cause: { status: 409 } }))).toBe(
+      true,
+    )
+  })
+
+  it('never classifies archived writes or ordinary failures as conflicts', () => {
+    expect(getBoardSyncConflictKind({ status: 409, code: 'board_archived' })).toBeNull()
+    expect(isBoardSyncConflictError({ status: 409, code: 'board_archived' })).toBe(false)
+    expect(getBoardSyncConflictKind(new Error('network down'))).toBeNull()
+    expect(isBoardSyncConflictError(new Error('network down'))).toBe(false)
+    expect(getBoardSyncConflictKind({ status: 500, code: 'service_unavailable' })).toBeNull()
+    expect(isBoardSyncConflictError({ status: 500 })).toBe(false)
   })
 })
 

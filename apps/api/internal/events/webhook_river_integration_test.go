@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/riverpolicy"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 
@@ -103,7 +103,7 @@ SELECT args, attempt, max_attempts FROM river_job
 	if args.SubscriptionID != sub.ID || args.DeliveryID != envelope.ID {
 		t.Fatalf("redelivered args=%+v, want sub %s delivery %s", args, sub.ID, envelope.ID)
 	}
-	if maxAttempts != taskqueue.RiverMaxAttemptsWebhookDeliver {
+	if maxAttempts != riverpolicy.RiverMaxAttemptsWebhookDeliver {
 		t.Fatalf("row max_attempts=%d, want the 8-attempt budget", maxAttempts)
 	}
 	if attempt < 1 {
@@ -207,9 +207,9 @@ func TestWebhookDeadLetterSurvivesRestart(t *testing.T) {
 	store.Dispatch(t.Context(), envelope)
 	worker := events.NewWebhookDeliverWorker(store)
 	args := events.WebhookDeliveryArgs{SubscriptionID: sub.ID, DeliveryID: envelope.ID, Envelope: envelope}
-	for attempt := 1; attempt <= taskqueue.RiverMaxAttemptsWebhookDeliver; attempt++ {
+	for attempt := 1; attempt <= riverpolicy.RiverMaxAttemptsWebhookDeliver; attempt++ {
 		job := &river.Job[events.WebhookDeliveryArgs]{
-			JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: taskqueue.RiverMaxAttemptsWebhookDeliver},
+			JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: riverpolicy.RiverMaxAttemptsWebhookDeliver},
 			Args:   args,
 		}
 		if err := worker.Work(t.Context(), job); err == nil {
@@ -225,7 +225,7 @@ JOIN workspace_events e ON e.internal_id=d.event_id
 WHERE s.public_id=$1 AND e.public_id=$2`, sub.ID, envelope.ID).Scan(&status, &attempts); err != nil {
 		t.Fatal(err)
 	}
-	if status != "dead_letter" || attempts != taskqueue.RiverMaxAttemptsWebhookDeliver {
+	if status != "dead_letter" || attempts != riverpolicy.RiverMaxAttemptsWebhookDeliver {
 		t.Fatalf("durable delivery status=%q attempts=%d", status, attempts)
 	}
 	var attemptRows int
@@ -236,8 +236,8 @@ JOIN event_subscriptions s ON s.internal_id=d.subscription_id
 WHERE s.public_id=$1`, sub.ID).Scan(&attemptRows); err != nil {
 		t.Fatal(err)
 	}
-	if attemptRows != taskqueue.RiverMaxAttemptsWebhookDeliver {
-		t.Fatalf("durable attempt rows=%d, want %d", attemptRows, taskqueue.RiverMaxAttemptsWebhookDeliver)
+	if attemptRows != riverpolicy.RiverMaxAttemptsWebhookDeliver {
+		t.Fatalf("durable attempt rows=%d, want %d", attemptRows, riverpolicy.RiverMaxAttemptsWebhookDeliver)
 	}
 	restarted := events.NewWebhookStore(sender, nil)
 	restarted.SetPersistence(events.NewPostgresWebhookPersistence(pool))

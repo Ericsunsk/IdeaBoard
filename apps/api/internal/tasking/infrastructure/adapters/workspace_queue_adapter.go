@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
@@ -54,10 +55,10 @@ var _ workspacetasks.TxEnqueuer = (*WorkspaceTaskEnqueuer)(nil)
 
 func NewWorkspaceTaskEnqueuer(client workspaceRiverClient, queue string, maxAttempts int) *WorkspaceTaskEnqueuer {
 	if strings.TrimSpace(queue) == "" {
-		queue = "drawing_default"
+		queue = riverpolicy.RiverQueueDefault
 	}
 	if maxAttempts <= 0 {
-		maxAttempts = 25
+		maxAttempts = riverpolicy.RiverMaxAttemptsDefault
 	}
 	return &WorkspaceTaskEnqueuer{client: client, queue: queue, maxAttempts: maxAttempts}
 }

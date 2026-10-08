@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/riverqueue/river"
@@ -63,16 +63,16 @@ func newTestSweepWorker(store TaskSettlementSweepStore, settler TaskSettlementSw
 // times out instead of piling up behind the next one.
 func TestTaskSettlementSweepUsesCodeOwnedBudget(t *testing.T) {
 	worker := newTestSweepWorker(&sweepFakeStore{}, &sweepFakeSettler{}, time.Now())
-	if got := worker.Timeout(nil); got != taskqueue.RiverJobTimeoutTaskSettlementSweep {
-		t.Fatalf("Timeout = %s, want the matrix constant %s", got, taskqueue.RiverJobTimeoutTaskSettlementSweep)
+	if got := worker.Timeout(nil); got != riverpolicy.RiverJobTimeoutTaskSettlementSweep {
+		t.Fatalf("Timeout = %s, want the matrix constant %s", got, riverpolicy.RiverJobTimeoutTaskSettlementSweep)
 	}
-	if got := worker.MaxAttempts(nil); got != taskqueue.RiverMaxAttemptsTaskSettlementSweep {
-		t.Fatalf("MaxAttempts = %d, want the matrix constant %d", got, taskqueue.RiverMaxAttemptsTaskSettlementSweep)
+	if got := worker.MaxAttempts(nil); got != riverpolicy.RiverMaxAttemptsTaskSettlementSweep {
+		t.Fatalf("MaxAttempts = %d, want the matrix constant %d", got, riverpolicy.RiverMaxAttemptsTaskSettlementSweep)
 	}
-	if taskqueue.RiverJobTimeoutTaskSettlementSweep >= taskSettlementSweepPeriod {
-		t.Fatalf("sweep timeout %s must stay below the %s periodic interval", taskqueue.RiverJobTimeoutTaskSettlementSweep, taskSettlementSweepPeriod)
+	if riverpolicy.RiverJobTimeoutTaskSettlementSweep >= taskSettlementSweepPeriod {
+		t.Fatalf("sweep timeout %s must stay below the %s periodic interval", riverpolicy.RiverJobTimeoutTaskSettlementSweep, taskSettlementSweepPeriod)
 	}
-	if taskqueue.RiverJobTimeoutTaskSettlementSweep >= taskqueue.RiverJobTimeoutDrawing {
+	if riverpolicy.RiverJobTimeoutTaskSettlementSweep >= riverpolicy.RiverJobTimeoutDrawing {
 		t.Fatal("a settlement-only sweep must not carry the provider-sized drawing budget")
 	}
 }
@@ -153,11 +153,11 @@ func TestTaskSettlementSweepPeriodicJobIsWired(t *testing.T) {
 	if args.Kind() != "task_settlement_sweep" {
 		t.Fatalf("kind = %q, want task_settlement_sweep", args.Kind())
 	}
-	if opts.Queue != taskqueue.RiverQueueTaskSettlementSweep {
-		t.Fatalf("queue = %q, want %q", opts.Queue, taskqueue.RiverQueueTaskSettlementSweep)
+	if opts.Queue != riverpolicy.RiverQueueTaskSettlementSweep {
+		t.Fatalf("queue = %q, want %q", opts.Queue, riverpolicy.RiverQueueTaskSettlementSweep)
 	}
-	if opts.MaxAttempts != taskqueue.RiverMaxAttemptsTaskSettlementSweep {
-		t.Fatalf("max attempts = %d, want %d", opts.MaxAttempts, taskqueue.RiverMaxAttemptsTaskSettlementSweep)
+	if opts.MaxAttempts != riverpolicy.RiverMaxAttemptsTaskSettlementSweep {
+		t.Fatalf("max attempts = %d, want %d", opts.MaxAttempts, riverpolicy.RiverMaxAttemptsTaskSettlementSweep)
 	}
 	start := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	if got := (taskSettlementSweepSchedule{}).Next(start); !got.Equal(start.Add(taskSettlementSweepPeriod)) {

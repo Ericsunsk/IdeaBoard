@@ -92,17 +92,8 @@ import type { SearchResult } from '../../domain/models'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { useSearchLibraryCoordinator } from '../../infrastructure/libraryCoordinator'
-
-export type SearchSavePopoverRequest = {
-  result: SearchResult
-  saved: boolean
-  authenticated: boolean
-}
-
-export type SearchSavePopoverController = {
-  toggle: (event: Event, request: SearchSavePopoverRequest) => void
-  hide: () => void
-}
+import type { SearchSavePopoverRequest } from '../browser/savePopoverContract'
+import { resolveDragAnchor } from '../browser/dragGhost'
 
 type OpenRequest = SearchSavePopoverRequest & { event: Event; anchor: HTMLElement }
 
@@ -217,7 +208,7 @@ function toggle(event: Event, request: SearchSavePopoverRequest) {
     return
   }
 
-  const anchor = event.currentTarget as HTMLElement | null
+  const anchor = resolveDragAnchor(event)
   if (!anchor) return
   const nextRequest: OpenRequest = { ...request, event, anchor }
   const activeKey =
@@ -262,13 +253,20 @@ async function persist(folderId?: string, newFolderName?: string) {
   if (!request || saving.value) return
   saving.value = true
   try {
-    await library.saveReference(request.result, folderId, newFolderName)
+    const saved = await library.saveReference(request.result, folderId, newFolderName)
     hide()
     const targetName =
-      newFolderName ||
-      folders.value.find((folder) => folder.id === folderId)?.name ||
-      t('search.savePopover.quickSaves')
-    toast.success(t('search.savePopover.savedToast', { name: targetName }))
+      (saved.createdFolder && saved.createdFolder.id === saved.asset.folderId
+        ? saved.createdFolder.name
+        : undefined) ||
+      (saved.asset.folderId
+        ? folders.value.find((folder) => folder.id === saved.asset.folderId)?.name
+        : t('search.savePopover.quickSaves'))
+    toast.success(
+      targetName
+        ? t('search.savePopover.savedToast', { name: targetName })
+        : t('search.savePopover.savedToLibraryToast'),
+    )
   } catch (error) {
     toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
   } finally {

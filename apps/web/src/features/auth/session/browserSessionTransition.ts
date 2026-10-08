@@ -10,12 +10,11 @@ import {
   readStoredSessionUser,
 } from './sessionPersistence'
 import { forgetStoredAuthScope } from '../../../shared/utils/auth'
+import { isSessionFresh } from './freshness'
 
-// Session trust window shared with the router's admin revalidation
-// threshold (`app/router`): a recently validated session is trusted
-// between navigations instead of reprobing on every navigation.
-const SESSION_CACHE_TTL_MS = 300_000
-
+// Session trust window and freshness predicate live in
+// `freshness.ts` (re-exported through the auth barrel); the router
+// admin gate consumes the same policy instead of owning a second window.
 type SessionState = {
   getUser: () => User | null
   isLoaded: () => boolean
@@ -76,11 +75,12 @@ export function createBrowserSessionTransition(
   const loadUser = dependencies.loadUser ?? fetchCurrentUserInfo
   const now = dependencies.now ?? Date.now
 
-  function commitUser(user: User) {
+  function commitUser(user: User): User {
     const previousUser = state.getUser()
     state.commit(user)
     persistSessionUser(user)
     if (previousUser?.public_id !== user.public_id) clearAuthScopedQueryCache()
+    return user
   }
 
   function restoreStoredUser() {
@@ -102,8 +102,7 @@ export function createBrowserSessionTransition(
     if (state.isLoaded() && !force) return state.getUser()
     try {
       const session = await loadUser()
-      commitUser(session.user)
-      return session.user
+      return commitUser(session.user)
     } catch (error) {
       if (isSessionExpiredStatus(getErrorStatusCode(error))) {
         clearSession()
@@ -115,8 +114,7 @@ export function createBrowserSessionTransition(
       if (options.retryTransient) {
         try {
           const session = await loadUser()
-          commitUser(session.user)
-          return session.user
+          return commitUser(session.user)
         } catch (retryError) {
           if (isSessionExpiredStatus(getErrorStatusCode(retryError))) {
             clearSession()
@@ -133,7 +131,7 @@ export function createBrowserSessionTransition(
 
   async function ensureSession(options: { fresh?: boolean } = {}): Promise<User | null> {
     const cacheValid =
-      state.isLoaded() && !options.fresh && now() - state.getValidatedAt() < SESSION_CACHE_TTL_MS
+      state.isLoaded() && !options.fresh && isSessionFresh(state.getValidatedAt(), now())
     if (cacheValid) return state.getUser()
     if (!(await transport.hasSession())) {
       clearSession()

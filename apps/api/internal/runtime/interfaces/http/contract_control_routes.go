@@ -165,12 +165,36 @@ func (d *ContractControlDeps) registerControlPaymentRoutes(control *gin.RouterGr
 		controlRoute{Operation: "payments.list_orders", Route: "GET /payments/orders"}, d.listControlPaymentOrders))
 	control.GET("/payments/orders/:order_number", d.guard(ControlCapabilityPayments,
 		controlRoute{Operation: "payments.get_order", Route: "GET /payments/orders/{order_number}", Target: orderTarget}, d.getControlPaymentOrder))
+	// create_refund stays ATOMIC (not detached) by deliberate cash-path
+	// evaluation: the reservation (CreatePendingPaymentRefund) and the
+	// settlement (MarkSucceeded/Failed) already commit in their own
+	// transactions (beginCommittedRefundTx) before/after Stripe I/O, so
+	// the cash boundary never depends on the guard transaction. Keeping
+	// the guard transaction open across the Stripe call is intentionally
+	// accepted here because it provides BLOCKING single-winner election
+	// for cash: concurrent same-key claimants block on the durable
+	// primary key until the winner commits, then transparently replay,
+	// instead of 503+retry. Detaching would replace that blocking
+	// replay with polling (in-progress 503 until the winner completes
+	// or the 60s orphan lease takes over) and would leave a
+	// crash-between-settlement-and-Complete window where the retry sees
+	// in-progress rather than replaying the committed refund. Domain
+	// dedup (order+key reuse of the same refund ID and Stripe
+	// idempotency key) keeps detached safe from double cash, but the
+	// guard-level blocking replay is the stronger cash-path guarantee,
+	// so atomic is kept and the cash durability note lives here.
 	control.POST("/payments/orders/:order_number/refunds", d.guard(ControlCapabilityPayments,
 		controlRoute{Operation: "payments.create_refund", Route: "POST /payments/orders/{order_number}/refunds", Mutation: true, Target: orderTarget}, d.createControlPaymentRefund))
 	control.GET("/payments/stripe-config", d.guard(ControlCapabilityPayments,
 		controlRoute{Operation: "payments.get_stripe_config", Route: "GET /payments/stripe-config"}, d.getControlStripeConfig))
+	// update_stripe_config is detached: the Stripe account/product/
+	// webhook precheck runs first as an external call, then the active
+	// generation publishes in a short compare-and-swap transaction. No
+	// long guard transaction ever wraps the Stripe call; the audit row
+	// stays an observer and durable replay (M1 short-claim) prevents a
+	// retry from re-preparing.
 	control.PUT("/payments/stripe-config", d.guard(ControlCapabilityPayments,
-		controlRoute{Operation: "payments.update_stripe_config", Route: "PUT /payments/stripe-config", Mutation: true}, d.updateControlStripeConfig))
+		controlRoute{Operation: "payments.update_stripe_config", Route: "PUT /payments/stripe-config", Mutation: true, Detached: true}, d.updateControlStripeConfig))
 }
 
 func (d *ContractControlDeps) registerControlTaskRoutes(control *gin.RouterGroup) {
@@ -223,15 +247,28 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 		controlRoute{Operation: "platform.update_outbound_policy", Route: "PUT /platform/settings/outbound-policy", Mutation: true}, d.updateControlOutboundPolicy))
 	control.GET("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_mail_setting", Route: "GET /platform/settings/mail"}, d.getControlMailSetting))
+	// update/delete_mail_setting are detached: the Auth service owns the
+	// mail configuration fact, so the Go side performs the external
+	// precheck/call first and persists nothing locally. No long guard
+	// transaction ever wraps the Auth HTTP call; the audit row stays an
+	// observer and durable replay (M1 short-claim) prevents a retry from
+	// re-sending an already-applied update/clear.
 	control.PUT("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_mail_setting", Route: "PUT /platform/settings/mail", Mutation: true}, d.updateControlMailSetting))
+		controlRoute{Operation: "platform.update_mail_setting", Route: "PUT /platform/settings/mail", Mutation: true, Detached: true}, d.updateControlMailSetting))
 	control.DELETE("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.delete_mail_setting", Route: "DELETE /platform/settings/mail", Mutation: true}, d.deleteControlMailSetting))
-	// Mail test is a delivery dry-run (sends one probe message, writes no
-	// configuration), so it registers as a POST read-guard without reason
-	// or idempotency requirements.
+		controlRoute{Operation: "platform.delete_mail_setting", Route: "DELETE /platform/settings/mail", Mutation: true, Detached: true}, d.deleteControlMailSetting))
+	// Mail test sends one probe message via the Auth service (external
+	// HTTP side effect, writes no configuration). It is a detached
+	// mutation: operator reason + header-only Idempotency-Key are
+	// required, same key + same request replays the first 2xx without
+	// resending the probe, same key + different request conflicts
+	// (409), and every call is audited with success/failed outcome.
+	// Detached (never the guard-owned DB transaction): the external
+	// send cannot be co-committed, the audit row stays an observer, and
+	// failures/unknown results re-execute on retry instead of replaying.
+	// A transaction rollback never implies the sent probe was revoked.
 	control.POST("/platform/settings/mail/test", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test"}, d.testControlMailSetting))
+		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test", Mutation: true, Detached: true}, d.testControlMailSetting))
 }
 
 // registerControlProxiedRoutes mounts the platform-config families that

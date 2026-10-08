@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	"ideaboard/api/internal/platform/riverpolicy"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -23,14 +23,14 @@ func TestWebhookDeliveryInsertOpts(t *testing.T) {
 	envelope := testEnvelope(t)
 	args := WebhookDeliveryArgs{SubscriptionID: "sub_abc", DeliveryID: envelope.ID, Envelope: envelope}
 	opts := WebhookDeliveryInsertOpts(args)
-	if opts.Queue != taskqueue.RiverQueueWebhookDeliver {
-		t.Fatalf("queue=%q, want %q", opts.Queue, taskqueue.RiverQueueWebhookDeliver)
+	if opts.Queue != riverpolicy.RiverQueueWebhookDeliver {
+		t.Fatalf("queue=%q, want %q", opts.Queue, riverpolicy.RiverQueueWebhookDeliver)
 	}
-	if taskqueue.RiverMaxAttemptsWebhookDeliver != webhookMaxAttempts {
+	if riverpolicy.RiverMaxAttemptsWebhookDeliver != webhookMaxAttempts {
 		t.Fatalf("matrix budget=%d, want the store budget %d",
-			taskqueue.RiverMaxAttemptsWebhookDeliver, webhookMaxAttempts)
+			riverpolicy.RiverMaxAttemptsWebhookDeliver, webhookMaxAttempts)
 	}
-	if opts.MaxAttempts != taskqueue.RiverMaxAttemptsWebhookDeliver {
+	if opts.MaxAttempts != riverpolicy.RiverMaxAttemptsWebhookDeliver {
 		t.Fatalf("maxAttempts=%d, want the 8-attempt budget", opts.MaxAttempts)
 	}
 	if !opts.UniqueOpts.ByArgs {

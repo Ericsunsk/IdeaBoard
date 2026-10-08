@@ -16,6 +16,7 @@ import (
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/runtime/domain"
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	eventinterfaces "ideaboard/api/internal/runtime/interfaces/events"
@@ -101,7 +102,7 @@ type appWorkerRuntime struct {
 	queueName   string
 	concurrency int
 	// queueMetrics polls River depth/lag gauges for every known queue
-	// (see taskqueue.RiverRetryMatrix); nil keeps the runtime
+	// (see riverpolicy.RiverRetryMatrix); nil keeps the runtime
 	// uninstrumented (tests).
 	queueMetrics *redmetrics.MultiRefresher
 }
@@ -195,7 +196,7 @@ func newAppTaskRuntime(
 	webhookStore := events.NewWebhookStore(events.NewHTTPSender(), nil)
 	webhookStore.SetPersistence(events.NewPostgresWebhookPersistence(dbs.db))
 
-	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, taskqueue.RiverMaxAttemptsDefault)
+	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, riverpolicy.RiverMaxAttemptsDefault)
 	aiGatewayRepo := aigateway.NewConfigRepository(repos.systemConfigRepo)
 	modelRoutes := aiGatewayModelRouteReader{repo: aiGatewayRepo}
 	gatewayFactory := func(ctx context.Context) (runtimeports.GatewayClient, error) {
@@ -219,7 +220,7 @@ func newAppTaskRuntime(
 	workspaceQuoter := &taskadapters.WorkspaceTaskQuoter{Catalog: services.billingCatalog}
 	workspaceMedia := workspacemedia.NewService(dbs.db)
 	workspaceAssets := &workspacemedia.TaskAssetAdapter{Store: workspaceMedia}
-	workspaceEnqueuer := taskadapters.NewWorkspaceTaskEnqueuer(nil, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault)
+	workspaceEnqueuer := taskadapters.NewWorkspaceTaskEnqueuer(nil, riverpolicy.RiverQueueDefault, riverpolicy.RiverMaxAttemptsDefault)
 	workspaceRouter := routing.NewRoutingResolver(catalog.NewRepository(dbs.db))
 	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		TaskRead: workspaceStore, TaskLifecycle: workspaceStore,
@@ -370,7 +371,7 @@ func newAppTaskRuntime(
 	// fail loudly as unknown kinds; the workspace_task_execute consumer
 	// and all periodic workers ride this same client.
 	riverClient, err := workerriver.NewRiverClient(dbs.riverPool, workerriver.RiverServerOptions{
-		QueueName:   taskqueue.RiverQueueDefault,
+		QueueName:   riverpolicy.RiverQueueDefault,
 		Concurrency: workerConcurrency,
 		AdditionalQueues: map[string]river.QueueConfig{
 			workerbilling.CreditReconciliationQueue:    {MaxWorkers: 1},
@@ -381,13 +382,13 @@ func newAppTaskRuntime(
 			// the shared concurrency config (no new infra); serial
 			// workers match the maintenance-queue precedent and the 1m
 			// per-attempt timeout bounds head-of-line blocking.
-			taskqueue.RiverQueueWebhookDeliver: {MaxWorkers: 1},
+			riverpolicy.RiverQueueWebhookDeliver: {MaxWorkers: 1},
 			// Final-timeout settlement sweep: one serial maintenance worker on
 			// the shared client (same precedent as the queues above). Serial is
 			// deliberate: the sweep converges abandoned holds, so overlapping
 			// runs would contend on the same per-task settle transactions for no
 			// throughput gain.
-			taskqueue.RiverQueueTaskSettlementSweep: {MaxWorkers: 1},
+			riverpolicy.RiverQueueTaskSettlementSweep: {MaxWorkers: 1},
 			// Identity admin reconciliation: one serial maintenance worker.
 			// Serial is deliberate: overlapping scans would contend on the
 			// same finding fingerprints for no throughput gain.
@@ -456,7 +457,7 @@ func newAppTaskRuntime(
 	}, appWorkerRuntime{
 		riverClient:  riverClient,
 		eventBus:     eventBus,
-		queueName:    taskqueue.RiverQueueDefault,
+		queueName:    riverpolicy.RiverQueueDefault,
 		concurrency:  workerConcurrency,
 		queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
 	}, nil
@@ -464,19 +465,20 @@ func newAppTaskRuntime(
 
 // riverQueueStatsByQueue fans one RiverQueue monitor out to every known
 // queue so each queue gets its own depth/lag gauge series. Queue inventory
-// must track taskqueue.RiverRetryMatrix; a missing queue loses its RED
-// signals (depth/lag alerts in docs/runbooks/backend-metrics.md).
+// is derived from riverpolicy.RiverRetryMatrix (the single roster source);
+// a missing queue loses its RED signals (depth/lag alerts in
+// docs/runbooks/backend-metrics.md), and a new matrix queue is picked up
+// without touching this wiring.
 // The legacy task-retention queue left with the #809 hard cut.
 func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics.RiverQueueStats {
-	queues := []string{
-		taskqueue.RiverQueueDefault,
-		workerbilling.CreditReconciliationQueue,
-		workerbilling.PaymentReconciliationQueue,
-		workerbilling.PaymentCheckoutShutdownQueue,
-		visionbilling.VisionBillingQueue,
-		taskqueue.RiverQueueWebhookDeliver,
-		taskqueue.RiverQueueTaskSettlementSweep,
-		identityreconciliation.IdentityReconciliationQueue,
+	seen := map[string]struct{}{}
+	queues := make([]string, 0, len(riverpolicy.RiverRetryMatrix()))
+	for _, policy := range riverpolicy.RiverRetryMatrix() {
+		if _, dup := seen[policy.Queue]; dup {
+			continue
+		}
+		seen[policy.Queue] = struct{}{}
+		queues = append(queues, policy.Queue)
 	}
 	stats := make(map[string]redmetrics.RiverQueueStats, len(queues))
 	for _, name := range queues {

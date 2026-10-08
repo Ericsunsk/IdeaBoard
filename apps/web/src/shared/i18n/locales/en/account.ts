@@ -27,13 +27,8 @@ export default {
   profile: {
     overviewAria: 'Account profile overview',
     changeAvatar: 'Change avatar',
-    banned: 'Banned',
     roleAdmin: 'Admin',
     roleCreator: 'Creator',
-    accountInfoAria: 'Account information',
-    storageNamespace: 'Storage namespace',
-    joinedAt: 'Joined',
-    lastUpdated: 'Last updated',
   },
   security: {
     currentPassword: 'Current password',

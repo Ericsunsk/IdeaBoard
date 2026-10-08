@@ -17,6 +17,7 @@ import {
   buildControlMutationHeaders,
   createControlError,
   requireOperatorReason,
+  type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
@@ -132,10 +133,7 @@ export type SearchRewardCodesInput = {
   signal?: AbortSignal
 }
 
-export type RewardCodeMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type RewardCodeMutationOptions = ControlMutationOptions
 
 export type AdminRewardCodeResource = {
   search: (input: SearchRewardCodesInput) => Promise<RewardCodePage>

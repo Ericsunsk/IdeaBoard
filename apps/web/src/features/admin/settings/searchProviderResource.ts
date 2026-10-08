@@ -1,4 +1,7 @@
-import { buildControlMutationHeaders } from '../shared/lib/controlMutation'
+import {
+  buildControlMutationHeaders,
+  type ControlMutationOptions,
+} from '../shared/lib/controlMutation'
 import {
   listControlSearchProviders,
   testControlSearchProvider,
@@ -22,10 +25,7 @@ import type {
 // monitor stream stay raw. Guards (Idempotency-Key + X-Operator-Reason,
 // audit) are enforced.
 
-export type SearchProviderMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type SearchProviderMutationOptions = ControlMutationOptions
 
 export interface AdminSearchProviderResource {
   list: () => Promise<SearchProviderList>

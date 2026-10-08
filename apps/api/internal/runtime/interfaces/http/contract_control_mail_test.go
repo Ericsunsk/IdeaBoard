@@ -303,7 +303,7 @@ func TestControlMailSettingDelete(t *testing.T) {
 }
 
 func TestControlMailSettingTest(t *testing.T) {
-	t.Run("test sends and acks", func(t *testing.T) {
+	t.Run("test sends and acks with reason, key, and audit", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
 		status, _, payload := h.serve(controlCall{
@@ -327,26 +327,156 @@ func TestControlMailSettingTest(t *testing.T) {
 		if len(mail.actors) != 1 || mail.actors[0] != controlOperatorID {
 			t.Fatalf("actors = %v, want [%d]", mail.actors, controlOperatorID)
 		}
+		last := h.sink.Records()[len(h.sink.Records())-1]
+		if last.Capability != ControlCapabilityPlatform || last.Operation != "platform.test_mail_setting" {
+			t.Fatalf("audit = %+v, want control:platform platform.test_mail_setting", last)
+		}
+		if last.Reason != "verify sender" || last.IdempotencyKey != "mail-test-1" || last.Outcome != ControlAuditOK {
+			t.Fatalf("audit reason/key/outcome = %+v", last)
+		}
 	})
 
-	t.Run("test skips the reason and key ceremony", func(t *testing.T) {
+	t.Run("body reason satisfies the requirement", func(t *testing.T) {
+		mail := newFakeControlMail()
+		h := newMailHarness(t, mail)
+		status, _, payload := h.serve(controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com","reason":"body reason"}`,
+			userID: controlOperatorID, role: "admin",
+			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-test-body-reason"},
+		})
+		if status != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (%v)", status, payload)
+		}
+	})
+
+	t.Run("missing reason or idempotency key is 400 before the seam", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
+			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-test-no-reason"},
 		})
-		if status != http.StatusOK {
-			t.Fatalf("status = %d, want 200 (%v)", status, payload)
+		if status != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", status)
 		}
-		if ok := controlData(t, payload).(map[string]any); ok["sent"] != true {
-			t.Fatalf("test ack = %v", payload)
+		if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
+			t.Fatalf("code = %q, want control_reason_required", code)
+		}
+		status, _, payload = h.serve(controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com"}`,
+			userID: controlOperatorID, role: "admin",
+			headers: map[string]string{OperatorReasonHeader: "has reason"},
+		})
+		if status != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", status)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeIdempotencyKeyRequired) {
+			t.Fatalf("code = %q, want idempotency_key_required", code)
+		}
+		mail.mu.Lock()
+		defer mail.mu.Unlock()
+		if len(mail.recipients) != 0 {
+			t.Fatalf("guarded tests = %d, want 0", len(mail.recipients))
+		}
+	})
+
+	t.Run("capability gate holds for anonymous and non-admin callers", func(t *testing.T) {
+		mail := newFakeControlMail()
+		h := newMailHarness(t, mail)
+		status, _, payload := h.serve(controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:    `{"recipient":"ops@example.com"}`,
+			headers: mailMutationHeaders("mail-test-cap-1", "reason"),
+		})
+		if status != http.StatusUnauthorized {
+			t.Fatalf("anon status = %d, want 401", status)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeUnauthorized) {
+			t.Fatalf("anon code = %q, want unauthorized", code)
+		}
+		status, _, _ = h.serve(controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com"}`,
+			userID: controlUserAID, role: "user",
+			headers: mailMutationHeaders("mail-test-cap-2", "reason"),
+		})
+		if status != http.StatusForbidden {
+			t.Fatalf("member status = %d, want 403", status)
+		}
+		mail.mu.Lock()
+		defer mail.mu.Unlock()
+		if len(mail.recipients) != 0 {
+			t.Fatalf("denied tests = %d, want 0", len(mail.recipients))
+		}
+	})
+
+	t.Run("same key same request replays without resending the probe", func(t *testing.T) {
+		mail := newFakeControlMail()
+		h := newMailHarness(t, mail)
+		body := `{"recipient":"ops@example.com"}`
+		first := controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   body,
+			userID: controlOperatorID, role: "admin",
+			headers: mailMutationHeaders("mail-test-replay-1", "verify sender"),
+		}
+		status, _, _ := h.serve(first)
+		if status != http.StatusOK {
+			t.Fatalf("first status = %d, want 200", status)
+		}
+		mail.mu.Lock()
+		if len(mail.recipients) != 1 {
+			mail.mu.Unlock()
+			t.Fatalf("recipients = %d, want 1", len(mail.recipients))
+		}
+		mail.mu.Unlock()
+		second := first
+		second.headers = mailMutationHeaders("mail-test-replay-1", "verify sender")
+		status, _, payload := h.serve(second)
+		if status != http.StatusOK {
+			t.Fatalf("replay status = %d, want 200 (%v)", status, payload)
+		}
+		mail.mu.Lock()
+		defer mail.mu.Unlock()
+		if len(mail.recipients) != 1 {
+			t.Fatalf("replay must not resend: recipients = %v", mail.recipients)
+		}
+		records := h.sink.Records()
+		if last := records[len(records)-1]; !last.Replayed || last.Outcome != ControlAuditOK {
+			t.Fatalf("replay audit = %+v, want replayed success", last)
+		}
+	})
+
+	t.Run("same key different request conflicts before the seam", func(t *testing.T) {
+		mail := newFakeControlMail()
+		h := newMailHarness(t, mail)
+		first := controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com"}`,
+			userID: controlOperatorID, role: "admin",
+			headers: mailMutationHeaders("mail-test-conflict-1", "verify sender"),
+		}
+		if status, _, _ := h.serve(first); status != http.StatusOK {
+			t.Fatalf("first status = %d, want 200", status)
+		}
+		divergent := first
+		divergent.body = `{"recipient":"other@example.com"}`
+		divergent.headers = mailMutationHeaders("mail-test-conflict-1", "verify sender")
+		status, _, payload := h.serve(divergent)
+		if status != http.StatusConflict {
+			t.Fatalf("divergent status = %d, want 409", status)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeIdempotencyConflict) {
+			t.Fatalf("code = %q, want idempotency_conflict", code)
 		}
 		mail.mu.Lock()
 		defer mail.mu.Unlock()
 		if len(mail.recipients) != 1 || mail.recipients[0] != "ops@example.com" {
-			t.Fatalf("recipients = %v", mail.recipients)
+			t.Fatalf("conflict must not send: recipients = %v", mail.recipients)
 		}
 	})
 
@@ -387,6 +517,82 @@ func TestControlMailSettingTest(t *testing.T) {
 		}
 		if code := controlErrorCode(t, payload); code != string(contract.CodeConflict) {
 			t.Fatalf("code = %q, want conflict", code)
+		}
+	})
+
+	t.Run("delivery failure never reports success and never poisons the key", func(t *testing.T) {
+		mail := newFakeControlMail()
+		mail.testErr = &auth.MailConfigError{Status: http.StatusBadGateway, Message: "provider down"}
+		h := newMailHarness(t, mail)
+		call := controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com"}`,
+			userID: controlOperatorID, role: "admin",
+			headers: mailMutationHeaders("mail-test-fail-1", "verify sender"),
+		}
+		status, _, payload := h.serve(call)
+		if status != http.StatusServiceUnavailable {
+			t.Fatalf("failure status = %d, want 503 (%v)", status, payload)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeServiceUnavailable) {
+			t.Fatalf("code = %q, want service_unavailable", code)
+		}
+		if _, hasData := payload["data"]; hasData {
+			t.Fatalf("failure must not carry data (never success): %v", payload)
+		}
+		last := h.sink.Records()[len(h.sink.Records())-1]
+		if last.Outcome != ControlAuditFailed {
+			t.Fatalf("failure audit = %+v, want failed", last)
+		}
+		// The failure is not cached: clearing the downstream fault and
+		// retrying the same key re-executes the probe instead of
+		// replaying the failure. A rollback elsewhere never implies
+		// the sent probe was revoked.
+		mail.mu.Lock()
+		mail.testErr = nil
+		mail.mu.Unlock()
+		status, _, payload = h.serve(call)
+		if status != http.StatusOK {
+			t.Fatalf("retry status = %d, want 200 (%v)", status, payload)
+		}
+		if ok := controlData(t, payload).(map[string]any); ok["sent"] != true {
+			t.Fatalf("retry ack = %v", payload)
+		}
+		mail.mu.Lock()
+		defer mail.mu.Unlock()
+		if len(mail.recipients) != 2 {
+			t.Fatalf("retry must re-execute: recipients = %v", mail.recipients)
+		}
+	})
+
+	t.Run("unknown envelope failure maps to 503 and stays retryable", func(t *testing.T) {
+		mail := newFakeControlMail()
+		mail.testErr = &auth.MailConfigError{Status: http.StatusInternalServerError, Message: "unknown"}
+		h := newMailHarness(t, mail)
+		call := controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com"}`,
+			userID: controlOperatorID, role: "admin",
+			headers: mailMutationHeaders("mail-test-fail-2", "verify sender"),
+		}
+		status, _, payload := h.serve(call)
+		if status != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want 503 (%v)", status, payload)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeServiceUnavailable) {
+			t.Fatalf("code = %q, want service_unavailable", code)
+		}
+		mail.mu.Lock()
+		mail.testErr = nil
+		mail.mu.Unlock()
+		status, _, _ = h.serve(call)
+		if status != http.StatusOK {
+			t.Fatalf("retry status = %d, want 200", status)
+		}
+		mail.mu.Lock()
+		defer mail.mu.Unlock()
+		if len(mail.recipients) != 2 {
+			t.Fatalf("unknown failure must not poison the key: recipients = %v", mail.recipients)
 		}
 	})
 }

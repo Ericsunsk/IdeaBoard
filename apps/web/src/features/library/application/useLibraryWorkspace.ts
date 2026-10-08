@@ -16,15 +16,18 @@ import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import {
   assertLibraryFolderId,
-  libraryAssetKey,
   requireWorkspaceId,
   type WorkspaceLibraryAsset,
 } from '../domain/validators'
 import { workspaceLibraryApi } from '../infrastructure/resource'
 import { listAllWorkspaceLibraryFolders } from './libraryUseCases'
 import {
+  buildLibraryAssetMovedOutcome,
+  buildLibraryAssetRemovedOutcome,
+  buildLibraryFolderOutcome,
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
+  LIBRARY_ALL_FOLDER_KEY,
   type LibraryFolderFacts,
   type LibraryFolderView,
   type LibraryMutationPublisher,
@@ -37,7 +40,7 @@ export type LibraryFolderTab = {
   isMutable: boolean
 }
 
-export const LIBRARY_ALL_FOLDER_KEY = 'all'
+export { LIBRARY_ALL_FOLDER_KEY } from './folderFacts'
 
 type LibraryAssetRequest = {
   id: number
@@ -224,11 +227,9 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
   async function createNewFolder(name: string) {
     const wid = resolveWorkspaceId(options.workspaceId)
     const folder = await workspaceLibraryApi.createFolder(wid, name)
-    await mutationPublisher.publishMutation({
-      kind: 'folder-created',
-      affectedFolderKeys: [folder.id],
-      galleryEffect: 'selection-will-reload',
-    })
+    await mutationPublisher.publishMutation(
+      buildLibraryFolderOutcome('folder-created', folder.id, 'selection-will-reload'),
+    )
     selectFolder(folder.id)
     toast.success(i18n.global.t('library.toasts.folderCreated'))
   }
@@ -238,11 +239,9 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
     if (!folder || isLibraryAllFolderKey(key)) return
     const wid = resolveWorkspaceId(options.workspaceId)
     const updated = await workspaceLibraryApi.renameFolder(wid, folder.id, name)
-    await mutationPublisher.publishMutation({
-      kind: 'folder-renamed',
-      affectedFolderKeys: [updated.id],
-      galleryEffect: 'none',
-    })
+    await mutationPublisher.publishMutation(
+      buildLibraryFolderOutcome('folder-renamed', updated.id, 'none'),
+    )
     toast.success(i18n.global.t('library.toasts.folderRenamed'))
   }
 
@@ -253,11 +252,13 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
       const wid = resolveWorkspaceId(options.workspaceId)
       await workspaceLibraryApi.deleteFolder(wid, folder.id)
       const selectedFolderWasDeleted = selectedFolder.value === key
-      await mutationPublisher.publishMutation({
-        kind: 'folder-deleted',
-        affectedFolderKeys: [key],
-        galleryEffect: selectedFolderWasDeleted ? 'selection-will-reload' : 'none',
-      })
+      await mutationPublisher.publishMutation(
+        buildLibraryFolderOutcome(
+          'folder-deleted',
+          key,
+          selectedFolderWasDeleted ? 'selection-will-reload' : 'none',
+        ),
+      )
       if (selectedFolder.value === key) selectFolder(LIBRARY_ALL_FOLDER_KEY)
       toast.success(i18n.global.t('library.toasts.folderDeleted'))
       return true
@@ -276,21 +277,16 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
     if (!folder || folder.id === asset.folderId) return false
     try {
       const wid = resolveWorkspaceId(options.workspaceId)
+      const previousFolderId = asset.folderId
       const updated = await workspaceLibraryApi.moveAsset(wid, asset.id, folder.id)
       if (selectedFolder.value !== LIBRARY_ALL_FOLDER_KEY && selectedFolder.value !== normalized) {
         assets.value = assets.value.filter((item) => item.id !== asset.id)
       } else {
         assets.value = assets.value.map((item) => (item.id === updated.id ? updated : item))
       }
-      await mutationPublisher.publishMutation({
-        kind: 'asset-moved',
-        affectedFolderKeys: [
-          LIBRARY_ALL_FOLDER_KEY,
-          ...(asset.folderId ? [asset.folderId] : []),
-          normalized,
-        ],
-        galleryEffect: 'none',
-      })
+      await mutationPublisher.publishMutation(
+        buildLibraryAssetMovedOutcome({ previousFolderId, asset: updated }, 'none'),
+      )
       toast.success(i18n.global.t('library.toasts.assetMoved'))
       return true
     } catch (error) {
@@ -304,14 +300,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
       const wid = resolveWorkspaceId(options.workspaceId)
       await workspaceLibraryApi.deleteAsset(wid, asset.id)
       assets.value = assets.value.filter((item) => item.id !== asset.id)
-      await mutationPublisher.publishMutation({
-        kind: 'asset-removed',
-        provider: asset.provider,
-        sourceID: asset.sourceId,
-        assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-        affectedFolderKeys: [LIBRARY_ALL_FOLDER_KEY, ...(asset.folderId ? [asset.folderId] : [])],
-        galleryEffect: 'none',
-      })
+      await mutationPublisher.publishMutation(buildLibraryAssetRemovedOutcome(asset, 'none'))
       toast.success(i18n.global.t('library.toasts.removedFromLibrary'))
     } catch (error) {
       toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.removeAssetFailed')))

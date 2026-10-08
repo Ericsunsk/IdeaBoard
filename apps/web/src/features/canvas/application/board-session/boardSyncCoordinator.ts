@@ -207,7 +207,7 @@ export function createBoardSyncCoordinator(
     error?: unknown,
   ) {
     if (reason === 'conflict') {
-      options.onError(i18n.global.t('canvas.session.nameConflictSavedLocally'))
+      options.onError(i18n.global.t('canvas.session.syncConflictSavedLocally'))
       return
     }
     if (reason === 'archived') {

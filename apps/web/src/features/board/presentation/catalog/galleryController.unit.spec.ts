@@ -115,10 +115,10 @@ describe('createGalleryController', () => {
   it('exposes catalog recovery only when rename recovery failed and clears it after a successful reload', async () => {
     const harness = createHarness()
     const board = makeBoard('board-1', 'Original')
-    const syncError = new Error('conflict')
+    const syncError = { status: 409, code: 'board_revision_conflict' }
     vi.mocked(harness.catalog.commands.rename).mockResolvedValueOnce({
       ok: false,
-      reason: 'remote-name-conflict',
+      reason: 'revision-conflict',
       boardId: board.id,
       previousBoard: board,
       error: syncError,

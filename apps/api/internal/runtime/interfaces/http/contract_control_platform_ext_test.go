@@ -355,14 +355,16 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 
 	t.Run("probes skip the reason and key ceremony", func(t *testing.T) {
 		// Connectivity dry-runs (ai-gateway test-connection, search
-		// provider test, mail test) are POST read-guards: no reason or
+		// provider test) are POST read-guards: no reason or
 		// Idempotency-Key is required, and a supplied reason is logged to
 		// the audit record. Nil deps fail closed past the guard (501/503),
-		// proving the guard itself no longer 400s.
+		// proving the guard itself no longer 400s. The mail probe is
+		// deliberately NOT in this list: it is a detached mutation
+		// (reason + key required, replay/conflict, audited success) even
+		// though its side effect is a single external probe email.
 		probes := []controlCall{
 			{method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`},
 			{method: http.MethodPost, path: "/api/control/v1/platform/search/providers/openai/test", body: `{}`},
-			{method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test", body: `{"recipient":"ops@example.com"}`},
 		}
 		for _, call := range probes {
 			call.userID = admin.userID

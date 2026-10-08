@@ -28,12 +28,8 @@ function primeAuthenticatedWorkspace(workspaceId: string) {
   setStoredAuth({
     public_id: '00000000-0000-0000-0000-000000000001',
     display_name: 'tester',
-    storage_namespace: 'ABC123',
     avatar: '',
     role: 'user',
-    status: 1,
-    created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:00:00.000Z',
   })
   resetWorkspaceSelectionStore()
   getWorkspaceSelectionStore().select(workspaceId)

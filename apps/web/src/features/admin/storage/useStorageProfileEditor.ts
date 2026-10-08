@@ -4,16 +4,9 @@ import { useStorageFeedback } from './useStorageFeedback'
 import { buildVendorPresets, type VendorPresetOption } from './meta'
 import {
   buildPayload,
-  canApply as canApplyProfile,
-  canTest as canTestProfile,
   createEmptyProfile as createEmptyStorageProfile,
   normalizeProfile,
   providerLabel as resolveProviderLabel,
-  providerSupportsTest,
-  statusClass as resolveStatusClass,
-  statusText as resolveStatusText,
-  storageMetaItems as resolveStorageMetaItems,
-  storageSubtitle as resolveStorageSubtitle,
   type ProviderMetaMap,
   type StorageCard,
   type StorageProfile,
@@ -25,21 +18,13 @@ import {
 type SaveStorageProfile = (input: {
   id?: string | undefined
   payload: StorageProfilePayload
-  apply?: boolean | undefined
 }) => Promise<{ profile: StorageProfile; message: string } | null>
-
-type StorageProfileCommand = (
-  id: string,
-) => Promise<{ profile: StorageProfile; message: string } | null>
 
 type StorageProfileEditorOptions = {
   creatableProviders: { value: StorageProviderMeta[] }
   providerMap: { value: ProviderMetaMap }
   storages: { value: StorageCard[] }
   saveProfile: SaveStorageProfile
-  applyProfile: StorageProfileCommand
-  testProfile: (id: string) => Promise<{ message: string } | null>
-  deleteProfile: (id: string) => Promise<{ message: string } | null>
   fetchBucketDomains: (id: string) => Promise<string[]>
 }
 
@@ -47,10 +32,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
   const storageFeedback = useStorageFeedback()
   const { runAsyncAction } = useAsyncAction()
   const saving = ref(false)
-  const savingAndApplying = ref(false)
   const fetching = ref(false)
-  const applyingId = ref<string | null>(null)
-  const testingId = ref<string | null>(null)
   const editorOpen = ref(false)
   const editorMode = ref<'create' | 'edit'>('create')
   const editingId = ref<string | null>(null)
@@ -103,13 +85,13 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
   }
 
   function closeEditor() {
-    if (saving.value || savingAndApplying.value || fetching.value) return
+    if (saving.value || fetching.value) return
     editorOpen.value = false
     editingId.value = null
     bucketDomains.value = []
   }
 
-  async function persistForm(showSuccess = true, apply = false) {
+  async function persistForm(showSuccess = true) {
     const payload = buildPayload(form.value, options.providerMap.value)
     const editId = editorMode.value === 'edit' ? editingId.value : undefined
     if (editorMode.value === 'edit' && !editId) {
@@ -120,7 +102,6 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     const response = await options.saveProfile({
       id: editId || undefined,
       payload,
-      apply: apply || undefined,
     })
     if (!response) return null
     const saved = normalizeProfile(response.profile, options.providerMap.value)
@@ -151,65 +132,6 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     )
   }
 
-  async function saveAndApply() {
-    await runAsyncAction(
-      async () => {
-        const saved = await persistForm(false, true)
-        if (!saved) return
-        storageFeedback.saveAndApplySucceeded()
-        closeEditor()
-      },
-      {
-        loading: savingAndApplying,
-        feedback: {
-          error: storageFeedback.saveAndApplyFailed,
-        },
-      },
-    )
-  }
-
-  async function applyStorage(id: string) {
-    await runAsyncAction(
-      async () => {
-        const response = await options.applyProfile(id)
-        if (!response) return
-        storageFeedback.applyCurrentSucceeded(response.message)
-      },
-      {
-        before: () => {
-          applyingId.value = id
-        },
-        after: () => {
-          applyingId.value = null
-        },
-        feedback: {
-          error: storageFeedback.applyCurrentFailed,
-        },
-      },
-    )
-  }
-
-  async function handleTest(storage: StorageCard) {
-    await runAsyncAction(
-      async () => {
-        const response = await options.testProfile(storage.id)
-        if (!response) return
-        storageFeedback.testConnectionSucceeded(response.message)
-      },
-      {
-        before: () => {
-          testingId.value = storage.id
-        },
-        after: () => {
-          testingId.value = null
-        },
-        feedback: {
-          error: storageFeedback.testConnectionFailed,
-        },
-      },
-    )
-  }
-
   async function fetchBucketDomains() {
     if (!selectedProviderMeta.value?.supports_bucket_info) return
 
@@ -235,28 +157,9 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     )
   }
 
-  async function removeProfile(id: string) {
-    await runAsyncAction(
-      async () => {
-        const response = await options.deleteProfile(id)
-        if (!response) return
-        storageFeedback.profileDeleted(response.message)
-        if (editingId.value === id) closeEditor()
-      },
-      {
-        feedback: {
-          error: storageFeedback.deleteProfileFailed,
-        },
-      },
-    )
-  }
-
   return {
     saving,
-    savingAndApplying,
     fetching,
-    applyingId,
-    testingId,
     editorOpen,
     editorMode,
     bucketDomains,
@@ -266,11 +169,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     openEdit,
     closeEditor,
     saveDraft,
-    saveAndApply,
-    applyStorage,
-    handleTest,
     fetchBucketDomains,
-    removeProfile,
   }
 }
 
@@ -337,34 +236,6 @@ function createStorageProfileForm(
     return resolveProviderLabel(provider, options.providerMap.value)
   }
 
-  function supportsTest(storage: StorageCard) {
-    return providerSupportsTest(storage.provider, options.providerMap.value)
-  }
-
-  function canTest(storage: StorageCard) {
-    return canTestProfile(storage, options.providerMap.value)
-  }
-
-  function canApply(storage: StorageCard) {
-    return canApplyProfile(storage, options.providerMap.value)
-  }
-
-  function statusText(storage: StorageCard) {
-    return resolveStatusText(storage, options.providerMap.value)
-  }
-
-  function statusClass(storage: StorageCard) {
-    return resolveStatusClass(storage, options.providerMap.value)
-  }
-
-  function storageSubtitle(storage: StorageCard) {
-    return resolveStorageSubtitle(storage)
-  }
-
-  function storageMetaItems(storage: StorageCard) {
-    return resolveStorageMetaItems(storage)
-  }
-
   return {
     vendorPresets,
     profileFromVendorPreset,
@@ -380,13 +251,6 @@ function createStorageProfileForm(
       configBoolValue,
       updateConfigValue,
       providerLabel,
-      supportsTest,
-      canTest,
-      canApply,
-      statusText,
-      statusClass,
-      storageSubtitle,
-      storageMetaItems,
     },
   }
 }

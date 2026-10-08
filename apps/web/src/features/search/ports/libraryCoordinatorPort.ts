@@ -1,6 +1,10 @@
 import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../../library'
-import type { WorkspaceLibraryAsset } from '../../library'
+import type {
+  WorkspaceLibraryAsset,
+  WorkspaceLibraryFolder,
+  WorkspaceLibrarySaveResult,
+} from '../../library'
 import type { LibrarySearchReference } from '../domain/authAction'
 
 export type SearchLibraryCoordinator = LibraryMutationPublisher & {
@@ -9,11 +13,14 @@ export type SearchLibraryCoordinator = LibraryMutationPublisher & {
     reference: LibrarySearchReference,
     folderID?: string,
     newFolderName?: string,
-  ) => Promise<WorkspaceLibraryAsset>
+  ) => Promise<{ asset: WorkspaceLibraryAsset; createdFolder?: WorkspaceLibraryFolder | undefined }>
   saveReferences: (
     references: LibrarySearchReference[],
-  ) => Promise<PromiseSettledResult<WorkspaceLibraryAsset>[]>
-  removeReference: (provider: ExternalImageProvider, sourceID: string) => Promise<void>
+  ) => Promise<PromiseSettledResult<WorkspaceLibrarySaveResult>[]>
+  removeReference: (
+    provider: ExternalImageProvider,
+    sourceID: string,
+  ) => Promise<{ asset: WorkspaceLibraryAsset | null }>
   reset: () => void
   dispose: () => void
 }

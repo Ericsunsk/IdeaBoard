@@ -137,7 +137,7 @@ export const getGetUserQueryKey = () => {
 
 export const getGetUserQueryOptions = <
   TData = Awaited<ReturnType<typeof getUser>>,
-  TError = UnauthorizedResponse,
+  TError = UnauthorizedResponse | ErrorEnvelope,
 >(options?: {
   query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUser>>, TError, TData>>
   request?: SecondParameter<typeof publicMutator>
@@ -157,7 +157,7 @@ export const getGetUserQueryOptions = <
 }
 
 export type GetUserQueryResult = NonNullable<Awaited<ReturnType<typeof getUser>>>
-export type GetUserQueryError = UnauthorizedResponse
+export type GetUserQueryError = UnauthorizedResponse | ErrorEnvelope
 
 /**
  * @summary Get the current principal profile
@@ -165,7 +165,7 @@ export type GetUserQueryError = UnauthorizedResponse
 
 export function useGetUser<
   TData = Awaited<ReturnType<typeof getUser>>,
-  TError = UnauthorizedResponse,
+  TError = UnauthorizedResponse | ErrorEnvelope,
 >(
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUser>>, TError, TData>>

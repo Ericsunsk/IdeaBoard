@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"time"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
@@ -35,8 +36,9 @@ import (
 // any side effect runs. Business 4xx/5xx outcomes are never retained:
 // the claim is abandoned in the same transaction, so the retry
 // re-executes. Infrastructure failures (scope/audit/claim/commit
-// errors) render 503 service_unavailable and are retryable with the
-// same key; they never poison it.
+// errors) render 503 service_unavailable. Atomic failures are retryable;
+// failed detached settlement retains uncertainty so retries cannot repeat
+// an external effect that may already have succeeded.
 //
 // External sagas (user deletion across Auth/Storage/tombstone phases,
 // Stripe/payment provider calls, NATS/River publication) cannot join
@@ -47,11 +49,20 @@ import (
 // uniqueness facts underneath (ledger idempotency keys, deletion
 // request phases) stay the source of truth for their own writes.
 
-// ControlIdempotencyDurable is the narrow durable seam the atomic guard
-// needs. *idempotency.ControlStore is the production implementation;
-// tests substitute fakes or pool-backed stores. All writes are
-// participants of the caller-owned guard transaction tx: they never
-// begin or commit.
+// ControlIdempotencyDurable is the narrow durable seam the guard needs
+// (atomic + detached). *idempotency.ControlStore is the production
+// implementation; tests substitute fakes or pool-backed stores.
+//
+// Transaction discipline differs by path:
+//   - Atomic: every write is a participant of the caller-owned
+//     guard transaction tx: they never begin or commit.
+//   - Detached: the guard drives the same Claim/Complete/Abandon
+//     through SHORT independent transactions (one for the claim,
+//     one for the outcome), never holding a long transaction across
+//     the external side effect. TryAbandonStale runs in the same
+//     short-transaction discipline, fenced by the observed token, for
+//     claims with no dispatch intent. MarkUnknown precedes external I/O
+//     so an uncertain external result can never be reclaimed by the lease.
 type ControlIdempotencyDurable interface {
 	// Claim inserts the in-progress fact in tx and reports whether the
 	// caller won. Losers observe Existing (replay on same hash, 409 on
@@ -63,6 +74,14 @@ type ControlIdempotencyDurable interface {
 	// Abandon deletes the winner's in-progress claim in tx so the retry
 	// re-executes.
 	Abandon(ctx context.Context, tx pgx.Tx, claim idempotency.ControlClaim) error
+	// MarkUnknown persists dispatch intent before an external side effect.
+	MarkUnknown(ctx context.Context, tx pgx.Tx, claim idempotency.ControlClaim) error
+	// TryAbandonStale deletes a stale in-progress claim older than
+	// before in tx (detached winner-lease recovery). True means one
+	// orphan was removed and the caller may reclaim; false means the
+	// in-progress row is fresh (active winner) or already gone, so
+	// the caller must not execute unfenced.
+	TryAbandonStale(ctx context.Context, tx pgx.Tx, claim idempotency.ControlClaim, before time.Time) (bool, error)
 	// PurgeExpired reclaims expired completed rows in autocommit,
 	// best-effort after a successful commit. It never fails the call.
 	PurgeExpired(ctx context.Context) (int64, error)

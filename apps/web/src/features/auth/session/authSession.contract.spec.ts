@@ -56,7 +56,7 @@ describe('useUserStore auth cache handling', () => {
 
   it('logs in and stores the fetched session user', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
-    const loggedInUser = makeSessionUser({ ordinal: 4, storage_namespace: 'USER04' })
+    const loggedInUser = makeSessionUser({ ordinal: 4 })
     vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockResolvedValue({ user: loggedInUser } as never)
 
@@ -216,7 +216,7 @@ describe('useUserStore auth cache handling', () => {
 
   it('registers and stores the created session user', async () => {
     const { store, authClient } = await getFreshUserStore()
-    const registeredUser = makeSessionUser({ ordinal: 2, storage_namespace: 'USER02' })
+    const registeredUser = makeSessionUser({ ordinal: 2 })
     vi.mocked(authClient.signUp.email).mockResolvedValue({
       data: { user: registeredUser },
     } as never)

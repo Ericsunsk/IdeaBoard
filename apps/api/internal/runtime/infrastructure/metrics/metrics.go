@@ -363,7 +363,7 @@ var (
 )
 
 // MultiRefresher periodically publishes River depth/lag gauges for every
-// known queue (see taskqueue.RiverRetryMatrix). It shares the Refresher
+// known queue (see riverpolicy.RiverRetryMatrix). It shares the Refresher
 // semantics: one blocking-safe snapshot per queue per tick, failures keep
 // the last gauges and only log, and nil set/empty stats disables refresh.
 type MultiRefresher struct {

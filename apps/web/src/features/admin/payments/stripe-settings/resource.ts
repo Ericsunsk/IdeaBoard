@@ -1,6 +1,7 @@
 import {
   buildControlMutationHeaders,
   requireOperatorReason,
+  type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import {
   getControlStripeConfig,
@@ -43,10 +44,7 @@ export type UpdateStripeConfigurationRequest = {
   purchases_enabled: boolean
 }
 
-export type StripeSettingsMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type StripeSettingsMutationOptions = ControlMutationOptions
 
 export function createAdminStripeSettingsResource(): AdminStripeSettingsResource {
   return {

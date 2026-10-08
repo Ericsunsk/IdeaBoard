@@ -1,4 +1,8 @@
-import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
+import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+  type ControlMutationOptions,
+} from '../shared/lib/controlMutation'
 import {
   deleteControlMailSetting,
   getControlMailSetting,
@@ -19,17 +23,9 @@ const MAIL_CONTROL_MESSAGES = {
   503: '邮件服务暂不可用，请稍后重试',
 } as const
 
-// Admin mail config boundary (#809 leftovers): the full mail flow (read,
-// save, clear, test) goes through the Control Plane mail-setting
-// operations with the contract envelope (`{ data }`). Mutations carry a
-// header-only Idempotency-Key and an operator reason (mirrored into the
-// body `reason` field, which the control guard also accepts); every write
-// emits a control audit record. The legacy `/api/admin/settings/mail*`
-// routes are untouched server-side; this resource no longer calls them.
-export type MailConfigMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+// Mail configuration uses Control Plane envelopes and audited mutations.
+// Idempotency-Key is header-only; operator reason also accompanies body writes.
+export type MailConfigMutationOptions = ControlMutationOptions
 
 export interface AdminMailConfigResource {
   get: () => Promise<MailConfigSummary>

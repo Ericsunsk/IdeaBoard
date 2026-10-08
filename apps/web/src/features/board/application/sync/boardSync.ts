@@ -377,7 +377,7 @@ function applySyncSuccess(
 }
 
 function markSyncFailure(boardId: string, captured: BoardScope, error: unknown) {
-  if (isBoardScopeCurrent(captured) && isBoardNameConflictError(error)) {
+  if (isBoardScopeCurrent(captured) && isBoardSyncConflictError(error)) {
     pendingRollbackBoardIds.add(boardId.trim())
   }
 }
@@ -394,18 +394,67 @@ export async function syncDeleteBoardToServer(boardId: string) {
   await archiveWorkspaceBoard(requireBoardWorkspaceId(), boardId)
 }
 
-export function isBoardNameConflictError(error: unknown): boolean {
-  if (isBoardArchivedError(error)) return false
-  if (typeof error !== 'object' || !error) return false
-  const status = 'status' in error ? (error as { status?: unknown }).status : undefined
-  if (status === 409) return true
-  const code = 'code' in error ? (error as { code?: unknown }).code : undefined
-  // v1 has no board-name uniqueness: 409s are `board_revision_conflict`
-  // (stale If-Match) or `board_idempotency_conflict`. They drive the same
-  // rollback/reconcile policy the legacy name conflict used.
-  // `board_archived` (409) is excluded above: archived writes surface the
-  // archived banner instead of the conflict recovery path.
-  return code === 409 || code === 'board_revision_conflict' || code === 'board_idempotency_conflict'
+/**
+ * Board sync conflict vocabulary (issue #910).
+ *
+ * v1 has no board-name uniqueness: every 409 that is not `board_archived`
+ * is an optimistic-concurrency signal, never a server name-uniqueness
+ * verdict. Local duplicate-name validation (`isBoardNameTaken`) stays the
+ * only name gate; these classifiers describe revision/idempotency conflicts
+ * only.
+ */
+export type BoardSyncConflictKind = 'revision-conflict' | 'idempotency-conflict'
+
+function eachErrorInCauseChain(error: unknown): unknown[] {
+  const chain: unknown[] = []
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    chain.push(current)
+    current = (current as { cause?: unknown }).cause
+  }
+  return chain
+}
+
+function hasHttpConflictStatusFallback(error: unknown): boolean {
+  return eachErrorInCauseChain(error).some((node) => {
+    if (!node || typeof node !== 'object') return false
+    const record = node as { status?: unknown; code?: unknown }
+    return record.status === 409 || record.code === 409
+  })
+}
+
+/**
+ * Canonical conflict kind for a transport failure: `revision-conflict` for
+ * stale `If-Match` writes (`board_revision_conflict`, plus a bare-409
+ * HTTP-status fallback for transports that drop the wire code — stale
+ * revisions are the only code-less 409 the v1 contract emits), or
+ * `idempotency-conflict` for `Idempotency-Key` reuse
+ * (`board_idempotency_conflict`). Returns null for archived writes and
+ * ordinary failures. Wrapped causes resolve through the shared error
+ * catalog, so `BoardSessionRemoteSyncError.cause` chains classify.
+ */
+export function getBoardSyncConflictKind(error: unknown): BoardSyncConflictKind | null {
+  if (isBoardArchivedError(error)) return null
+  const code = userErrorCode(error)
+  if (code === 'board_revision_conflict') return 'revision-conflict'
+  if (code === 'board_idempotency_conflict') return 'idempotency-conflict'
+  if (code === 'board_archived') return null
+  // Necessary HTTP-status fallback: a bare 409 without a wire code can only
+  // be a stale-revision conflict under the v1 contract (idempotency
+  // conflicts always carry their wire code; archived is excluded above).
+  if (hasHttpConflictStatusFallback(error)) return 'revision-conflict'
+  return null
+}
+
+/**
+ * Any optimistic-concurrency conflict (revision or idempotency). Archived
+ * writes are never conflicts: they surface the archived banner instead of
+ * the conflict recovery path.
+ */
+export function isBoardSyncConflictError(error: unknown): boolean {
+  return getBoardSyncConflictKind(error) !== null
 }
 
 /**

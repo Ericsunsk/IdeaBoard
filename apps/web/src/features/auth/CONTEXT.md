@@ -7,15 +7,15 @@ Shape: flat feature (`components/` + `session/` + `pages/`, no `domain/`/`applic
 
 ## Domain Language
 
-| Term           | Meaning                                                                                                                                                                                            |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| User Session   | Client session facts (`user` / `isAdmin` / `sessionValidatedAt`); single `useUserStore()`; server session belongs to Better Auth.                                                                  |
-| Auth Transport | Sole Better Auth adapter (`session/transport.ts`): signIn/signUp/signOut/getSession plus `/api/auth/*` fetch.                                                                                      |
-| Session Cache  | In-memory session snapshot with 5-minute TTL (`browserSessionTransition.ts`, shared with the router admin threshold); `ensureSession` returns cache when fresh, else `hasSession ? fetch : clear`. |
-| Post-Auth Path | Post-login redirect intent; stored only in `sessionStorage` (`ideaboard:auth:post-auth-path`), consume-once, must pass internal-path validation.                                                   |
-| Auth Overlay   | Global login/register modal (`mode: login\|register\|null`); installed in `WorkspaceLayout` via `createAuthOverlay` / `provideAuthOverlay`, opened per surface.                                    |
-| OTP            | Two-step form state for forgot-password and register verification (`otpPending`); authenticated only on success, failure toasts without state change.                                              |
-| Impersonation  | Admin impersonation banner state: `impersonatedBy` from Better Auth `useSession()` read only in `WorkspaceLayout`; exit via `stopImpersonating`.                                                   |
+| Term           | Meaning                                                                                                                                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User Session   | Client session facts (`user` / `isAdmin` / `sessionValidatedAt`); single `useUserStore()`; server session belongs to Better Auth.                                                                                                                                                     |
+| Auth Transport | Sole Better Auth adapter (`session/transport.ts`): signIn/signUp/signOut/getSession plus `/api/auth/*` fetch.                                                                                                                                                                         |
+| Session Cache  | In-memory session snapshot with 5-minute TTL (`session/freshness.ts` owns the trust window and freshness predicate; `browserSessionTransition.ensureSession` and the router admin gate both consume it); `ensureSession` returns cache when fresh, else `hasSession ? fetch : clear`. |
+| Post-Auth Path | Post-login redirect intent; stored only in `sessionStorage` (`ideaboard:auth:post-auth-path`), consume-once, must pass internal-path validation.                                                                                                                                      |
+| Auth Overlay   | Global login/register modal (`mode: login\|register\|null`); installed in `WorkspaceLayout` via `createAuthOverlay` / `provideAuthOverlay`, opened per surface.                                                                                                                       |
+| OTP            | Two-step form state for forgot-password and register verification (`otpPending`); authenticated only on success, failure toasts without state change.                                                                                                                                 |
+| Impersonation  | Admin impersonation banner state: `impersonatedBy` from Better Auth `useSession()` read only in `WorkspaceLayout`; exit via `stopImpersonating`.                                                                                                                                      |
 
 ## Public Seams
 
@@ -34,6 +34,7 @@ Shape: flat feature (`components/` + `session/` + `pages/`, no `domain/`/`applic
 - Panels and pages never call the generated client or Better Auth directly; chain is `Panel --runAsyncAction--> useUserStore --> authTransport --> authClient/fetch`.
 - Identity changes (login, identity switch, logout, 401/403) must update refs, write/clear the `localStorage` snapshot, and clear all auth-scoped Query cache (`clearAuthScopedQueryCache`).
 - `?redirect=` and post-auth path must pass `isSafeInternalRedirectPath` / `normalizeSafeInternalRedirectPath`; illegal values fall back to `USER_BOARDS_PATH`.
+- Avatar is a server-persisted profile projection: upload writes the user record and `/user` reads it. Client snapshots are temporary; successful refetch replaces them, including clearing a missing avatar.
 - `localStorage` holds only session snapshots and scope-restore keys; redirect intent lives only in `sessionStorage`; `File`/`blob` previews are never persisted.
 - Session: `unauthenticated` to `restoring` (memory restore) to `authenticated` (login/verifyOTP plus `fetchUserInfo(force, { retryTransient })`) to `session-expired` (401/403 clears refs, storage, Query; network/5xx keeps stale refs and retries next nav); `ensureSession` returns directly when cache is under 5 minutes.
 - OAuth callback: `loading` to `ensureSession(fresh)` plus `replace(redirect)`; provider error or session failure to `logout/clear` plus `replace` to param-free callback to `failed` (shows back-to-login button).

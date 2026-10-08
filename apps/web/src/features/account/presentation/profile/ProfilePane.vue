@@ -58,9 +58,6 @@
             {{ userStore.user?.display_name }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Badge v-if="isUserBanned" variant="destructive">
-              {{ t('account.profile.banned') }}
-            </Badge>
             <Badge
               :variant="
                 userRoleSeverity === 'danger'
@@ -76,29 +73,6 @@
         </div>
       </div>
     </section>
-
-    <section class="min-w-0" :aria-label="t('account.profile.accountInfoAria')">
-      <dl class="m-0 border-y border-border">
-        <div
-          v-for="field in profileFields"
-          :key="field.label"
-          class="grid min-h-14 grid-cols-1 items-center gap-1 border-b border-border py-3 last:border-b-0 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4"
-        >
-          <dt class="text-admin-body font-semibold text-muted-foreground">
-            {{ field.label }}
-          </dt>
-          <dd class="m-0 min-w-0">
-            <span
-              class="block truncate text-admin-title-sm font-semibold text-foreground"
-              :class="field.mono ? 'font-mono text-admin-content' : ''"
-              :title="field.value"
-            >
-              {{ field.value }}
-            </span>
-          </dd>
-        </div>
-      </dl>
-    </section>
   </AccountPane>
 </template>
 
@@ -110,24 +84,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
-import { formatDottedIsoDate } from '../../../../shared/utils/dateTime'
 import AccountPane from '../common/AccountPane.vue'
 
 type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
-type ProfileField = {
-  label: string
-  value: string
-  mono?: boolean
-}
 
 const { t } = useI18n()
 const userStore = useUserStore()
 const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 
-const formattedJoinedAt = computed(() => formatDottedIsoDate(userStore.user?.created_at))
-const formattedUpdatedAt = computed(() => formatDottedIsoDate(userStore.user?.updated_at))
-const isUserBanned = computed(() => userStore.user?.status === 0)
+// Canonical principal facts only (issue #913): display_name/role come from
+// `GET /api/v1/user`; avatar uploads persist the profile URL for later session reloads.
+// Storage and operational fields are outside the public session contract.
 const userRoleLabel = computed(() =>
   userStore.user?.role === 'admin'
     ? t('account.profile.roleAdmin')
@@ -140,21 +108,6 @@ const userInitial = computed(() => {
   const displayName = userStore.user?.display_name?.trim()
   return displayName?.[0]?.toUpperCase() || 'U'
 })
-const profileFields = computed<ProfileField[]>(() => [
-  {
-    label: t('account.profile.storageNamespace'),
-    value: userStore.user?.storage_namespace || '-',
-    mono: true,
-  },
-  {
-    label: t('account.profile.joinedAt'),
-    value: formattedJoinedAt.value,
-  },
-  {
-    label: t('account.profile.lastUpdated'),
-    value: formattedUpdatedAt.value,
-  },
-])
 
 function openAvatarPicker() {
   avatarInputRef.value?.click()

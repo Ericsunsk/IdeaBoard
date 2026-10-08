@@ -472,7 +472,7 @@ ideaboard delete --yes
 
 启动期 fail-fast 链（按顺序，任一失败进程直接退出）：`Config.Validate`（DB 口令/SSL、非法 env、PUBLIC_ORIGIN、`APP_SECRETS_ENCRYPTION_KEY` presence）→ `AUTH_INTERNAL_KEY`（生产 32+ 字符非占位）→ imgproxy 配置 → secrets key 格式校验（base64 32-byte）→ runtime 权限校验。`PUBLIC_ORIGIN` 缺失不再等到首次拼 URL 才暴露。
 
-River 重试矩阵是代码持有的 typed policy（事实源 `internal/tasking/infrastructure/queue.RiverRetryMatrix`，insert 点引用同包常量，改预算只改一处）：
+River 重试矩阵是代码持有的 typed policy（事实源 `internal/platform/riverpolicy.RiverRetryMatrix`，insert 点引用同包常量，改预算只改一处）：
 
 | Queue | MaxAttempts | 说明 |
 |-------|-------------|------|

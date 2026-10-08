@@ -4,10 +4,8 @@ import (
 	"context"
 	"time"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentcheckout "ideaboard/api/internal/payments/application/checkout"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
-	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentreadmodel "ideaboard/api/internal/payments/application/readmodel"
 	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
 	paymentrefund "ideaboard/api/internal/payments/application/refund"
@@ -48,9 +46,7 @@ type PaymentCheckoutStore interface {
 	ListActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
 	ListUserPendingPaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
 	ListUnsettledPaymentOrders(context.Context) ([]paymentsdomain.PaymentOrder, error)
-	ListPaymentRechargeHistory(context.Context, int64, time.Time, *paymentreadmodel.RechargeHistoryCursor, int) ([]dbsqlc.ListPaymentRechargeHistoryRow, error)
-	ListAdminPaymentOrders(context.Context, paymentreadmodel.AdminPaymentOrderFilters) (paymentcontracts.AdminPaymentOrderPage, error)
-	GetAdminPaymentOrder(context.Context, string) (paymentreadmodel.AdminPaymentOrderDetailRecord, []dbsqlc.ListAdminPaymentOrderWebhookEventsRow, error)
+	paymentreadmodel.CheckoutStore
 }
 
 type PaymentOrderConvergenceStore interface {

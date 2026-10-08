@@ -1,4 +1,4 @@
-package queue
+package riverpolicy
 
 import (
 	"testing"
@@ -28,14 +28,15 @@ func TestRiverRetryMatrixIsSelfConsistent(t *testing.T) {
 	}
 	for _, want := range []string{
 		RiverQueueDefault,
-		"credit_reconciliation",
-		"payment_reconciliation",
-		"payment_checkout_shutdown",
-		"task_retention",
-		"vision_billing",
-		"media_reclamation",
+		RiverQueueCreditReconciliation,
+		RiverQueuePaymentReconciliation,
+		RiverQueuePaymentCheckoutShutdown,
+		RiverQueueTaskRetention,
+		RiverQueueVisionBilling,
+		RiverQueueMediaReclamation,
+		RiverQueueWebhookDeliver,
 		RiverQueueTaskSettlementSweep,
-		"identity_admin_reconciliation",
+		RiverQueueIdentityAdminReconciliation,
 	} {
 		if seen[want] == 0 {
 			t.Fatalf("matrix is missing queue %q", want)
@@ -55,15 +56,16 @@ func TestRiverRetryMatrixMatchesInsertSiteConstants(t *testing.T) {
 		budgets[policy.Queue] = policy.MaxAttempts
 	}
 	want := map[string]int{
-		RiverQueueDefault:               RiverMaxAttemptsDefault,
-		"credit_reconciliation":         RiverMaxAttemptsCreditReconciliation,
-		"payment_reconciliation":        RiverMaxAttemptsPaymentReconciliation,
-		"payment_checkout_shutdown":     RiverMaxAttemptsPaymentCheckoutShutdown,
-		"task_retention":                RiverMaxAttemptsTaskRetention,
-		"vision_billing":                RiverMaxAttemptsVisionBilling,
-		"media_reclamation":             RiverMaxAttemptsMediaReclamation,
-		RiverQueueTaskSettlementSweep:   RiverMaxAttemptsTaskSettlementSweep,
-		"identity_admin_reconciliation": RiverMaxAttemptsIdentityAdminReconciliation,
+		RiverQueueDefault:                     RiverMaxAttemptsDefault,
+		RiverQueueCreditReconciliation:        RiverMaxAttemptsCreditReconciliation,
+		RiverQueuePaymentReconciliation:       RiverMaxAttemptsPaymentReconciliation,
+		RiverQueuePaymentCheckoutShutdown:     RiverMaxAttemptsPaymentCheckoutShutdown,
+		RiverQueueTaskRetention:               RiverMaxAttemptsTaskRetention,
+		RiverQueueVisionBilling:               RiverMaxAttemptsVisionBilling,
+		RiverQueueMediaReclamation:            RiverMaxAttemptsMediaReclamation,
+		RiverQueueWebhookDeliver:              RiverMaxAttemptsWebhookDeliver,
+		RiverQueueTaskSettlementSweep:         RiverMaxAttemptsTaskSettlementSweep,
+		RiverQueueIdentityAdminReconciliation: RiverMaxAttemptsIdentityAdminReconciliation,
 	}
 	for queue, attempts := range want {
 		if budgets[queue] != attempts {

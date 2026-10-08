@@ -12,19 +12,19 @@ export default {
     deleting: '삭제 중…',
   },
   feedback: {
-    createNameConflict: '이미 같은 이름의 캔버스가 있습니다. 다시 시도해 주세요.',
+    createSyncConflict: '동기화 충돌이 발생했습니다. 다시 시도해 주세요.',
     createSyncFailed: '캔버스를 생성할 수 없습니다. 나중에 다시 시도해 주세요.',
     nameAlreadyExists: '이름이 이미 존재합니다',
     nameEmpty: '캔버스 이름은 비워둘 수 없습니다',
-    renameConflictReloaded: '이름 충돌로 캔버스 목록을 새로고침했습니다.',
+    renameSyncConflictReloaded: '동기화 충돌로 캔버스 목록을 새로고침했습니다.',
     renameSyncFailedRolledBack: '이름 변경 동기화에 실패하여 원래 이름으로 복원했습니다.',
-    renameConflictRecoveryIncomplete:
-      '이름 충돌 및 복구가 완료되지 않았습니다. 캔버스 목록을 새로고침해 주세요.',
+    renameSyncConflictRecoveryIncomplete:
+      '동기화 충돌 및 복구가 완료되지 않았습니다. 캔버스 목록을 새로고침해 주세요.',
     renameSyncFailedNoRollback:
       '이름 변경 동기화에 실패했고 복원할 수 없습니다. 캔버스 목록을 새로고침해 주세요.',
     renamed: '캔버스 이름이 변경되었습니다',
     copyFailed: '복사에 실패했습니다',
-    duplicateNameConflict: '복사된 이름의 캔버스가 이미 존재합니다. 다시 시도해 주세요.',
+    duplicateSyncConflict: '복사 중 동기화 충돌이 발생했습니다. 다시 시도해 주세요.',
     duplicateSyncFailed: '복사 동기화에 실패했습니다. 나중에 다시 시도해 주세요.',
     duplicated: '캔버스가 복사되었습니다',
     deleteSyncFailed: '삭제에 실패했습니다. 나중에 다시 시도해 주세요.',

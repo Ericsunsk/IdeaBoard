@@ -35,18 +35,17 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
   const userStore = useUserStore()
   onMounted(() => {
     const currentUser = userStore.user
-    if (!currentUser || currentUser.email || userStore.email) return
+    // Identity email comes only from the Better Auth chain (issue #913):
+    // the business principal never carries an email, so hydrate the
+    // session-store email instead of reading it off the user projection.
+    if (!currentUser || userStore.email) return
 
     const userId = currentUser.public_id
     void authTransport
       .getSessionUser()
       .then((sessionUser) => {
         if (!sessionUser?.email) return
-        if (
-          userStore.user?.public_id !== userId ||
-          userStore.user.email ||
-          userStore.email
-        ) {
+        if (userStore.user?.public_id !== userId || userStore.email) {
           return
         }
         userStore.setEmail(sessionUser.email)
@@ -179,7 +178,9 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
   return {
     viewModel: {
       avatarUrl: computed(() => userStore.user?.avatar || undefined),
-      userEmail: computed(() => userStore.user?.email || userStore.email || undefined),
+      // Menu email display stays on the Better Auth chain (issue #913):
+      // the business principal has no email field to read.
+      userEmail: computed(() => userStore.email || undefined),
       balance,
       menuItems,
     },

@@ -15,6 +15,7 @@ import {
   buildControlMutationHeaders,
   createControlError,
   requireOperatorReason,
+  type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 import type {
@@ -37,10 +38,7 @@ import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/c
 // catalog save, connection update, and the server-side connection probe
 // (provider/path required since #847 removed the mapping fallback).
 // Callers keep importing these names, never generated code directly.
-export type GatewayMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
+export type GatewayMutationOptions = ControlMutationOptions
 export type GatewayConfigSummary = {
   base_url?: string
   account_id?: string

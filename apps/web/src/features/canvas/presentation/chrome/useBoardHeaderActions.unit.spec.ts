@@ -8,10 +8,7 @@ import {
 } from '../../../board/ports/canvas'
 import { createBoardRepository, replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
-import {
-  getWorkspaceSelectionStore,
-  resetWorkspaceSelectionStore,
-} from '../../../workspace'
+import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 
 vi.mock('../../../board/ports/canvas', async (importOriginal) => {
@@ -141,22 +138,22 @@ describe('useBoardHeaderActions', () => {
     expect(message.success).toHaveBeenCalledWith('Canvas list reloaded.')
   })
 
-  it('reports remote conflict hydrate success without claiming the old name was restored', async () => {
+  it('reports sync-conflict hydrate success without claiming the old name was restored', async () => {
     const rename = vi.fn(async () => ({
       ok: false as const,
-      reason: 'remote-name-conflict' as const,
+      reason: 'revision-conflict' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
       rollback: { ok: true as const, board: board('board-a', 'Old Board') },
       hydrate: { ok: true as const },
-      error: { status: 409 },
+      error: { status: 409, code: 'board_revision_conflict' },
     }))
     const { header, message } = createHeader(createCatalog(rename))
 
     header.boardNameDraft.value = 'Taken'
     await header.onConfirmBoardRename()
 
-    expect(message.error).toHaveBeenCalledWith('Name conflict. Canvas list reloaded.')
+    expect(message.error).toHaveBeenCalledWith('Sync conflict. Canvas list reloaded.')
     expect(header.catalogRecovery.value).toEqual({ status: 'idle' })
   })
 
@@ -183,15 +180,15 @@ describe('useBoardHeaderActions', () => {
     expect(header.isRenamePending.value).toBe(false)
   })
 
-  it('keeps reload recovery available when remote conflict hydration fails', async () => {
+  it('keeps reload recovery available when sync-conflict hydration fails', async () => {
     const rename = vi.fn(async () => ({
       ok: false as const,
-      reason: 'remote-name-conflict' as const,
+      reason: 'idempotency-conflict' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
       rollback: { ok: true as const, board: board('board-a', 'Old Board') },
       hydrate: { ok: false as const, error: new Error('hydrate failed') },
-      error: { status: 409 },
+      error: { status: 409, code: 'board_idempotency_conflict' },
     }))
     const { header, message } = createHeader(createCatalog(rename))
 
@@ -199,7 +196,7 @@ describe('useBoardHeaderActions', () => {
     await header.onConfirmBoardRename()
 
     expect(message.error).toHaveBeenCalledWith(
-      'Name conflict. Original name restored, but the remote list refresh failed. Please reload.',
+      'Sync conflict. Original name restored, but the remote list refresh failed. Please reload.',
     )
     expect(header.catalogRecovery.value).toEqual({
       status: 'reload-required',

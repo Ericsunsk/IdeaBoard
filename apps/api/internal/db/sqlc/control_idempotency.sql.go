@@ -13,7 +13,7 @@ import (
 
 const abandonControlIdempotency = `-- name: AbandonControlIdempotency :exec
 DELETE FROM control_idempotency_records
-WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND NOT completed
+WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND attempt_token = $6 AND NOT completed
 `
 
 type AbandonControlIdempotencyParams struct {
@@ -22,6 +22,7 @@ type AbandonControlIdempotencyParams struct {
 	TargetType       string `json:"target_type"`
 	TargetID         string `json:"target_id"`
 	IdempotencyKey   string `json:"idempotency_key"`
+	AttemptToken     string `json:"attempt_token"`
 }
 
 func (q *Queries) AbandonControlIdempotency(ctx context.Context, arg AbandonControlIdempotencyParams) error {
@@ -31,16 +32,17 @@ func (q *Queries) AbandonControlIdempotency(ctx context.Context, arg AbandonCont
 		arg.TargetType,
 		arg.TargetID,
 		arg.IdempotencyKey,
+		arg.AttemptToken,
 	)
 	return err
 }
 
 const claimControlIdempotency = `-- name: ClaimControlIdempotency :one
 
-INSERT INTO control_idempotency_records (operator_identity, operation, target_type, target_id, idempotency_key, request_hash)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO control_idempotency_records (operator_identity, operation, target_type, target_id, idempotency_key, request_hash, attempt_token)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (operator_identity, operation, target_type, target_id, idempotency_key) DO NOTHING
-RETURNING request_hash, completed, expires_at
+RETURNING request_hash, completed, expires_at, attempt_token, settlement_unknown
 `
 
 type ClaimControlIdempotencyParams struct {
@@ -50,22 +52,21 @@ type ClaimControlIdempotencyParams struct {
 	TargetID         string `json:"target_id"`
 	IdempotencyKey   string `json:"idempotency_key"`
 	RequestHash      string `json:"request_hash"`
+	AttemptToken     string `json:"attempt_token"`
 }
 
 type ClaimControlIdempotencyRow struct {
-	RequestHash string             `json:"request_hash"`
-	Completed   bool               `json:"completed"`
-	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	RequestHash       string             `json:"request_hash"`
+	Completed         bool               `json:"completed"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	AttemptToken      string             `json:"attempt_token"`
+	SettlementUnknown bool               `json:"settlement_unknown"`
 }
 
-// Control Plane durable idempotency facts (#891). The guard claims the
-// in-progress row INSIDE its guard-owned transaction before running the
-// handler: concurrent same-key claimants block on the primary key until
-// the winner commits or rolls back, so exactly one winner executes the
-// business side effect. In-progress rows are therefore never committed
-// (a crash aborts them with the transaction); only 2xx outcomes flip
-// the row to completed with the response for replay. Business failures
-// delete the claim so the retry re-executes.
+// Control idempotency authority. A unique attempt_token fences all writes.
+// Atomic mutations commit completion with business writes; detached mutations
+// commit settlement_unknown before external I/O, excluding lease takeover.
+// Only completed responses expire; unknown outcomes never automatically retry.
 func (q *Queries) ClaimControlIdempotency(ctx context.Context, arg ClaimControlIdempotencyParams) (ClaimControlIdempotencyRow, error) {
 	row := q.db.QueryRow(ctx, claimControlIdempotency,
 		arg.OperatorIdentity,
@@ -74,21 +75,29 @@ func (q *Queries) ClaimControlIdempotency(ctx context.Context, arg ClaimControlI
 		arg.TargetID,
 		arg.IdempotencyKey,
 		arg.RequestHash,
+		arg.AttemptToken,
 	)
 	var i ClaimControlIdempotencyRow
-	err := row.Scan(&i.RequestHash, &i.Completed, &i.ExpiresAt)
+	err := row.Scan(
+		&i.RequestHash,
+		&i.Completed,
+		&i.ExpiresAt,
+		&i.AttemptToken,
+		&i.SettlementUnknown,
+	)
 	return i, err
 }
 
-const completeControlIdempotency = `-- name: CompleteControlIdempotency :exec
+const completeControlIdempotency = `-- name: CompleteControlIdempotency :execrows
 UPDATE control_idempotency_records
 SET completed = TRUE,
     response_status = $6,
     response_content_type = $7,
     response_body = $8,
     completed_at = now(),
-    expires_at = $9
-WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND NOT completed
+    expires_at = $9,
+    settlement_unknown = FALSE
+WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND attempt_token = $10 AND NOT completed
 `
 
 type CompleteControlIdempotencyParams struct {
@@ -101,10 +110,11 @@ type CompleteControlIdempotencyParams struct {
 	ResponseContentType string             `json:"response_content_type"`
 	ResponseBody        string             `json:"response_body"`
 	ExpiresAt           pgtype.Timestamptz `json:"expires_at"`
+	AttemptToken        string             `json:"attempt_token"`
 }
 
-func (q *Queries) CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) error {
-	_, err := q.db.Exec(ctx, completeControlIdempotency,
+func (q *Queries) CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeControlIdempotency,
 		arg.OperatorIdentity,
 		arg.Operation,
 		arg.TargetType,
@@ -114,13 +124,17 @@ func (q *Queries) CompleteControlIdempotency(ctx context.Context, arg CompleteCo
 		arg.ResponseContentType,
 		arg.ResponseBody,
 		arg.ExpiresAt,
+		arg.AttemptToken,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteControlIdempotencyRecord = `-- name: DeleteControlIdempotencyRecord :exec
 DELETE FROM control_idempotency_records
-WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5
+WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND attempt_token = $6 AND completed AND expires_at <= now()
 `
 
 type DeleteControlIdempotencyRecordParams struct {
@@ -129,6 +143,7 @@ type DeleteControlIdempotencyRecordParams struct {
 	TargetType       string `json:"target_type"`
 	TargetID         string `json:"target_id"`
 	IdempotencyKey   string `json:"idempotency_key"`
+	AttemptToken     string `json:"attempt_token"`
 }
 
 func (q *Queries) DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error {
@@ -138,12 +153,13 @@ func (q *Queries) DeleteControlIdempotencyRecord(ctx context.Context, arg Delete
 		arg.TargetType,
 		arg.TargetID,
 		arg.IdempotencyKey,
+		arg.AttemptToken,
 	)
 	return err
 }
 
 const getControlIdempotency = `-- name: GetControlIdempotency :one
-SELECT request_hash, completed, response_status, response_content_type, response_body, expires_at
+SELECT request_hash, completed, response_status, response_content_type, response_body, expires_at, attempt_token, settlement_unknown
 FROM control_idempotency_records
 WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5
 `
@@ -163,6 +179,8 @@ type GetControlIdempotencyRow struct {
 	ResponseContentType string             `json:"response_content_type"`
 	ResponseBody        string             `json:"response_body"`
 	ExpiresAt           pgtype.Timestamptz `json:"expires_at"`
+	AttemptToken        string             `json:"attempt_token"`
+	SettlementUnknown   bool               `json:"settlement_unknown"`
 }
 
 func (q *Queries) GetControlIdempotency(ctx context.Context, arg GetControlIdempotencyParams) (GetControlIdempotencyRow, error) {
@@ -181,8 +199,40 @@ func (q *Queries) GetControlIdempotency(ctx context.Context, arg GetControlIdemp
 		&i.ResponseContentType,
 		&i.ResponseBody,
 		&i.ExpiresAt,
+		&i.AttemptToken,
+		&i.SettlementUnknown,
 	)
 	return i, err
+}
+
+const markUnknownControlIdempotency = `-- name: MarkUnknownControlIdempotency :execrows
+UPDATE control_idempotency_records
+SET settlement_unknown = TRUE
+WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND attempt_token = $6 AND NOT completed
+`
+
+type MarkUnknownControlIdempotencyParams struct {
+	OperatorIdentity string `json:"operator_identity"`
+	Operation        string `json:"operation"`
+	TargetType       string `json:"target_type"`
+	TargetID         string `json:"target_id"`
+	IdempotencyKey   string `json:"idempotency_key"`
+	AttemptToken     string `json:"attempt_token"`
+}
+
+func (q *Queries) MarkUnknownControlIdempotency(ctx context.Context, arg MarkUnknownControlIdempotencyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markUnknownControlIdempotency,
+		arg.OperatorIdentity,
+		arg.Operation,
+		arg.TargetType,
+		arg.TargetID,
+		arg.IdempotencyKey,
+		arg.AttemptToken,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const purgeExpiredControlIdempotency = `-- name: PurgeExpiredControlIdempotency :execrows
@@ -192,6 +242,37 @@ WHERE completed AND expires_at <= now()
 
 func (q *Queries) PurgeExpiredControlIdempotency(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, purgeExpiredControlIdempotency)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const tryAbandonStaleControlIdempotency = `-- name: TryAbandonStaleControlIdempotency :execrows
+DELETE FROM control_idempotency_records
+WHERE operator_identity = $1 AND operation = $2 AND target_type = $3 AND target_id = $4 AND idempotency_key = $5 AND attempt_token = $6 AND NOT completed AND NOT settlement_unknown AND created_at < $7
+`
+
+type TryAbandonStaleControlIdempotencyParams struct {
+	OperatorIdentity string             `json:"operator_identity"`
+	Operation        string             `json:"operation"`
+	TargetType       string             `json:"target_type"`
+	TargetID         string             `json:"target_id"`
+	IdempotencyKey   string             `json:"idempotency_key"`
+	AttemptToken     string             `json:"attempt_token"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) TryAbandonStaleControlIdempotency(ctx context.Context, arg TryAbandonStaleControlIdempotencyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, tryAbandonStaleControlIdempotency,
+		arg.OperatorIdentity,
+		arg.Operation,
+		arg.TargetType,
+		arg.TargetID,
+		arg.IdempotencyKey,
+		arg.AttemptToken,
+		arg.CreatedAt,
+	)
 	if err != nil {
 		return 0, err
 	}

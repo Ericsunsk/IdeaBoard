@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/platform/riverpolicy"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/riverqueue/river"
@@ -633,7 +633,7 @@ func TestNewWorkspaceTaskWorkerRequiresSeams(t *testing.T) {
 func TestWorkspaceTaskWorkerTimeout(t *testing.T) {
 	env := newWorkerTestEnv()
 	worker := env.newWorker(nil, nil)
-	if got := worker.Timeout(nil); got != taskqueue.RiverJobTimeoutDrawing {
+	if got := worker.Timeout(nil); got != riverpolicy.RiverJobTimeoutDrawing {
 		t.Fatalf("Timeout = %v, want RiverJobTimeoutDrawing", got)
 	}
 }

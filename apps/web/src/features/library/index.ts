@@ -43,7 +43,9 @@ export {
   type LibraryAssetMaterializer,
   type LibraryMaterializeOptions,
   type LibraryMaterializedMedia,
+  type WorkspaceLibraryRemoveResult,
   type WorkspaceLibrarySavedKey,
+  type WorkspaceLibrarySaveResult,
 } from './application/libraryUseCases'
 export * from './domain/transfer'
 export * from './application/folderFacts'
