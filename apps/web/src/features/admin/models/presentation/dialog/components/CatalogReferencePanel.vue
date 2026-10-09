@@ -43,7 +43,9 @@
       <div class="flex items-center gap-2.5">
         <div
           class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg"
-          :class="brandLogo ? 'border border-border/60 bg-muted/60' : 'bg-primary/10 text-primary'"
+          :class="
+            brandLogo ? 'border border-border/60 bg-muted/60' : 'bg-primary-faint text-primary'
+          "
         >
           <img
             v-if="brandLogo && !logoLoadFailed"
@@ -112,23 +114,16 @@
             MODELS_MESSAGES.referenceNoData
           }}</span>
           <span v-else class="flex flex-wrap justify-end gap-1">
-            <span
+            <!-- 能力徽标收口 AdminStatusPill：supported→success，未知/不支持→neutral；
+                 静态属性不呼吸；✓/✗/? 后缀保留 false 与未知区分（不再用 line-through）。 -->
+            <AdminStatusPill
               v-for="capability in capabilities"
               :key="capability.key"
-              class="inline-flex items-center rounded px-1.5 py-0.5 text-admin-caption font-medium"
-              :class="
-                capability.supported === true
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : capability.supported === false
-                    ? 'bg-muted text-muted-foreground line-through'
-                    : 'bg-muted text-muted-foreground'
-              "
-            >
-              {{ capability.label
-              }}{{
-                capability.supported === true ? '✓' : capability.supported === false ? '✗' : '?'
-              }}
-            </span>
+              :label="`${capability.label}${capability.supported === true ? '✓' : capability.supported === false ? '✗' : '?'}`"
+              :variant="capability.supported === true ? 'success' : 'neutral'"
+              :pulse="false"
+              size="small"
+            />
           </span>
         </div>
 
@@ -179,18 +174,22 @@
           <span v-if="statusKind === 'unknown'" class="font-medium text-muted-foreground">{{
             MODELS_MESSAGES.referenceNoData
           }}</span>
-          <span
+          <!-- 上游状态收口 AdminStatusPill：deprecated→danger 红色预警，beta→neutral；
+               缺失即无预警，绝不误报；静态属性不呼吸。 -->
+          <AdminStatusPill
             v-else-if="statusKind === 'deprecated'"
-            class="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-admin-caption font-semibold text-red-700"
-          >
-            {{ MODELS_MESSAGES.referenceDeprecated(snapshot.status) }}
-          </span>
-          <span
+            :label="MODELS_MESSAGES.referenceDeprecated(snapshot.status)"
+            variant="danger"
+            :pulse="false"
+            size="small"
+          />
+          <AdminStatusPill
             v-else-if="statusKind === 'beta'"
-            class="inline-flex items-center rounded border border-border bg-card px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground"
-          >
-            {{ snapshot.status }}
-          </span>
+            :label="snapshot.status ?? ''"
+            variant="neutral"
+            :pulse="false"
+            size="small"
+          />
           <span v-else class="font-medium text-foreground">{{ snapshot.status }}</span>
         </div>
       </div>
@@ -207,6 +206,7 @@
 import { computed, ref, watch } from 'vue'
 import { watchDebounced } from '@vueuse/core'
 import { Cube, Refresh } from '@iconoir/vue'
+import AdminStatusPill from '../../../../shared/components/AdminStatusPill.vue'
 import { createAdminGatewayResource } from '../../../infrastructure/adminGatewayResource'
 import { resolveModelBrandLogo } from '../../../../shared/logos/brandLogos'
 import {

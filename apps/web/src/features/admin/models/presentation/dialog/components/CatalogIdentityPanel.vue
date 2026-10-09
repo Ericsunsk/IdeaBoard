@@ -37,7 +37,7 @@
             v-for="prefix in idPrefixOptions"
             :key="prefix"
             type="button"
-            class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
+            class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary-line-strong hover:bg-primary-faint-soft hover:text-primary cursor-pointer"
             @click="applyPrefix(prefix)"
           >
             {{ prefix }}

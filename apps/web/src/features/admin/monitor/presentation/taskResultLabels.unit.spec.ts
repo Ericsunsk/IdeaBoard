@@ -6,7 +6,7 @@ import {
   getAttemptRetryLayerLabel,
   getAttemptStageLabel,
   getAttemptStatusLabel,
-  getAttemptStatusSeverity,
+  getAttemptStatusVariant,
   getBillingSettlementLabel,
   getDetailExecutionModelLabel,
   getDetailExecutionProviderLabel,
@@ -26,11 +26,11 @@ describe('taskResultLabels', () => {
     expect(getAttemptProviderLabel({ provider: '', resolved_model: '' } as never)).toBe('模型 未知')
   })
 
-  it('maps attempt status, stage, and severity with passthrough fallback', () => {
+  it('maps attempt status, stage, and variant with passthrough fallback', () => {
     expect(getAttemptStatusLabel('failed')).toBe('失败')
     expect(getAttemptStatusLabel('mystery')).toBe('mystery')
-    expect(getAttemptStatusSeverity('failed')).toBe('danger')
-    expect(getAttemptStatusSeverity('mystery')).toBe('secondary')
+    expect(getAttemptStatusVariant('failed')).toBe('danger')
+    expect(getAttemptStatusVariant('mystery')).toBe('neutral')
     expect(getAttemptStageLabel('queued')).toBe('排队中')
     expect(getAttemptStageLabel('mystery')).toBe('mystery')
   })

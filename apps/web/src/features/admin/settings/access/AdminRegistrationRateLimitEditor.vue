@@ -81,12 +81,10 @@ import {
   useAccessSettings,
 } from './useAccessSettings'
 import { useAdminAccessSettingsFeedback } from '../shared/useSettingsFeedback'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { SETTINGS_MESSAGES } from '../pages/messages'
 
 const access = useAccessSettings({
   feedback: useAdminAccessSettingsFeedback(),
-  confirm: useAdminConfirm(),
 })
 
 const {

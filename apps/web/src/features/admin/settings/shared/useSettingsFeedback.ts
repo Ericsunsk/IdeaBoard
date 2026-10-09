@@ -13,6 +13,7 @@ type AdminSettingFeedback = {
 }
 
 export type AdminMailSettingsFeedback = {
+  loadFailed: (error: unknown) => void
   saved: () => void
   saveFailed: (error: unknown) => void
   testSent: () => void
@@ -22,6 +23,7 @@ export type AdminMailSettingsFeedback = {
 }
 
 export type AdminSearchProviderFeedback = {
+  loadFailed: (error: unknown) => void
   keySaved: (providerLabel: string, wasEnabled: boolean) => void
   saveFailed: (error: unknown) => void
   testPassed: (providerLabel: string) => void
@@ -40,6 +42,9 @@ export type AdminAccessSettingsFeedback = {
   rateLimitValidationFailed: (message: string) => void
   rateLimitSaved: () => void
   rateLimitSaveFailed: (error: unknown) => void
+  loginLockoutValidationFailed: (message: string) => void
+  loginLockoutSaved: () => void
+  loginLockoutSaveFailed: (error: unknown) => void
   registrationUpdated: (enabled: boolean) => void
   registrationUpdateFailed: (error: unknown) => void
 }
@@ -64,6 +69,9 @@ function createAdminAccessSettingsFeedback(toast: AdminToastPort): AdminAccessSe
     rateLimitValidationFailed: (message) => toast.error(message),
     rateLimitSaved: () => toast.success('访问限流已保存'),
     rateLimitSaveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存失败')),
+    loginLockoutValidationFailed: (message) => toast.error(message),
+    loginLockoutSaved: () => toast.success('登录锁定已保存'),
+    loginLockoutSaveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存失败')),
     registrationUpdated: (enabled) => toast.success(enabled ? '已开放注册' : '已关闭注册'),
     registrationUpdateFailed: (error) =>
       toast.error(formatAdminDisplayError(error, '更新注册状态失败')),
@@ -103,6 +111,7 @@ export function useAdminOutboundPolicyFeedback() {
 
 function createAdminMailSettingsFeedback(toast: AdminToastPort): AdminMailSettingsFeedback {
   return {
+    loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载邮件配置失败')),
     saved: () => toast.success('邮件配置已保存，请发送 Test Email'),
     saveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存邮件配置失败')),
     testSent: () => toast.success('Test Email 已发送'),
@@ -114,6 +123,8 @@ function createAdminMailSettingsFeedback(toast: AdminToastPort): AdminMailSettin
 
 function createAdminSearchProviderFeedback(toast: AdminToastPort): AdminSearchProviderFeedback {
   return {
+    loadFailed: (error) =>
+      toast.error(formatAdminDisplayError(error, '加载图片搜索供应商配置失败')),
     keySaved: (providerLabel, wasEnabled) =>
       toast.success(
         wasEnabled

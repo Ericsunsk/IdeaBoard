@@ -1,8 +1,10 @@
+import { requireContractData } from '../../../shared/api/contractKernel'
 import {
   buildControlMutationHeaders,
-  type ControlMutationOptions,
+  buildRoutineControlMutationHeaders,
 } from '../shared/lib/controlMutation'
-import { loadControlSetting, storeControlSetting } from '../shared/lib/controlResource'
+import type { ControlMutationOptions } from '../shared/lib/controlMutation'
+import { loadControlSetting } from '../shared/lib/controlResource'
 import {
   applyControlStorageProfile,
   createControlStorageProfile,
@@ -13,18 +15,18 @@ import {
   testControlStorageProfile,
   updateControlStorageProfile,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../shared/api/contractKernel'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 import { withControlCopy } from '../shared/lib/controlCopy'
 
 // Admin storage boundary (W2 transports). Reads ride the Control Plane
 // with the unified contract envelope (`{ data }` success / `{ error:
 // { code, message, request_id } }` errors); save/apply/test/delete move to
-// the Control Plane storage operations with the same envelope. Every
-// mutation carries a header-only Idempotency-Key plus an operator reason
-// collected through the shared confirm dialog, and emits a control audit
-// record. The deleted `/api/admin/storage/*` routes are gone; this module
-// is the single transport.
+// the Control Plane storage operations with the same envelope. Save/apply
+// are routine config writes (backend ReasonOptional): no confirm dialog,
+// the audit records an empty reason. Delete stays a destructive confirm
+// with a required reason. Every mutation carries a header-only
+// Idempotency-Key. The deleted `/api/admin/storage/*` routes are gone; this
+// module is the single transport.
 export type GeneratedStorageProviderMeta = {
   provider: string
   label: string
@@ -140,25 +142,34 @@ async function saveAdminStorageProfile(
   input: SaveStorageProfileInput,
   options: StorageProfileMutationOptions,
 ): Promise<StorageProfileCommandResult> {
-  return storeControlSetting(input, options, {
-    fallback: '保存存储配置失败',
-    domainMessages: {
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  try {
+    const body = await (input.id
+      ? updateControlStorageProfile(
+          input.id,
+          { ...(input.payload as unknown as Record<string, unknown>) },
+          { headers: buildRoutineControlMutationHeaders(options) },
+        )
+      : createControlStorageProfile(
+          { ...(input.payload as unknown as Record<string, unknown>) },
+          { headers: buildRoutineControlMutationHeaders(options) },
+        ))
+    const saved = requireContractData<{ message: string; profile: GeneratedStorageProfile }>(
+      body,
+      '保存存储配置失败',
+    )
+    return {
+      message: saved.message,
+      profile: normalizeGeneratedProfile(saved.profile),
+    }
+  } catch (error) {
+    throw withControlCopy(error, '保存存储配置失败', {
       control_not_found: '保存存储配置失败',
       not_found: '保存存储配置失败',
       404: '保存存储配置失败',
-    },
-    toRequest: (save: SaveStorageProfileInput) => ({
-      ...(save.payload as unknown as Record<string, unknown>),
-    }),
-    persist: (body, headers) =>
-      input.id
-        ? updateControlStorageProfile(input.id, body as Record<string, unknown>, { headers })
-        : createControlStorageProfile(body as Record<string, unknown>, { headers }),
-    map: (saved: { message: string; profile: GeneratedStorageProfile }) => ({
-      message: saved.message,
-      profile: normalizeGeneratedProfile(saved.profile),
-    }),
-  })
+    })
+  }
 }
 
 async function applyAdminStorageProfileRecord(
@@ -168,7 +179,7 @@ async function applyAdminStorageProfileRecord(
   let body: unknown
   try {
     body = await applyControlStorageProfile(id, {
-      headers: buildControlMutationHeaders(options),
+      headers: buildRoutineControlMutationHeaders(options),
     })
   } catch (error) {
     throw withControlCopy(error, '设为当前失败', {
@@ -191,10 +202,14 @@ async function testAdminStorageProfileRecord(
   id: string,
   options: StorageProfileMutationOptions,
 ): Promise<{ message: string }> {
+  // Connectivity probe is a POST read-guard (backend non-Mutation): no
+  // reason ceremony, the audit records an empty reason. Routine headers
+  // keep Idempotency-Key while omitting X-Operator-Reason when empty,
+  // matching mail routine probes and search provider probes.
   let body: unknown
   try {
     body = await testControlStorageProfile(id, {
-      headers: buildControlMutationHeaders(options),
+      headers: buildRoutineControlMutationHeaders(options),
     })
   } catch (error) {
     throw withControlCopy(error, '连接失败', {

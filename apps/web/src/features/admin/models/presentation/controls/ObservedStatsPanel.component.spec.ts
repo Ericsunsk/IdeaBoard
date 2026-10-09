@@ -97,6 +97,36 @@ describe('ObservedStatsPanel', () => {
     expect(screen.getByText('Off Sale · 非在售')).toBeInTheDocument()
   })
 
+  it('pins on-sale pills to Pill semantic variants without breathing', async () => {
+    // 在售→success，非在售→neutral；静态属性 Pill 一律 pulse=false。
+    const { rerender } = render(ObservedStatsPanel, { props: { observed: observed() } })
+    const onSalePill = screen.getByText('GPT Image 1 · 在售').parentElement!
+    expect(onSalePill).toHaveClass('bg-success-soft', 'text-success')
+    expect(onSalePill.querySelector('.animate-ping')).toBeNull()
+    await rerender({
+      observed: observed({
+        skuMargins: [
+          {
+            sku: 'ai-image:off',
+            displayName: 'Off Sale',
+            service: 'generation',
+            onSale: false,
+            unitCreditsByVariant: {},
+            actualCostCredits: null,
+            hasActualCost: false,
+            costSource: 'unavailable',
+            costNote: '',
+            marginCredits: null,
+            marginStatus: 'unknown_no_cost',
+          },
+        ],
+      }),
+    })
+    const offSalePill = screen.getByText('Off Sale · 非在售').parentElement!
+    expect(offSalePill).toHaveClass('bg-muted', 'text-muted-foreground')
+    expect(offSalePill.querySelector('.animate-ping')).toBeNull()
+  })
+
   it('falls back gracefully without observations', () => {
     render(ObservedStatsPanel, { props: { observed: null } })
     expect(screen.getByText(/暂无 7 天观测数据/)).toBeInTheDocument()

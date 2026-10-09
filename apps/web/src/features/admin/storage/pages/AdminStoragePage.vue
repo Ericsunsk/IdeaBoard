@@ -27,21 +27,13 @@
       </div>
     </div>
 
-    <!-- 1. 存储列表表格与空状态/加载态 -->
-    <AdminEmptyState v-if="loadFailed" :title="STORAGE_MESSAGES.tableLoadFailed">
-      <template #actions>
-        <ActionButton :loading="loading" @click="loadData">
-          {{ STORAGE_MESSAGES.retry }}
-        </ActionButton>
-      </template>
-    </AdminEmptyState>
+    <!-- 1. 存储列表表格（方案 A：加载失败只 toast，不进 Status/空态；表格恒显预设行占位） -->
     <AdminStorageTable
-      v-else
       :rows="allStorageRows"
       :loading="loading"
       :applying-id="applyingId"
       :testing-id="testingId"
-      :toggling-id="togglingId"
+      :is-toggling="isStorageToggling"
       :active-logo-target-id="activeLogoTarget?.id"
       @open-logo-picker="openLogoPicker"
       @apply-storage="applyStorage"
@@ -96,18 +88,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Plus } from '@iconoir/vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminLogoPickerPopover from '../../shared/components/AdminLogoPickerPopover.vue'
-import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import { vendorPresetCatalog } from '../meta'
 import { STORAGE_MESSAGES } from './messages'
 import { SETTINGS_SECTIONS } from '../../settings/shared/sections'
 import { useStorageContext } from '../useStorageContext'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { reconcileStableRows } from '../../shared/lib/reconcileStableRows'
 import type { StorageCard } from '../profiles'
-import AdminStorageTable, { type StorageTableRow } from '../components/AdminStorageTable.vue'
+import AdminStorageTable, {
+  type StorageHealth,
+  type StorageTableRow,
+} from '../components/AdminStorageTable.vue'
 import AdminStorageEditorDialog from '../components/AdminStorageEditorDialog.vue'
 
 const adminConfirm = useAdminConfirm()
@@ -115,10 +110,9 @@ const {
   saving,
   fetching,
   loading,
-  loadFailed,
   applyingId,
   testingId,
-  togglingId,
+  toggle: storageToggle,
   editorOpen,
   editorMode,
   selectedVendorKey,
@@ -175,12 +169,23 @@ function matchProfileToPreset(storage: StorageCard): string | null {
   return matched?.key ?? null
 }
 
+function resolveStorageHealth(card: (typeof cards.items.value)[number]): StorageHealth {
+  // 健康三态（方案 A）：当前生效→正常(success)；启用但缺关键配置→异常(danger)；
+  // 其余（含 standby 已配置、未配置预设）→未验证(neutral)。
+  // standby 已配置不蹭健康色；配置缺失只占位“—”，启用真相源是行内开关。
+  // 缺关键配置以后端卡片 canApply 为准（enabled && !canApply）。
+  if (card.storage.isCurrent) return 'normal'
+  if (card.storage.enabled && !card.canApply) return 'abnormal'
+  return 'unverified'
+}
+
 function buildConfiguredRow(
   card: (typeof cards.items.value)[number],
   presetKey?: string,
 ): StorageTableRow {
   const isCur = card.storage.isCurrent
-  const isConf = card.statusText === STORAGE_MESSAGES.configured
+  // 开关乐观走共享 toggle.effective 即时翻转；健康胶囊仍取服务端
+  // enabled（resolveStorageHealth 读 card.storage），不随开关预翻。
   return {
     id: card.storage.id,
     isPresetOnly: false,
@@ -191,8 +196,8 @@ function buildConfiguredRow(
     vendorIcon: card.vendorIcon,
     avatarLabel: card.avatarLabel,
     isCurrent: isCur,
-    enabled: card.storage.enabled,
-    statusType: isCur ? 'current' : isConf ? 'configured' : 'unconfigured',
+    enabled: storageToggle.effective(card.storage.id, card.storage.enabled),
+    health: resolveStorageHealth(card),
     bucket: getBucketDisplay(card),
     endpoint: getEndpointDisplay(card),
     supportsTest: card.supportsTest,
@@ -211,13 +216,48 @@ function buildUnconfiguredPresetRow(preset: (typeof vendorPresetCatalog)[number]
     avatarLabel: preset.label.slice(0, 2),
     isCurrent: false,
     enabled: false,
-    statusType: 'unconfigured',
+    health: 'unverified',
     bucket: '—',
     endpoint: String(preset.defaultConfig?.endpoint ?? '—'),
     supportsTest: false,
     canTest: false,
     canApply: false,
   }
+}
+
+const storageRowCache = new Map<string, StorageTableRow>()
+
+function isSameStorageCore(cached: StorageTableRow, incoming: StorageTableRow): boolean {
+  return (
+    cached.id === incoming.id &&
+    cached.isPresetOnly === incoming.isPresetOnly &&
+    cached.presetKey === incoming.presetKey &&
+    cached.name === incoming.name &&
+    cached.isCurrent === incoming.isCurrent &&
+    cached.enabled === incoming.enabled &&
+    cached.health === incoming.health &&
+    cached.bucket === incoming.bucket &&
+    cached.endpoint === incoming.endpoint
+  )
+}
+
+function isSameStorageFlags(cached: StorageTableRow, incoming: StorageTableRow): boolean {
+  return (
+    cached.supportsTest === incoming.supportsTest &&
+    cached.canTest === incoming.canTest &&
+    cached.canApply === incoming.canApply &&
+    cached.storage?.id === incoming.storage?.id &&
+    cached.storage?.enabled === incoming.storage?.enabled &&
+    cached.storage?.isCurrent === incoming.storage?.isCurrent
+  )
+}
+
+function isSameStorageRow(cached: StorageTableRow, incoming: StorageTableRow): boolean {
+  return isSameStorageCore(cached, incoming) && isSameStorageFlags(cached, incoming)
+}
+
+function isStorageToggling(id: string): boolean {
+  return storageToggle.isPending(id)
 }
 
 const allStorageRows = computed<StorageTableRow[]>(() => {
@@ -250,8 +290,21 @@ const allStorageRows = computed<StorageTableRow[]>(() => {
     }
   }
 
-  return rows
+  // 行引用稳定：先把乐观覆盖投影进 enabled，再经共享 helper 对账；内容
+  // 一致即复用旧引用，只有真正变化的行才返回新对象。
+  return reconcileStableRows(storageRowCache, rows, (row) => row.id, isSameStorageRow)
 })
+
+// 服务端追上乐观值后清掉覆盖，避免长期遮挡外部变更；不等则保留。
+watch(
+  () => cards.items.value,
+  (items) => {
+    storageToggle.reconcileAll(
+      items.map((card) => ({ key: card.storage.id, enabled: card.storage.enabled })),
+    )
+  },
+  { deep: true },
+)
 
 const activeLogoTarget = ref<{ id: string; name: string; endpoint: string } | null>(null)
 const logoPickerPopoverRef = ref<InstanceType<typeof AdminLogoPickerPopover> | null>(null)

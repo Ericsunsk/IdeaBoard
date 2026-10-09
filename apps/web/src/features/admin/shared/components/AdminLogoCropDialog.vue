@@ -84,7 +84,7 @@
         </div>
       </div>
 
-      <p v-if="cropError" class="min-w-0 text-admin-caption font-[650] text-destructive">
+      <p v-if="cropError" class="min-w-0 text-admin-caption font-admin-strong text-destructive">
         {{ cropError }}
       </p>
     </div>
@@ -123,10 +123,7 @@ import 'vue-advanced-cropper/dist/style.css'
 import AdminButton from './AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from './AdminDialogShell.vue'
-import {
-  adminDialogTitleClass,
-  adminTextButtonClass,
-} from '../lib/uiClasses'
+import { adminDialogTitleClass, adminTextButtonClass } from '../lib/uiClasses'
 
 type CropperInstance = InstanceType<typeof Cropper>
 

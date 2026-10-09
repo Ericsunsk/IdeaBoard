@@ -19,9 +19,6 @@
         {{ REWARD_CODES_MESSAGES.plaintextCopyLabel(copied) }}
       </ActionButton>
     </div>
-    <AdminAlert v-if="copyError" severity="error">{{
-      REWARD_CODES_MESSAGES.plaintextCopyFailed
-    }}</AdminAlert>
     <template #footer>
       <ActionButton @click="emit('update:visible', false)">
         {{ REWARD_CODES_MESSAGES.plaintextAcknowledged }}
@@ -32,9 +29,9 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import { useAdminToast } from '../../shared/lib/toast'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import { REWARD_CODES_MESSAGES } from './messages'
 
@@ -44,14 +41,13 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ 'update:visible': [visible: boolean] }>()
 const copied = ref(false)
-const copyError = ref(false)
+const toast = useAdminToast()
 
 watch(
   () => props.visible,
   (visible) => {
     if (visible) {
       copied.value = false
-      copyError.value = false
     }
   },
 )
@@ -61,6 +57,6 @@ const { copyText } = useAppClipboard()
 async function copy() {
   const ok = await copyText(props.plaintext)
   copied.value = ok
-  copyError.value = !ok
+  if (!ok) toast.error(REWARD_CODES_MESSAGES.plaintextCopyFailed)
 }
 </script>

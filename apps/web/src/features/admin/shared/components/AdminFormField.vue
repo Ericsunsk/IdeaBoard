@@ -63,7 +63,7 @@ const fieldClass = computed(() =>
   props.bodyClass ? ['flex min-w-0 flex-col', props.bodyClass] : 'flex min-w-0 flex-col gap-1.5',
 )
 const labelTextClass = computed(
-  () => props.labelClass || 'text-admin-meta font-[680] text-muted-foreground',
+  () => props.labelClass || 'text-admin-meta font-admin-emphasis text-muted-foreground',
 )
 const slotProps = computed<AdminFormFieldSlotProps>(() => ({
   describedbyId: describedbyId.value,

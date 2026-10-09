@@ -14,7 +14,7 @@
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
           <label
-            class="text-admin-meta font-[680] text-muted-foreground"
+            class="text-admin-meta font-admin-emphasis text-muted-foreground"
             :for="`prompt-textarea-${item.slug}`"
           >
             {{ PROMPTS_MESSAGES.editorSystemLabel }}
@@ -29,7 +29,7 @@
               :key="variable.key"
               type="button"
               :disabled="saving"
-              class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer disabled:opacity-50"
+              class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary-line-strong hover:bg-primary-faint-soft hover:text-primary cursor-pointer disabled:opacity-50"
               @click="insertVariable(variable.key)"
             >
               {{ variable.key }}

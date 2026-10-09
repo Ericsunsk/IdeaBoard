@@ -22,11 +22,6 @@ export const AUTH_DISPLAY_NAME_LIMIT = {
   max: 100,
 } as const
 
-export type AuthFieldMessages = {
-  required: string
-  invalid: string
-}
-
 type SentinelOption = {
   /** `false` keeps a plain message (no inline-placeholder rendering). Defaults to `true`. */
   sentinel?: boolean
@@ -41,30 +36,8 @@ export function requiredFieldError(
   return options?.sentinel === false ? requiredMessage : markRequiredError(requiredMessage)
 }
 
-export function emailFieldError(
-  value: string,
-  messages: AuthFieldMessages,
-  options?: SentinelOption,
-) {
-  return (
-    requiredFieldError(value, messages.required, options) || validateEmail(value, messages.invalid)
-  )
-}
-
 export function emailFormatError(value: string, invalidMessage: string) {
   return validateEmail(value, invalidMessage)
-}
-
-export function passwordFieldError(
-  value: string,
-  messages: AuthFieldMessages,
-  lengthMessage: string,
-  options?: SentinelOption,
-) {
-  return (
-    requiredFieldError(value, messages.required, options) ||
-    getPasswordLengthError(value, lengthMessage)
-  )
 }
 
 export function passwordLengthFieldError(value: string, lengthMessage: string) {

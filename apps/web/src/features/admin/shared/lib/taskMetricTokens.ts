@@ -60,6 +60,10 @@ export const monitorChartSpecs = {
  * pending/info, running/warning, completed/success, failed/danger, cancelled/mist。
  * Chart.js 绘制 canvas 需要具体色值，withAlpha 也无法处理 var()，因此这里取
  * adminThemeTokenFallbacks 里的 fallback，而不是就地再写一份 hex。
+ *
+ * 过滤 pills 是中性分类控件，不是状态表达：一律中性样式（bg-muted 载体 +
+ * muted-foreground 圆点），不蹭 success/warning/info/destructive 状态色；
+ * 图表线条仍保留语义色（chartColor），与状态 Pill（domain/status）同源。
  */
 const { chartMist, danger, info, success, warning } = adminThemeTokenFallbacks
 
@@ -79,8 +83,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     status: TaskStatus.pending,
     label: 'Pending',
     pillTitle: 'Filter pending tasks',
-    dotClass: 'bg-info',
-    activePillClass: 'bg-info-soft text-info font-semibold ring-1 ring-info/20',
+    dotClass: 'bg-muted-foreground',
+    activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
     chartColor: info,
     chartLabel: 'Pending',
@@ -91,8 +95,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     status: TaskStatus.running,
     label: 'Running',
     pillTitle: 'Filter running tasks',
-    dotClass: 'bg-warning',
-    activePillClass: 'bg-warning-soft text-warning font-semibold ring-1 ring-warning/20',
+    dotClass: 'bg-muted-foreground',
+    activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
     chartColor: warning,
     chartLabel: 'Running',
@@ -103,8 +107,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     status: TaskStatus.completed,
     label: 'Success',
     pillTitle: 'Filter completed tasks',
-    dotClass: 'bg-success',
-    activePillClass: 'bg-success-soft text-success font-semibold ring-1 ring-success/20',
+    dotClass: 'bg-muted-foreground',
+    activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
     chartColor: success,
     chartLabel: 'Success',
@@ -115,8 +119,8 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     status: TaskStatus.failed,
     label: 'Errors',
     pillTitle: 'Filter failed tasks',
-    dotClass: 'bg-destructive',
-    activePillClass: 'bg-destructive/15 text-destructive font-semibold ring-1 ring-destructive/20',
+    dotClass: 'bg-muted-foreground',
+    activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
     chartColor: danger,
     chartLabel: 'Errors',

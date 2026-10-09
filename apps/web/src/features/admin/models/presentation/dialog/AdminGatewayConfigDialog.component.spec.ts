@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminGatewayConfigDialog from './AdminGatewayConfigDialog.vue'
 import { ADMIN_PROBE_OPERATOR_REASON } from '../../../shared/lib/confirmSettingsSave'
 import type {
@@ -13,13 +13,6 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('../../../shared/lib/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../shared/lib/toast')>()),
   useAdminToast: () => toast,
-}))
-
-vi.mock('../../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({
-    confirm: vi.fn().mockResolvedValue(true),
-    readReason: () => 'gateway review',
-  }),
 }))
 
 const mockResource: AdminGatewayConnection = {
@@ -106,7 +99,7 @@ describe('AdminGatewayConfigDialog', () => {
         account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
         gateway_id: 'my-gateway',
       },
-      { operatorReason: 'gateway review' },
+      { operatorReason: '' },
     )
 
     expect(toast.success).toHaveBeenCalledWith('AI 网关配置已保存')
@@ -140,7 +133,7 @@ describe('AdminGatewayConfigDialog', () => {
         account_id: '',
         gateway_id: '',
       },
-      { operatorReason: 'gateway review' },
+      { operatorReason: '' },
     )
     expect(toast.success).toHaveBeenCalledWith('AI 网关配置已保存')
   })
@@ -181,7 +174,7 @@ describe('AdminGatewayConfigDialog', () => {
         base_url:
           'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2',
       }),
-      { operatorReason: 'gateway review' },
+      { operatorReason: '' },
     )
     const updateCall = vi.mocked(mockResource.update).mock.calls[0]?.[0]
     expect(updateCall?.token).toBeUndefined()
@@ -218,8 +211,12 @@ describe('AdminGatewayConfigDialog', () => {
     const { user } = renderDialog()
 
     await user.click(await screen.findByRole('button', { name: '测试连接' }))
-    expect(screen.getByText('测试连接需要填写 provider 与 path')).toBeVisible()
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('测试连接需要填写 provider 与 path')
+    })
     expect(mockResource.testConnection).not.toHaveBeenCalled()
+    // 失败收敛到 toast：inline 不挂 probe 缺参提示。
+    expect(screen.queryByText('测试连接需要填写 provider 与 path')).not.toBeInTheDocument()
 
     await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
     await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
@@ -236,5 +233,97 @@ describe('AdminGatewayConfigDialog', () => {
       { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )
     expect(toast.success).toHaveBeenCalledWith('网关连接正常 (38ms)')
+  })
+
+  it('reports unsuccessful probe result only via toast without inline error', async () => {
+    vi.mocked(mockResource.testConnection).mockResolvedValue({
+      success: false,
+      message: '网关探活失败：upstream 502',
+    })
+    const { user } = renderDialog()
+
+    await screen.findByDisplayValue(
+      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+    )
+    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
+    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
+    await user.click(await screen.findByRole('button', { name: '测试连接' }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('网关探活失败：upstream 502')
+    })
+    expect(screen.queryByText('网关探活失败：upstream 502')).not.toBeInTheDocument()
+  })
+
+  it('reports probe exception only via toast without inline error', async () => {
+    vi.mocked(mockResource.testConnection).mockRejectedValueOnce(new Error('boom'))
+    const { user } = renderDialog()
+
+    await screen.findByDisplayValue(
+      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+    )
+    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
+    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
+    await user.click(await screen.findByRole('button', { name: '测试连接' }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalled()
+    })
+    expect(toast.error.mock.calls[0]?.[0]).toContain('boom')
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
+  })
+
+  it('keeps base_url validation inline for test connection', async () => {
+    const { user } = renderDialog()
+
+    const baseUrlInput = await screen.findByPlaceholderText(/gateway/i)
+    await fireEvent.update(baseUrlInput, 'not-a-valid-url')
+    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
+    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
+    await user.click(await screen.findByRole('button', { name: '测试连接' }))
+
+    expect(await screen.findByText('网关 Base URL 必须以 http:// 或 https:// 开头')).toBeVisible()
+    expect(mockResource.testConnection).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('shows the testing spinner in the probe path input suffix instead of the test button', async () => {
+    let resolveTest!: (value: { success: boolean; latencyMs?: number; message?: string }) => void
+    vi.mocked(mockResource.testConnection).mockReturnValueOnce(
+      new Promise<{ success: boolean; latencyMs?: number; message?: string }>((resolve) => {
+        resolveTest = resolve
+      }),
+    )
+    const { user } = renderDialog()
+
+    await screen.findByDisplayValue(
+      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+    )
+    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
+    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
+    const testBtn = await screen.findByRole('button', { name: '测试连接' })
+    await user.click(testBtn)
+
+    // 输入栏尾部出现可访问的 testing 状态，按钮保持 disabled 但自身无 spinner。
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Testing…')
+    const spinner = status.querySelector('svg')
+    expect(spinner?.getAttribute('aria-hidden')).toBe('true')
+    expect(testBtn).toBeDisabled()
+    expect(testBtn.querySelector('svg')).not.toBeInTheDocument()
+    // loading 行为：探活输入栏标记 aria-busy（不测内部 Spinner 实现）。
+    expect(screen.getByPlaceholderText('例如: v1/models')).toHaveAttribute('aria-busy', 'true')
+
+    resolveTest({ success: true, latencyMs: 38, message: '网关连接正常 (38ms)' })
+    await waitFor(() => {
+      expect(mockResource.testConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'openai', path: 'v1/models' }),
+        { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
+      )
+    })
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+    expect(screen.getByPlaceholderText('例如: v1/models')).not.toHaveAttribute('aria-busy')
   })
 })

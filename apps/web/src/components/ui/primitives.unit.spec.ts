@@ -38,11 +38,11 @@ describe('Standard shadcn-vue primitives', () => {
     expect(input.attributes('aria-invalid')).toBe('true')
   })
 
-  it('renders standard Badge component with variants and severity', () => {
+  it('renders standard Badge component with variants', () => {
     expect(badgeVariants({ variant: 'destructive' })).toContain('bg-destructive')
     expect(badgeVariants({ variant: 'success' })).toContain('text-emerald-700')
     const wrapper = mount(Badge, {
-      props: { severity: 'success', rounded: true },
+      props: { variant: 'success', rounded: true },
       slots: { default: 'Active' },
     })
     expect(wrapper.text()).toBe('Active')

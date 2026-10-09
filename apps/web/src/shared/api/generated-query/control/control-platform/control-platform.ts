@@ -12,11 +12,13 @@
  * Public capabilities never imply control capabilities.
  *
  * Mutations: every POST/PUT/PATCH/DELETE requires a header-only
- * Idempotency-Key and an operator reason (reason/operator_note body field
- * or X-Operator-Reason header), else 400. Every guarded call emits a
- * Control AuditRecord (operator, target, capability, request_id,
- * idempotency key, reason, outcome, timestamp); audit records never enter
- * the public event layer.
+ * Idempotency-Key, else 400. High-risk mutations additionally require an
+ * operator reason (reason/operator_note body field or X-Operator-Reason
+ * header), else 400; routine config mutations (x-audit reason: false)
+ * accept an optional reason and audit the empty reason as-is. Every
+ * guarded call emits a Control AuditRecord (operator, target,
+ * capability, request_id, idempotency key, reason, outcome, timestamp);
+ * audit records never enter the public event layer.
  *
  * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
@@ -77,6 +79,7 @@ import type {
   UnprocessableEntityResponse,
   UpdateControlAIGatewayBody,
   UpdateControlBrandingSettingBody,
+  UpdateControlLoginLockoutSettingBody,
   UpdateControlMediaUploadSettingBody,
   UpdateControlRateLimitSettingBody,
   UpdateControlRegistrationSettingBody,
@@ -170,7 +173,7 @@ export const getUpdateControlRegistrationSettingUrl = () => {
 }
 
 /**
- * @summary Update the registration setting (operator reason required)
+ * @summary Update the registration setting (operator reason optional)
  */
 export const updateControlRegistrationSetting = async (
   updateControlRegistrationSettingBody: UpdateControlRegistrationSettingBody,
@@ -254,7 +257,7 @@ export type UpdateControlRegistrationSettingMutationVariables = {
 }
 
 /**
- * @summary Update the registration setting (operator reason required)
+ * @summary Update the registration setting (operator reason optional)
  */
 export const useUpdateControlRegistrationSetting = <
   TError =
@@ -360,7 +363,7 @@ export const getUpdateControlRateLimitSettingUrl = () => {
 }
 
 /**
- * @summary Update the rate-limit setting (operator reason required)
+ * @summary Update the rate-limit setting (operator reason optional)
  */
 export const updateControlRateLimitSetting = async (
   updateControlRateLimitSettingBody: UpdateControlRateLimitSettingBody,
@@ -444,7 +447,7 @@ export type UpdateControlRateLimitSettingMutationVariables = {
 }
 
 /**
- * @summary Update the rate-limit setting (operator reason required)
+ * @summary Update the rate-limit setting (operator reason optional)
  */
 export const useUpdateControlRateLimitSetting = <
   TError =
@@ -468,6 +471,196 @@ export const useUpdateControlRateLimitSetting = <
   TContext
 > => {
   return useMutation(getUpdateControlRateLimitSettingMutationOptions(options), queryClient)
+}
+export const getGetControlLoginLockoutSettingUrl = () => {
+  return `/platform/settings/login-lockout`
+}
+
+/**
+ * @summary Read the login-lockout setting
+ */
+export const getControlLoginLockoutSetting = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlLoginLockoutSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetControlLoginLockoutSettingQueryKey = () => {
+  return ['platform', 'settings', 'login-lockout'] as const
+}
+
+export const getGetControlLoginLockoutSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlLoginLockoutSetting>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getControlLoginLockoutSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof controlMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlLoginLockoutSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlLoginLockoutSetting>>> = ({
+    signal,
+  }) => getControlLoginLockoutSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getControlLoginLockoutSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetControlLoginLockoutSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlLoginLockoutSetting>>
+>
+export type GetControlLoginLockoutSettingQueryError = UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Read the login-lockout setting
+ */
+
+export function useGetControlLoginLockoutSetting<
+  TData = Awaited<ReturnType<typeof getControlLoginLockoutSetting>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlLoginLockoutSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlLoginLockoutSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateControlLoginLockoutSettingUrl = () => {
+  return `/platform/settings/login-lockout`
+}
+
+/**
+ * @summary Update the login-lockout setting (operator reason optional)
+ */
+export const updateControlLoginLockoutSetting = async (
+  updateControlLoginLockoutSettingBody: UpdateControlLoginLockoutSettingBody,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlObjectEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlObjectEnvelope>(getUpdateControlLoginLockoutSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateControlLoginLockoutSettingBody),
+  })
+}
+
+export const getUpdateControlLoginLockoutSettingMutationKey = () =>
+  ['updateControlLoginLockoutSetting'] as const
+
+export const getUpdateControlLoginLockoutSettingMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateControlLoginLockoutSetting>>,
+    TError,
+    UpdateControlLoginLockoutSettingMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateControlLoginLockoutSetting>>,
+  TError,
+  UpdateControlLoginLockoutSettingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateControlLoginLockoutSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateControlLoginLockoutSetting>>,
+    UpdateControlLoginLockoutSettingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateControlLoginLockoutSetting(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UpdateControlLoginLockoutSettingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateControlLoginLockoutSetting>>
+>
+export type UpdateControlLoginLockoutSettingMutationBody = UpdateControlLoginLockoutSettingBody
+export type UpdateControlLoginLockoutSettingMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+export type UpdateControlLoginLockoutSettingMutationVariables = {
+  data: UpdateControlLoginLockoutSettingBody
+}
+
+/**
+ * @summary Update the login-lockout setting (operator reason optional)
+ */
+export const useUpdateControlLoginLockoutSetting = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateControlLoginLockoutSetting>>,
+      TError,
+      UpdateControlLoginLockoutSettingMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateControlLoginLockoutSetting>>,
+  TError,
+  UpdateControlLoginLockoutSettingMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateControlLoginLockoutSettingMutationOptions(options), queryClient)
 }
 export const getGetControlBrandingSettingUrl = () => {
   return `/platform/settings/branding`
@@ -550,7 +743,7 @@ export const getUpdateControlBrandingSettingUrl = () => {
 }
 
 /**
- * @summary Update the branding setting (operator reason required)
+ * @summary Update the branding setting (operator reason optional)
  */
 export const updateControlBrandingSetting = async (
   updateControlBrandingSettingBody: UpdateControlBrandingSettingBody,
@@ -634,7 +827,7 @@ export type UpdateControlBrandingSettingMutationVariables = {
 }
 
 /**
- * @summary Update the branding setting (operator reason required)
+ * @summary Update the branding setting (operator reason optional)
  */
 export const useUpdateControlBrandingSetting = <
   TError =
@@ -853,7 +1046,7 @@ export const getUpdateControlSupportChannelsUrl = () => {
 }
 
 /**
- * @summary Update support channels (operator reason required)
+ * @summary Update support channels (operator reason optional)
  */
 export const updateControlSupportChannels = async (
   supportChannelsSetting: SupportChannelsSetting,
@@ -943,7 +1136,7 @@ export type UpdateControlSupportChannelsMutationError =
 export type UpdateControlSupportChannelsMutationVariables = { data: SupportChannelsSetting }
 
 /**
- * @summary Update support channels (operator reason required)
+ * @summary Update support channels (operator reason optional)
  */
 export const useUpdateControlSupportChannels = <
   TError =
@@ -1053,7 +1246,7 @@ export const getUpdateControlMediaUploadSettingUrl = () => {
 }
 
 /**
- * @summary Update the media-upload setting (operator reason required)
+ * @summary Update the media-upload setting (operator reason optional)
  */
 export const updateControlMediaUploadSetting = async (
   updateControlMediaUploadSettingBody: UpdateControlMediaUploadSettingBody,
@@ -1137,7 +1330,7 @@ export type UpdateControlMediaUploadSettingMutationVariables = {
 }
 
 /**
- * @summary Update the media-upload setting (operator reason required)
+ * @summary Update the media-upload setting (operator reason optional)
  */
 export const useUpdateControlMediaUploadSetting = <
   TError =
@@ -1243,7 +1436,7 @@ export const getUpdateControlOutboundPolicyUrl = () => {
 }
 
 /**
- * @summary Update the outbound policy (operator reason required)
+ * @summary Update the outbound policy (operator reason optional)
  */
 export const updateControlOutboundPolicy = async (
   controlOutboundPolicyRequest: ControlOutboundPolicyRequest,
@@ -1325,7 +1518,7 @@ export type UpdateControlOutboundPolicyMutationError =
 export type UpdateControlOutboundPolicyMutationVariables = { data: ControlOutboundPolicyRequest }
 
 /**
- * @summary Update the outbound policy (operator reason required)
+ * @summary Update the outbound policy (operator reason optional)
  */
 export const useUpdateControlOutboundPolicy = <
   TError =
@@ -1428,7 +1621,7 @@ export const getUpdateControlMailSettingUrl = () => {
 }
 
 /**
- * @summary Update the mail setting (operator reason required)
+ * @summary Update the mail setting (operator reason optional)
  */
 export const updateControlMailSetting = async (
   controlMailConfigRequest: ControlMailConfigRequest,
@@ -1509,7 +1702,7 @@ export type UpdateControlMailSettingMutationError =
 export type UpdateControlMailSettingMutationVariables = { data: ControlMailConfigRequest }
 
 /**
- * @summary Update the mail setting (operator reason required)
+ * @summary Update the mail setting (operator reason optional)
  */
 export const useUpdateControlMailSetting = <
   TError =
@@ -1625,7 +1818,7 @@ export const getTestControlMailSettingUrl = () => {
 }
 
 /**
- * @summary Send a mail setting test email (operator reason required)
+ * @summary Send a mail setting test email (operator reason optional)
  */
 export const testControlMailSetting = async (
   controlMailTestRequest: ControlMailTestRequest,
@@ -1706,7 +1899,7 @@ export type TestControlMailSettingMutationError =
 export type TestControlMailSettingMutationVariables = { data: ControlMailTestRequest }
 
 /**
- * @summary Send a mail setting test email (operator reason required)
+ * @summary Send a mail setting test email (operator reason optional)
  */
 export const useTestControlMailSetting = <
   TError =
@@ -1807,7 +2000,7 @@ export const getUpdateControlAIGatewayUrl = () => {
 }
 
 /**
- * @summary Update the AI gateway configuration (operator reason required)
+ * @summary Update the AI gateway configuration (operator reason optional)
  */
 export const updateControlAIGateway = async (
   updateControlAIGatewayBody: UpdateControlAIGatewayBody,
@@ -1888,7 +2081,7 @@ export type UpdateControlAIGatewayMutationError =
 export type UpdateControlAIGatewayMutationVariables = { data: UpdateControlAIGatewayBody }
 
 /**
- * @summary Update the AI gateway configuration (operator reason required)
+ * @summary Update the AI gateway configuration (operator reason optional)
  */
 export const useUpdateControlAIGateway = <
   TError =
@@ -1994,7 +2187,7 @@ export const getSaveControlAIGatewayCatalogUrl = () => {
 }
 
 /**
- * @summary Save the AI gateway model catalog (operator reason required)
+ * @summary Save the AI gateway model catalog (operator reason optional)
  */
 export const saveControlAIGatewayCatalog = async (
   saveControlAIGatewayCatalogBody: SaveControlAIGatewayCatalogBody,
@@ -2076,7 +2269,7 @@ export type SaveControlAIGatewayCatalogMutationError =
 export type SaveControlAIGatewayCatalogMutationVariables = { data: SaveControlAIGatewayCatalogBody }
 
 /**
- * @summary Save the AI gateway model catalog (operator reason required)
+ * @summary Save the AI gateway model catalog (operator reason optional)
  */
 export const useSaveControlAIGatewayCatalog = <
   TError =
@@ -2931,7 +3124,7 @@ export const getCreateControlStorageProfileUrl = () => {
 }
 
 /**
- * @summary Create a storage profile (operator reason required)
+ * @summary Create a storage profile (operator reason optional)
  */
 export const createControlStorageProfile = async (
   createControlStorageProfileBody: CreateControlStorageProfileBody,
@@ -3013,7 +3206,7 @@ export type CreateControlStorageProfileMutationError =
 export type CreateControlStorageProfileMutationVariables = { data: CreateControlStorageProfileBody }
 
 /**
- * @summary Create a storage profile (operator reason required)
+ * @summary Create a storage profile (operator reason optional)
  */
 export const useCreateControlStorageProfile = <
   TError =
@@ -3043,7 +3236,7 @@ export const getUpdateControlStorageProfileUrl = (id: string) => {
 }
 
 /**
- * @summary Update a storage profile (operator reason required)
+ * @summary Update a storage profile (operator reason optional)
  */
 export const updateControlStorageProfile = async (
   id: string,
@@ -3129,7 +3322,7 @@ export type UpdateControlStorageProfileMutationVariables = {
 }
 
 /**
- * @summary Update a storage profile (operator reason required)
+ * @summary Update a storage profile (operator reason optional)
  */
 export const useUpdateControlStorageProfile = <
   TError =
@@ -3250,7 +3443,7 @@ export const getApplyControlStorageProfileUrl = (id: string) => {
 }
 
 /**
- * @summary Apply a storage profile (operator reason required)
+ * @summary Apply a storage profile (operator reason optional)
  */
 export const applyControlStorageProfile = async (
   id: string,
@@ -3311,7 +3504,7 @@ export type ApplyControlStorageProfileMutationError =
 export type ApplyControlStorageProfileMutationVariables = { id: string }
 
 /**
- * @summary Apply a storage profile (operator reason required)
+ * @summary Apply a storage profile (operator reason optional)
  */
 export const useApplyControlStorageProfile = <
   TError =
@@ -3589,7 +3782,7 @@ export const getUpdateControlSearchProviderUrl = (provider: string) => {
 }
 
 /**
- * @summary Update a search provider (operator reason required)
+ * @summary Update a search provider (operator reason optional)
  */
 export const updateControlSearchProvider = async (
   provider: string,
@@ -3675,7 +3868,7 @@ export type UpdateControlSearchProviderMutationVariables = {
 }
 
 /**
- * @summary Update a search provider (operator reason required)
+ * @summary Update a search provider (operator reason optional)
  */
 export const useUpdateControlSearchProvider = <
   TError =
@@ -3954,7 +4147,7 @@ export const getSaveControlFeaturePromptUrl = (slug: string) => {
 }
 
 /**
- * @summary Save a feature prompt template (operator reason required)
+ * @summary Save a feature prompt template (operator reason optional)
  */
 export const saveControlFeaturePrompt = async (
   slug: string,
@@ -4039,7 +4232,7 @@ export type SaveControlFeaturePromptMutationVariables = {
 }
 
 /**
- * @summary Save a feature prompt template (operator reason required)
+ * @summary Save a feature prompt template (operator reason optional)
  */
 export const useSaveControlFeaturePrompt = <
   TError =
@@ -4309,7 +4502,7 @@ export const getBackfillControlStatisticsUrl = () => {
 }
 
 /**
- * @summary Backfill task statistics (operator reason required)
+ * @summary Backfill task statistics (operator reason optional)
  */
 export const backfillControlStatistics = async (
   backfillControlStatisticsBody?: BackfillControlStatisticsBody,
@@ -4390,7 +4583,7 @@ export type BackfillControlStatisticsMutationError =
 export type BackfillControlStatisticsMutationVariables = { data?: BackfillControlStatisticsBody }
 
 /**
- * @summary Backfill task statistics (operator reason required)
+ * @summary Backfill task statistics (operator reason optional)
  */
 export const useBackfillControlStatistics = <
   TError =
@@ -4501,7 +4694,7 @@ export const getSaveControlBrandLogoOverrideUrl = (
 
 /**
  * Body carries {logo_key}; the scope-qualified key (scope plus target_key) is the audited target. Data shape is ControlBrandLogoOverride inside the contract envelope.
- * @summary Upsert a brand logo override (operator reason required)
+ * @summary Upsert a brand logo override (operator reason optional)
  */
 export const saveControlBrandLogoOverride = async (
   scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
@@ -4592,7 +4785,7 @@ export type SaveControlBrandLogoOverrideMutationVariables = {
 }
 
 /**
- * @summary Upsert a brand logo override (operator reason required)
+ * @summary Upsert a brand logo override (operator reason optional)
  */
 export const useSaveControlBrandLogoOverride = <
   TError =

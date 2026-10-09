@@ -38,15 +38,6 @@
         class="scroll-mt-20"
         tabindex="-1"
       >
-        <AdminAlert v-if="searchLoadError" severity="error" class="mb-4">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <span>{{ searchLoadError }}</span>
-            <ActionButton variant="outline" @click="loadSearchProviders">
-              {{ SETTINGS_MESSAGES.retry }}
-            </ActionButton>
-          </div>
-        </AdminAlert>
-
         <AdminImageProvidersTable
           :configs="searchConfigs"
           :resource="searchResource"
@@ -88,7 +79,10 @@
         class="scroll-mt-20"
         tabindex="-1"
       >
-        <AdminRegistrationRateLimitEditor />
+        <div class="flex flex-col gap-8">
+          <AdminRegistrationRateLimitEditor />
+          <AdminLoginLockoutEditor />
+        </div>
       </section>
 
       <section
@@ -119,11 +113,10 @@ import AdminImageProvidersTable from '../image-library/AdminImageProvidersTable.
 import AdminOAuthLoginCard from '../oauth/AdminOAuthLoginCard.vue'
 import AdminPaymentSettingsCard from '../payment/AdminPaymentSettingsCard.vue'
 import AdminUploadConcurrencyFooter from '../upload/AdminUploadConcurrencyFooter.vue'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminMailConfigCard from '../mail/AdminMailConfigCard.vue'
 import AdminOutboundPolicyCard from '../outbound/AdminOutboundPolicyCard.vue'
 import AdminRegistrationRateLimitEditor from '../access/AdminRegistrationRateLimitEditor.vue'
+import AdminLoginLockoutEditor from '../access/AdminLoginLockoutEditor.vue'
 import AdminSupportChannelsEditor from '../support-channels/AdminSupportChannelsEditor.vue'
 import AdminStoragePage from '../../storage/pages/AdminStoragePage.vue'
 import AdminSettingsOnThisPage, {
@@ -134,8 +127,7 @@ import {
   type AdminSearchProviderResource,
 } from '../image-library/searchProviderResource'
 import { SEARCH_PROVIDERS, type SearchProviderConfig } from '../image-library/searchProviderTypes'
-import { formatAdminDisplayError } from '../../shared/lib/toast'
-import { SETTINGS_MESSAGES } from './messages'
+import { useAdminSearchProviderFeedback } from '../shared/useSettingsFeedback'
 import { useScrollSpy } from '../shared/useScrollSpy'
 
 const TOC_ITEMS: readonly OnThisPageItem[] = [
@@ -153,26 +145,26 @@ const TOC_ITEMS: readonly OnThisPageItem[] = [
 const { activeId: activeSectionId, handleSelect } = useScrollSpy(TOC_ITEMS.map((item) => item.id))
 
 const searchResource: AdminSearchProviderResource = createAdminSearchProviderResource()
+const searchFeedback = useAdminSearchProviderFeedback()
 const searchConfigs = ref<SearchProviderConfig[]>([])
 const searchLoading = ref(false)
-const searchLoadError = ref('')
+let searchRequestGeneration = 0
 
 async function loadSearchProviders() {
+  const generation = ++searchRequestGeneration
   searchLoading.value = true
-  searchLoadError.value = ''
   try {
     const list = await searchResource.list()
+    if (generation !== searchRequestGeneration) return
     searchConfigs.value = [...list.providers].sort(
       (left, right) =>
         SEARCH_PROVIDERS.indexOf(left.provider) - SEARCH_PROVIDERS.indexOf(right.provider),
     )
   } catch (err) {
-    searchLoadError.value = formatAdminDisplayError(
-      err,
-      SETTINGS_MESSAGES.searchProvidersLoadFailed,
-    )
+    if (generation !== searchRequestGeneration) return
+    searchFeedback.loadFailed(err)
   } finally {
-    searchLoading.value = false
+    if (generation === searchRequestGeneration) searchLoading.value = false
   }
 }
 

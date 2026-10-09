@@ -244,7 +244,7 @@ const scrollRegionRole = computed(() => (props.scrollAriaLabel ? 'region' : unde
 const hasExpansionSlot = computed(() => Boolean(slots.expansion))
 // 对标 AdminModelAddDialog 手写表 thead：sticky 定位 + 背景 token，默认关闭零影响。
 const stickyHeaderClass = computed(() =>
-  props.stickyHeader ? 'sticky top-0 z-10 bg-muted/80 backdrop-blur-xs' : undefined,
+  props.stickyHeader ? 'sticky top-0 z-admin-sticky bg-muted/80 backdrop-blur-xs' : undefined,
 )
 // 初载（无行 + loading）走 spinner/骨架；有行 + loading 是后台刷新，行保留挂载弱示意。
 const isStale = computed(() => props.loading && rows.value.length > 0)

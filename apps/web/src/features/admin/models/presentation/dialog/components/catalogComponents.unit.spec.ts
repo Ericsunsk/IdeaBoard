@@ -299,10 +299,20 @@ describe('AdminModelEditDialog subcomponents', () => {
       expect(await screen.findByText('text / image → text')).toBeInTheDocument()
       expect(await screen.findByText('2025-04-14 / 截止 2024-04')).toBeInTheDocument()
       expect(await screen.findByText('gpt-nano')).toBeInTheDocument()
-      // deprecated 红 badge：状态原文 + 已下线预警。
+      // 能力徽标收口 AdminStatusPill：supported→success，unsupported→neutral，
+      // 静态属性不呼吸；✓/✗ 后缀保留区分。
+      const supportedPill = (await screen.findByText(/工具调用✓/)).parentElement!
+      expect(supportedPill).toHaveClass('bg-success-soft', 'text-success')
+      expect(supportedPill.querySelector('.animate-ping')).toBeNull()
+      const unsupportedPill = (await screen.findByText(/推理✗/)).parentElement!
+      expect(unsupportedPill).toHaveClass('bg-muted', 'text-muted-foreground')
+      expect(unsupportedPill.querySelector('.animate-ping')).toBeNull()
+      // deprecated 红 Pill：状态原文 + 已下线预警（danger 语义载体，满圆 Badge）。
       const badge = await screen.findByText(/已下线预警/)
       expect(badge.textContent).toMatch(/deprecated/)
-      expect(badge.className).toMatch(/red/)
+      const badgeRoot = badge.parentElement!
+      expect(badgeRoot).toHaveClass('bg-destructive-soft', 'text-destructive', 'rounded-full')
+      expect(badgeRoot.querySelector('.animate-ping')).toBeNull()
       expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
     })
 
@@ -330,6 +340,10 @@ describe('AdminModelEditDialog subcomponents', () => {
 
       expect(await screen.findByText('beta')).toBeInTheDocument()
       expect(screen.queryByText(/已下线预警/)).not.toBeInTheDocument()
+      // beta 收口 neutral Pill：满圆 Badge + muted 载体，静态不呼吸。
+      const betaRoot = screen.getByText('beta').parentElement!
+      expect(betaRoot).toHaveClass('bg-muted', 'text-muted-foreground', 'rounded-full')
+      expect(betaRoot.querySelector('.animate-ping')).toBeNull()
       // 部分缺失：模态/发布/家族行回落暂无数据，不炸版。
       expect(screen.getAllByText('暂无数据').length).toBeGreaterThanOrEqual(3)
     })

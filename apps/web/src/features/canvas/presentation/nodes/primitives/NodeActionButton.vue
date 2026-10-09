@@ -73,7 +73,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 
 .node-action-btn.variant-stage-ghost {
   border: none;
-  border-radius: 8px;
+  border-radius: var(--canvas-radius-md);
   background: rgba(75, 85, 99, 0.72);
   color: #f9fafb;
   min-height: 26px;
@@ -110,7 +110,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 .node-action-btn.variant-primary {
   min-height: 32px;
   border-color: var(--node-tool-button-brand);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--node-tool-button-brand);
   color: var(--canvas-text-inverse);
   font-size: 12px;

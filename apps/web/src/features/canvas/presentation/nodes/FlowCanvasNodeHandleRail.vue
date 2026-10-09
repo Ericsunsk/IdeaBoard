@@ -154,7 +154,7 @@ watch(
   top: calc(50% + var(--handle-plus-hit-y));
   width: calc(52px * var(--canvas-node-ui-scale, 1));
   height: calc(52px * var(--canvas-node-ui-scale, 1));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transform: translate(-50%, -50%);
   pointer-events: auto;
 }
@@ -169,7 +169,7 @@ watch(
   width: 32px;
   height: 32px;
   border: calc(var(--flow-edge-width) * 1px) solid var(--handle-ring-color);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--handle-ring-color);
   box-shadow: none;

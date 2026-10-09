@@ -85,15 +85,13 @@
         :input-error-class="passwordInputErrorClass"
         input-type="email"
         autocomplete="email"
+        :loading="emailLoading"
+        :loading-label="t('account.security.sending')"
         :placeholder="t('account.security.newEmailPlaceholder')"
       />
-      <Button
-        type="submit"
-        :loading="emailLoading"
-        :disabled="emailLoading"
-        :class="accountPrimaryActionButtonClass"
-        >{{ emailLoading ? t('account.security.sending') : t('account.security.sendCode') }}</Button
-      >
+      <Button type="submit" :disabled="emailLoading" :class="accountPrimaryActionButtonClass">{{
+        emailLoading ? t('account.security.sending') : t('account.security.sendCode')
+      }}</Button>
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">

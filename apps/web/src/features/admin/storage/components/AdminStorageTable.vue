@@ -86,30 +86,14 @@
           </template>
         </AdminColumn>
 
-        <!-- Status 列（全局规范：任务监控页 TaskStatusCell 式 Token 胶囊 + 圆点） -->
-        <AdminColumn field="status" header="Status" :style="{ width: '105px' }">
+        <!-- Status 列（健康三态：正常/异常/未验证，载体统一 AdminStatusPill） -->
+        <AdminColumn field="status" :header="STATUS_COLUMN_HEADER" :style="{ width: '105px' }">
           <template #body="{ data }">
-            <span
-              v-if="data.isCurrent"
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-semibold leading-none bg-success-soft text-success ring-1 ring-success/20"
-            >
-              <span class="size-1.5 rounded-full bg-success" />
-              <span>{{ STORAGE_MESSAGES.current }}</span>
-            </span>
-            <span
-              v-else-if="data.statusType === 'configured'"
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-semibold leading-none bg-info-soft text-info ring-1 ring-info/20"
-            >
-              <span class="size-1.5 rounded-full bg-info" />
-              <span>{{ STORAGE_MESSAGES.configured }}</span>
-            </span>
-            <span
-              v-else
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-semibold leading-none bg-muted text-muted-foreground ring-1 ring-border"
-            >
-              <span class="size-1.5 rounded-full bg-muted-foreground" />
-              <span>{{ STORAGE_MESSAGES.unconfigured }}</span>
-            </span>
+            <AdminStatusPill
+              :label="storageHealthLabel(data.health)"
+              :variant="storageHealthVariant(data.health)"
+              size="small"
+            />
           </template>
         </AdminColumn>
 
@@ -198,15 +182,16 @@
               class="flex items-center"
               :title="data.storage && storageDisableReason(data.storage)"
             >
+              <!-- toggling 只锁定本行开关：其他行保持可交互，避免整列同时变灰闪烁。 -->
               <AdminSwitch
                 :model-value="data.enabled"
-                :aria-label="`启用 ${data.name}`"
+                :aria-label="`Enable ${data.name}`"
                 :aria-description="data.storage && storageDisableReason(data.storage)"
                 :disabled="
                   data.isPresetOnly ||
                   !data.storage ||
                   Boolean(storageDisableReason(data.storage)) ||
-                  togglingId != null
+                  (data.storage ? isRowToggling(data.storage.id) : false)
                 "
                 @update:model-value="
                   data.storage && emit('toggle-enabled', data.storage, Boolean($event))
@@ -228,6 +213,7 @@ import type { Component } from 'vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import {
@@ -241,31 +227,12 @@ import {
 import { STORAGE_MESSAGES } from '../pages/messages'
 import { storageDisableReason, type StorageCard } from '../profiles'
 
-export interface StorageTableRow {
-  id: string
-  isPresetOnly: boolean
-  presetKey?: string | undefined
-  storage?: StorageCard | undefined
-  name: string
-  vendorLogo?: string | undefined
-  vendorIcon?: Component | undefined
-  avatarLabel?: string | undefined
-  isCurrent: boolean
-  enabled: boolean
-  statusType: 'current' | 'configured' | 'unconfigured'
-  bucket: string
-  endpoint: string
-  supportsTest: boolean
-  canTest: boolean
-  canApply: boolean
-}
-
-defineProps<{
+const props = defineProps<{
   rows: StorageTableRow[]
   loading: boolean
   applyingId: string | null
   testingId: string | null
-  togglingId?: string | null | undefined
+  isToggling?: ((id: string) => boolean) | undefined
   activeLogoTargetId: string | null | undefined
 }>()
 
@@ -281,4 +248,50 @@ const emit = defineEmits<{
   'remove-storage': [storage: StorageCard]
   'toggle-enabled': [storage: StorageCard, enabled: boolean]
 }>()
+
+function isRowToggling(id: string): boolean {
+  return props.isToggling?.(id) ?? false
+}
+
+// 健康三态（方案 A）：Ready/异常/未验证；启用只用开关，无启用胶囊；
+// 配置缺失只占位“—”。组件内常量，不进 messages.ts 公共文案。
+export type StorageHealth = 'normal' | 'abnormal' | 'unverified'
+const STATUS_COLUMN_HEADER = 'Status'
+const STORAGE_HEALTH_LABEL: Record<StorageHealth, string> = {
+  normal: 'Ready',
+  abnormal: 'Error',
+  unverified: 'Unverified',
+}
+const STORAGE_HEALTH_VARIANT: Record<StorageHealth, 'success' | 'danger' | 'neutral'> = {
+  normal: 'success',
+  abnormal: 'danger',
+  unverified: 'neutral',
+}
+
+function storageHealthLabel(health: StorageHealth): string {
+  return STORAGE_HEALTH_LABEL[health]
+}
+
+function storageHealthVariant(health: StorageHealth): 'success' | 'danger' | 'neutral' {
+  return STORAGE_HEALTH_VARIANT[health]
+}
+
+export interface StorageTableRow {
+  id: string
+  isPresetOnly: boolean
+  presetKey?: string | undefined
+  storage?: StorageCard | undefined
+  name: string
+  vendorLogo?: string | undefined
+  vendorIcon?: Component | undefined
+  avatarLabel?: string | undefined
+  isCurrent: boolean
+  enabled: boolean
+  health: StorageHealth
+  bucket: string
+  endpoint: string
+  supportsTest: boolean
+  canTest: boolean
+  canApply: boolean
+}
 </script>

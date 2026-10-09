@@ -15,6 +15,7 @@ import { requireContractData } from '../../../../shared/api/contractKernel'
 import { controlCreditIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 import {
   buildControlMutationHeaders,
+  buildRoutineControlMutationHeaders,
   createControlError,
   requireOperatorReason,
   type ControlMutationOptions,
@@ -25,11 +26,13 @@ import { withControlCopy } from '../../shared/lib/controlCopy'
 // enable/delete ride the Control Plane reward-code operations
 // (`/api/control/v1/rewards/codes*`) with the unified contract envelope
 // (`{ data }` success / `{ error: { code, message, request_id } }`
-// errors). Every mutation carries a header-only Idempotency-Key plus an
-// operator reason collected through the shared confirm dialog, and emits
-// a control audit record. The deleted `/api/admin/rewards/codes/*` routes
-// are gone; this module is the single transport. View types and
-// normalizers keep their shapes so the UI and specs keep working.
+// errors). Update and enable/disable are routine config writes (backend
+// ReasonOptional): no confirm dialog, the audit records an empty reason.
+// Create and delete keep their confirm dialogs with a required reason.
+// Every mutation carries a header-only Idempotency-Key. The deleted
+// `/api/admin/rewards/codes/*` routes are gone; this module is the single
+// transport. View types and normalizers keep their shapes so the UI and
+// specs keep working.
 const RewardCodeStatus = {
   disabled: 'disabled',
   expired: 'expired',
@@ -228,7 +231,9 @@ async function updateRewardCode(
   input: UpdateRewardCodeInput,
   options: RewardCodeMutationOptions,
 ): Promise<UpdatedRewardCode> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const operatorReason = options.operatorReason.trim()
   let body: unknown
   try {
     const payload: {
@@ -247,10 +252,10 @@ async function updateRewardCode(
     }
     if (input.code) payload.code = input.code
     body = await updateControlRewardCode(id, payload, {
-      headers: buildControlMutationHeaders({
-        operatorReason,
-        idempotencyKey: options.idempotencyKey ?? controlCreditIdempotencyKey('reward-update'),
-      }),
+      headers: buildRoutineControlMutationHeaders(
+        options,
+        controlCreditIdempotencyKey('reward-update'),
+      ),
     })
   } catch (error) {
     throw withControlCopy(error, '更新兑换码失败')
@@ -268,17 +273,19 @@ async function setRewardCodeEnabled(
   enabled: boolean,
   options: RewardCodeMutationOptions,
 ): Promise<RewardCode> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const operatorReason = options.operatorReason.trim()
   let body: unknown
   try {
     body = await setControlRewardCodeEnabled(
       id,
       { enabled, reason: operatorReason },
       {
-        headers: buildControlMutationHeaders({
-          operatorReason,
-          idempotencyKey: options.idempotencyKey ?? controlCreditIdempotencyKey('reward-enabled'),
-        }),
+        headers: buildRoutineControlMutationHeaders(
+          options,
+          controlCreditIdempotencyKey('reward-enabled'),
+        ),
       },
     )
   } catch (error) {

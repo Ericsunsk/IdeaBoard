@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky top-0 z-30 flex shrink-0 flex-col bg-background">
+  <div class="sticky top-0 z-admin-header flex shrink-0 flex-col bg-background">
     <header
       class="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 sm:px-6 lg:px-8"
     >
@@ -56,7 +56,7 @@
           </AdminPopoverTrigger>
           <AdminPopoverContent
             :side-offset="8"
-            class="w-[340px] max-w-[calc(100vw_-_28px)] p-0 shadow-lg"
+            class="w-admin-popover max-w-[calc(100vw_-_28px)] p-0 shadow-admin-popover"
           >
             <div :class="adminAnomalyPopoverClass">
               <div
@@ -65,10 +65,11 @@
                 <div class="min-w-0">
                   <div class="text-admin-content font-bold text-foreground">异常雷达</div>
                 </div>
-                <AdminBadge
-                  :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
-                  :severity="hasAnomalies ? 'danger' : 'success'"
-                  rounded
+                <AdminStatusPill
+                  :label="hasAnomalies ? `${anomalyCount} 项` : '正常'"
+                  :variant="hasAnomalies ? 'danger' : 'success'"
+                  :pulse="hasAnomalies"
+                  size="small"
                 />
               </div>
 
@@ -137,7 +138,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminPopover from '../shared/components/AdminPopover.vue'
 import AdminPopoverTrigger from '../shared/components/AdminPopoverTrigger.vue'
 import AdminPopoverContent from '../shared/components/AdminPopoverContent.vue'
-import AdminBadge from '../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
 import { BellNotificationSolid as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'
 import { useUserStore } from '../../auth'

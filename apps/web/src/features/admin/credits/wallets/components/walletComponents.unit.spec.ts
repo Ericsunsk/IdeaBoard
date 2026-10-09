@@ -52,6 +52,33 @@ describe('Wallet Subcomponents', () => {
     expect(onCancel).toHaveBeenCalled()
   })
 
+  it.each([
+    { tab: 'grant', dot: 'bg-success' },
+    { tab: 'deduction', dot: 'bg-destructive' },
+    { tab: 'refund', dot: 'bg-success' },
+  ] as const)('pins WalletAdjustPanel $tab dot to Pill semantic $dot', ({ tab, dot }) => {
+    // Tab 圆点对齐 Pill 语义色：grant/refund→success（与 getCreditCommandVariant
+    // 一致），deduction→destructive；refund 不再用 warning。
+    const { unmount } = renderWithUser(WalletAdjustPanel, {
+      props: {
+        activeTab: tab,
+        refundSource: null,
+        amountCredits: null,
+        reason: '',
+        showErrors: false,
+        validation: { valid: true, amountError: '', reasonError: '' },
+        commandPending: false,
+      },
+    })
+
+    const dotEl = document.querySelector('span.size-2.rounded-full')!
+    expect(dotEl).toHaveClass(dot)
+    if (tab === 'refund') {
+      expect(dotEl).not.toHaveClass('bg-warning')
+    }
+    unmount()
+  })
+
   it('renders WalletLedgerTable and emits openRefund', async () => {
     const onOpenRefund = vi.fn()
     const mockTransaction: AdminCreditLedgerTransaction = {

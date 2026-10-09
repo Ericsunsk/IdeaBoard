@@ -58,18 +58,17 @@
           {{ MODELS_MESSAGES.referenceNoData }}
         </div>
         <div v-else class="flex flex-wrap gap-1">
-          <span
+          <!-- 在售 SKU 状态收口 AdminStatusPill：onSale→success，非在售→neutral；
+               静态属性不呼吸（pulse=false），文案保持“名称 · 在售/非在售”。 -->
+          <AdminStatusPill
             v-for="margin in observed!.skuMargins"
             :key="margin.sku"
-            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-admin-caption font-medium"
-            :class="
-              margin.onSale ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'
-            "
+            :label="`${margin.displayName || margin.sku} ${MODELS_MESSAGES.observedSaleState(margin.onSale)}`"
+            :variant="margin.onSale ? 'success' : 'neutral'"
+            :pulse="false"
+            size="small"
             :title="margin.service"
-          >
-            {{ margin.displayName || margin.sku }}
-            {{ MODELS_MESSAGES.observedSaleState(margin.onSale) }}
-          </span>
+          />
         </div>
       </div>
 
@@ -90,6 +89,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AdminStatusPill from '../../../shared/components/AdminStatusPill.vue'
 import {
   formatObservedFailure,
   formatObservedRate,

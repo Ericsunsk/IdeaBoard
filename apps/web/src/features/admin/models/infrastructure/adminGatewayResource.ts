@@ -13,6 +13,7 @@ import {
 import { requireContractData } from '../../../../shared/api/contractKernel'
 import {
   buildControlMutationHeaders,
+  buildRoutineControlMutationHeaders,
   createControlError,
   requireOperatorReason,
   type ControlMutationOptions,
@@ -34,10 +35,12 @@ import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/c
 // read-only extras moved to the Control Plane the same way: route preview,
 // model detection, pricing-reference lookup, and the 7-day observation
 // window. Writes moved to the Control Plane with the same envelope
-// (operator reason required; nil-ack mutations resolve `{ data: {} }`):
-// catalog save, connection update, and the server-side connection probe
-// (provider/path required since #847 removed the mapping fallback).
-// Callers keep importing these names, never generated code directly.
+// (nil-ack mutations resolve `{ data: {} }`): catalog save and connection
+// update are routine config writes (backend ReasonOptional, no reason
+// ceremony, audit records empty), while the server-side connection probe
+// (provider/path required since #847 removed the mapping fallback) keeps
+// its probe note. Callers keep importing these names, never generated code
+// directly.
 export type GatewayMutationOptions = ControlMutationOptions
 export type GatewayConfigSummary = {
   base_url?: string
@@ -433,7 +436,7 @@ async function saveModelCatalog(
   try {
     const body = await saveControlAIGatewayCatalog(
       { items: items.map(toGatewayCatalogItem) },
-      { headers: buildControlMutationHeaders(options) },
+      { headers: buildRoutineControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存模型库失败')
@@ -526,7 +529,7 @@ async function updateGatewayConnection(
   try {
     const body = await updateControlAIGateway(
       { ...input },
-      { headers: buildControlMutationHeaders(options) },
+      { headers: buildRoutineControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存 AI 网关配置失败')

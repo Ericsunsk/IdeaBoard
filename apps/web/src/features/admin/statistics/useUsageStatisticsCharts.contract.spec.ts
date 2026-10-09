@@ -31,7 +31,6 @@ describe('useUsageStatisticsCharts', () => {
     expect(readDataset(charts.qualityTrendChartData.value, 'Success').data).toEqual(
       Array(7).fill(0),
     )
-    expect(charts.bottleneckSourceChartData.value.labels).toEqual([])
   })
 
   it('builds sparse usage trend series and summary footers from the selected range', () => {
@@ -290,40 +289,6 @@ describe('useUsageStatisticsCharts', () => {
       '失败: 4',
     ])
   })
-
-  it('normalizes bottleneck values before charting and tooltip output', () => {
-    const charts = useUsageStatisticsCharts({
-      adminStatistics: ref(
-        makeStatistics({
-          bottleneck_sources: [
-            {
-              source: 'storage',
-              label: 'should be filtered',
-              total: -2,
-              failed: -1,
-              avg_latency_ms: -100,
-            },
-            {
-              source: 'provider',
-              label: '',
-              total: 5,
-              failed: -1,
-              avg_latency_ms: 2500,
-            },
-          ],
-        }),
-      ),
-      timeRange: ref(GetAdminStatisticsRange['7d']),
-    })
-
-    expect(charts.bottleneckSourceChartData.value.labels).toEqual(['上游模型'])
-    expect(readDataset(charts.bottleneckSourceChartData.value, '任务量').data).toEqual([5])
-    expect(bottleneckTooltipLabel(charts.bottleneckSourceChartOptions.value, 0)).toEqual([
-      '任务: 5',
-      '失败: 0',
-      '平均耗时: 2.50s',
-    ])
-  })
 })
 
 function makeStatistics(overrides: Partial<AdminStatistics> = {}): AdminStatistics {
@@ -397,10 +362,6 @@ function trendTooltipAfterBody(options: unknown, dataIndex: number) {
 
 function qualityTooltipAfterBody(options: unknown, dataIndex: number) {
   return tooltipCallbacks(options).afterBody?.([{ dataIndex }]) as string[]
-}
-
-function bottleneckTooltipLabel(options: unknown, dataIndex: number) {
-  return tooltipCallbacks(options).label?.({ dataIndex }) as string[]
 }
 
 function tooltipCallbacks(options: unknown) {

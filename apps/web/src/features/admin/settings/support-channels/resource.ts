@@ -4,7 +4,10 @@ import {
 } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import { SupportChannelKind } from '../../../../shared/api/generated-query/control/model/supportChannelKind'
 import type { SupportChannelsSetting } from '../../../../shared/api/generated-query/control/model/supportChannelsSetting'
-import { createControlSettingResource } from '../../shared/lib/controlResource'
+import { requireContractData } from '../../../../shared/api/contractKernel'
+import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
+import { loadControlSetting } from '../../shared/lib/controlResource'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 export type { SupportChannelsSetting } from '../../../../shared/api/generated-query/control/model/supportChannelsSetting'
 
 export const supportChannelsQueryKey = ['admin', 'settings', 'support-channels'] as const
@@ -19,22 +22,36 @@ function toSetting(data: SupportChannelsSetting): SupportChannelsSetting {
   return { channels: data.channels.map((channel) => ({ ...channel })) }
 }
 
-const settingResource = createControlSettingResource({
-  getFallback: '读取客户支持失败',
-  saveFallback: '保存客户支持失败',
-  // The save path keeps the legacy shared-reader unpack string for
-  // malformed envelopes; only the transport copy converged.
-  saveDataFallback: '读取客户支持失败',
-  map: toSetting,
-  toRequest: (input: SupportChannelsSetting) => input,
-  fetch: () => getControlSupportChannels(),
-  persist: (body, headers) =>
-    updateControlSupportChannels(body as SupportChannelsSetting, { headers }),
-})
+async function getSupportChannels(): Promise<SupportChannelsSetting> {
+  return loadControlSetting(getControlSupportChannels, {
+    fallback: '读取客户支持失败',
+    map: toSetting,
+  })
+}
+
+async function updateSupportChannels(
+  input: SupportChannelsSetting,
+  operatorReason: string,
+): Promise<SupportChannelsSetting> {
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const reason = operatorReason.trim()
+  try {
+    const data = requireContractData<SupportChannelsSetting>(
+      await updateControlSupportChannels(input, {
+        headers: buildRoutineControlMutationHeaders({ operatorReason: reason }),
+      }),
+      '读取客户支持失败',
+    )
+    return toSetting(data)
+  } catch (error) {
+    throw withControlCopy(error, '保存客户支持失败')
+  }
+}
 
 export function createAdminSupportChannelsResource(): AdminSupportChannelsResource {
   return {
-    get: () => settingResource.get(),
-    update: (input, operatorReason) => settingResource.save(input, { operatorReason }),
+    get: getSupportChannels,
+    update: updateSupportChannels,
   }
 }

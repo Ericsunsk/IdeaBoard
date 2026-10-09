@@ -152,7 +152,7 @@ function onSubmit(prompt: string) {
   position: absolute;
   border: 1.5px solid var(--outpaint-frame-accent);
   background: #ffffff;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0;
   pointer-events: auto;
   box-sizing: border-box;

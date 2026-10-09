@@ -3,7 +3,7 @@
     <DialogPortal>
       <DialogOverlay
         data-admin-drawer-mask
-        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         @click="requestCloseFromMask"
       />
       <DialogContent
@@ -12,7 +12,7 @@
         aria-modal="true"
         :aria-busy="ariaBusy"
         data-admin-drawer
-        class="fixed inset-y-0 right-0 z-50 flex h-full w-[min(38rem,calc(100vw-1rem))] flex-col border-l border-border bg-card shadow-2xl transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
+        class="fixed inset-y-0 right-0 z-admin-dialog flex h-full w-admin-drawer flex-col border-l border-border bg-card shadow-admin-drawer transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
         @escape-key-down="handleEscape"
         @pointer-down-outside="blockOutsideDismiss"
       >

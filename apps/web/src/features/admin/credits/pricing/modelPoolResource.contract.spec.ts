@@ -120,12 +120,31 @@ describe('Admin Model Pool resource', () => {
     expect((failure as Error).message).toBe('模型池已被更新，请刷新后重试')
   })
 
-  it('requires an operator reason before saving', async () => {
+  it('replaces the pool without an operator reason while keeping the idempotency key', async () => {
+    const state = {
+      version: 2,
+      entries: [],
+      putBody: {
+        service: 'generation',
+        sku,
+        version: 3,
+        changed: true,
+        entries: [],
+      },
+      seen: {} as {
+        body?: unknown
+        idempotencyKey?: string | null
+        operatorReason?: string | null
+      },
+    }
+    useMswHandlers(...poolHandlers(state))
+
     await expect(
-      replaceAdminModelPool(sku, { version: 0, entries: [] }, { operatorReason: '  ' }).catch(
-        (error: unknown) => error,
-      ),
-    ).resolves.toMatchObject({ code: 'control_reason_required' })
+      replaceAdminModelPool(sku, { version: 2, entries: [] }, { operatorReason: '  ' }),
+    ).resolves.toMatchObject({ version: 3, changed: true })
+    expect(state.seen.body).toEqual({ expected_version: 2, entries: [], reason: '' })
+    expect(state.seen.idempotencyKey).toMatch(/.+/)
+    expect(state.seen.operatorReason).toBeNull()
   })
 
   it('lists catalog models through the injected lister', async () => {

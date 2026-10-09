@@ -14,8 +14,8 @@ export const PAYMENTS_MESSAGES = {
   accountLabel: '账户',
   accountUnset: '尚未配置',
   modeLabel: '模式',
-  productReadyState: (ready: boolean) => (ready ? 'Product 已就绪' : 'Product 未就绪'),
-  webhookReadyState: (ready: boolean) => (ready ? 'Webhook 已就绪' : 'Webhook 未就绪'),
+  productReadyState: (ready: boolean) => (ready ? 'Product Ready' : 'Product Not ready'),
+  webhookReadyState: (ready: boolean) => (ready ? 'Webhook Ready' : 'Webhook Not ready'),
   apiKeyHint: '支持 sk_ 或 rk_ 格式。',
   taxCodePlaceholder: '例如：txcd_10105001',
   purchasesLabel: '充值开放',
@@ -28,8 +28,5 @@ export const PAYMENTS_MESSAGES = {
   apiKeyPlaceholder: (configured: boolean) =>
     configured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
   stripeLoadFailed: '加载 Stripe 设置失败，请重试',
-  stripeSaveTitle: '保存 Stripe 设置',
-  stripeSaveMessage: '确定保存 Stripe 密钥与税务配置吗？该操作将记录操作人与原因。',
-  stripeSaveConfirm: '保存',
   stripeSaveFailed: '保存 Stripe 设置失败，请重试',
 } as const

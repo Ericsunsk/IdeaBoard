@@ -40,7 +40,7 @@ const variantClasses = computed(() => {
   const v = props.variant
 
   if (sev === 'error' || sev === 'danger' || v === 'destructive') {
-    return 'border-destructive/20 bg-destructive/15 text-destructive font-medium'
+    return 'border-destructive/20 bg-destructive-soft text-destructive font-medium'
   }
   if (sev === 'warn' || sev === 'warning' || v === 'warning') {
     return 'border-warning/20 bg-warning-soft text-warning font-medium'

@@ -5,11 +5,12 @@ package httpapi
 // Compares the runtime guard policy (capability + Mutation/Detached in
 // contract_control_routes.go) against the spec policy (x-capability,
 // x-audit reason/outcome, Idempotency-Key/OperatorReason params in
-// openapi.control.yaml). Mail test is the fixed reference: spec and
-// runtime must both require operator reason + header-only
-// Idempotency-Key with audited success outcome, and the runtime must
-// stay detached (no guard-owned DB transaction wraps the external Auth
-// HTTP probe). Detached mutations (mail test/update/delete, Stripe
+// openapi.control.yaml). Mail test is the fixed reference: it stays a
+// detached mutation with header-only Idempotency-Key and audited
+// success outcome on both sides (routine probe, so the operator reason
+// is optional on both sides), and the runtime must stay detached (no
+// guard-owned DB transaction wraps the external Auth HTTP probe).
+// Detached mutations (mail test/update/delete, Stripe
 // config update) run the M1 durable winner election through short
 // independent transactions, so cross-process replay holds without a
 // long guard transaction. create_refund deliberately stays atomic:
@@ -49,14 +50,15 @@ type specPolicy struct {
 }
 
 type runtimePolicy struct {
-	operation  string
-	method     string
-	path       string
-	capability string
-	mutation   bool
-	detached   bool
-	viaProxy   bool
-	viaGuard   bool
+	operation      string
+	method         string
+	path           string
+	capability     string
+	mutation       bool
+	reasonOptional bool
+	detached       bool
+	viaProxy       bool
+	viaGuard       bool
 }
 
 // policyParityExceptions documents spec-mutation vs runtime-read drift
@@ -174,11 +176,16 @@ func compareControlPolicyMetadata(sp specPolicy, rp runtimePolicy, exception boo
 		return fmt.Errorf("explicit exception must stay a runtime read-guard")
 	}
 	wantMutation := rp.mutation || exception
+	// Routine config mutations stay mutations (key + audited success
+	// outcome) with an exempt reason: only x-audit reason flips false.
+	wantReason := wantMutation && !rp.reasonOptional
+	if sp.reason != wantReason {
+		return fmt.Errorf("x-audit reason = %v, want %v", sp.reason, wantReason)
+	}
 	for _, field := range []struct {
 		name string
 		got  bool
 	}{
-		{"x-audit reason", sp.reason},
 		{"IdempotencyKey parameter", sp.idempotency},
 		{"OperatorReason parameter", sp.reasonParam},
 	} {
@@ -224,6 +231,20 @@ func TestControlPolicyMetadataRejectsIndividualFieldDrift(t *testing.T) {
 	}
 	if err := compareControlPolicyMetadata(validMutation, runtimePolicy{mutation: true}, false); err != nil {
 		t.Fatalf("valid mutation must pass: %v", err)
+	}
+	optionalMutation := specPolicy{
+		operator: true, reason: false, idempotency: true, reasonParam: true, outcome: "success",
+	}
+	if err := compareControlPolicyMetadata(optionalMutation, runtimePolicy{mutation: true, reasonOptional: true}, false); err != nil {
+		t.Fatalf("valid reason-optional mutation must pass: %v", err)
+	}
+	if err := compareControlPolicyMetadata(optionalMutation, runtimePolicy{mutation: true}, false); err == nil ||
+		!strings.Contains(err.Error(), "x-audit reason") {
+		t.Fatalf("optional spec against required runtime must fail on reason, got %v", err)
+	}
+	if err := compareControlPolicyMetadata(validMutation, runtimePolicy{mutation: true, reasonOptional: true}, false); err == nil ||
+		!strings.Contains(err.Error(), "x-audit reason") {
+		t.Fatalf("required spec against optional runtime must fail on reason, got %v", err)
 	}
 	if err := compareControlPolicyMetadata(validMutation, runtimePolicy{}, true); err != nil {
 		t.Fatalf("valid explicit exception must pass: %v", err)
@@ -289,14 +310,15 @@ func loadRuntimePolicies(t *testing.T) map[string]runtimePolicy {
 		viaProxy := strings.Contains(window[:400], "controlProxy(") || strings.Contains(window[:400], "controlProxyRaw(")
 		viaGuard := strings.Contains(window[:400], ".guard(")
 		p := runtimePolicy{
-			operation:  op,
-			method:     method,
-			path:       path,
-			capability: "control:" + strings.ToLower(capShort),
-			mutation:   strings.Contains(routeLit, "Mutation: true"),
-			detached:   strings.Contains(routeLit, "Detached: true"),
-			viaProxy:   viaProxy,
-			viaGuard:   viaGuard,
+			operation:      op,
+			method:         method,
+			path:           path,
+			capability:     "control:" + strings.ToLower(capShort),
+			mutation:       strings.Contains(routeLit, "Mutation: true"),
+			reasonOptional: strings.Contains(routeLit, "ReasonOptional: true"),
+			detached:       strings.Contains(routeLit, "Detached: true"),
+			viaProxy:       viaProxy,
+			viaGuard:       viaGuard,
 		}
 		// Capability short names map: Users->users, Workspaces->workspaces,
 		// Billing->billing, Credits->credits, Payments->payments,
@@ -313,7 +335,7 @@ func TestControlOperationPolicyParity(t *testing.T) {
 	spec := loadSpecPolicies(t)
 	runtime := loadRuntimePolicies(t)
 
-	t.Run("mail test requires reason, key, and audited success on both sides", func(t *testing.T) {
+	t.Run("mail test stays detached with optional reason on both sides", func(t *testing.T) {
 		sp, ok := spec["testControlMailSetting"]
 		if !ok {
 			t.Fatal("spec missing testControlMailSetting")
@@ -321,8 +343,8 @@ func TestControlOperationPolicyParity(t *testing.T) {
 		if sp.capability != "control:platform" {
 			t.Fatalf("spec capability = %q, want control:platform", sp.capability)
 		}
-		if !sp.reason {
-			t.Fatal("spec mail test must have x-audit reason: true")
+		if sp.reason {
+			t.Fatal("spec mail test must have x-audit reason: false (routine probe, reason optional)")
 		}
 		if sp.outcome != "success" {
 			t.Fatalf("spec outcome = %q, want success", sp.outcome)
@@ -341,7 +363,10 @@ func TestControlOperationPolicyParity(t *testing.T) {
 			t.Fatalf("runtime capability = %q, want control:platform", rp.capability)
 		}
 		if !rp.mutation {
-			t.Fatal("runtime mail test must be Mutation:true (reason + key enforced by the guard)")
+			t.Fatal("runtime mail test must be Mutation:true (key enforced by the guard, reason optional)")
+		}
+		if !rp.reasonOptional {
+			t.Fatal("runtime mail test must be ReasonOptional:true (routine probe)")
 		}
 		if !rp.detached {
 			t.Fatal("runtime mail test must be Detached:true (external Auth probe never runs inside the guard DB transaction)")

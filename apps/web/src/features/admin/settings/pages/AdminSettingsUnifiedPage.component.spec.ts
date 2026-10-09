@@ -1,15 +1,37 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { h } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { h, nextTick } from 'vue'
+import { createDeferred } from '../../../../test/deferred'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { renderWithUser, screen, within } from '../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../shared/testing'
 import { SETTINGS_MESSAGES } from './messages'
 import { STORAGE_MESSAGES } from '../../storage/pages/messages'
 import AdminSettingsUnifiedPage from './AdminSettingsUnifiedPage.vue'
+import * as searchProviderResource from '../image-library/searchProviderResource'
 
 vi.mock('../../../../shared/composables/useAppToast')
+
+// The real table intentionally hides background loading once rows exist. Expose
+// the page's prop for the stale-finally regression while keeping real controls.
+vi.mock('../image-library/AdminImageProvidersTable.vue', async (importOriginal) => {
+  const { default: Table } =
+    await importOriginal<typeof import('../image-library/AdminImageProvidersTable.vue')>()
+  const { defineComponent, h } = await import('vue')
+  return {
+    default: defineComponent({
+      inheritAttrs: false,
+      setup(_, { attrs }) {
+        return () =>
+          h('div', [
+            h('output', { 'aria-label': 'Search refresh loading' }, String(attrs.loading)),
+            h(Table, attrs),
+          ])
+      },
+    }),
+  }
+})
 
 vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
@@ -38,6 +60,8 @@ vi.mock('../../storage/resource', () => ({
 }))
 
 describe('AdminSettingsUnifiedPage', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   beforeEach(() => {
     mockAppToast()
     useMswHandlers(
@@ -94,6 +118,11 @@ describe('AdminSettingsUnifiedPage', () => {
       http.get('/api/control/v1/platform/settings/rate-limit', () =>
         HttpResponse.json({
           data: { window_seconds: 60, max_requests: 100 },
+        }),
+      ),
+      http.get('/api/control/v1/platform/settings/login-lockout', () =>
+        HttpResponse.json({
+          data: { threshold: 10, duration_seconds: 900 },
         }),
       ),
       http.get('/api/control/v1/users/oauth/:provider', ({ params }) => {
@@ -194,43 +223,152 @@ describe('AdminSettingsUnifiedPage', () => {
     expect(mailNavBtn).toHaveAttribute('aria-current', 'true')
   })
 
-  it('renders search load error with retry and recovers on retry', async () => {
+  it('routes search load failure to toast error without an inline alert', async () => {
+    const toast = mockAppToast()
     useMswHandlers(
       http.get('/api/control/v1/platform/search/providers', () =>
         HttpResponse.json({ error: { code: 'internal', message: 'boom' } }, { status: 500 }),
       ),
     )
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { user } = renderWithUser(AdminSettingsUnifiedPage, {
+    renderWithUser(AdminSettingsUnifiedPage, {
       global: {
         plugins: [[VueQueryPlugin, { queryClient }]],
       },
     })
 
-    const retryBtn = await screen.findByRole('button', { name: '重试' })
-    expect(retryBtn).toBeVisible()
-    expect(screen.getByText('boom')).toBeVisible()
-
-    useMswHandlers(
-      http.get('/api/control/v1/platform/search/providers', () =>
-        HttpResponse.json({
-          data: {
-            providers: [
-              {
-                provider: 'unsplash',
-                api_key_configured: true,
-                enabled: false,
-                test_state: 'passed',
-              },
-            ],
-          },
-        }),
-      ),
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('boom')),
     )
-    await user.click(retryBtn)
-
-    await vi.waitFor(() => {
-      expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
-    })
+    expect(toast.success).not.toHaveBeenCalled()
+    // 失败一律 toast，不设内嵌 Alert/重试；图片搜索板块保留为真相源。
+    expect(await screen.findByText('外部图片搜索与素材供应商配置')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
   })
+
+  it('keeps the latest search refresh when an older change response arrives later', async () => {
+    let listCalls = 0
+    const olderResponse = createDeferred<Response>()
+    const resource = searchProviderResource.createAdminSearchProviderResource()
+    const list = vi.spyOn(resource, 'list')
+    vi.spyOn(searchProviderResource, 'createAdminSearchProviderResource').mockReturnValue(resource)
+    const initial = {
+      provider: 'unsplash',
+      api_key_configured: true,
+      enabled: false,
+      test_state: 'passed',
+    }
+    const latest = { ...initial, enabled: false, test_state: 'never' as const }
+    useMswHandlers(
+      http.put('/api/control/v1/platform/search/providers/:provider', () =>
+        HttpResponse.json({ data: {} }),
+      ),
+      http.get('/api/control/v1/platform/search/providers', () => {
+        listCalls += 1
+        if (listCalls === 1) return HttpResponse.json({ data: { providers: [initial] } })
+        if (listCalls === 2) {
+          return olderResponse.promise
+        }
+        return HttpResponse.json({ data: { providers: [latest] } })
+      }),
+    )
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { user } = renderWithUser(AdminSettingsUnifiedPage, {
+      global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+    })
+
+    const toggle = await screen.findByRole('switch', { name: 'Enable Unsplash' })
+    const section = within(screen.getByRole('region', { name: '图片搜索' }))
+    await user.click(toggle)
+    await waitFor(() => expect(listCalls).toBe(2))
+    // The key save starts the latest request, whose disabled/unverified response
+    // wins first while the earlier enabled response remains unresolved.
+    await user.type(screen.getByLabelText('Unsplash API Key'), 'replacement-key')
+    await user.click(section.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(listCalls).toBe(3))
+    await list.mock.results[2]!.value
+    await nextTick()
+    expect(section.getByText('Unverified')).toBeVisible()
+
+    olderResponse.resolve(
+      HttpResponse.json({ data: { providers: [{ ...initial, enabled: true }] } }),
+    )
+    await list.mock.results[1]!.value
+    await nextTick()
+    expect(section.getByText('Unverified')).toBeVisible()
+    expect(screen.getByRole('switch', { name: 'Enable Unsplash' })).toHaveAttribute(
+      'data-state',
+      'unchecked',
+    )
+  })
+
+  it.each(['before latest', 'after latest'] as const)(
+    'ignores an older search refresh failure %s completion',
+    async (order) => {
+      const toast = mockAppToast()
+      const older = createDeferred<Response>()
+      const latest = createDeferred<Response>()
+      const resource = searchProviderResource.createAdminSearchProviderResource()
+      const list = vi.spyOn(resource, 'list')
+      vi.spyOn(searchProviderResource, 'createAdminSearchProviderResource').mockReturnValue(
+        resource,
+      )
+      let listCalls = 0
+      const initial = {
+        provider: 'unsplash',
+        api_key_configured: true,
+        enabled: false,
+        test_state: 'passed',
+      }
+      useMswHandlers(
+        http.put('/api/control/v1/platform/search/providers/:provider', () =>
+          HttpResponse.json({ data: {} }),
+        ),
+        http.get('/api/control/v1/platform/search/providers', () => {
+          listCalls += 1
+          if (listCalls === 1) return HttpResponse.json({ data: { providers: [initial] } })
+          return listCalls === 2 ? older.promise : latest.promise
+        }),
+      )
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      const { user } = renderWithUser(AdminSettingsUnifiedPage, {
+        global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+      })
+      const toggle = await screen.findByRole('switch', { name: 'Enable Unsplash' })
+      const section = within(screen.getByRole('region', { name: '图片搜索' }))
+      await user.click(toggle)
+      await waitFor(() => expect(listCalls).toBe(2))
+      await user.type(section.getByLabelText('Unsplash API Key'), 'replacement-key')
+      await user.click(section.getByRole('button', { name: '保存' }))
+      await waitFor(() => expect(listCalls).toBe(3))
+      expect(screen.getByLabelText('Search refresh loading')).toHaveTextContent('true')
+
+      const finishLatest = async () => {
+        latest.resolve(
+          HttpResponse.json({ data: { providers: [{ ...initial, test_state: 'never' }] } }),
+        )
+        await list.mock.results[2]!.value
+        await nextTick()
+      }
+      if (order === 'after latest') await finishLatest()
+      older.resolve(
+        HttpResponse.json(
+          { error: { code: 'internal', message: 'older-refresh-failed' } },
+          { status: 500 },
+        ),
+      )
+      await expect(list.mock.results[1]!.value).rejects.toThrow()
+      await nextTick()
+      expect(toast.error).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('Search refresh loading')).toHaveTextContent(
+        order === 'before latest' ? 'true' : 'false',
+      )
+      if (order === 'before latest') await finishLatest()
+      expect(section.getByText('Unverified')).toBeVisible()
+      expect(toggle).toHaveAttribute('data-state', 'unchecked')
+      expect(screen.getByLabelText('Search refresh loading')).toHaveTextContent('false')
+    },
+  )
 })

@@ -1,15 +1,12 @@
-import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
-} from '../../shared/lib/controlMutation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import {
   getControlBrandingSetting,
   updateControlBrandingSetting,
 } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '../../../../shared/api/contractKernel'
+import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
 import type { AdminBrandingSettingsFeedback } from '../shared/useSettingsFeedback'
 import {
   DEFAULT_SITE_BRANDING_SETTING,
@@ -22,25 +19,21 @@ import {
   type BrandingSetting,
 } from '../../../../shared/composables/useSiteBranding'
 import { useSettingsLifecycle } from '../shared/useSettingsLifecycle'
-import type { AdminConfirmPort } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
 // Admin branding boundary (W2 transports). Reads and writes go through the
 // Control Plane with the contract envelope (`{data}`); every mutation
-// carries a header-only Idempotency-Key plus an operator reason collected
-// through the shared confirm dialog, and emits a control audit record. The
-// deleted `/api/admin/settings/branding` route is gone; this module is the
+// carries a header-only Idempotency-Key and emits a control audit record.
+// Branding is a routine config write (backend ReasonOptional), so saves skip
+// the confirm dialog and audit an empty reason. The deleted
+// `/api/admin/settings/branding` route is gone; this module is the
 // single transport. Direct logo upload has no control equivalent
 // (`POST /api/admin/upload` is deleted), so it fails closed with guidance:
 // operators paste a Logo URL instead.
 const ADMIN_BRANDING_QUERY_KEY = ['admin', 'settings', 'branding'] as const
 
-export function useBrandingSettings(options: {
-  feedback: AdminBrandingSettingsFeedback
-  confirm: AdminConfirmPort
-}) {
+export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFeedback }) {
   const queryClient = useQueryClient()
   const brandingQuery = useQuery<BrandingSetting, Error>({
     queryKey: ADMIN_BRANDING_QUERY_KEY,
@@ -48,13 +41,8 @@ export function useBrandingSettings(options: {
   })
   const setting = computed(() => brandingQuery.data.value)
   const loading = computed(() => brandingQuery.isLoading.value || brandingQuery.isFetching.value)
-  // The lifecycle save runs inside saveSetting below with the reason
-  // collected first; the ref bridges the two without changing the
-  // lifecycle contract.
-  const pendingOperatorReason = ref<string | null>(null)
   const saveMutation = useMutation({
-    mutationFn: (draft: BrandingSetting) =>
-      saveBrandingSetting(draft, pendingOperatorReason.value ?? ''),
+    mutationFn: (draft: BrandingSetting) => saveBrandingSetting(draft),
   })
   const saving = computed(() => saveMutation.isPending.value)
   const lifecycle = useSettingsLifecycle({
@@ -79,18 +67,9 @@ export function useBrandingSettings(options: {
   })
 
   async function saveSetting(): Promise<boolean> {
-    const operatorReason = await confirmSettingsSave(options.confirm, {
-      title: '保存站点设置',
-      message: '确定保存站点名称与 Logo 配置吗？该操作将记录操作人与原因。',
-      confirmLabel: '保存',
-    })
-    if (!operatorReason) return false
-    pendingOperatorReason.value = operatorReason
-    try {
-      return await lifecycle.save()
-    } finally {
-      pendingOperatorReason.value = null
-    }
+    // Routine config write (backend ReasonOptional): save directly without
+    // the confirm dialog; the audit records an empty reason.
+    return lifecycle.save()
   }
 
   const uploadLogoMutation = useMutation({
@@ -147,16 +126,15 @@ async function fetchBrandingSetting(signal?: AbortSignal): Promise<BrandingSetti
   }
 }
 
-async function saveBrandingSetting(
-  draft: BrandingSetting,
-  operatorReason: string,
-): Promise<BrandingSetting> {
-  const reason = requireOperatorReason(operatorReason)
+async function saveBrandingSetting(draft: BrandingSetting): Promise<BrandingSetting> {
   try {
     const body = await updateControlBrandingSetting(
       { project_name: draft.project_name, logo_url: draft.logo_url },
       {
-        headers: buildControlMutationHeaders({ operatorReason: reason }),
+        // Routine config write (backend ReasonOptional): no operator-reason
+        // header, the audit records an empty reason. Idempotency-Key stays
+        // required on both tiers.
+        headers: buildRoutineControlMutationHeaders(),
       },
     )
     return requireContractData<BrandingSetting>(body, '保存项目品牌失败')

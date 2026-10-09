@@ -8,7 +8,7 @@ export const OAUTH_MESSAGES = {
   oauthSelectLogoAria: (providerLabel: string) => `选择 ${providerLabel} Logo`,
   oauthProviderLoginAria: (providerLabel: string) => `${providerLabel} 登录`,
   oauthCredentialsTitle: (providerLabel: string) => `${providerLabel} 凭据配置`,
-  oauthEnabledLabel: (enabled: boolean) => (enabled ? '已启用' : '未启用'),
+  oauthEnabledLabel: (enabled: boolean) => (enabled ? 'Enabled' : 'Disabled'),
   oauthClientIdPlaceholder: '请输入 OAuth Client ID',
   oauthClientIdRequired: '请输入 Client ID',
   oauthClientSecretRequired: '请输入 Client Secret',
@@ -17,8 +17,6 @@ export const OAUTH_MESSAGES = {
   oauthCopyCallback: '复制',
   oauthCallbackHint: (portal: string) => `请在 ${portal} 将此 URL 添加为重定向白名单 URI`,
   oauthSave: '保存',
-  oauthSaveTitle: '保存 OAuth Provider 设置',
-  oauthSaveMessage: '确定保存 OAuth Provider 配置吗？该操作将记录操作人与原因。',
   oauthLoadFailed: '加载 OAuth Provider 设置失败，请重试',
   oauthIncompleteProvider: (providerLabel: string) =>
     `请先配置 ${providerLabel} 的 Client ID 和 Client Secret`,

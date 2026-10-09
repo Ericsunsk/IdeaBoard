@@ -46,13 +46,17 @@
               {{ detail.user.displayName }}
             </div>
           </div>
-          <AdminBadge :severity="getPaymentOrderStatusPresentation(detail.status).severity">
-            {{ getPaymentOrderStatusPresentation(detail.status).label }}
-          </AdminBadge>
+          <AdminStatusPill
+            :label="getPaymentOrderStatusPresentation(detail.status).label"
+            :variant="getPaymentOrderStatusPresentation(detail.status).variant"
+            size="small"
+          />
         </div>
         <dl class="mt-4 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in overviewRows" :key="row.label" class="min-w-0">
-            <dt class="text-admin-caption font-[650] text-muted-foreground">{{ row.label }}</dt>
+            <dt class="text-admin-caption font-admin-strong text-muted-foreground">
+              {{ row.label }}
+            </dt>
             <dd class="mt-0.5 break-words text-admin-body font-semibold text-foreground">
               {{ row.value }}
             </dd>
@@ -66,7 +70,9 @@
         </h3>
         <dl class="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in stripeRows" :key="row.label" class="min-w-0">
-            <dt class="text-admin-caption font-[650] text-muted-foreground">{{ row.label }}</dt>
+            <dt class="text-admin-caption font-admin-strong text-muted-foreground">
+              {{ row.label }}
+            </dt>
             <dd class="mt-0.5 break-all font-mono text-admin-meta text-foreground">
               {{ row.value }}
             </dd>
@@ -79,13 +85,17 @@
           <h3 id="payment-reconciliation" class="text-admin-body font-bold text-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.reconciliationTitle }}
           </h3>
-          <AdminBadge :severity="detail.reconciliation.anomalous ? 'danger' : 'secondary'">
-            {{ PAYMENT_ORDERS_MESSAGES.anomalyState(detail.reconciliation.anomalous) }}
-          </AdminBadge>
+          <AdminStatusPill
+            :label="PAYMENT_ORDERS_MESSAGES.anomalyState(detail.reconciliation.anomalous)"
+            :variant="detail.reconciliation.anomalous ? 'danger' : 'neutral'"
+            size="small"
+          />
         </div>
         <dl class="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in reconciliationRows" :key="row.label" class="min-w-0">
-            <dt class="text-admin-caption font-[650] text-muted-foreground">{{ row.label }}</dt>
+            <dt class="text-admin-caption font-admin-strong text-muted-foreground">
+              {{ row.label }}
+            </dt>
             <dd class="mt-0.5 break-words text-admin-body text-foreground">{{ row.value }}</dd>
           </div>
         </dl>
@@ -159,14 +169,16 @@
               {{ PAYMENT_ORDERS_MESSAGES.refundActionTitle }}
             </h3>
           </div>
-          <AdminBadge severity="info">
-            {{ PAYMENT_ORDERS_MESSAGES.refundableBadge(formatIdeas(refundableIdeas)) }}
-          </AdminBadge>
+          <AdminStatusPill
+            :label="PAYMENT_ORDERS_MESSAGES.refundableBadge(formatIdeas(refundableIdeas))"
+            variant="info"
+            size="small"
+          />
         </div>
         <form class="mt-3 flex flex-wrap items-end gap-3" novalidate @submit.prevent="submitRefund">
           <label
             for="admin-payment-refund-ideas"
-            class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+            class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
           >
             <span>{{ PAYMENT_ORDERS_MESSAGES.refundQuantityLabel }}</span>
             <AdminNumberInput
@@ -214,7 +226,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
@@ -399,12 +411,12 @@ function formatRefund(refund: AdminPaymentRefundSummary): string {
 
 function refundStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    pending: '退款处理中',
-    succeeded: '退款成功',
-    failed: '退款失败',
-    anomaly: '需要人工处理',
-    'refund.updated': 'Stripe 退款更新',
-    'refund.failed': 'Stripe 退款失败',
+    pending: 'Refund Pending',
+    succeeded: 'Refund Succeeded',
+    failed: 'Refund Failed',
+    anomaly: 'Needs Manual Review',
+    'refund.updated': 'Stripe Refund Updated',
+    'refund.failed': 'Stripe Refund Failed',
   }
   return labels[status] ?? status
 }

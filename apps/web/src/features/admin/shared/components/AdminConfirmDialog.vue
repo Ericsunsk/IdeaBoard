@@ -2,10 +2,10 @@
   <AlertDialogRoot :open="Boolean(activeAdminConfirm?.open)">
     <AlertDialogPortal>
       <AlertDialogOverlay
-        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
       />
       <AlertDialogContent
-        class="fixed top-[50%] left-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border border-border bg-card text-card-foreground p-6 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+        class="fixed top-[50%] left-[50%] z-admin-dialog grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-admin-card border border-border bg-card text-card-foreground p-6 shadow-admin-dialog data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
       >
         <div class="flex flex-col gap-2">
           <AlertDialogTitle class="text-admin-title font-bold text-foreground">
@@ -19,7 +19,7 @@
         <label
           v-if="activeAdminConfirm?.reasonEnabled"
           for="admin-confirm-reason-textarea"
-          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
         >
           <span>{{ activeAdminConfirm?.reasonLabel }}</span>
           <textarea

@@ -22,11 +22,6 @@
       }}</ActionButton>
     </div>
 
-    <AdminAlert v-if="query.error.value" severity="error">
-      {{ OAUTH_MESSAGES.oauthLoadFailed }}
-      <AdminButton variant="outline" @click="query.refetch()">{{ M.retry }}</AdminButton>
-    </AdminAlert>
-
     <div class="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
       <div v-if="query.isPending.value" class="flex items-center gap-2" role="status">
         <AdminSpinner class="size-4" :aria-label="M.settingsLoading" />
@@ -65,8 +60,6 @@
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
@@ -79,10 +72,13 @@ import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 import { SETTINGS_MESSAGES as M } from '../pages/messages'
 import { SETTINGS_SECTIONS } from '../shared/sections'
+import { useRefetchOnClose } from '../../shared/composables/useRefetchOnClose'
+import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 
 const props = defineProps<{ resource?: OAuthProviderSettingsResource | undefined }>()
 const resource = computed(() => props.resource ?? createOAuthProviderSettingsResource())
 const visible = ref(false)
+const toast = useAdminToast()
 
 const PROVIDER_CODES: readonly OAuthProviderCode[] = ['google', 'discord']
 
@@ -108,7 +104,13 @@ const providers = computed(() =>
 )
 
 // 弹窗内保存后关闭时刷新摘要，保持板块状态与弹窗一致。
-watch(visible, (open) => {
-  if (!open) void query.refetch()
-})
+useRefetchOnClose(visible, () => query.refetch())
+
+// 加载失败走 toast，Status 胶囊保留为真相源。
+watch(
+  () => query.error.value,
+  (error) => {
+    if (error) toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
+  },
+)
 </script>

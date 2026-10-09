@@ -111,7 +111,8 @@ export function getFindingRiskPresentation(finding: CreditReconciliationFinding)
       : '未限制'
   return {
     label: `${severity} · ${risk} · ${restriction}`,
-    severity: finding.risk === 'high' || finding.isolated ? ('danger' as const) : ('warn' as const),
+    variant:
+      finding.risk === 'high' || finding.isolated ? ('danger' as const) : ('warning' as const),
   }
 }
 

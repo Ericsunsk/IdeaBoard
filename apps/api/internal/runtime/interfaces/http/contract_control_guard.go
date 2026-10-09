@@ -3,9 +3,10 @@ package httpapi
 // Control Plane guard, rate limits, and route registration (issue #808).
 //
 // The guard is the single choke point every /api/control/v1 route flows
-// through: capability check (never IsAdmin) -> reason + Idempotency-Key
-// enforcement on mutations -> idempotent execution with response replay
-// -> handler -> mandatory audit record (success/read/denied/failure).
+// through: capability check (never IsAdmin) -> Idempotency-Key enforcement
+// on mutations (plus reason enforcement unless the route is ReasonOptional)
+// -> idempotent execution with response replay -> handler -> mandatory audit
+// record (success/read/denied/failure).
 // Denied and failed calls are audited too.
 
 import (
@@ -95,10 +96,11 @@ type ControlBillingAccountStore interface {
 // ContractControlDeps wires the Control Plane handlers. Every field is a
 // narrow seam owned by its business context; nil keeps the dependent
 // routes fail-closed with 501 (service_unavailable) instead of panicking.
-// Proxied legacy handlers (AIGateway, Storage, SearchProviders,
+// Proxied platform-config handlers (AIGateway, Storage, SearchProviders,
 // FeaturePrompts, Monitor) keep their validation and side-effect logic
 // single-sourced; the control guard still enforces capability, audit,
-// idempotency, and reason uniformly around them.
+// idempotency, and reason (required unless the route sets ReasonOptional)
+// uniformly around them.
 type ContractControlDeps struct {
 	Users           ControlUserService
 	Identity        identityports.IdentityAdminCommands
@@ -171,8 +173,9 @@ type ContractControlDeps struct {
 	TxScope ControlTxScope
 	TxAudit ControlAuditTxWriter
 	// Mail is the Auth-owned transactional mail seam behind the control
-	// mail-setting handlers (same instance serving legacy admin mail
-	// settings); nil keeps the mail routes fail-closed with 503.
+	// mail-setting handlers (the same Auth-owned seam instance; the legacy
+	// admin mail routes were removed in #809); nil keeps the mail routes
+	// fail-closed with 503.
 	Mail ControlMailService
 }
 
@@ -351,8 +354,9 @@ type controlContext struct {
 	Body     []byte
 }
 
-// guard wraps a handler with admin-only auth, reason + idempotency
-// enforcement (mutations), idempotent execution, and the mandatory
+// guard wraps a handler with admin-only auth, Idempotency-Key enforcement
+// on mutations (plus operator-reason enforcement unless the route sets
+// ReasonOptional), idempotent execution, and the mandatory
 // audit record. It returns a gin handler. The capability argument is the
 // audit label only (family strings survive for the audit record and the
 // openapi x-capabilities mirror); authorization is the admin business
@@ -395,13 +399,16 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			}
 			body = raw
 			record.Reason = extractControlReason(c, body)
-			if _, err := adminaction.New(p.UserID(), record.Reason); err != nil {
-				record.Status = http.StatusBadRequest
-				record.Outcome = ControlAuditDenied
-				emitControlAudit(c.Request.Context(), d.sink(), record)
-				contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, msgControlReasonRequired)
-				c.Abort()
-				return
+			// Empty optional reasons remain empty in the audit; supplied reasons are validated.
+			if record.Reason != "" || !route.ReasonOptional {
+				if _, err := adminaction.New(p.UserID(), record.Reason); err != nil {
+					record.Status = http.StatusBadRequest
+					record.Outcome = ControlAuditDenied
+					emitControlAudit(c.Request.Context(), d.sink(), record)
+					contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, msgControlReasonRequired)
+					c.Abort()
+					return
+				}
 			}
 			key, err := contract.IdempotencyKeyFromHeader(c)
 			if err != nil {

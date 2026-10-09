@@ -29,12 +29,9 @@ export const REWARD_CODES_MESSAGES = {
   deleteAction: '删除',
   plaintextHeader: '保存兑换码',
   newCodeHeader: '保存新 Code',
-  confirmUpdateTitle: '确认更新兑换码',
   confirmCreateTitle: '确认创建兑换码',
-  confirmUpdateMessage: (displayName: string) => `确定更新“${displayName}”吗？该操作将记录审计。`,
   confirmCreateMessage: (displayName: string) =>
     `确定创建兑换码“${displayName}”吗？该操作将记录审计。`,
-  confirmUpdate: '确认更新',
   confirmCreate: '确认创建',
   created: '兑换码已创建',
   updatedWithCode: '兑换码与 Code 已更新',

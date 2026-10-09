@@ -172,4 +172,16 @@ describe('AdminLayout', () => {
     expect(screen.queryByText('stale@example.com')).not.toBeInTheDocument()
     expect(screen.getByText('--')).toBeVisible()
   })
+
+  it('pins the anomaly radar to calm success when no anomalies are active', async () => {
+    // 雷达正常态：按钮 aria 无计数、钟形无红点；弹窗内 Pill 为 success 常态且
+    // pulse=false（压住 success 默认呼吸，见 AdminHeaderBar :pulse="hasAnomalies"）。
+    await renderLayout()
+
+    const radarButton = await screen.findByRole('button', { name: '异常雷达' })
+    expect(radarButton).toBeVisible()
+    expect(radarButton).toHaveAttribute('aria-label', '异常雷达')
+    // 无活跃异常时钟形红点不挂载（有异常时才挂载 bg-destructive 圆点）。
+    expect(radarButton.querySelector('.bg-destructive')).toBeNull()
+  })
 })

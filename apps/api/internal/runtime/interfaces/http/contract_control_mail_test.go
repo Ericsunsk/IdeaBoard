@@ -228,20 +228,22 @@ func TestControlMailSettingUpdate(t *testing.T) {
 		}
 	})
 
-	t.Run("missing reason or idempotency key is 400 before the seam", func(t *testing.T) {
+	t.Run("reason is optional but the idempotency key stays required", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
+		// Routine config exemption: key without reason succeeds and
+		// audits the empty reason as-is.
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 			body:   `{"from_name":"IdeaBoard","from_email":"noreply@example.com"}`,
 			userID: controlOperatorID, role: "admin",
 			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-put-3"},
 		})
-		if status != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", status)
+		if status != http.StatusOK {
+			t.Fatalf("key-only status = %d, want 200 (%v)", status, payload)
 		}
-		if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
-			t.Fatalf("code = %q, want control_reason_required", code)
+		if last := h.sink.Records()[len(h.sink.Records())-1]; last.Reason != "" || last.Operation != "platform.update_mail_setting" {
+			t.Fatalf("key-only audit = %+v, want empty reason", last)
 		}
 		status, _, payload = h.serve(controlCall{
 			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
@@ -257,8 +259,8 @@ func TestControlMailSettingUpdate(t *testing.T) {
 		}
 		mail.mu.Lock()
 		defer mail.mu.Unlock()
-		if len(mail.updates) != 0 {
-			t.Fatalf("guarded updates = %d, want 0", len(mail.updates))
+		if len(mail.updates) != 1 {
+			t.Fatalf("guarded updates = %d, want 1 (only the key-only call)", len(mail.updates))
 		}
 	})
 
@@ -386,20 +388,22 @@ func TestControlMailSettingTest(t *testing.T) {
 		}
 	})
 
-	t.Run("missing reason or idempotency key is 400 before the seam", func(t *testing.T) {
+	t.Run("reason is optional but the idempotency key stays required", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
+		// Routine probe exemption: key without reason still sends and
+		// audits the empty reason as-is.
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
 			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-test-no-reason"},
 		})
-		if status != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", status)
+		if status != http.StatusOK {
+			t.Fatalf("key-only status = %d, want 200 (%v)", status, payload)
 		}
-		if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
-			t.Fatalf("code = %q, want control_reason_required", code)
+		if last := h.sink.Records()[len(h.sink.Records())-1]; last.Reason != "" || last.Operation != "platform.test_mail_setting" {
+			t.Fatalf("key-only audit = %+v, want empty reason", last)
 		}
 		status, _, payload = h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
@@ -415,8 +419,8 @@ func TestControlMailSettingTest(t *testing.T) {
 		}
 		mail.mu.Lock()
 		defer mail.mu.Unlock()
-		if len(mail.recipients) != 0 {
-			t.Fatalf("guarded tests = %d, want 0", len(mail.recipients))
+		if len(mail.recipients) != 1 {
+			t.Fatalf("guarded tests = %d, want 1 (only the key-only call)", len(mail.recipients))
 		}
 	})
 

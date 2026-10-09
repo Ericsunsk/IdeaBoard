@@ -25,7 +25,7 @@
             v-if="isDev || isDemoMode"
             variant="outline"
             size="sm"
-            :class="isDemoMode ? 'border-primary/50 text-primary bg-primary/10' : ''"
+            :class="isDemoMode ? 'border-primary-line-emphasis text-primary bg-primary-faint' : ''"
             @click="toggleDemoMode"
           >
             {{ isDemoMode ? '退出演示' : '演示数据' }}
@@ -54,7 +54,7 @@
     <!-- 2. 加载中状态 (AdminSpinner 自带 role="progressbar") -->
     <div
       v-if="isLoading && items.length === 0"
-      class="flex min-h-[260px] items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
+      class="flex min-h-admin-empty-state items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
       :aria-label="BILLING_PRICING_MESSAGES.loadingAria"
     >
       <AdminSpinner class="size-9 text-primary" />
@@ -173,6 +173,9 @@ import type {
   PricingVariant,
 } from './billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
+// 组合保存 toast 文案收口在此（不改 messages.ts 公共文件）：旧文案“请根据提示重试”
+// 已无 inline 提示可指，自洽文案只说“请重试”，失败明细直接拼在 toast 后缀里。
+const COMBINED_SAVE_FAILED_PREFIX = '部分配置保存失败，请重试'
 import { stringParam } from '../../../../shared/router/queryParams'
 import {
   DEMO_MODE_QUERY_VALUE,
@@ -430,15 +433,11 @@ function handlePoolSaveError(error: unknown) {
 async function savePool(entries: AdminModelPoolEntry[]) {
   const item = poolEditItem.value
   if (!item || poolSavePending.value || !poolEditReady.value) return
-  // Control writes require an operator reason (audit); a cancelled dialog
-  // aborts silently. The save replaces the complete Service pool
-  // atomically against the loaded version (409 on concurrent edits).
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: BILLING_PRICING_MESSAGES.poolSaveTitle,
-    message: BILLING_PRICING_MESSAGES.poolSaveMessage(item.displayName),
-    confirmLabel: BILLING_PRICING_MESSAGES.poolSaveConfirm,
-  })
-  if (!operatorReason) return
+  // Pool replace is a routine config write (backend ReasonOptional): no
+  // confirm dialog, the audit records an empty reason. The save replaces
+  // the complete Service pool atomically against the loaded version (409
+  // on concurrent edits).
+  const operatorReason = ''
   poolSavePending.value = true
   poolSaveError.value = ''
   poolSaveStale.value = false
@@ -639,6 +638,11 @@ async function saveCombinedSettings(
   const pricingChanged = isPricingChanged(item, prices)
   const poolChanged = isPoolChanged(savedPoolEntries.value, entries)
   let failed = false
+  let pricingFailed = false
+  let poolFailed = false
+  let poolConflicted = false
+  let pricingDetail = ''
+  let poolDetail = ''
 
   try {
     if (pricingChanged) {
@@ -646,9 +650,9 @@ async function saveCombinedSettings(
       try {
         const published = await resource.publishPrices(item.sku, prices, { operatorReason })
         applyPricePublishSuccess(item, published)
-        publishError.value = ''
       } catch (error) {
-        publishError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed)
+        pricingFailed = true
+        pricingDetail = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed)
         failed = true
       } finally {
         publishPending.value = false
@@ -664,10 +668,10 @@ async function saveCombinedSettings(
           { operatorReason },
         )
         applyPoolReplaceSuccess(item, saved)
-        poolSaveError.value = ''
-        poolSaveStale.value = false
       } catch (error) {
-        handlePoolSaveError(error)
+        poolFailed = true
+        poolDetail = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
+        poolConflicted = error instanceof Error && (error as { code?: unknown }).code === 'conflict'
         failed = true
       } finally {
         poolSavePending.value = false
@@ -679,7 +683,24 @@ async function saveCombinedSettings(
   }
 
   if (failed) {
-    toast.error(BILLING_PRICING_MESSAGES.saveAllFailed)
+    // 组合保存部分失败仅 toast 命名失败部分，不写 inline，避免双通知重复；
+    // 单定价/单池路径仍走各自 inline。409（pool conflict）是例外：toast 已带
+    // 明细，同时置 poolSaveStale 让对话框内出现“重新加载”入口，否则用户无处刷新。
+    publishError.value = ''
+    poolSaveError.value = ''
+    poolSaveStale.value = poolConflicted
+    const failedTabs: string[] = []
+    const details: string[] = []
+    if (pricingFailed) {
+      failedTabs.push(BILLING_PRICING_MESSAGES.tabPricing)
+      if (pricingDetail) details.push(pricingDetail)
+    }
+    if (poolFailed) {
+      failedTabs.push(BILLING_PRICING_MESSAGES.tabModelPool)
+      if (poolDetail) details.push(poolDetail)
+    }
+    const suffix = details.length > 0 ? `：${details.join('；')}` : ''
+    toast.error(`${COMBINED_SAVE_FAILED_PREFIX}（${failedTabs.join('、')}）${suffix}`)
   } else {
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.saveAllSuccess)
@@ -712,12 +733,9 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
   if (availabilityPending[item.sku] || item.status === 'unpriced' || item.status === 'archived') {
     return
   }
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: enabled ? BILLING_PRICING_MESSAGES.enableTitle : BILLING_PRICING_MESSAGES.disableTitle,
-    message: BILLING_PRICING_MESSAGES.availabilityMessage(enabled, item.displayName),
-    confirmLabel: enabled ? BILLING_PRICING_MESSAGES.enable : BILLING_PRICING_MESSAGES.disable,
-  })
-  if (!operatorReason) return
+  // Availability is a routine config write (backend ReasonOptional): no
+  // confirm dialog, the audit records an empty reason.
+  const operatorReason = ''
   availabilityPending[item.sku] = true
   if (isDemoMode.value) {
     item.status = enabled ? 'active' : 'disabled'

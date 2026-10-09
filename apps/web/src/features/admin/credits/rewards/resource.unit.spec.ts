@@ -159,15 +159,44 @@ describe('AdminRewardCodeResource', () => {
     )
   })
 
-  it('requires an operator reason for mutations before any network call', async () => {
+  it('requires an operator reason for create/delete before any network call', async () => {
     const resource = createAdminRewardCodeResource()
 
-    await expect(resource.setEnabled(7, false, { operatorReason: '  ' })).rejects.toMatchObject({
+    await expect(
+      resource.create(
+        {
+          displayName: '夏日灵感奖励',
+          code: 'IDEA2026',
+          creditAmount: 80,
+          maxRedemptions: 100,
+          expiresAt: '2026-12-31T00:00:00Z',
+          idempotencyKey: 'reward-create:1',
+        },
+        { operatorReason: '' },
+      ),
+    ).rejects.toMatchObject({
       code: 'control_reason_required',
     })
     await expect(resource.delete(7, { operatorReason: '' })).rejects.toMatchObject({
       code: 'control_reason_required',
     })
     expect(transport.request).not.toHaveBeenCalled()
+  })
+
+  it('sends routine update/enable mutations without an operator reason', async () => {
+    transport.request.mockResolvedValue(
+      contractOk(codeFixture({ enabled: false, status: 'disabled' })),
+    )
+    const resource = createAdminRewardCodeResource()
+
+    await resource.setEnabled(7, false, { operatorReason: '  ' })
+
+    expect(transport.request).toHaveBeenCalledWith(
+      '/control/v1/rewards/codes/7/enabled',
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: expect.not.objectContaining({ 'X-Operator-Reason': expect.anything() }),
+      }),
+    )
   })
 })

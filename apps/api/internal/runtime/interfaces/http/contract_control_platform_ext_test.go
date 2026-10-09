@@ -330,13 +330,12 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 	admin := controlCall{userID: controlOperatorID, role: "admin"}
 
 	t.Run("mutations require reason", func(t *testing.T) {
+		// Only reason-enforced mutations are listed here: OAuth provider
+		// updates and reward code updates/toggles are routine config
+		// (ReasonOptional) and succeed without a reason.
 		cases := []controlCall{
-			{method: http.MethodPut, path: "/api/control/v1/users/oauth/google", body: `{"enabled":true}`,
-				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-2"}},
 			{method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{}`,
 				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-3"}},
-			{method: http.MethodPatch, path: "/api/control/v1/rewards/codes/7", body: `{}`,
-				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-4"}},
 			{method: http.MethodDelete, path: "/api/control/v1/rewards/codes/7",
 				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-5"}},
 		}

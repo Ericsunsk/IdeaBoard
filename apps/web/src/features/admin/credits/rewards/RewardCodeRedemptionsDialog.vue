@@ -12,7 +12,7 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-foreground">
+              <div class="text-admin-title-sm font-admin-display text-foreground">
                 {{ REWARD_CODES_MESSAGES.redemptionsTitle }}
               </div>
             </div>
@@ -149,7 +149,7 @@
               class="grid gap-x-6 gap-y-4 sm:grid-cols-3"
             >
               <div>
-                <dt class="text-admin-caption font-[700] text-muted-foreground">Redemption ID</dt>
+                <dt class="text-admin-caption font-bold text-muted-foreground">Redemption ID</dt>
                 <dd
                   class="mt-1 mb-0 break-all font-mono text-admin-body text-foreground select-all"
                 >
@@ -157,7 +157,7 @@
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-muted-foreground">
+                <dt class="text-admin-caption font-bold text-muted-foreground">
                   Credits Transaction ID
                 </dt>
                 <dd
@@ -167,9 +167,7 @@
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-muted-foreground">
-                  masked Code hint
-                </dt>
+                <dt class="text-admin-caption font-bold text-muted-foreground">masked Code hint</dt>
                 <dd
                   class="mt-1 mb-0 break-all font-mono text-admin-body text-foreground select-all"
                 >

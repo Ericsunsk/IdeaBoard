@@ -19,13 +19,13 @@ export const adminSelectTriggerClass =
 export const adminSelectTriggerCompactClass = 'h-8 px-2.5 text-admin-meta'
 
 /** Active/filtered state for a dropdown trigger, used by filter-style selects. */
-export const adminSelectTriggerActiveClass = 'border-primary bg-primary/5 text-primary'
+export const adminSelectTriggerActiveClass = 'border-primary bg-primary-faint-soft text-primary'
 
 export const adminSelectTriggerIconClass = 'size-4 shrink-0 text-muted-foreground opacity-70'
 
 /** The option list overlay. One motion contract, one radius, one offset. */
 export const adminSelectContentClass =
-  'relative z-50 overflow-hidden rounded-lg border border-border bg-popover text-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2'
+  'relative z-admin-dialog overflow-hidden rounded-lg border border-border bg-popover text-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2'
 
 /** Every dropdown overlay detaches from its trigger by the same distance. */
 export const ADMIN_SELECT_SIDE_OFFSET = 4
@@ -44,4 +44,4 @@ export const adminSelectItemCheckClass = 'size-4 text-primary'
 
 /** Overlay panels that host more than a plain option list. */
 export const adminSelectPanelClass =
-  'z-50 w-[260px] max-w-[calc(100vw_-_48px)] rounded-lg border border-border bg-card p-4 text-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2'
+  'z-admin-dialog w-[260px] max-w-[calc(100vw_-_48px)] rounded-lg border border-border bg-card p-4 text-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2'

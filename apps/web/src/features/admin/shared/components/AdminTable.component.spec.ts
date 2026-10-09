@@ -209,7 +209,7 @@ describe('AdminTable', () => {
 
     const sticky = renderTable({ value: rows, stickyHeader: true })
     const theadClass = sticky.container.querySelector('thead')?.className ?? ''
-    for (const token of ['sticky', 'top-0', 'z-10', 'bg-muted/80', 'backdrop-blur-xs']) {
+    for (const token of ['sticky', 'top-0', 'z-admin-sticky', 'bg-muted/80', 'backdrop-blur-xs']) {
       expect(theadClass).toContain(token)
     }
   })

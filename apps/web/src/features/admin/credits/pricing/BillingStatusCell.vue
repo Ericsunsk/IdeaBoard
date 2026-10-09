@@ -1,44 +1,37 @@
 <template>
-  <span
-    :class="[
-      'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none',
-      metric.activePillClass,
-    ]"
-  >
-    <span :class="['size-1.5 rounded-full', metric.dotClass]" />
-    <span>{{ label }}</span>
-  </span>
+  <!-- 防抖固定槽收口到 SwitchRow：四态最长 8 字符（Disabled/Unpriced/Archived）
+    按 84px 锁宽，短文案 Active(6) 居中不收缩；pulse 默认关闭，
+    success↔neutral 翻转不挂载/卸载 ping。纯 status 展示，不渲染 switch。 -->
+  <SwitchRow :pill="label" :pill-variant="variant" :pulse="false" status-min-width="84px" />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { taskMetricDefinitions, type TaskMetricKey } from '../../shared/lib/taskMetricTokens'
+import SwitchRow from '../../shared/components/SwitchRow.vue'
+import type { AdminStatusPillVariant } from '../../shared/components/AdminStatusPill.vue'
 import type { AdminBillableItemStatus } from './billableCatalogTypes'
 
 const props = defineProps<{
   status: AdminBillableItemStatus
 }>()
 
-// 定价状态借任务监控 metric token（圆点+胶囊同系），文案保留定价四态：
-// 未定价→pending 蓝，生效中→completed 绿，已停用/已归档→cancelled 灰。
-const metricKeyForStatus: Record<AdminBillableItemStatus, TaskMetricKey> = {
-  unpriced: 'pending',
-  active: 'completed',
-  disabled: 'cancelled',
-  archived: 'cancelled',
-}
-
+// 定价状态载体统一 AdminStatusPill（方案 A）：文案保留定价四态，
+// variant 沿用原 taskMetricTokens 语义：生效中 success、未定价 info、
+// 已停用/已归档 neutral（中性，不蹭健康色）。
 const statusLabel: Record<AdminBillableItemStatus, string> = {
-  unpriced: '未定价',
-  active: '生效中',
-  disabled: '已停用',
-  archived: '已归档',
+  unpriced: 'Unpriced',
+  active: 'Active',
+  disabled: 'Disabled',
+  archived: 'Archived',
 }
 
-const metric = computed(
-  () =>
-    taskMetricDefinitions.find((item) => item.key === metricKeyForStatus[props.status]) ??
-    taskMetricDefinitions[0]!,
-)
+const statusVariant: Record<AdminBillableItemStatus, AdminStatusPillVariant> = {
+  unpriced: 'info',
+  active: 'success',
+  disabled: 'neutral',
+  archived: 'neutral',
+}
+
 const label = computed(() => statusLabel[props.status])
+const variant = computed<AdminStatusPillVariant>(() => statusVariant[props.status])
 </script>

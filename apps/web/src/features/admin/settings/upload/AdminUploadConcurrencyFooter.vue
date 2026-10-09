@@ -18,13 +18,6 @@
       <span class="shrink-0 text-admin-body text-muted-foreground select-none">
         {{ SETTINGS_MESSAGES.tasksUnit }}
       </span>
-      <span
-        v-if="mediaUploadValidationError"
-        role="alert"
-        class="text-admin-caption text-destructive"
-      >
-        {{ mediaUploadValidationError }}
-      </span>
     </div>
     <div class="flex shrink-0 items-center gap-2">
       <ActionButton
@@ -54,7 +47,6 @@
 <script setup lang="ts">
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { SETTINGS_MESSAGES } from '../pages/messages'
 import {
   MEDIA_UPLOAD_MAX_CONCURRENT,
@@ -67,7 +59,6 @@ const LABEL_ID = 'admin-media-upload-footer-label'
 
 const mediaUpload = useMediaUploadSettings({
   feedback: useAdminMediaUploadSettingsFeedback(),
-  confirm: useAdminConfirm(),
 })
 
 const {

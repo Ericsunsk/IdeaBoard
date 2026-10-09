@@ -5,7 +5,7 @@
       v-if="drawerOpen"
       type="button"
       aria-label="关闭导航"
-      class="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs lg:hidden"
+      class="fixed inset-0 z-admin-overlay bg-scrim-soft backdrop-blur-xs lg:hidden"
       @click="drawerOpen = false"
     />
 
@@ -29,7 +29,7 @@
         :class="[
           route.meta.fullWidth
             ? 'max-w-none px-4 sm:px-6 lg:pl-8 lg:pr-4'
-            : 'max-w-[1600px] px-4 sm:px-6 lg:px-8',
+            : 'max-w-admin-shell px-4 sm:px-6 lg:px-8',
         ]"
       >
         <!-- hidePageHeader 路由（如积分运营自带吸顶标题块）：v-show 保留 DOM，
@@ -90,9 +90,7 @@ const { showStickyTitle, dynamicTitle, reset: resetStickyTitle } = useAdminStick
 
 // 仅自带吸顶标题块的聚合页（hidePageHeader）常驻顶栏标题，其它单页遵循随滚动显隐的全局标准。
 const pinStickyTitle = computed(
-  () =>
-    Boolean(route.meta.hidePageHeader) ||
-    isPathUnderRoute(route.path, ADMIN_CREDITS_PATH),
+  () => Boolean(route.meta.hidePageHeader) || isPathUnderRoute(route.path, ADMIN_CREDITS_PATH),
 )
 const stickyTitleVisible = computed(() => pinStickyTitle.value || showStickyTitle.value)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)

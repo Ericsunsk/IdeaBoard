@@ -47,11 +47,11 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-          <AdminBadge
+          <AdminStatusPill
             v-if="detailTask"
-            :value="getTaskStatusDefinition(detailTask.status).text"
-            :severity="getTaskStatusDefinition(detailTask.status).severity"
-            rounded
+            :label="getTaskStatusDefinition(detailTask.status).text"
+            :variant="getTaskStatusDefinition(detailTask.status).variant"
+            size="small"
           />
         </div>
       </div>
@@ -301,10 +301,10 @@
                   {{ attempt.resolved_model || '-' }}
                 </span>
               </div>
-              <AdminBadge
-                :value="getAttemptStatusLabel(attempt.status)"
-                :severity="getAttemptStatusSeverity(attempt.status)"
-                rounded
+              <AdminStatusPill
+                :label="getAttemptStatusLabel(attempt.status)"
+                :variant="getAttemptStatusVariant(attempt.status)"
+                size="small"
               />
             </div>
             <div
@@ -499,7 +499,7 @@ import {
   XmarkCircle,
 } from '@iconoir/vue'
 import { DialogTitle } from 'reka-ui'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
@@ -520,7 +520,7 @@ import {
   getAttemptRetryLayerLabel,
   getAttemptStageLabel,
   getAttemptStatusLabel,
-  getAttemptStatusSeverity,
+  getAttemptStatusVariant,
   getBillingSettlementLabel,
   getDetailExecutionModelLabel,
   getDetailExecutionProviderLabel,

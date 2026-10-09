@@ -12,7 +12,7 @@ export const adminSurfaceScrollContentClass =
   'app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain'
 
 export const adminEmptyStateClass =
-  'flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-border bg-card text-center text-muted-foreground'
+  'flex min-h-admin-empty-state flex-col items-center justify-center rounded-lg border border-border bg-card text-center text-muted-foreground'
 
 export const adminDashboardRootClass = 'flex max-w-full min-w-0 flex-col gap-4 p-0'
 
@@ -64,7 +64,7 @@ export const adminLogoButtonClass =
 export const adminTextButtonClass = '!text-muted-foreground hover:!text-foreground'
 
 export const adminAnomalyPopoverClass =
-  'flex max-h-[calc(100dvh_-_24px)] w-[340px] max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-card text-card-foreground'
+  'flex max-h-[calc(100dvh_-_24px)] w-admin-popover max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-card text-card-foreground'
 
 export const adminDialogHeaderSplitClass =
   'flex w-full flex-col gap-4 pr-4 md:flex-row md:items-start md:justify-between'
@@ -85,7 +85,7 @@ export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center
 
 // 全局唯一 Admin 弹窗 chrome：使用标准语义卡片与边框。
 export const adminDialogChromeClass =
-  'rounded-[var(--radius-admin-dialog)] border border-border bg-card text-card-foreground shadow-xl'
+  'rounded-[var(--radius-admin-dialog)] border border-border bg-card text-card-foreground shadow-admin-dialog'
 
 export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-card'
 
@@ -101,8 +101,6 @@ export const adminDialogChromeContentClass =
 export const adminDialogChromeFooterClass = '!px-6 !py-4 border-t border-border bg-card'
 
 export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-foreground'
-
-export const adminCompactTagClass = '!px-2 !py-0.5 !text-admin-caption !leading-4'
 
 // 全局唯一输入框 chrome（AdminInput/AdminNumberInput/AdminTextarea 共用）：
 // 遵循标准 shadcn 输入栏规范，无 hover 杂效，focus 用柔光 ring；尺寸/字号由各组件按 size 追加覆盖。

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../../test/render'
+import { expectDomOrder } from '../../../../test/domOrder'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from '../domain/status'
@@ -174,9 +175,7 @@ describe('AdminTaskResultDialog', () => {
 
     const firstProvider = await screen.findByText('openai')
     const secondProvider = screen.getByText('gemini')
-    expect(
-      firstProvider.compareDocumentPosition(secondProvider) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expectDomOrder([firstProvider, secondProvider])
     expect(screen.getByText('model-a')).toBeVisible()
     expect(screen.getByText('model-b')).toBeVisible()
     expect(screen.getByText('超时')).toBeVisible()

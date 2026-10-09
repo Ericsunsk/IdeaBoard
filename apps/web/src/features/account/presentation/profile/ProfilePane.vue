@@ -58,17 +58,9 @@
             {{ userStore.user?.display_name }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Badge
-              :variant="
-                userRoleSeverity === 'danger'
-                  ? 'destructive'
-                  : userRoleSeverity === 'secondary'
-                    ? 'secondary'
-                    : 'default'
-              "
-            >
+            <StatusBadge :tone="userRoleTone" :dot="false">
               {{ userRoleLabel }}
-            </Badge>
+            </StatusBadge>
           </div>
         </div>
       </div>
@@ -81,12 +73,10 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Camera } from '@iconoir/vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
+import StatusBadge, { type AppStatusTone } from '../../../../shared/components/StatusBadge.vue'
 import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
 import AccountPane from '../common/AccountPane.vue'
-
-type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -101,8 +91,8 @@ const userRoleLabel = computed(() =>
     ? t('account.profile.roleAdmin')
     : t('account.profile.roleCreator'),
 )
-const userRoleSeverity = computed<TagSeverity>(() =>
-  userStore.user?.role === 'admin' ? 'info' : 'secondary',
+const userRoleTone = computed<AppStatusTone>(() =>
+  userStore.user?.role === 'admin' ? 'info' : 'neutral',
 )
 const userInitial = computed(() => {
   const displayName = userStore.user?.display_name?.trim()

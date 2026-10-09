@@ -6,6 +6,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { makeControlUserPayload } from '../../../test/factories'
 import { mockAppToast, type AppToastMocks } from '../../../test/toast'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
+import { expectDomOrder } from '../../../test/domOrder'
 import AdminUsersPage from './AdminUsersPage.vue'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
@@ -150,9 +151,7 @@ describe('AdminUsersPage', () => {
 
     const emailHeader = await screen.findByRole('columnheader', { name: 'Email' })
     const ipHeader = await screen.findByRole('columnheader', { name: 'IP' })
-    expect(
-      emailHeader.compareDocumentPosition(ipHeader) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expectDomOrder([emailHeader, ipHeader])
     expect(await screen.findByText('203.0.113.42')).toBeVisible()
     expect(await screen.findByText('🇺🇸')).toBeVisible()
   })
@@ -164,12 +163,7 @@ describe('AdminUsersPage', () => {
     const headers = ['用户', 'Email', 'IP', '角色', '账户余额', '状态', '加入时间', 'More'].map(
       (name) => screen.getByRole('columnheader', { name }),
     )
-    for (let index = 0; index < headers.length - 1; index += 1) {
-      expect(
-        headers[index]!.compareDocumentPosition(headers[index + 1]!) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy()
-    }
+    expectDomOrder(headers)
   })
 
   it('loads more Ledger entries and refreshes the user list after confirmed Grant', async () => {
@@ -667,7 +661,7 @@ describe('AdminUsersPage', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows a recoverable read error and retries wallet and Ledger loading', async () => {
+  it('reports wallet and Ledger load failures through toast only and retries loading', async () => {
     let shouldFail = true
     useMswHandlers(
       http.get(`/api/control/v1/credits/wallets/${userPublicID}`, () =>
@@ -704,16 +698,15 @@ describe('AdminUsersPage', () => {
       await screen.findByRole('button', { name: '打开 admin_balance_user 的账户详情' }),
     )
     const dialog = await screen.findByRole('dialog', { name: 'admin_balance_user 的Idea账户' })
-    expect(await within(dialog).findByText('账户或流水加载失败。请刷新后重试。')).toBeVisible()
+    // Toast-only contract: load failures surface via toast, never an inline alert.
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalled())
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('账户或流水加载失败。请刷新后重试。')).not.toBeInTheDocument()
 
     shouldFail = false
     await user.click(within(dialog).getByRole('button', { name: '刷新' }))
-    await waitFor(() =>
-      expect(
-        within(dialog).queryByText('账户或流水加载失败。请刷新后重试。'),
-      ).not.toBeInTheDocument(),
-    )
     expect(await within(dialog).findByText('恢复后的流水')).toBeVisible()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

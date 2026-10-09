@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, within } from '../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import AdminOAuthLoginCard from './AdminOAuthLoginCard.vue'
 import type { OAuthProviderSettingsResource } from './resource'
@@ -57,17 +57,22 @@ describe('AdminOAuthLoginCard', () => {
     expect(within(dialog).getByText('Google 凭据配置')).toBeVisible()
   })
 
-  it('renders a retryable load error', async () => {
-    mockAppToast()
+  it('routes load failure to toast error without an inline alert and keeps pills as truth', async () => {
+    const mocks = mockAppToast()
     const resource = {
-      get: vi.fn().mockRejectedValue(new Error('oauth down')),
+      get: vi.fn().mockRejectedValue(new Error('toast-probe-load')),
       save: vi.fn(),
     }
-    const { user } = renderCard(resource as unknown as OAuthProviderSettingsResource)
+    renderCard(resource as unknown as OAuthProviderSettingsResource)
 
-    expect(await screen.findByText('加载 OAuth Provider 设置失败，请重试')).toBeVisible()
-    const before = resource.get.mock.calls.length
-    await user.click(screen.getByRole('button', { name: '重试' }))
-    expect(resource.get.mock.calls.length).toBeGreaterThan(before)
+    await waitFor(() =>
+      expect(mocks.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-load')),
+    )
+    expect(mocks.success).not.toHaveBeenCalled()
+    expect(screen.queryByText(/toast-probe-load/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    // Status 胶囊保留为真相源：加载失败时双 Provider 均展示 Disabled。
+    expect(await screen.findByText('Google')).toBeVisible()
+    expect(screen.getAllByText('Disabled')).toHaveLength(2)
   })
 })

@@ -12,11 +12,13 @@
  * Public capabilities never imply control capabilities.
  *
  * Mutations: every POST/PUT/PATCH/DELETE requires a header-only
- * Idempotency-Key and an operator reason (reason/operator_note body field
- * or X-Operator-Reason header), else 400. Every guarded call emits a
- * Control AuditRecord (operator, target, capability, request_id,
- * idempotency key, reason, outcome, timestamp); audit records never enter
- * the public event layer.
+ * Idempotency-Key, else 400. High-risk mutations additionally require an
+ * operator reason (reason/operator_note body field or X-Operator-Reason
+ * header), else 400; routine config mutations (x-audit reason: false)
+ * accept an optional reason and audit the empty reason as-is. Every
+ * guarded call emits a Control AuditRecord (operator, target,
+ * capability, request_id, idempotency key, reason, outcome, timestamp);
+ * audit records never enter the public event layer.
  *
  * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
@@ -184,6 +186,7 @@ export * from './unauthorizedResponse'
 export * from './unprocessableEntityResponse'
 export * from './updateControlAIGatewayBody'
 export * from './updateControlBrandingSettingBody'
+export * from './updateControlLoginLockoutSettingBody'
 export * from './updateControlMediaUploadSettingBody'
 export * from './updateControlRateLimitSettingBody'
 export * from './updateControlRegistrationSettingBody'

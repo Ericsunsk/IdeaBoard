@@ -57,10 +57,7 @@
           </div>
 
           <div class="flex shrink-0 flex-wrap items-center gap-2">
-            <ActionButton
-              variant="outline"
-              @click="historyDialogVisible = true"
-            >
+            <ActionButton variant="outline" @click="historyDialogVisible = true">
               {{ CREDIT_HEALTH_MESSAGES.history }}
             </ActionButton>
             <ActionButton
@@ -126,10 +123,10 @@
               :key="`${kind}-${run.id}`"
               class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-2.5"
             >
-              <AdminBadge
-                :value="getRunStatusLabel(run.status)"
-                :severity="getRunStatusSeverity(run.status)"
-                rounded
+              <AdminStatusPill
+                :label="getRunStatusLabel(run.status)"
+                :variant="getRunStatusVariant(run.status)"
+                size="small"
               />
               <span class="font-mono text-xs font-bold text-foreground"> Run #{{ run.id }} </span>
               <span class="text-xs text-muted-foreground">{{
@@ -167,20 +164,17 @@
 import { computed, ref } from 'vue'
 import { CheckCircle, Clock, WarningTriangle, XmarkCircle } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
-import {
-  adminDashboardRootClass,
-  adminTextButtonClass,
-} from '../../shared/lib/uiClasses'
+import { adminDashboardRootClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import {
   formatAdminDateTimeWithSeconds,
   formatReconciliationRunError,
   getRunStatusLabel,
-  getRunStatusSeverity,
+  getRunStatusVariant,
 } from '../shared/format'
 import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
 import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'

@@ -47,6 +47,13 @@ describe('Canvas surface skin contract', () => {
     expect(nodeHandleRail).toContain('--handle-ring-color: var(--flow-edge-color)')
   })
 
+  it('sources the tonal-range wash from the app canvas wash token', () => {
+    expect(surfaceSkin).toContain(
+      '--canvas-accent-wash: var(--color-canvas-accent-wash, rgba(122, 107, 213, 0.08))',
+    )
+    expect(appStyle).toContain('--color-canvas-accent-wash:')
+  })
+
   it('keeps Canvas consumers on the named surface contract instead of direct app token aliases', () => {
     const consumers = [
       chromeSkin,

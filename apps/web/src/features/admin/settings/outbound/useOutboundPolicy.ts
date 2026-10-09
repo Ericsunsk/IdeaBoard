@@ -2,8 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed, ref, toRaw, watch } from 'vue'
 import type { Ref } from 'vue'
-import type { AdminConfirmPort } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import type { AdminOutboundPolicyFeedback } from '../shared/useSettingsFeedback'
 import {
   DEFAULT_OUTBOUND_POLICY_FORM,
@@ -15,10 +13,7 @@ import {
 } from './contract'
 import { outboundPolicyQueryKey, useOutboundPolicyResource } from './resource'
 
-export function useOutboundPolicy(options: {
-  feedback: AdminOutboundPolicyFeedback
-  confirm: AdminConfirmPort
-}) {
+export function useOutboundPolicy(options: { feedback: AdminOutboundPolicyFeedback }) {
   const queryClient = useQueryClient()
   const resource = useOutboundPolicyResource()
   const setting = computed(() => resource.query.data.value)
@@ -31,9 +26,9 @@ export function useOutboundPolicy(options: {
   const validationError = ref('')
   const loading = computed(() => resource.query.isLoading.value || resource.query.isFetching.value)
   const saveMutation = useMutation({
-    mutationFn: (input: { draft: OutboundPolicyForm; operatorReason: string }) =>
+    mutationFn: (input: { draft: OutboundPolicyForm }) =>
       resource.update(outboundPolicyFormToRequest(input.draft), {
-        operatorReason: input.operatorReason,
+        operatorReason: '',
       }),
     onSuccess: async (savedSetting) => {
       hydrate(savedSetting)
@@ -63,19 +58,11 @@ export function useOutboundPolicy(options: {
       return false
     }
 
-    // Control Plane writes require an operator reason (audit). Collect it
-    // through the shared confirm dialog; a cancelled dialog aborts silently.
-    const operatorReason = await confirmSettingsSave(options.confirm, {
-      title: '保存',
-      message: '确定保存私有地址访问策略吗？该操作将记录操作人与原因。',
-      confirmLabel: '保存',
-    })
-    if (!operatorReason) return false
-
+    // Routine config write (backend ReasonOptional): save directly
+    // without the confirm dialog; the audit records an empty reason.
     try {
       await saveMutation.mutateAsync({
         draft: normalizeOutboundPolicyFormValue(form.value),
-        operatorReason,
       })
       options.feedback.saved()
       return true

@@ -59,8 +59,39 @@ describe('Monitor Components', () => {
     expect(onUpdateCollapse).toHaveBeenCalledWith(true)
 
     const runningPill = screen.getByTitle('Filter running tasks')
+    // 过滤 pills 中性分类：激活态走 bg-muted 载体，不带 success/warning/info/destructive 状态色。
+    const runningDot = runningPill.querySelector('span:first-child')!
+    expect(runningDot.className).toMatch(/bg-muted-foreground/)
+    expect(runningDot.className).not.toMatch(/bg-warning|bg-success|bg-info|bg-destructive/)
     await user.click(runningPill)
     expect(onToggleStatus).toHaveBeenCalledWith('running')
+  })
+
+  it('renders active filter pill with neutral classification style', async () => {
+    const stats: TaskMetricStatsSnapshot = {
+      total: 10,
+      pending: 1,
+      running: 2,
+      completed: 5,
+      failed: 1,
+      cancelled: 1,
+    }
+
+    renderWithUser(TaskEventsCard, {
+      props: {
+        filterStatus: 'failed',
+        metricStatsSnapshot: stats,
+        chartsCollapsed: false,
+        timelineChartData: { labels: [], datasets: [] },
+        timelineChartOptions: {} as never,
+        adminChartPlugins: [],
+        chartHeightPx: 120,
+      },
+    })
+
+    const failedPill = screen.getByTitle('Filter failed tasks')
+    expect(failedPill.className).toMatch(/bg-muted/)
+    expect(failedPill.className).not.toMatch(/bg-destructive-soft|text-destructive/)
   })
 
   it('renders TaskActivityTable with tasks and pagination', async () => {

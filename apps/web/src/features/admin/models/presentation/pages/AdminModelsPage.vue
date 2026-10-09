@@ -98,7 +98,7 @@
       <div
         v-for="model in filteredModels"
         :key="model.id"
-        class="group flex flex-col h-full overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/50"
+        class="group flex flex-col h-full overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary-line-emphasis"
       >
         <!-- 卡片主体区域 (Upper Section，含近 7 天观测区) -->
         <AdminModelCardBody
@@ -133,9 +133,9 @@
               :aria-label="MODELS_MESSAGES.copyIdAria(model.id)"
               @click="copyModelId(model.id)"
             >
-              <Check v-if="copiedModelId === model.id" class="size-3.5 text-emerald-600" />
+              <Check v-if="copiedModelId === model.id" class="size-3.5 text-success" />
               <Copy v-else class="size-3.5 text-muted-foreground" />
-              <span :class="copiedModelId === model.id ? 'text-emerald-600 font-semibold' : ''">
+              <span :class="copiedModelId === model.id ? 'text-success font-semibold' : ''">
                 {{ copiedModelId === model.id ? MODELS_MESSAGES.copied : MODELS_MESSAGES.copy }}
               </span>
             </button>

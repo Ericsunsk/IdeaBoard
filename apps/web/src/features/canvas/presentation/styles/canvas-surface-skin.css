@@ -89,7 +89,7 @@ body.canvas-overscroll-guard {
   --canvas-accent-glow: var(--color-canvas-accent-glow);
   --canvas-accent-soft: color-mix(in srgb, var(--color-canvas-accent) 12%, transparent);
   --canvas-accent-soft-strong: color-mix(in srgb, var(--color-canvas-accent) 16%, transparent);
-  --canvas-accent-wash: var(--color-canvas-accent-soft);
+  --canvas-accent-wash: var(--color-canvas-accent-wash, rgba(122, 107, 213, 0.08));
   --canvas-accent-outline: var(--color-canvas-accent-border-soft);
   --canvas-running-from: var(--color-canvas-running-from);
   --canvas-running-to: var(--color-canvas-running-to);

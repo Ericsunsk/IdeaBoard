@@ -6,6 +6,8 @@
     :required="required"
     :field-class="fieldClass"
     :icon-class="iconClass"
+    :loading="loading"
+    :loading-label="loadingLabel"
   >
     <template v-if="$slots.prefix" #prefix>
       <slot name="prefix" />
@@ -29,7 +31,13 @@
         v-bind="controlState(invalid)"
         :autocomplete="autocomplete"
         :required="slotRequired"
-        :class="[inputClass, $slots.prefix ? 'pl-10' : '', invalid ? inputErrorClass : '']"
+        :aria-busy="loading || undefined"
+        :class="[
+          inputClass,
+          $slots.prefix ? 'pl-10' : '',
+          loading ? 'pr-10' : '',
+          invalid ? inputErrorClass : '',
+        ]"
         :invalid="invalid"
         :placeholder="placeholder"
         :aria-invalid="ariaInvalid"
@@ -61,6 +69,8 @@ const props = withDefaults(
     autocomplete?: string | undefined
     disabled?: boolean
     required?: boolean
+    loading?: boolean
+    loadingLabel?: string | undefined
   }>(),
   {
     error: '',
@@ -74,6 +84,8 @@ const props = withDefaults(
     autocomplete: undefined,
     disabled: false,
     required: true,
+    loading: false,
+    loadingLabel: 'Sending…',
   },
 )
 

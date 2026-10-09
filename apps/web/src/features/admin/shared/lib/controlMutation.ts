@@ -33,6 +33,18 @@ export function buildControlMutationHeaders(
   })
 }
 
+/** Routine writes allow an empty reason but preserve caller-owned retry keys. */
+export function buildRoutineControlMutationHeaders(
+  options: Partial<ControlMutationOptions> = {},
+  defaultIdempotencyKey?: string,
+): Record<string, string> {
+  return buildContractRequestHeaders({
+    requestId: newRequestId(),
+    idempotencyKey: options.idempotencyKey ?? defaultIdempotencyKey ?? newRequestId(),
+    operatorReason: options.operatorReason?.trim() || undefined,
+  })
+}
+
 /** Read the machine code from either an envelope error or an HTTP-like error. */
 export function readControlErrorCode(error: unknown): string | number | undefined {
   if (error && typeof error === 'object' && 'code' in error) {

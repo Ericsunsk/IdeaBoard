@@ -133,6 +133,7 @@
             :placeholder="MODELS_MESSAGES.gatewayProbePathPlaceholder"
             autocomplete="off"
             :disabled="loading || saving || testing"
+            :loading="testing"
             class="w-full font-mono"
           />
         </div>
@@ -153,7 +154,6 @@
         <template #extra-actions>
           <ActionButton
             variant="outline"
-            :loading="testing"
             :disabled="loading || saving || testing"
             @click="handleTestConnection"
           >
@@ -177,11 +177,7 @@ import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import AdminInput from '../../../shared/components/AdminInput.vue'
 import { formatAdminDisplayError } from '../../../shared/lib/toast'
 import { useAdminGatewayConfigFeedback } from '../../application/useAdminModelCatalogFeedback'
-import { useAdminConfirm } from '../../../shared/composables/useAdminConfirm'
-import {
-  ADMIN_PROBE_OPERATOR_REASON,
-  confirmSettingsSave,
-} from '../../../shared/lib/confirmSettingsSave'
+import { ADMIN_PROBE_OPERATOR_REASON } from '../../../shared/lib/confirmSettingsSave'
 import { MODELS_MESSAGES } from '../pages/messages'
 import {
   createAdminGatewayResource,
@@ -202,7 +198,6 @@ const emit = defineEmits<{
 const defaultResource = createAdminGatewayResource().connection
 const resource = computed(() => props.resource ?? defaultResource)
 const feedback = useAdminGatewayConfigFeedback()
-const adminConfirm = useAdminConfirm()
 
 const summary = ref<GatewayConnectionSummary | null>(null)
 const probeProvider = ref('')
@@ -257,8 +252,8 @@ async function loadGatewayConfig() {
 const handleTestConnection = form.handleSubmit(async (values) => {
   // Server-side probes skip the confirm dialog (backend POST read-guard:
   // no reason ceremony); the fixed probe note still lands on the audit record.
+  // 失败一律走 toast（feedback.testFailed），inline 只留 base_url 表单校验。
   testing.value = true
-  error.value = ''
 
   try {
     const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
@@ -267,7 +262,7 @@ const handleTestConnection = form.handleSubmit(async (values) => {
     const provider = probeProvider.value.trim()
     const path = probePath.value.trim().replace(/^\/+/, '')
     if (!provider || !path) {
-      error.value = MODELS_MESSAGES.gatewayProbeRequired
+      feedback.testFailed(MODELS_MESSAGES.gatewayProbeRequired)
       return
     }
     const res = await resource.value.testConnection(
@@ -282,28 +277,19 @@ const handleTestConnection = form.handleSubmit(async (values) => {
     if (res.success) {
       feedback.testPassed(res.message)
     } else {
-      error.value = res.message || MODELS_MESSAGES.gatewayTestFailed
       feedback.testFailed(res.message)
     }
   } catch (err) {
-    const msg = formatAdminDisplayError(err, MODELS_MESSAGES.gatewayTestFailed)
-    error.value = msg
-    feedback.testFailed(msg)
+    feedback.testFailed(formatAdminDisplayError(err, MODELS_MESSAGES.gatewayTestFailed))
   } finally {
     testing.value = false
   }
 })
 
 const handleSave = form.handleSubmit(async (values) => {
-  // Control writes collect the operator reason through the shared confirm
-  // shell (reversible tier: note optional, empty falls back to a default);
-  // a cancelled dialog aborts the save silently.
-  const operatorReason = await confirmSettingsSave(adminConfirm, {
-    title: MODELS_MESSAGES.gatewaySaveTitle,
-    message: MODELS_MESSAGES.gatewaySaveMessage,
-    confirmLabel: MODELS_MESSAGES.gatewaySaveConfirm,
-  })
-  if (!operatorReason) return
+  // Routine config write (backend ReasonOptional): save directly without
+  // the confirm dialog; the audit records an empty reason.
+  const operatorReason = ''
   saving.value = true
   error.value = ''
 

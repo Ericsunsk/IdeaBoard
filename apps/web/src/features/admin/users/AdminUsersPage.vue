@@ -25,7 +25,7 @@
         @reset="resetUserFilters"
       >
         <label
-          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
         >
           <span>{{ USERS_MESSAGES.role }}</span>
           <AdminSelect
@@ -38,7 +38,7 @@
         </label>
 
         <label
-          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
         >
           <span>{{ USERS_MESSAGES.status }}</span>
           <AdminSelect
@@ -98,7 +98,7 @@
               </div>
               <span
                 class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card"
-                :class="user.isActive ? 'bg-emerald-500' : 'bg-destructive'"
+                :class="user.isActive ? 'bg-success' : 'bg-destructive'"
               />
             </div>
             <span class="truncate font-medium text-foreground" :title="user.displayName">
@@ -164,10 +164,10 @@
         </template>
       </AdminColumn>
 
-      <!-- 角色列：语义化 Badge 徽标 -->
+      <!-- 角色列（方案 A：载体统一 AdminStatusPill，非状态徽标亦收口） -->
       <AdminColumn field="role" :header="USERS_MESSAGES.role" :style="{ width: '105px' }">
         <template #body="{ data: user }">
-          <AdminBadge :value="user.roleLabel" :severity="user.roleSeverity" rounded />
+          <AdminStatusPill :label="user.roleLabel" :variant="user.roleVariant" size="small" />
         </template>
       </AdminColumn>
 
@@ -190,10 +190,10 @@
         </template>
       </AdminColumn>
 
-      <!-- 状态列：语义化 Badge 状态 -->
+      <!-- 状态列（方案 A：载体统一 AdminStatusPill，正常 success / 封禁 danger） -->
       <AdminColumn field="status" :header="USERS_MESSAGES.status" :style="{ width: '105px' }">
         <template #body="{ data: user }">
-          <AdminBadge :value="user.statusLabel" :severity="user.statusSeverity" rounded />
+          <AdminStatusPill :label="user.statusLabel" :variant="user.statusVariant" size="small" />
         </template>
       </AdminColumn>
 
@@ -256,13 +256,12 @@
     :user="walletDialogUser"
     @refresh-users="loadUsers"
   />
-
 </template>
 
 <script setup lang="ts">
 import { Discord, Globe, Google, Mail, MoreHoriz, Refresh } from '@iconoir/vue'
 import { computed, ref } from 'vue'
-import AdminBadge from '../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
 import AdminButton from '../shared/components/AdminButton.vue'
 import AdminCollectionPageShell from '../shared/components/AdminCollectionPageShell.vue'
 import AdminColumn from '../shared/components/AdminColumn.vue'

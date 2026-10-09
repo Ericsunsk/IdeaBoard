@@ -63,8 +63,8 @@ describe('adminSelectSkin', () => {
   })
 
   it('stacks every overlay at the same z-index', () => {
-    expect(adminSelectContentClass).toContain('z-50')
-    expect(adminSelectPanelClass).toContain('z-50')
+    expect(adminSelectContentClass).toContain('z-admin-dialog')
+    expect(adminSelectPanelClass).toContain('z-admin-dialog')
   })
 
   it('detaches every overlay from its trigger by one distance', () => {

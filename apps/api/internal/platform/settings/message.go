@@ -14,6 +14,8 @@ const (
 	msgNormalizeOutboundAllowHost5    = "allow_hosts 包含无效 hostname"                           // NormalizeOutboundAllowHost @ outbound_policy.go
 	msgUpdateRateLimit                = "window_seconds 必须在 1 到 3600 秒之间"                     // UpdateRateLimit @ runtime_settings.go
 	msgUpdateRateLimit2               = "max_requests 必须在 1 到 10000 之间"                       // UpdateRateLimit @ runtime_settings.go
+	msgUpdateLoginLockout             = "threshold 必须在 3 到 100 之间"                            // UpdateLoginLockout @ runtime_settings.go
+	msgUpdateLoginLockout2            = "duration_seconds 必须在 60 到 86400 秒之间"                 // UpdateLoginLockout @ runtime_settings.go
 	msgNormalizeMediaUploadSetting    = "upload_max_concurrent 必须在 1 到 64 之间"                 // NormalizeMediaUploadSetting @ runtime_settings.go
 	msgNormalizeBranding              = "project_name 不能为空"                                   // NormalizeBranding @ runtime_settings.go
 	msgNormalizeBranding2             = "project_name 不能超过 40 个字符"                            // NormalizeBranding @ runtime_settings.go

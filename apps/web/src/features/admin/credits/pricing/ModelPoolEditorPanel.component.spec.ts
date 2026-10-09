@@ -200,6 +200,20 @@ describe('ModelPoolEditorPanel', () => {
     ])
   })
 
+  it('reserves one error line per row so validation cannot shift rows', async () => {
+    const { user } = renderPanel({
+      entries: [{ modelId: 'a/first', enabled: true, resolutions: [] }],
+    })
+
+    // 错误行恒占位：无错误时留空盒，校验出现只填文本、不增删节点。
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveClass('min-h-4')
+    expect(alert).toHaveTextContent('')
+
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    expect(await screen.findByText('启用的模型至少需要一个分辨率')).toBeVisible()
+  })
+
   it('shows mutation errors and offers reload on stale versions', async () => {
     renderPanel({ errorMessage: '保存模型池失败', stale: true })
 

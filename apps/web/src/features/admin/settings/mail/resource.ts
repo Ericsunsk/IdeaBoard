@@ -1,10 +1,10 @@
 import {
   buildControlMutationHeaders,
-  requireOperatorReason,
+  buildRoutineControlMutationHeaders,
   type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import type { ControlMailConfigRequest } from '../../../../shared/api/generated-query/control/model/controlMailConfigRequest'
-import { loadControlSetting, storeControlSetting } from '../../shared/lib/controlResource'
+import { loadControlSetting } from '../../shared/lib/controlResource'
 import {
   deleteControlMailSetting,
   getControlMailSetting,
@@ -60,14 +60,20 @@ async function updateMailConfig(
   input: MailConfigUpdate,
   options: MailConfigMutationOptions,
 ): Promise<MailConfigSummary> {
-  return storeControlSetting(input, options, {
-    fallback: '保存邮件配置失败',
-    domainMessages: MAIL_CONTROL_MESSAGES,
-    map: (summary: MailConfigSummary) => summary,
-    toRequest: (update: MailConfigUpdate, reason: string) => ({ ...update, reason }),
-    persist: (body, headers) =>
-      updateControlMailSetting(body as ControlMailConfigRequest, { headers }),
-  })
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const operatorReason = options.operatorReason.trim()
+  try {
+    const body = await updateControlMailSetting(
+      { ...input, reason: operatorReason } as ControlMailConfigRequest,
+      {
+        headers: buildRoutineControlMutationHeaders(options),
+      },
+    )
+    return requireContractData<MailConfigSummary>(body, '保存邮件配置失败')
+  } catch (error) {
+    throw withControlCopy(error, '保存邮件配置失败', MAIL_CONTROL_MESSAGES)
+  }
 }
 
 async function clearMailConfig(options: MailConfigMutationOptions): Promise<void> {
@@ -85,11 +91,15 @@ async function testMailConfig(
   recipient: string,
   options: MailConfigMutationOptions,
 ): Promise<void> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+  // Routine probe (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const operatorReason = options.operatorReason.trim()
   try {
     const body = await testControlMailSetting(
       { recipient, reason: operatorReason },
-      { headers: buildControlMutationHeaders(options) },
+      {
+        headers: buildRoutineControlMutationHeaders(options),
+      },
     )
     requireContractData<{ sent?: boolean | undefined }>(body, '测试邮件发送失败')
   } catch (error) {

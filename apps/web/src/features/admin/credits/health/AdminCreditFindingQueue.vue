@@ -135,11 +135,10 @@
           :style="{ width: '18%', minWidth: '140px' }"
         >
           <template #body="{ data }">
-            <AdminBadge
-              :value="getFindingRiskPresentation(data).label"
-              :severity="getFindingRiskPresentation(data).severity"
-              :class="adminCompactTagClass"
-              rounded
+            <AdminStatusPill
+              :label="getFindingRiskPresentation(data).label"
+              :variant="getFindingRiskPresentation(data).variant"
+              size="small"
             />
           </template>
         </AdminColumn>
@@ -205,39 +204,39 @@
   >
     <div v-if="selectedFinding" class="flex min-w-0 flex-col gap-6 px-6 py-5">
       <section class="min-w-0">
-        <div class="text-admin-title font-[760] text-foreground">
+        <div class="text-admin-title font-admin-display text-foreground">
           {{ getFindingTypePresentation(selectedFinding.finding_type).title }}
         </div>
         <p class="mt-2 mb-0 text-admin-body leading-6 text-muted-foreground">
           {{ getFindingTypePresentation(selectedFinding.finding_type).summary }}
         </p>
-        <AdminBadge
+        <AdminStatusPill
           class="mt-3"
-          :value="getFindingRiskPresentation(selectedFinding).label"
-          :severity="getFindingRiskPresentation(selectedFinding).severity"
-          rounded
+          :label="getFindingRiskPresentation(selectedFinding).label"
+          :variant="getFindingRiskPresentation(selectedFinding).variant"
+          size="small"
         />
       </section>
 
       <section class="grid gap-x-5 gap-y-4 border-y border-border py-5 sm:grid-cols-2">
         <div>
-          <div class="text-admin-caption font-[700] text-muted-foreground">
+          <div class="text-admin-caption font-bold text-muted-foreground">
             {{ CREDIT_HEALTH_MESSAGES.queueSubjectColumn }}
           </div>
-          <div class="mt-1 break-all text-admin-body font-[680] text-foreground">
+          <div class="mt-1 break-all text-admin-body font-admin-emphasis text-foreground">
             {{ selectedFinding.subject_type }} · {{ selectedFinding.subject_id }}
           </div>
         </div>
         <div>
-          <div class="text-admin-caption font-[700] text-muted-foreground">
+          <div class="text-admin-caption font-bold text-muted-foreground">
             {{ CREDIT_HEALTH_MESSAGES.queueDrawerOccurrences }}
           </div>
-          <div class="mt-1 font-mono text-admin-body font-[680] text-foreground">
+          <div class="mt-1 font-mono text-admin-body font-admin-emphasis text-foreground">
             {{ selectedFinding.occurrence_count }}
           </div>
         </div>
         <div>
-          <div class="text-admin-caption font-[700] text-muted-foreground">
+          <div class="text-admin-caption font-bold text-muted-foreground">
             {{ CREDIT_HEALTH_MESSAGES.queueDrawerFirstSeen }}
           </div>
           <div class="mt-1 font-mono text-admin-body text-foreground">
@@ -245,7 +244,7 @@
           </div>
         </div>
         <div>
-          <div class="text-admin-caption font-[700] text-muted-foreground">
+          <div class="text-admin-caption font-bold text-muted-foreground">
             {{ CREDIT_HEALTH_MESSAGES.queueLastSeenColumn }}
           </div>
           <div class="mt-1 font-mono text-admin-body text-foreground">
@@ -253,7 +252,7 @@
           </div>
         </div>
         <div v-if="selectedFinding.resolved_at">
-          <div class="text-admin-caption font-[700] text-muted-foreground">
+          <div class="text-admin-caption font-bold text-muted-foreground">
             {{ CREDIT_HEALTH_MESSAGES.queueDrawerResolvedAt }}
           </div>
           <div class="mt-1 font-mono text-admin-body text-foreground">
@@ -263,17 +262,17 @@
       </section>
 
       <section v-if="selectedFinding.wallet_public_id">
-        <div class="text-admin-caption font-[700] text-muted-foreground">
+        <div class="text-admin-caption font-bold text-muted-foreground">
           {{ CREDIT_HEALTH_MESSAGES.queueDrawerWallet }}
         </div>
-        <div class="mt-2 text-admin-body font-[680] text-foreground">
+        <div class="mt-2 text-admin-body font-admin-emphasis text-foreground">
           Wallet ·
           {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
         </div>
       </section>
 
       <section class="min-w-0">
-        <div class="text-admin-caption font-[700] text-muted-foreground">
+        <div class="text-admin-caption font-bold text-muted-foreground">
           {{ CREDIT_HEALTH_MESSAGES.queueDrawerDetails }}
         </div>
         <dl v-if="detailEntries.length > 0" class="mt-2 grid min-w-0 gap-2">
@@ -282,7 +281,7 @@
             :key="entry.key"
             class="min-w-0 rounded-lg border border-border bg-muted/50 px-3 py-2.5"
           >
-            <dt class="text-admin-caption font-[700] text-muted-foreground">
+            <dt class="text-admin-caption font-bold text-muted-foreground">
               {{ entry.key }}
             </dt>
             <dd
@@ -298,7 +297,7 @@
       </section>
 
       <section class="min-w-0">
-        <div class="text-admin-caption font-[700] text-muted-foreground">Fingerprint</div>
+        <div class="text-admin-caption font-bold text-muted-foreground">Fingerprint</div>
         <div
           class="mt-2 break-all rounded-lg border border-border bg-muted/50 px-3 py-2.5 font-mono text-admin-caption leading-5 text-muted-foreground"
         >
@@ -313,7 +312,7 @@
 import { computed, ref, watch } from 'vue'
 import { Eye, Refresh } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminMono from '../../shared/components/AdminMono.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
@@ -326,7 +325,6 @@ import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollec
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { adminPolling } from '../../../../shared/query/queryDefaults'
 import {
-  adminCompactTagClass,
   adminFramedIconButtonClass,
   adminTableCardClass,
   adminTableClass,

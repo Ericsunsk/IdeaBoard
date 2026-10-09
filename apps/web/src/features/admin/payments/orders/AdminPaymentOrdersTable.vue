@@ -65,10 +65,10 @@
       :style="{ width: '120px' }"
     >
       <template #body="{ data }">
-        <AdminBadge
-          :value="getStripeStatusLabel(data.stripeStatus)"
-          :severity="stripeStatusSeverity(data.stripeStatus)"
-          rounded
+        <AdminStatusPill
+          :label="getStripeStatusLabel(data.stripeStatus)"
+          :variant="stripeStatusVariant(data.stripeStatus)"
+          size="small"
         />
       </template>
     </AdminColumn>
@@ -79,21 +79,21 @@
       :style="{ width: '120px' }"
     >
       <template #body="{ data }">
-        <AdminBadge
-          :value="getCreditStatusLabel(data.creditStatus)"
-          :severity="creditStatusSeverity(data.creditStatus)"
-          rounded
+        <AdminStatusPill
+          :label="getCreditStatusLabel(data.creditStatus)"
+          :variant="creditStatusVariant(data.creditStatus)"
+          size="small"
         />
       </template>
     </AdminColumn>
 
     <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.anomalyColumn" :style="{ width: '110px' }">
       <template #body="{ data }">
-        <AdminBadge
+        <AdminStatusPill
           v-if="data.anomalousAt"
-          :value="PAYMENT_ORDERS_MESSAGES.anomalyBadge"
-          severity="danger"
-          rounded
+          :label="PAYMENT_ORDERS_MESSAGES.anomalyBadge"
+          variant="danger"
+          size="small"
         />
         <span v-else class="text-xs text-muted-foreground">{{ ADMIN_NUMERIC_EMPTY }}</span>
       </template>
@@ -137,7 +137,9 @@
 
 <script setup lang="ts">
 import { Eye } from '@iconoir/vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminStatusPill, {
+  type AdminStatusPillVariant,
+} from '../../shared/components/AdminStatusPill.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminMono from '../../shared/components/AdminMono.vue'
@@ -169,16 +171,16 @@ defineProps<{
 
 const emit = defineEmits<{ 'open-detail': [publicOrderNumber: string] }>()
 
-function stripeStatusSeverity(status: string) {
+function stripeStatusVariant(status: string): AdminStatusPillVariant {
   if (status === 'paid') return 'success'
   if (status === 'payment_failed') return 'danger'
-  if (status === 'open' || status === 'async_payment_pending') return 'warn'
-  return 'secondary'
+  if (status === 'open' || status === 'async_payment_pending') return 'warning'
+  return 'neutral'
 }
 
-function creditStatusSeverity(status: string) {
+function creditStatusVariant(status: string): AdminStatusPillVariant {
   if (status === 'credited') return 'success'
-  if (status === 'pending') return 'warn'
-  return 'secondary'
+  if (status === 'pending') return 'warning'
+  return 'neutral'
 }
 </script>

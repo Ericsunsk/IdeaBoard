@@ -289,15 +289,21 @@ function trimNumber(value: number): string {
 }
 
 // 提供商徽标单源：AddDialog 行徽标唯一出处。
+// workers/openai/google 沿用 warning/success/info 语义载体（只换载体值，不动语义）；
+// fal/anthropic/deepseek/groq 无语义等价色，走 provider 品牌 token（soft/border 经透明档派生）。
 export function modelProviderBadgeClass(provider: string): string {
   const p = (provider || '').toLowerCase()
-  if (p.includes('workers')) return 'bg-amber-50 text-amber-700 border border-amber-200'
-  if (p.includes('openai')) return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-  if (p.includes('fal')) return 'bg-purple-50 text-purple-700 border border-purple-200'
-  if (p.includes('anthropic')) return 'bg-orange-50 text-orange-700 border border-orange-200'
-  if (p.includes('deepseek')) return 'bg-blue-50 text-blue-700 border border-blue-200'
+  if (p.includes('workers')) return 'bg-warning-soft text-warning border border-warning/20'
+  if (p.includes('openai')) return 'bg-success-soft text-success border border-success/20'
+  if (p.includes('fal'))
+    return 'bg-provider-purple/10 text-provider-purple border border-provider-purple/20'
+  if (p.includes('anthropic'))
+    return 'bg-provider-orange/10 text-provider-orange border border-provider-orange/20'
+  if (p.includes('deepseek'))
+    return 'bg-provider-blue/10 text-provider-blue border border-provider-blue/20'
   if (p.includes('google') || p.includes('vertex'))
-    return 'bg-sky-50 text-sky-700 border border-sky-200'
-  if (p.includes('groq')) return 'bg-rose-50 text-rose-700 border border-rose-200'
+    return 'bg-info-soft text-info border border-info/20'
+  if (p.includes('groq'))
+    return 'bg-provider-rose/10 text-provider-rose border border-provider-rose/20'
   return 'bg-muted text-muted-foreground border border-border'
 }

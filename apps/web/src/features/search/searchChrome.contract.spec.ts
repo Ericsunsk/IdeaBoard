@@ -9,6 +9,7 @@ const searchPage = readSource('presentation/pages/SearchPage.vue')
 const searchStyles = readSource('presentation/search.css')
 const searchSavePopover = readSource('presentation/components/SearchSavePopover.vue')
 const searchBatchActionDock = readSource('presentation/components/SearchBatchActionDock.vue')
+const searchResultCard = readSource('presentation/components/SearchResultCard.vue')
 
 describe('Search page chrome contract', () => {
   it('uses the shared page chrome surface without a Search-only background layer', () => {
@@ -38,5 +39,16 @@ describe('Search page chrome contract', () => {
     expect(searchStyles).toContain('margin-block-start: var(--spacing-overlay-gutter)')
     expect(searchStyles).toContain("[data-side='top']")
     expect(searchSavePopover).not.toContain('positionPopoverAbove')
+  })
+
+  it('sources image overlay action fills from app overlay-btn tokens', () => {
+    expect(searchStyles).toContain(
+      '--search-overlay-btn-bg: var(--color-overlay-btn-bg, rgba(0, 0, 0, 0.42))',
+    )
+    expect(searchStyles).toContain(
+      '--search-overlay-btn-bg-hover: var(--color-overlay-btn-bg-hover, rgba(0, 0, 0, 0.68))',
+    )
+    expect(searchResultCard).toContain('var(--search-overlay-btn-bg)')
+    expect(searchResultCard).toContain('var(--search-overlay-btn-bg-hover)')
   })
 })

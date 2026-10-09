@@ -6,7 +6,7 @@
       <span class="text-admin-body font-medium text-muted-foreground tracking-normal">
         {{ label }}
       </span>
-      <span class="text-admin-modal-title font-[780] text-foreground leading-[1.05]">
+      <span class="text-admin-modal-title font-admin-display text-foreground leading-[1.05]">
         {{ value }}
       </span>
     </div>

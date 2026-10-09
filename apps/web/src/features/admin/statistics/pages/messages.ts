@@ -12,6 +12,5 @@ export const STATISTICS_MESSAGES = {
   trendTitle: '调用量与消耗趋势',
   riskMatrixTitle: '模型风险矩阵',
   qualityTrendTitle: '服务质量趋势',
-  bottleneckTitle: '瓶颈来源',
   loadFailed: '加载统计数据失败',
 } as const

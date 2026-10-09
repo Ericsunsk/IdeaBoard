@@ -28,7 +28,7 @@
         @reset="resetStatusFilter"
       >
         <label
-          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
         >
           <span>{{ REWARD_CODES_MESSAGES.activeStateLabel }}</span>
           <AdminSelect v-model="statusFilter" :options="statusOptions" size="small" />
@@ -68,7 +68,7 @@
 
     <AdminTable
       v-if="!initialError"
-      :value="rewardCodes"
+      :value="displayRewardCodes"
       :loading="loading"
       data-key="id"
       scrollable
@@ -113,27 +113,25 @@
         </template>
       </AdminColumn>
 
-      <!-- 状态列：Badge + 开关 -->
+      <!-- 状态列（载体统一 AdminStatusPill；启用只用开关，胶囊保留生命周期） -->
       <AdminColumn
         field="status"
         :header="REWARD_CODES_MESSAGES.statusColumn"
         :style="{ width: '180px' }"
       >
         <template #body="{ data }">
-          <div class="flex items-center gap-3">
-            <AdminBadge
-              :value="statusPresentation(data.status).label"
-              :severity="statusPresentation(data.status).severity"
-              rounded
-            />
-            <AdminSwitch
-              :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
-              :model-value="data.enabled"
-              :disabled="Boolean(enabledPending[data.id])"
-              :aria-label="REWARD_CODES_MESSAGES.enabledAria(data.displayName)"
-              @update:model-value="setRewardCodeEnabled(data, $event)"
-            />
-          </div>
+          <!-- 防抖行收口到 SwitchRow：68px status 槽锁宽 + switch 固定位，不绑 key。 -->
+          <SwitchRow
+            :pill="statusPresentation(data.status).label"
+            :pill-variant="statusPresentation(data.status).variant"
+            status-min-width="68px"
+            :model-value="data.enabled"
+            :switch-attrs="{
+              disabled: enabledToggle.isPending(data.id),
+              'aria-label': REWARD_CODES_MESSAGES.enabledAria(data.displayName),
+            }"
+            @update:model-value="setRewardCodeEnabled(data, $event)"
+          />
         </template>
       </AdminColumn>
 
@@ -208,16 +206,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { MoreHoriz, Refresh } from '@iconoir/vue'
 import AdminCollectionPageShell from '../../shared/components/AdminCollectionPageShell.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import type { AdminStatusPillVariant } from '../../shared/components/AdminStatusPill.vue'
+import SwitchRow from '../../shared/components/SwitchRow.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSelect from '../../shared/components/AdminSelect.vue'
-import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleDate } from '../../../../shared/i18n/formatters'
@@ -234,6 +232,7 @@ import {
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
 import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../../shared/lib/tableColumns'
+import { reconcileStableRows } from '../../shared/lib/reconcileStableRows'
 import RewardCodeFormDialog, { type RewardCodeFormSubmit } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
@@ -270,8 +269,51 @@ const {
   clearSearch,
   resetStatusFilter,
 } = useRewardCodeList({ resource })
-const { enabledPending, deletePending, replaceRewardCode, setRewardCodeEnabled, confirmDelete } =
-  useRewardCodeRowActions({ resource, updateRewardCodes, refreshRewardCodes })
+const {
+  toggle: enabledToggle,
+  deletePending,
+  replaceRewardCode,
+  setRewardCodeEnabled,
+  confirmDelete,
+} = useRewardCodeRowActions({ resource, updateRewardCodes, refreshRewardCodes })
+
+// 行开关乐观投影 + 引用稳定：enabled 走共享 toggle.effective 即时翻转，
+// status 胶囊四态仍取服务端 status（投影不碰 status）；内容一致复用旧引用，
+// data-key="id" 保证行 DOM 复用不 remount。
+const rewardRowCache = new Map<number, RewardCode>()
+
+function isSameRewardRow(cached: RewardCode, incoming: RewardCode): boolean {
+  return (
+    cached.id === incoming.id &&
+    cached.displayName === incoming.displayName &&
+    cached.maskedCodeHint === incoming.maskedCodeHint &&
+    cached.creditAmount === incoming.creditAmount &&
+    cached.maxRedemptions === incoming.maxRedemptions &&
+    cached.redemptionCount === incoming.redemptionCount &&
+    cached.expiresAt === incoming.expiresAt &&
+    cached.enabled === incoming.enabled &&
+    cached.status === incoming.status &&
+    cached.createdAt === incoming.createdAt &&
+    cached.updatedAt === incoming.updatedAt
+  )
+}
+
+const displayRewardCodes = computed(() => {
+  const projected = rewardCodes.value.map((row) => ({
+    ...row,
+    enabled: enabledToggle.effective(row.id, row.enabled),
+  }))
+  return reconcileStableRows(rewardRowCache, projected, (row) => row.id, isSameRewardRow)
+})
+
+// 服务端追上乐观值后清掉覆盖，避免长期遮挡外部变更；不等则保留。
+watch(
+  rewardCodes,
+  (rows) => {
+    enabledToggle.reconcileAll(rows.map((row) => ({ key: row.id, enabled: row.enabled })))
+  },
+  { deep: true },
+)
 const toast = useAdminToast()
 const saving = ref(false)
 const saveError = ref('')
@@ -303,20 +345,14 @@ function openCreateDialog() {
   createDialogVisible.value = true
 }
 
-async function confirmRewardCodeSave(editing: RewardCode | null, displayName: string) {
-  // Reward code create/update is reversible config: the note is optional
-  // and an empty field falls back to a default so one click proceeds.
-  // Returns null only when the operator cancels.
+async function confirmRewardCodeCreate(displayName: string) {
+  // Reward code create keeps its confirm dialog (required reason); update
+  // is a routine config write (backend ReasonOptional) and never calls
+  // this. Returns null only when the operator cancels.
   return confirmSettingsSave(confirm, {
-    title: editing
-      ? REWARD_CODES_MESSAGES.confirmUpdateTitle
-      : REWARD_CODES_MESSAGES.confirmCreateTitle,
-    message: editing
-      ? REWARD_CODES_MESSAGES.confirmUpdateMessage(editing.displayName)
-      : REWARD_CODES_MESSAGES.confirmCreateMessage(displayName),
-    confirmLabel: editing
-      ? REWARD_CODES_MESSAGES.confirmUpdate
-      : REWARD_CODES_MESSAGES.confirmCreate,
+    title: REWARD_CODES_MESSAGES.confirmCreateTitle,
+    message: REWARD_CODES_MESSAGES.confirmCreateMessage(displayName),
+    confirmLabel: REWARD_CODES_MESSAGES.confirmCreate,
   })
 }
 
@@ -358,8 +394,14 @@ async function persistRewardCode(
 async function saveRewardCode(input: RewardCodeFormSubmit) {
   if (saving.value) return
   const editing = editingRewardCode.value
-  const operatorReason = await confirmRewardCodeSave(editing, input.displayName)
-  if (!operatorReason) return
+  // Reward code update is a routine config write (backend ReasonOptional):
+  // save directly with an empty reason. Create keeps its confirm dialog.
+  let operatorReason = ''
+  if (!editing) {
+    const created = await confirmRewardCodeCreate(input.displayName)
+    if (!created) return
+    operatorReason = created
+  }
   saving.value = true
   saveError.value = ''
   try {
@@ -423,16 +465,19 @@ function formatExpiresAt(value?: string): string {
   })
 }
 
-function statusPresentation(status: RewardCode['status']) {
+function statusPresentation(status: RewardCode['status']): {
+  label: string
+  variant: AdminStatusPillVariant
+} {
   switch (status) {
     case 'expired':
-      return { label: REWARD_CODES_MESSAGES.statusExpired, severity: 'secondary' as const }
+      return { label: REWARD_CODES_MESSAGES.statusExpired, variant: 'neutral' }
     case 'exhausted':
-      return { label: REWARD_CODES_MESSAGES.statusExhausted, severity: 'warn' as const }
+      return { label: REWARD_CODES_MESSAGES.statusExhausted, variant: 'warning' }
     case 'disabled':
-      return { label: REWARD_CODES_MESSAGES.statusDisabled, severity: 'secondary' as const }
+      return { label: REWARD_CODES_MESSAGES.statusDisabled, variant: 'neutral' }
     case 'enabled':
-      return { label: REWARD_CODES_MESSAGES.statusEnabled, severity: 'success' as const }
+      return { label: REWARD_CODES_MESSAGES.statusEnabled, variant: 'success' }
   }
 }
 </script>

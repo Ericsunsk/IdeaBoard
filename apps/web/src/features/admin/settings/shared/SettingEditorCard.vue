@@ -33,15 +33,8 @@
           {{ description }}
         </span>
       </div>
-      <div v-if="$slots['header-actions'] || status" class="flex shrink-0 items-center gap-2">
+      <div v-if="$slots['header-actions']" class="flex shrink-0 items-center gap-2">
         <slot name="header-actions" />
-        <AdminBadge
-          v-if="status"
-          :value="status"
-          class="shrink-0"
-          :severity="statusSeverity"
-          rounded
-        />
       </div>
     </div>
 
@@ -72,7 +65,6 @@
 
 <script setup lang="ts">
 import type { Component, HTMLAttributes } from 'vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(
@@ -81,17 +73,13 @@ const props = withDefaults(
     description?: string | undefined
     icon?: Component | undefined
     plain?: boolean | undefined
-    status?: string | undefined
-    statusSeverity?: 'danger' | 'info' | 'secondary' | 'success' | 'warn' | undefined
     title: string
   }>(),
   {
     plain: false,
-    statusSeverity: 'secondary',
     class: undefined,
     description: undefined,
     icon: undefined,
-    status: undefined,
   },
 )
 </script>

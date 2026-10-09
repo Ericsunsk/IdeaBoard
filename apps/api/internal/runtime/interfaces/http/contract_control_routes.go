@@ -5,13 +5,14 @@ package httpapi
 // RegisterContractControlRoutes mounts the full Control Plane surface on
 // the group: dedicated contract-envelope handlers for users, workspaces,
 // billing, credits, payments, tasks, and platform settings, plus guarded
-// adapters over the legacy admin handlers for ai-gateway, storage, search
-// providers, feature prompts, monitor/statistics, brand-logo overrides,
-// and rewards (single-sourced validation and side effects; the
-// control-facing render layer translates every proxied response into the
-// contract envelope at the boundary, parent #809). Unknown control paths
-// fail closed with 501. There is NO task creation route here by design.
-// Legacy /api/admin/* registration is untouched.
+// adapters over the reused platform-config handler methods for ai-gateway,
+// storage, search providers, feature prompts, monitor/statistics,
+// brand-logo overrides, and rewards (single-sourced validation and side
+// effects; the control-facing render layer translates every proxied
+// response into the contract envelope at the boundary, parent #809).
+// Unknown control paths fail closed with 501. There is NO task creation
+// route here by design. Legacy /api/admin/* routes were removed in #809
+// (hard cut); only their handler methods are reused under the guard.
 
 import (
 	"net/http"
@@ -106,13 +107,13 @@ func (d *ContractControlDeps) registerControlBillingRoutes(control *gin.RouterGr
 	control.POST("/billing/catalog/:sku/prices", d.guard(ControlCapabilityBilling,
 		controlRoute{Operation: "billing.publish_prices", Route: "POST /billing/catalog/{sku}/prices", Mutation: true, Target: skuTarget}, d.publishControlCatalogPrices))
 	control.PUT("/billing/catalog/:sku/availability", d.guard(ControlCapabilityBilling,
-		controlRoute{Operation: "billing.set_availability", Route: "PUT /billing/catalog/{sku}/availability", Mutation: true, Target: skuTarget}, d.setControlCatalogAvailability))
+		controlRoute{Operation: "billing.set_availability", Route: "PUT /billing/catalog/{sku}/availability", Mutation: true, ReasonOptional: true, Target: skuTarget}, d.setControlCatalogAvailability))
 	control.DELETE("/billing/catalog/:sku", d.guard(ControlCapabilityBilling,
 		controlRoute{Operation: "billing.delete_item", Route: "DELETE /billing/catalog/{sku}", Mutation: true, Target: skuTarget}, d.deleteControlCatalogItem))
 	control.GET("/billing/catalog/:sku/pool", d.guard(ControlCapabilityBilling,
 		controlRoute{Operation: "billing.get_model_pool", Route: "GET /billing/catalog/{sku}/pool", Target: skuTarget}, d.getControlModelPool))
 	control.PUT("/billing/catalog/:sku/pool", d.guard(ControlCapabilityBilling,
-		controlRoute{Operation: "billing.replace_model_pool", Route: "PUT /billing/catalog/{sku}/pool", Mutation: true, Target: skuTarget}, d.replaceControlModelPool))
+		controlRoute{Operation: "billing.replace_model_pool", Route: "PUT /billing/catalog/{sku}/pool", Mutation: true, ReasonOptional: true, Target: skuTarget}, d.replaceControlModelPool))
 }
 
 func (d *ContractControlDeps) registerControlCreditRoutes(control *gin.RouterGroup) {
@@ -195,7 +196,7 @@ func (d *ContractControlDeps) registerControlPaymentRoutes(control *gin.RouterGr
 	// stays an observer and durable replay (M1 short-claim) prevents a
 	// retry from re-preparing.
 	control.PUT("/payments/providers/:provider", d.guard(ControlCapabilityPayments,
-		controlRoute{Operation: "payments.update_stripe_config", Route: "PUT /payments/providers/{provider}", Mutation: true, Detached: true, Target: providerTarget}, d.updateControlStripeConfig))
+		controlRoute{Operation: "payments.update_stripe_config", Route: "PUT /payments/providers/{provider}", Mutation: true, ReasonOptional: true, Detached: true, Target: providerTarget}, d.updateControlStripeConfig))
 }
 
 func (d *ContractControlDeps) registerControlTaskRoutes(control *gin.RouterGroup) {
@@ -213,26 +214,30 @@ func (d *ContractControlDeps) registerControlOAuthRoutes(control *gin.RouterGrou
 	control.GET("/users/oauth/:provider", d.guard(ControlCapabilityUsers,
 		controlRoute{Operation: "users.get_oauth_provider", Route: "GET /users/oauth/{provider}", Target: providerTarget}, d.getControlOAuthProvider))
 	control.PUT("/users/oauth/:provider", d.guard(ControlCapabilityUsers,
-		controlRoute{Operation: "users.update_oauth_provider", Route: "PUT /users/oauth/{provider}", Mutation: true, Target: providerTarget}, d.updateControlOAuthProvider))
+		controlRoute{Operation: "users.update_oauth_provider", Route: "PUT /users/oauth/{provider}", Mutation: true, ReasonOptional: true, Target: providerTarget}, d.updateControlOAuthProvider))
 }
 
 func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin.RouterGroup) {
 	control.GET("/platform/settings/registration", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_registration", Route: "GET /platform/settings/registration"}, d.getControlRegistrationSetting))
 	control.PUT("/platform/settings/registration", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_registration", Route: "PUT /platform/settings/registration", Mutation: true}, d.updateControlRegistrationSetting))
+		controlRoute{Operation: "platform.update_registration", Route: "PUT /platform/settings/registration", Mutation: true, ReasonOptional: true}, d.updateControlRegistrationSetting))
 	control.GET("/platform/settings/rate-limit", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_rate_limit", Route: "GET /platform/settings/rate-limit"}, d.getControlRateLimitSetting))
 	control.PUT("/platform/settings/rate-limit", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_rate_limit", Route: "PUT /platform/settings/rate-limit", Mutation: true}, d.updateControlRateLimitSetting))
+		controlRoute{Operation: "platform.update_rate_limit", Route: "PUT /platform/settings/rate-limit", Mutation: true, ReasonOptional: true}, d.updateControlRateLimitSetting))
+	control.GET("/platform/settings/login-lockout", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.get_login_lockout", Route: "GET /platform/settings/login-lockout"}, d.getControlLoginLockoutSetting))
+	control.PUT("/platform/settings/login-lockout", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.update_login_lockout", Route: "PUT /platform/settings/login-lockout", Mutation: true, ReasonOptional: true}, d.updateControlLoginLockoutSetting))
 	control.GET("/platform/settings/branding", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_branding", Route: "GET /platform/settings/branding"}, d.getControlBrandingSetting))
 	control.PUT("/platform/settings/branding", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_branding", Route: "PUT /platform/settings/branding", Mutation: true}, d.updateControlBrandingSetting))
+		controlRoute{Operation: "platform.update_branding", Route: "PUT /platform/settings/branding", Mutation: true, ReasonOptional: true}, d.updateControlBrandingSetting))
 	control.GET("/platform/settings/support-channels", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_support_channels", Route: "GET /platform/settings/support-channels"}, d.getControlSupportChannels))
 	control.PUT("/platform/settings/support-channels", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_support_channels", Route: "PUT /platform/settings/support-channels", Mutation: true}, d.updateControlSupportChannels))
+		controlRoute{Operation: "platform.update_support_channels", Route: "PUT /platform/settings/support-channels", Mutation: true, ReasonOptional: true}, d.updateControlSupportChannels))
 	// Branding logo upload is a POST read-guard (the guard cannot buffer
 	// multipart bodies): reason + Idempotency-Key are enforced in-handler
 	// with content-hash replay, and every call is audited.
@@ -241,11 +246,11 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 	control.GET("/platform/settings/media-upload", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_media_upload", Route: "GET /platform/settings/media-upload"}, d.getControlMediaUploadSetting))
 	control.PUT("/platform/settings/media-upload", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_media_upload", Route: "PUT /platform/settings/media-upload", Mutation: true}, d.updateControlMediaUploadSetting))
+		controlRoute{Operation: "platform.update_media_upload", Route: "PUT /platform/settings/media-upload", Mutation: true, ReasonOptional: true}, d.updateControlMediaUploadSetting))
 	control.GET("/platform/settings/outbound-policy", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_outbound_policy", Route: "GET /platform/settings/outbound-policy"}, d.getControlOutboundPolicy))
 	control.PUT("/platform/settings/outbound-policy", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_outbound_policy", Route: "PUT /platform/settings/outbound-policy", Mutation: true}, d.updateControlOutboundPolicy))
+		controlRoute{Operation: "platform.update_outbound_policy", Route: "PUT /platform/settings/outbound-policy", Mutation: true, ReasonOptional: true}, d.updateControlOutboundPolicy))
 	control.GET("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_mail_setting", Route: "GET /platform/settings/mail"}, d.getControlMailSetting))
 	// update/delete_mail_setting are detached: the Auth service owns the
@@ -255,13 +260,14 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 	// observer and durable replay (M1 short-claim) prevents a retry from
 	// re-sending an already-applied update/clear.
 	control.PUT("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.update_mail_setting", Route: "PUT /platform/settings/mail", Mutation: true, Detached: true}, d.updateControlMailSetting))
+		controlRoute{Operation: "platform.update_mail_setting", Route: "PUT /platform/settings/mail", Mutation: true, ReasonOptional: true, Detached: true}, d.updateControlMailSetting))
 	control.DELETE("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.delete_mail_setting", Route: "DELETE /platform/settings/mail", Mutation: true, Detached: true}, d.deleteControlMailSetting))
 	// Mail test sends one probe message via the Auth service (external
 	// HTTP side effect, writes no configuration). It is a detached
-	// mutation: operator reason + header-only Idempotency-Key are
-	// required, same key + same request replays the first 2xx without
+	// mutation: the header-only Idempotency-Key is required and the
+	// operator reason is optional (routine probe, audited as-is when
+	// empty); same key + same request replays the first 2xx without
 	// resending the probe, same key + different request conflicts
 	// (409), and every call is audited with success/failed outcome.
 	// Detached (never the guard-owned DB transaction): the external
@@ -269,13 +275,14 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 	// failures/unknown results re-execute on retry instead of replaying.
 	// A transaction rollback never implies the sent probe was revoked.
 	control.POST("/platform/settings/mail/test", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test", Mutation: true, Detached: true}, d.testControlMailSetting))
+		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test", Mutation: true, ReasonOptional: true, Detached: true}, d.testControlMailSetting))
 }
 
 // registerControlProxiedRoutes mounts the platform-config families that
-// reuse the legacy admin handler methods under the control guard
+// reuse the platform-config handler methods under the control guard
 // (capability control:platform, mandatory audit, header idempotency,
-// operator reason). Every proxied response is translated into the unified
+// operator reason unless the route sets ReasonOptional). Every proxied
+// response is translated into the unified
 // contract envelope at the boundary (parent #809); the binary brand-logo
 // and the SSE monitor stream stay raw protocol exceptions. Every other
 // control guarantee holds uniformly.
@@ -291,11 +298,11 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/platform/ai-gateway", d.controlProxy(
 			controlRoute{Operation: "platform.get_ai_gateway", Route: "GET /platform/ai-gateway"}, ControlCapabilityPlatform, gatewayAvailable, h.Get))
 		control.PUT("/platform/ai-gateway", d.controlProxy(
-			controlRoute{Operation: "platform.update_ai_gateway", Route: "PUT /platform/ai-gateway", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.Update))
+			controlRoute{Operation: "platform.update_ai_gateway", Route: "PUT /platform/ai-gateway", Mutation: true, ReasonOptional: true}, ControlCapabilityPlatform, gatewayAvailable, h.Update))
 		control.GET("/platform/ai-gateway/catalog", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_catalog", Route: "GET /platform/ai-gateway/catalog"}, ControlCapabilityPlatform, gatewayAvailable, h.ListCatalog))
 		control.PUT("/platform/ai-gateway/catalog", d.controlProxy(
-			controlRoute{Operation: "platform.save_ai_gateway_catalog", Route: "PUT /platform/ai-gateway/catalog", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.SaveCatalog))
+			controlRoute{Operation: "platform.save_ai_gateway_catalog", Route: "PUT /platform/ai-gateway/catalog", Mutation: true, ReasonOptional: true}, ControlCapabilityPlatform, gatewayAvailable, h.SaveCatalog))
 		control.GET("/platform/ai-gateway/providers", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_providers", Route: "GET /platform/ai-gateway/providers"}, ControlCapabilityPlatform, gatewayAvailable, h.ListProviders))
 		control.GET("/platform/ai-gateway/detect-models", d.controlProxy(
@@ -321,13 +328,13 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/platform/storage/profiles", d.controlProxy(
 			controlRoute{Operation: "platform.list_storage_profiles", Route: "GET /platform/storage/profiles"}, ControlCapabilityPlatform, storageAvailable, h.ListProfiles))
 		control.POST("/platform/storage/profiles", d.controlProxy(
-			controlRoute{Operation: "platform.create_storage_profile", Route: "POST /platform/storage/profiles", Mutation: true}, ControlCapabilityPlatform, storageAvailable, h.CreateProfile))
+			controlRoute{Operation: "platform.create_storage_profile", Route: "POST /platform/storage/profiles", Mutation: true, ReasonOptional: true}, ControlCapabilityPlatform, storageAvailable, h.CreateProfile))
 		control.PUT("/platform/storage/profiles/:id", d.controlProxy(
-			controlRoute{Operation: "platform.update_storage_profile", Route: "PUT /platform/storage/profiles/{id}", Mutation: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.UpdateProfile))
+			controlRoute{Operation: "platform.update_storage_profile", Route: "PUT /platform/storage/profiles/{id}", Mutation: true, ReasonOptional: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.UpdateProfile))
 		control.DELETE("/platform/storage/profiles/:id", d.controlProxy(
 			controlRoute{Operation: "platform.delete_storage_profile", Route: "DELETE /platform/storage/profiles/{id}", Mutation: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.DeleteProfile))
 		control.POST("/platform/storage/profiles/:id/apply", d.controlProxy(
-			controlRoute{Operation: "platform.apply_storage_profile", Route: "POST /platform/storage/profiles/{id}/apply", Mutation: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.ApplyProfile))
+			controlRoute{Operation: "platform.apply_storage_profile", Route: "POST /platform/storage/profiles/{id}/apply", Mutation: true, ReasonOptional: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.ApplyProfile))
 		control.POST("/platform/storage/profiles/:id/test", d.controlProxy(
 			// Profile test is a connectivity dry-run (no config write), so
 			// it registers as a POST read-guard without reason or
@@ -341,7 +348,7 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/platform/search/providers", d.controlProxy(
 			controlRoute{Operation: "platform.list_search_providers", Route: "GET /platform/search/providers"}, ControlCapabilityPlatform, searchAvailable, h.List))
 		control.PUT("/platform/search/providers/:provider", d.controlProxy(
-			controlRoute{Operation: "platform.update_search_provider", Route: "PUT /platform/search/providers/{provider}", Mutation: true, Target: controlTargetParam("provider", "search_provider")}, ControlCapabilityPlatform, searchAvailable, h.Update))
+			controlRoute{Operation: "platform.update_search_provider", Route: "PUT /platform/search/providers/{provider}", Mutation: true, ReasonOptional: true, Target: controlTargetParam("provider", "search_provider")}, ControlCapabilityPlatform, searchAvailable, h.Update))
 		control.POST("/platform/search/providers/:provider/test", d.controlProxy(
 			// Provider test is a connectivity dry-run (the recorded test
 			// outcome is the probe result itself, not a config write), so
@@ -356,7 +363,7 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/platform/feature-prompts/:slug", d.controlProxy(
 			controlRoute{Operation: "platform.get_feature_prompt", Route: "GET /platform/feature-prompts/{slug}", Target: controlTargetParam("slug", "feature_prompt")}, ControlCapabilityPlatform, promptsAvailable, h.Get))
 		control.PUT("/platform/feature-prompts/:slug", d.controlProxy(
-			controlRoute{Operation: "platform.save_feature_prompt", Route: "PUT /platform/feature-prompts/{slug}", Mutation: true, Target: controlTargetParam("slug", "feature_prompt")}, ControlCapabilityPlatform, promptsAvailable, h.Save))
+			controlRoute{Operation: "platform.save_feature_prompt", Route: "PUT /platform/feature-prompts/{slug}", Mutation: true, ReasonOptional: true, Target: controlTargetParam("slug", "feature_prompt")}, ControlCapabilityPlatform, promptsAvailable, h.Save))
 	}
 	{
 		h := d.Monitor
@@ -371,7 +378,7 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/platform/statistics", d.controlProxy(
 			controlRoute{Operation: "platform.get_statistics", Route: "GET /platform/statistics"}, ControlCapabilityPlatform, monitorAvailable, h.GetStatistics))
 		control.POST("/platform/statistics/backfill", d.controlProxy(
-			controlRoute{Operation: "platform.backfill_statistics", Route: "POST /platform/statistics/backfill", Mutation: true}, ControlCapabilityPlatform, monitorAvailable, h.BackfillStatistics))
+			controlRoute{Operation: "platform.backfill_statistics", Route: "POST /platform/statistics/backfill", Mutation: true, ReasonOptional: true}, ControlCapabilityPlatform, monitorAvailable, h.BackfillStatistics))
 	}
 	{
 		h := d.BrandLogos
@@ -379,7 +386,7 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/platform/brand-logo-overrides", d.controlProxy(
 			controlRoute{Operation: "platform.list_brand_logo_overrides", Route: "GET /platform/brand-logo-overrides"}, ControlCapabilityPlatform, brandLogosAvailable, h.List))
 		control.PUT("/platform/brand-logo-overrides/:scope/:target_key", d.controlProxy(
-			controlRoute{Operation: "platform.upsert_brand_logo_override", Route: "PUT /platform/brand-logo-overrides/{scope}/{target_key}", Mutation: true, Target: controlBrandLogoOverrideTarget}, ControlCapabilityPlatform, brandLogosAvailable, h.Upsert))
+			controlRoute{Operation: "platform.upsert_brand_logo_override", Route: "PUT /platform/brand-logo-overrides/{scope}/{target_key}", Mutation: true, ReasonOptional: true, Target: controlBrandLogoOverrideTarget}, ControlCapabilityPlatform, brandLogosAvailable, h.Upsert))
 		control.DELETE("/platform/brand-logo-overrides/:scope/:target_key", d.controlProxy(
 			controlRoute{Operation: "platform.delete_brand_logo_override", Route: "DELETE /platform/brand-logo-overrides/{scope}/{target_key}", Mutation: true, Target: controlBrandLogoOverrideTarget}, ControlCapabilityPlatform, brandLogosAvailable, h.Delete))
 	}
@@ -400,9 +407,9 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.GET("/rewards/codes/:id/redemptions/:redemption_id", d.controlProxy(
 			controlRoute{Operation: "rewards.get_redemption", Route: "GET /rewards/codes/{id}/redemptions/{redemption_id}", Target: controlTargetParam("redemption_id", "reward_redemption")}, ControlCapabilityCredits, readAvailable, read.GetAdminRedemption))
 		control.PATCH("/rewards/codes/:id", d.controlProxy(
-			controlRoute{Operation: "rewards.update_code", Route: "PATCH /rewards/codes/{id}", Mutation: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.UpdateRewardCode))
+			controlRoute{Operation: "rewards.update_code", Route: "PATCH /rewards/codes/{id}", Mutation: true, ReasonOptional: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.UpdateRewardCode))
 		control.PATCH("/rewards/codes/:id/enabled", d.controlProxy(
-			controlRoute{Operation: "rewards.set_code_enabled", Route: "PATCH /rewards/codes/{id}/enabled", Mutation: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.SetRewardCodeEnabled))
+			controlRoute{Operation: "rewards.set_code_enabled", Route: "PATCH /rewards/codes/{id}/enabled", Mutation: true, ReasonOptional: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.SetRewardCodeEnabled))
 		control.DELETE("/rewards/codes/:id", d.controlProxy(
 			controlRoute{Operation: "rewards.delete_code", Route: "DELETE /rewards/codes/{id}", Mutation: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.DeleteRewardCode))
 	}
@@ -420,7 +427,8 @@ func controlBrandLogoOverrideTarget(c *gin.Context, _ []byte) (string, string) {
 }
 
 // RegisterContractControlRoutesOnEngine mounts the Control Plane group on
-// the engine, replacing the #800 stub group. Legacy routes are untouched.
+// the engine, replacing the #800 stub group. Legacy /api/admin routes stay
+// deleted per the #809 hard cut.
 func RegisterContractControlRoutesOnEngine(r *gin.Engine, authDeps AuthDeps, deps ContractControlDeps) {
 	control := r.Group(ContractControlGroupPath)
 	control.Use(ContractRequestIDMiddleware())

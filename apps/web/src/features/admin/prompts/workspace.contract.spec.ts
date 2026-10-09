@@ -66,7 +66,7 @@ describe('prompt config workspace facade', () => {
         slug: featureSlug,
         prompt: '',
       },
-      { operatorReason: 'prompt review' },
+      { operatorReason: '' },
     )
     expect(feedback.promptSaved).toHaveBeenCalledWith(featureTitle)
     expect(workspace.promptMap[featureSlug]).toBe('')
@@ -118,7 +118,7 @@ describe('prompt config workspace facade', () => {
     const firstSave = workspace.savePrompt(featureSlug)
     const duplicateSave = workspace.savePrompt(featureSlug)
 
-    // Operator-reason collection yields a microtask before the transport call.
+    // The save runs through the async-action gate before the transport call.
     await vi.waitFor(() => expect(workspace.saving[featureSlug]).toBe(true))
     await vi.waitFor(() => expect(mockResource.savePrompt).toHaveBeenCalledOnce())
     await expect(duplicateSave).resolves.toBeNull()
@@ -164,10 +164,6 @@ function createWorkspace() {
   const { runAsyncAction } = useAsyncAction()
   const workspace = createAdminPromptConfigWorkspace({
     feedback,
-    confirm: {
-      confirm: vi.fn().mockResolvedValue(true),
-      readReason: () => 'prompt review',
-    },
     getFeatureTitle: () => featureTitle,
     runAsyncAction,
     resource: mockResource as unknown as AdminPromptConfigResource,

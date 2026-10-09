@@ -19,7 +19,7 @@
         </h2>
       </div>
 
-      <div v-else class="flex w-full min-w-0 items-center justify-between gap-3 pr-6">
+      <div v-else class="flex w-full min-w-0 items-center gap-3 pr-6">
         <div class="flex items-center gap-3">
           <button
             type="button"
@@ -51,13 +51,6 @@
             </p>
           </div>
         </div>
-
-        <AdminBadge
-          v-if="form.isCurrent"
-          :value="STORAGE_MESSAGES.editorCurrentBadge"
-          severity="success"
-          rounded
-        />
       </div>
     </template>
 
@@ -73,7 +66,7 @@
           :class="
             selectedVendorKey === vendor.key
               ? 'border-primary bg-card shadow-xs'
-              : 'border-border bg-card hover:border-primary/60'
+              : 'border-border bg-card hover:border-primary-line-bold'
           "
           :aria-label="vendor.label"
           @click="emit('select-vendor', vendor.key)"
@@ -128,7 +121,7 @@
             <div v-for="field in authFields" :key="field.key" class="flex min-w-0 flex-col gap-1">
               <label
                 :for="`admin-storage-${field.key}`"
-                class="text-admin-meta font-[680] text-muted-foreground"
+                class="text-admin-meta font-admin-emphasis text-muted-foreground"
               >
                 {{ field.label }}
               </label>
@@ -156,7 +149,7 @@
             <div class="flex items-center justify-between">
               <label
                 :for="`admin-storage-${field.key}`"
-                class="text-admin-meta font-[680] text-muted-foreground"
+                class="text-admin-meta font-admin-emphasis text-muted-foreground"
               >
                 {{ field.label }}
               </label>
@@ -165,7 +158,7 @@
                 text
                 size="small"
                 :class="[adminTextButtonClass, '!text-xs font-medium']"
-                :loading="fetching"
+                :disabled="fetching"
                 @click="emit('fetch-bucket-domains')"
               >
                 {{ STORAGE_MESSAGES.editorDetectDomains }}
@@ -181,6 +174,8 @@
                   ? STORAGE_MESSAGES.secretKeptPlaceholder
                   : field.placeholder || STORAGE_MESSAGES.fieldPlaceholder(field.label)
               "
+              :loading="field.key === 'access_domain' && fetching"
+              loading-label="Fetching…"
               @update:model-value="updateConfigValue(field.key, String($event ?? ''))"
             />
 
@@ -245,7 +240,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { DatabaseExport } from '@iconoir/vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'

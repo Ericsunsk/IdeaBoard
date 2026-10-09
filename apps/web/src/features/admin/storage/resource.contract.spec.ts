@@ -112,7 +112,7 @@ describe('createAdminStorageResource', () => {
     ).rejects.toThrow('存储名称已存在')
   })
 
-  it('carries idempotency and operator reason headers on storage mutations', async () => {
+  it('carries the idempotency key without an operator reason on routine storage saves', async () => {
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
       http.post('/api/control/v1/platform/storage/profiles', ({ request }) => {
@@ -129,10 +129,31 @@ describe('createAdminStorageResource', () => {
 
     await resource.saveProfile(
       { payload: makeStoragePayload() },
-      { operatorReason: 'storage review', idempotencyKey: 'storage-1' },
+      { operatorReason: '', idempotencyKey: 'storage-1' },
     )
 
-    expect(seenHeaders).toEqual({ idempotencyKey: 'storage-1', operatorReason: 'storage review' })
+    expect(seenHeaders).toEqual({ idempotencyKey: 'storage-1', operatorReason: null })
+  })
+
+  it('probes storage connections with a routine empty reason while keeping the idempotency key', async () => {
+    let seenHeaders: Record<string, string | null> = {}
+    useMswHandlers(
+      http.post('/api/control/v1/platform/storage/profiles/:id/test', ({ request }) => {
+        seenHeaders = {
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        }
+        return HttpResponse.json({ data: { message: 'tested' } })
+      }),
+    )
+    const resource = createAdminStorageResource()
+
+    // 后端 POST read-guard 非 Mutation：空 reason 合法，与 mail/搜索探针对齐。
+    await expect(
+      resource.testProfile('profile-1', { operatorReason: '', idempotencyKey: 'probe-1' }),
+    ).resolves.toEqual({ message: 'tested' })
+
+    expect(seenHeaders).toEqual({ idempotencyKey: 'probe-1', operatorReason: null })
   })
 
   it('uses the resource fallback when a successful response omits required data', async () => {

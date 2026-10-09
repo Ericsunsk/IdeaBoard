@@ -43,14 +43,19 @@ export function createUsageChartPlugins(theme: UsageChartTheme) {
   ]
 }
 
+/*
+ * Static fallbacks mirror the light token hex behind each readColor() call
+ * (accent/ring, muted-foreground, border ×2, card, foreground) so charts
+ * render the token palette even when CSS vars cannot resolve (SSR/tests).
+ */
 const defaultTheme: UsageChartTheme = {
   accent: '#9278e6',
   accentFill: 'rgba(146, 120, 230, 0.1)',
-  axisText: '#667085',
-  axisLine: '#d7e0eb',
-  grid: '#e7edf4',
+  axisText: '#62626a',
+  axisLine: '#ececec',
+  grid: '#ececec',
   surface: '#ffffff',
-  text: '#1d2939',
+  text: '#313131',
   fontFamily: chartFontFamilyStack,
 }
 

@@ -172,19 +172,52 @@ describe('mail/resource', () => {
     expect(seen?.idempotencyKey).toMatch(/.+/)
   })
 
-  it('refuses to send mutations without an operator reason', async () => {
+  it('sends routine update/test mutations without an operator reason but keeps refusing unaudited clears', async () => {
+    let seenUpdate: { body: unknown; headers: Record<string, string> } | undefined
+    let seenTest: { body: unknown; headers: Record<string, string> } | undefined
+    useMswHandlers(
+      http.put('/api/control/v1/platform/settings/mail', async ({ request }) => {
+        seenUpdate = {
+          body: await request.json(),
+          headers: {
+            idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
+            operatorReason: request.headers.get('X-Operator-Reason') ?? '',
+          },
+        }
+        return HttpResponse.json({ data: summaryPayload })
+      }),
+      http.post('/api/control/v1/platform/settings/mail/test', async ({ request }) => {
+        seenTest = {
+          body: await request.json(),
+          headers: {
+            idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
+            operatorReason: request.headers.get('X-Operator-Reason') ?? '',
+          },
+        }
+        return HttpResponse.json({ data: { sent: true } })
+      }),
+    )
     const resource = createAdminMailConfigResource()
 
-    await expect(
-      resource.update(
-        { from_name: 'IdeaBoard', from_email: 'noreply@example.com' },
-        { operatorReason: '   ' },
-      ),
-    ).rejects.toThrow('需要填写操作原因')
-    await expect(resource.clear({ operatorReason: '' })).rejects.toThrow('需要填写操作原因')
-    await expect(resource.test('ops@example.com', { operatorReason: '' })).rejects.toThrow(
-      '需要填写操作原因',
+    await resource.update(
+      { from_name: 'IdeaBoard', from_email: 'noreply@example.com' },
+      { operatorReason: '   ' },
     )
+    expect(seenUpdate?.body).toEqual({
+      from_name: 'IdeaBoard',
+      from_email: 'noreply@example.com',
+      reason: '',
+    })
+    expect(seenUpdate?.headers.operatorReason).toBe('')
+    expect(seenUpdate?.headers.idempotencyKey).toMatch(/.+/)
+
+    await resource.test('ops@example.com', { operatorReason: '' })
+    expect(seenTest?.body).toEqual({ recipient: 'ops@example.com', reason: '' })
+    expect(seenTest?.headers.operatorReason).toBe('')
+    expect(seenTest?.headers.idempotencyKey).toMatch(/.+/)
+
+    // Mail clear stays enforced (backend 400 without a reason).
+    await expect(resource.clear({ operatorReason: '' })).rejects.toThrow('需要填写操作原因')
   })
 
   it('maps read 403/404/503 to operator copy', async () => {

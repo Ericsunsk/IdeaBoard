@@ -143,7 +143,7 @@ onBeforeUnmount(() => {
   inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--primitive-radius-sm);
   touch-action: none;
   cursor: none;
 }
@@ -153,7 +153,7 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   z-index: 4;
-  color: rgb(122, 107, 213);
+  color: var(--canvas-accent-hover);
   opacity: 0;
   pointer-events: none;
   stroke-width: 0.8;

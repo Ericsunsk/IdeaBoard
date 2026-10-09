@@ -129,7 +129,7 @@ describe('Admin System Settings adapters', () => {
       }),
     )
     const feedback = createBrandingFeedback()
-    const harness = mountComposable(() => useBrandingSettings({ feedback, confirm: testConfirm() }))
+    const harness = mountComposable(() => useBrandingSettings({ feedback }))
 
     try {
       await vi.waitFor(() => expect(harness.value.form.value.project_name).toBe('IdeaBoard'))
@@ -187,6 +187,11 @@ describe('Admin System Settings adapters', () => {
           data: { window_seconds: 60, max_requests: 120 },
         }),
       ),
+      http.get('/api/control/v1/platform/settings/login-lockout', () =>
+        HttpResponse.json({
+          data: { threshold: 10, duration_seconds: 900 },
+        }),
+      ),
       http.put('/api/control/v1/platform/settings/rate-limit', async ({ request }) => {
         const body = await request.json()
         rateLimitRequests.push(body)
@@ -198,7 +203,7 @@ describe('Admin System Settings adapters', () => {
       }),
     )
     const feedback = createAccessFeedback()
-    const harness = mountComposable(() => useAccessSettings({ feedback, confirm: testConfirm() }))
+    const harness = mountComposable(() => useAccessSettings({ feedback }))
 
     try {
       await vi.waitFor(() => expect(harness.value.rateLimitForm.value.window_seconds).toBe(60))
@@ -215,13 +220,13 @@ describe('Admin System Settings adapters', () => {
       await expect(harness.value.saveRateLimit()).resolves.toBe(true)
       expect(rateLimitRequests).toEqual([{ window_seconds: 60, max_requests: 240 }])
       expect(rateLimitHeaders[0]?.idempotencyKey).toMatch(/.+/)
-      expect(rateLimitHeaders[0]?.operatorReason).toBe('lifecycle review')
+      expect(rateLimitHeaders[0]?.operatorReason).toBeNull()
       expect(feedback.rateLimitSaved).toHaveBeenCalledOnce()
 
       await harness.value.handleToggleRegistration(true)
       expect(registrationRequests).toEqual([{ enabled: true }])
       expect(registrationHeaders[0]?.idempotencyKey).toMatch(/.+/)
-      expect(registrationHeaders[0]?.operatorReason).toBe('lifecycle review')
+      expect(registrationHeaders[0]?.operatorReason).toBeNull()
       expect(harness.value.registrationEnabled.value).toBe(true)
       expect(feedback.registrationUpdated).toHaveBeenCalledWith(true)
     } finally {
@@ -237,6 +242,9 @@ describe('Admin System Settings adapters', () => {
       http.get('/api/control/v1/platform/settings/rate-limit', () =>
         HttpResponse.json({ data: { window_seconds: 60, max_requests: 120 } }),
       ),
+      http.get('/api/control/v1/platform/settings/login-lockout', () =>
+        HttpResponse.json({ data: { threshold: 10, duration_seconds: 900 } }),
+      ),
       http.put('/api/control/v1/platform/settings/rate-limit', () =>
         HttpResponse.json(
           { error: { code: 'idempotency_conflict', message: 'duplicate', request_id: 'req-1' } },
@@ -245,7 +253,7 @@ describe('Admin System Settings adapters', () => {
       ),
     )
     const feedback = createAccessFeedback()
-    const harness = mountComposable(() => useAccessSettings({ feedback, confirm: testConfirm() }))
+    const harness = mountComposable(() => useAccessSettings({ feedback }))
 
     try {
       await vi.waitFor(() => expect(harness.value.rateLimitForm.value.window_seconds).toBe(60))
@@ -281,9 +289,7 @@ describe('Admin System Settings adapters', () => {
       }),
     )
     const feedback = createSettingFeedback() as AdminMediaUploadSettingsFeedback
-    const harness = mountComposable(() =>
-      useMediaUploadSettings({ feedback, confirm: testConfirm() }),
-    )
+    const harness = mountComposable(() => useMediaUploadSettings({ feedback }))
 
     try {
       await vi.waitFor(() => expect(harness.value.form.value.upload_max_concurrent).toBe(8))
@@ -309,13 +315,6 @@ describe('Admin System Settings adapters', () => {
     }
   })
 })
-
-function testConfirm() {
-  return {
-    confirm: vi.fn().mockResolvedValue(true),
-    readReason: () => 'lifecycle review',
-  }
-}
 
 function mountComposable<T>(setupComposable: () => T) {
   let value: T | null = null
@@ -379,5 +378,8 @@ function createAccessFeedback(): AdminAccessSettingsFeedback {
     rateLimitSaveFailed: vi.fn(),
     registrationUpdated: vi.fn(),
     registrationUpdateFailed: vi.fn(),
+    loginLockoutValidationFailed: vi.fn(),
+    loginLockoutSaved: vi.fn(),
+    loginLockoutSaveFailed: vi.fn(),
   }
 }

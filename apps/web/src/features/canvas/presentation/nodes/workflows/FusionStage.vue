@@ -269,7 +269,7 @@ function getBlendWeightBadgeStyle(index: number) {
   --fusion-node-ray-color: var(--flow-edge-color);
   position: absolute;
   height: calc(var(--flow-edge-width) * 1px);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-image: repeating-linear-gradient(
     90deg,
     var(--fusion-node-ray-color) 0 5px,
@@ -318,7 +318,7 @@ function getBlendWeightBadgeStyle(index: number) {
   height: auto;
   aspect-ratio: 1 / 1;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--canvas-radius-md);
   background: transparent;
   overflow: hidden;
   padding: 0;
@@ -352,7 +352,7 @@ function getBlendWeightBadgeStyle(index: number) {
   translate: -50% -50%;
   scale: 1;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   box-shadow: none;
   display: inline-flex;
@@ -382,7 +382,7 @@ function getBlendWeightBadgeStyle(index: number) {
 .fusion-blend-handle-dot {
   width: 16px;
   height: 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--canvas-accent);
 }
 
@@ -397,7 +397,7 @@ function getBlendWeightBadgeStyle(index: number) {
   translate: -50% -50%;
   min-width: 34px;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 0;
   background: rgba(255, 255, 255, 0.8);
   color: var(--canvas-text-body);

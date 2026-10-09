@@ -13,11 +13,13 @@ info:
     Public capabilities never imply control capabilities.
 
     Mutations: every POST/PUT/PATCH/DELETE requires a header-only
-    Idempotency-Key and an operator reason (reason/operator_note body field
-    or X-Operator-Reason header), else 400. Every guarded call emits a
-    Control AuditRecord (operator, target, capability, request_id,
-    idempotency key, reason, outcome, timestamp); audit records never enter
-    the public event layer.
+    Idempotency-Key, else 400. High-risk mutations additionally require an
+    operator reason (reason/operator_note body field or X-Operator-Reason
+    header), else 400; routine config mutations (x-audit reason: false)
+    accept an optional reason and audit the empty reason as-is. Every
+    guarded call emits a Control AuditRecord (operator, target,
+    capability, request_id, idempotency key, reason, outcome, timestamp);
+    audit records never enter the public event layer.
 
     Envelope: every route renders {data, meta?} success and
     {error: {code, message, request_id}} errors with a Request-Id response
@@ -387,7 +389,7 @@ paths:
     put:
       tags: [ControlUsers]
       operationId: updateControlOAuthProvider
-      summary: Update one social OAuth provider channel (operator reason required)
+      summary: Update one social OAuth provider channel (operator reason optional)
       description: >-
         Updates the social login channel (enabled, client_id,
         client_secret) through the Auth-owned social-provider seam.
@@ -398,7 +400,7 @@ paths:
       x-audit:
         operator: true
         target: oauth_provider
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlProviderSlug'
@@ -710,12 +712,12 @@ paths:
     put:
       tags: [ControlBilling]
       operationId: setControlCatalogAvailability
-      summary: Set SKU availability (operator reason required)
+      summary: Set SKU availability (operator reason optional)
       x-capability: control:billing
       x-audit:
         operator: true
         target: billing_sku
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlSku'
@@ -814,12 +816,12 @@ paths:
     put:
       tags: [ControlBilling]
       operationId: replaceControlCatalogModelPool
-      summary: Replace the Service Model Pool atomically (operator reason required)
+      summary: Replace the Service Model Pool atomically (operator reason optional)
       x-capability: control:billing
       x-audit:
         operator: true
         target: billing_sku
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlSku'
@@ -1382,12 +1384,12 @@ paths:
     put:
       tags: [ControlPayments]
       operationId: updateControlStripeConfig
-      summary: Update the Stripe configuration (operator reason required)
+      summary: Update the Stripe configuration (operator reason optional)
       x-capability: control:payments
       x-audit:
         operator: true
         target: payment_provider
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlProviderSlug'
@@ -1549,12 +1551,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlRegistrationSetting
-      summary: Update the registration setting (operator reason required)
+      summary: Update the registration setting (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1612,12 +1614,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlRateLimitSetting
-      summary: Update the rate-limit setting (operator reason required)
+      summary: Update the rate-limit setting (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1632,6 +1634,69 @@ paths:
       responses:
         '200':
           description: Rate-limit setting updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/login-lockout:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlLoginLockoutSetting
+      summary: Read the login-lockout setting
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Login-lockout setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlObjectEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlLoginLockoutSetting
+      summary: Update the login-lockout setting (operator reason optional)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Login-lockout setting payload (mirrors the runtime settings seam).
+      responses:
+        '200':
+          description: Login-lockout setting updated.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -1675,12 +1740,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlBrandingSetting
-      summary: Update the branding setting (operator reason required)
+      summary: Update the branding setting (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1805,12 +1870,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlSupportChannels
-      summary: Update support channels (operator reason required)
+      summary: Update support channels (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1869,12 +1934,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlMediaUploadSetting
-      summary: Update the media-upload setting (operator reason required)
+      summary: Update the media-upload setting (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1932,12 +1997,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlOutboundPolicy
-      summary: Update the outbound policy (operator reason required)
+      summary: Update the outbound policy (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1994,12 +2059,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlMailSetting
-      summary: Update the mail setting (operator reason required)
+      summary: Update the mail setting (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2063,12 +2128,12 @@ paths:
     post:
       tags: [ControlPlatform]
       operationId: testControlMailSetting
-      summary: Send a mail setting test email (operator reason required)
+      summary: Send a mail setting test email (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2125,12 +2190,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlAIGateway
-      summary: Update the AI gateway configuration (operator reason required)
+      summary: Update the AI gateway configuration (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2188,12 +2253,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: saveControlAIGatewayCatalog
-      summary: Save the AI gateway model catalog (operator reason required)
+      summary: Save the AI gateway model catalog (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2571,12 +2636,12 @@ paths:
     post:
       tags: [ControlPlatform]
       operationId: createControlStorageProfile
-      summary: Create a storage profile (operator reason required)
+      summary: Create a storage profile (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2610,12 +2675,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlStorageProfile
-      summary: Update a storage profile (operator reason required)
+      summary: Update a storage profile (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: storage_profile
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlStorageProfileId'
@@ -2682,12 +2747,12 @@ paths:
     post:
       tags: [ControlPlatform]
       operationId: applyControlStorageProfile
-      summary: Apply a storage profile (operator reason required)
+      summary: Apply a storage profile (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: storage_profile
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlStorageProfileId'
@@ -2800,12 +2865,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: updateControlSearchProvider
-      summary: Update a search provider (operator reason required)
+      summary: Update a search provider (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: search_provider
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlSearchProvider'
@@ -2926,12 +2991,12 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: saveControlFeaturePrompt
-      summary: Save a feature prompt template (operator reason required)
+      summary: Save a feature prompt template (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: feature_prompt
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlPromptSlug'
@@ -3060,12 +3125,12 @@ paths:
     post:
       tags: [ControlPlatform]
       operationId: backfillControlStatistics
-      summary: Backfill task statistics (operator reason required)
+      summary: Backfill task statistics (operator reason optional)
       x-capability: control:platform
       x-audit:
         operator: true
         target: null
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -3127,7 +3192,7 @@ paths:
     put:
       tags: [ControlPlatform]
       operationId: saveControlBrandLogoOverride
-      summary: Upsert a brand logo override (operator reason required)
+      summary: Upsert a brand logo override (operator reason optional)
       description: >-
         Body carries {logo_key}; the scope-qualified key (scope plus
         target_key) is the audited target. Data shape is
@@ -3136,7 +3201,7 @@ paths:
       x-audit:
         operator: true
         target: brand_logo_override
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlBrandLogoScope'
@@ -3295,7 +3360,7 @@ paths:
     patch:
       tags: [ControlCredits]
       operationId: updateControlRewardCode
-      summary: Update a reward code (operator reason required)
+      summary: Update a reward code (operator reason optional)
       description: >-
         Data shape is ControlUpdatedRewardCode inside the legacy admin
         envelope. Lowering max_redemptions below redemption_count
@@ -3304,7 +3369,7 @@ paths:
       x-audit:
         operator: true
         target: reward_code
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlRewardCodeId'
@@ -3378,7 +3443,7 @@ paths:
     patch:
       tags: [ControlCredits]
       operationId: setControlRewardCodeEnabled
-      summary: Enable or disable a reward code (operator reason required)
+      summary: Enable or disable a reward code (operator reason optional)
       description: >-
         Data shape is ControlRewardCode inside the legacy admin
         envelope.
@@ -3386,7 +3451,7 @@ paths:
       x-audit:
         operator: true
         target: reward_code
-        reason: true
+        reason: false
         outcome: success
       parameters:
         - $ref: '#/components/parameters/ControlRewardCodeId'

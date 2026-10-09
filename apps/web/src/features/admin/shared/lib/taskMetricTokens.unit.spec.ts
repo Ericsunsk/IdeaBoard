@@ -92,4 +92,16 @@ describe('taskMetricTokens', () => {
     expect(getTaskMetricByStatus('completed')?.chartColor).toBe(success)
     expect(getTaskMetricByStatus('failed')?.chartColor).toBe(danger)
   })
+
+  it('keeps filter pills neutral while chart lines retain semantic colors', () => {
+    // 过滤 pills 是中性分类控件：pending/running/completed/failed 的圆点与激活态
+    // 一律中性（bg-muted 载体），不蹭状态色；图表线条仍保留语义色。
+    const neutralActive = 'bg-muted text-foreground font-semibold ring-1 ring-border'
+    for (const key of ['pending', 'running', 'completed', 'failed'] as const) {
+      const metric = taskMetricDefinitions.find((item) => item.key === key)!
+      expect(metric.dotClass).toBe('bg-muted-foreground')
+      expect(metric.activePillClass).toBe(neutralActive)
+      expect(metric.chartColor).toBeTruthy()
+    }
+  })
 })

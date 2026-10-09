@@ -88,7 +88,7 @@
         >
           <table class="w-full text-left text-xs border-collapse">
             <thead
-              class="sticky top-0 z-10 bg-muted/80 backdrop-blur-xs border-b border-border text-muted-foreground font-medium"
+              class="sticky top-0 z-admin-sticky bg-muted/80 backdrop-blur-xs border-b border-border text-muted-foreground font-medium"
             >
               <tr>
                 <th class="w-10 px-3 py-2.5 text-center">
@@ -113,7 +113,7 @@
                 :key="model.id"
                 class="transition-colors hover:bg-muted/40 cursor-pointer"
                 :class="{
-                  'bg-primary/[0.03]': selectedModelIds.has(model.id),
+                  'bg-primary-faintest': selectedModelIds.has(model.id),
                   'opacity-60 bg-muted/20 cursor-not-allowed': isModelExisting(model.id),
                 }"
                 @click="toggleRowSelection(model.id)"
@@ -138,7 +138,7 @@
                       :class="
                         rowBrandLogo(model)
                           ? 'bg-muted/60 border border-border/60'
-                          : 'bg-primary/10 text-primary'
+                          : 'bg-primary-faint text-primary'
                       "
                     >
                       <img
@@ -182,7 +182,7 @@
                   </span>
                   <span
                     v-else-if="selectedModelIds.has(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-admin-micro font-medium text-primary"
+                    class="inline-flex items-center gap-1 rounded-full bg-primary-faint px-2 py-0.5 text-admin-micro font-medium text-primary"
                   >
                     <Check class="size-3" />
                     {{ MODELS_MESSAGES.addSelected }}

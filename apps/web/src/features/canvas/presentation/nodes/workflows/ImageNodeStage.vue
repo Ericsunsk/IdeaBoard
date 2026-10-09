@@ -294,7 +294,7 @@ function submitOutpaint(prompt: string) {
   gap: 8px;
   max-width: calc(100% - 16px);
   padding: 4px 6px 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--canvas-radius-md);
   background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--color-destructive) 18%);
   color: var(--color-destructive);
   font-size: 12px;

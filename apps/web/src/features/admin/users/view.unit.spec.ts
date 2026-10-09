@@ -54,9 +54,9 @@ describe('admin user view model', () => {
       isAdmin: true,
       isActive: false,
       roleLabel: 'Admin',
-      roleSeverity: 'danger',
+      roleVariant: 'danger',
       statusLabel: '封禁',
-      statusSeverity: 'danger',
+      statusVariant: 'danger',
     })
     expect(row.createdDateLabel).toBe('2026-06-29')
   })

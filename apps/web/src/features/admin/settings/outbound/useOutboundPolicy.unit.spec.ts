@@ -2,7 +2,6 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent } from 'vue'
 import { useMswHandlers } from '../../../../test/msw'
-import type { AdminConfirmPort } from '../../shared/composables/useAdminConfirm'
 import type { AdminOutboundPolicyFeedback } from '../shared/useSettingsFeedback'
 import { useOutboundPolicy } from './useOutboundPolicy'
 import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../shared/testing'
@@ -65,11 +64,14 @@ describe('useOutboundPolicy', () => {
 
       expect(state.updateRequests).toEqual([
         {
-          body: { allow_hosts: ['draft.internal'], reason: 'policy review' },
-          operatorReason: 'policy review',
+          body: { allow_hosts: ['draft.internal'], reason: '' },
+          operatorReason: null,
         },
       ])
-      expect(harness.confirm.confirm).toHaveBeenCalledOnce()
+      expect(harness.feedback.saved).not.toHaveBeenCalled()
+      expect(harness.lifecycle.form.value.allow_hosts).toBe('draft.internal')
+      expect(harness.lifecycle.isDirty.value).toBe(false)
+      expect(harness.lifecycle.saving.value).toBe(true)
       expect(harness.lifecycle.setting.value).toEqual({ allow_hosts: ['draft.internal'] })
       expect(harness.lifecycle.form.value.allow_hosts).toBe('draft.internal')
       expect(harness.lifecycle.isDirty.value).toBe(false)
@@ -143,40 +145,11 @@ describe('useOutboundPolicy', () => {
       await harness.unmount()
     }
   })
-
-  it('aborts the save silently when the operator cancels the confirm dialog', async () => {
-    const state = createOutboundPolicyMswState({ getAllowHosts: () => [] })
-    useMswHandlers(...createOutboundPolicyHandlers(state))
-    const harness = mountOutboundPolicy({
-      confirm: { confirm: vi.fn().mockResolvedValue(false) },
-    })
-
-    try {
-      await vi.waitFor(() => {
-        expect(harness.lifecycle.setting.value).toEqual({ allow_hosts: [] })
-      })
-      harness.lifecycle.form.value.allow_hosts = 'models.internal'
-
-      await expect(harness.lifecycle.save()).resolves.toBe(false)
-
-      expect(state.updateRequests).toEqual([])
-      expect(harness.feedback.saved).not.toHaveBeenCalled()
-      expect(harness.feedback.saveFailed).not.toHaveBeenCalled()
-      expect(harness.lifecycle.isDirty.value).toBe(true)
-    } finally {
-      await harness.unmount()
-    }
-  })
 })
 
-function mountOutboundPolicy(overrides: { confirm?: Partial<AdminConfirmPort> } = {}) {
+function mountOutboundPolicy() {
   let lifecycle: OutboundPolicyLifecycle | null = null
   const feedback = createFeedback()
-  const confirm: AdminConfirmPort = {
-    confirm: vi.fn().mockResolvedValue(true),
-    readReason: () => 'policy review',
-    ...overrides.confirm,
-  }
   const queryClient = new QueryClient({
     defaultOptions: {
       mutations: { retry: false },
@@ -191,7 +164,7 @@ function mountOutboundPolicy(overrides: { confirm?: Partial<AdminConfirmPort> } 
   const app = createApp(
     defineComponent({
       setup() {
-        lifecycle = useOutboundPolicy({ feedback, confirm })
+        lifecycle = useOutboundPolicy({ feedback })
         return () => null
       },
     }),
@@ -202,7 +175,6 @@ function mountOutboundPolicy(overrides: { confirm?: Partial<AdminConfirmPort> } 
   app.mount(host)
 
   return {
-    confirm,
     feedback,
     lifecycle: requireMountedLifecycle(lifecycle),
     async unmount() {

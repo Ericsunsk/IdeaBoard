@@ -248,7 +248,7 @@ function snapValue(value: number) {
   inset-inline: 0;
   top: 50%;
   height: var(--editing-two-handle-slider-track-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(
     --editing-two-handle-slider-track-background,
     var(--editing-two-handle-slider-track-background-default)
@@ -264,7 +264,7 @@ function snapValue(value: number) {
   width: var(--editing-two-handle-slider-handle-size);
   height: var(--editing-two-handle-slider-handle-size);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0;
   background: var(
     --editing-two-handle-slider-handle-color,

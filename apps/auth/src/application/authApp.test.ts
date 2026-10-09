@@ -99,6 +99,8 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
           registrationEnabled: true,
           windowSeconds: 60,
           maxRequests: 30,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         })),
       isMailReady: overrides.mailConfigService
         ? async () => (await overrides.mailConfigService!.getSummary()).readiness === 'ready'
@@ -313,6 +315,8 @@ describe('createAuthApp', () => {
           registrationEnabled: false,
           windowSeconds: 60,
           maxRequests: 30,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         }),
         authHandler: async (_req, res) => {
           authHandlerCalled = true
@@ -348,6 +352,8 @@ describe('createAuthApp', () => {
           registrationEnabled,
           windowSeconds: 60,
           maxRequests: 30,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         }),
         socialProviderSettingsService: {
           getSummary: async () => {
@@ -401,6 +407,8 @@ describe('createAuthApp', () => {
             registrationEnabled: true,
             windowSeconds: 60,
             maxRequests: 30,
+            lockoutThreshold: 10,
+            lockoutDurationSeconds: 900,
           }
         },
         authHandler: async (_req, res) => {
@@ -440,6 +448,8 @@ describe('createAuthApp', () => {
             registrationEnabled: true,
             windowSeconds: 60,
             maxRequests: 30,
+            lockoutThreshold: 10,
+            lockoutDurationSeconds: 900,
           }
         },
         authHandler: async (_req, res) => {
@@ -476,6 +486,8 @@ describe('createAuthApp', () => {
             registrationEnabled: true,
             windowSeconds: 60,
             maxRequests: 30,
+            lockoutThreshold: 10,
+            lockoutDurationSeconds: 900,
           }
         },
         authHandler: async (_req, res) => {
@@ -515,6 +527,8 @@ describe('createAuthApp', () => {
             registrationEnabled: true,
             windowSeconds: 60,
             maxRequests: 30,
+            lockoutThreshold: 10,
+            lockoutDurationSeconds: 900,
           }
         },
         authHandler: async (_req, res) => {
@@ -549,6 +563,8 @@ describe('createAuthApp', () => {
             registrationEnabled: true,
             windowSeconds: 60,
             maxRequests: 1,
+            lockoutThreshold: 10,
+            lockoutDurationSeconds: 900,
           }),
           authHandler: async (_req, res) => {
             authHandlerCalls += 1

@@ -5,8 +5,7 @@ import {
 import { requireContractData } from '../../../../shared/api/contractKernel'
 import { createAdminGatewayResource } from '../../models/infrastructure/adminGatewayResource'
 import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
+  buildRoutineControlMutationHeaders,
   type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
@@ -31,9 +30,10 @@ const MODEL_POOL_CONTROL_MESSAGES = {
 
 // Admin Service Model Pool boundary (#849). Reads and atomic replaces go
 // through the Control Plane billing pool operations with the contract
-// envelope (`{data}`); the PUT carries a header-only Idempotency-Key
-// plus an operator reason (mirrored into the body `reason` field) and
-// emits a control audit record. Pages and dialogs consume this module,
+// envelope (`{data}`); the PUT is a routine config write (backend
+// ReasonOptional): no confirm dialog, the audit records an empty reason
+// (mirrored into the body `reason` field), while the header-only
+// Idempotency-Key stays required. Pages and dialogs consume this module,
 // never generated clients directly.
 //
 // The add-from-catalog list reuses the existing Model catalog resource
@@ -90,7 +90,9 @@ export async function replaceAdminModelPool(
   input: ModelPoolReplaceInput,
   options: ModelPoolMutationOptions,
 ): Promise<AdminModelPoolSaveResult> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const operatorReason = options.operatorReason.trim()
   try {
     const body = await replaceControlCatalogModelPool(
       sku,
@@ -103,7 +105,9 @@ export async function replaceAdminModelPool(
         })),
         reason: operatorReason,
       },
-      { headers: buildControlMutationHeaders(options) },
+      {
+        headers: buildRoutineControlMutationHeaders(options),
+      },
     )
     const data = requireContractData<AdminModelPoolSaveWire>(body, '保存模型池失败')
     return { ...normalizePool(data, sku), changed: data.changed === true }

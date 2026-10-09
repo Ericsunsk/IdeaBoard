@@ -9,11 +9,11 @@
     <aside
       ref="siderRef"
       aria-label="后台导航"
-      class="fixed top-0 left-0 z-50 flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-border bg-background transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-30"
+      class="fixed top-0 left-0 z-admin-dialog flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-border bg-background transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-admin-header"
       :class="[
         effectiveCollapsed ? 'w-52 lg:w-14' : 'w-52',
-        isCollapsed && isHovered ? 'lg:z-40' : '',
-        drawerOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full lg:translate-x-0',
+        isCollapsed && isHovered ? 'lg:z-admin-overlay' : '',
+        drawerOpen ? 'translate-x-0 shadow-admin-dialog' : '-translate-x-full lg:translate-x-0',
       ]"
       @mouseleave="handleNavMouseLeave"
       @focusout="handleSiderFocusOut"

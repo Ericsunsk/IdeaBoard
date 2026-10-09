@@ -9,6 +9,13 @@ import {
   type AuthGuardSettings,
   createAuthGuardSettingsReader,
 } from '../admission/authGuardSettings.js'
+import {
+  extractLockoutEmail,
+  createLoginLockoutGuard,
+  recordSignInOutcome,
+  throwIfLocked,
+  type LoginLockoutGuard,
+} from '../admission/loginLockout.js'
 import { normalizeCanonicalEmail } from '../infrastructure/authUtils.js'
 import type { AuthEnvironment } from '../infrastructure/env.js'
 import {
@@ -130,6 +137,7 @@ export function createAuthComponents(
       isSupportedSocialProvider(provider) && socialProviderRuntime.isReady(provider),
   })
   const loginMetadataReporter = createLoginMetadataReporter(environment)
+  const loginLockoutGuard = createLoginLockoutGuard(database, getAuthGuardSettings)
   const authBaseOptions = createBetterAuthOptions({
     environment,
     database,
@@ -137,6 +145,7 @@ export function createAuthComponents(
     authAdmissionPolicy,
     getAuthGuardSettings,
     loginMetadataReporter,
+    loginLockoutGuard,
   })
   const runtimeAuthRegistry = socialProviderRuntime.configure(authBaseOptions)
   const socialProviderSettingsService = createRuntimeSocialProviderSettingsService(
@@ -181,6 +190,7 @@ export function createBetterAuthOptions(input: {
   authAdmissionPolicy: AuthAdmissionPolicy
   getAuthGuardSettings?: () => Promise<AuthGuardSettings>
   loginMetadataReporter?: LoginMetadataReporter
+  loginLockoutGuard?: LoginLockoutGuard
 }): BetterAuthOptions {
   const {
     environment,
@@ -189,6 +199,7 @@ export function createBetterAuthOptions(input: {
     authAdmissionPolicy,
     getAuthGuardSettings,
     loginMetadataReporter,
+    loginLockoutGuard,
   } = input
   return {
     database,
@@ -293,6 +304,25 @@ export function createBetterAuthOptions(input: {
             ctx.body.newEmail = normalizeCanonicalEmail(ctx.body.newEmail)
           }
         }
+        // Brute-force protection runs after canonicalization so the
+        // counter key matches the credential lookup exactly. A locked
+        // denial throws before Better Auth checks the password, and
+        // failures are counted in the after hook below.
+        if (ctx.path === '/sign-in/email' && loginLockoutGuard) {
+          await throwIfLocked(loginLockoutGuard, extractLockoutEmail(ctx.body))
+        }
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-in/email' || !loginLockoutGuard) return
+        const hookContext = ctx as unknown as {
+          body?: unknown
+          context?: { returned?: unknown }
+        }
+        await recordSignInOutcome(
+          loginLockoutGuard,
+          extractLockoutEmail(hookContext.body),
+          hookContext.context?.returned,
+        )
       }),
     },
   } satisfies BetterAuthOptions

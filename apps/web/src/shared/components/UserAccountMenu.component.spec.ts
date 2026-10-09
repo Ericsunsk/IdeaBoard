@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '../i18n'
 import { render, renderWithUser, screen, waitFor } from '../../test/render'
+import { expectDomOrder } from '../../test/domOrder'
 import UserAccountMenu from './UserAccountMenu.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
@@ -33,9 +34,7 @@ describe('UserAccountMenu', () => {
     const [separator] = screen.getAllByRole('separator')
     expect(email).toBeVisible()
     expect(separator).toBeVisible()
-    expect(
-      email.compareDocumentPosition(separator!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expectDomOrder([email, separator])
   })
 
   it('renders the typed balance control before the avatar', async () => {
@@ -284,12 +283,7 @@ describe('UserAccountMenu', () => {
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(link.querySelector('svg')).not.toBeNull()
-    expect(
-      language.compareDocumentPosition(support) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(
-      support.compareDocumentPosition(signOutSeparator!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expectDomOrder([language, support, signOutSeparator])
   })
 
   it('hides Support when no channels are available', async () => {

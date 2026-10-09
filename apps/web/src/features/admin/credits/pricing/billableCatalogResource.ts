@@ -19,6 +19,7 @@ import type {
 } from './billableCatalogTypes'
 import {
   buildControlMutationHeaders,
+  buildRoutineControlMutationHeaders,
   requireOperatorReason,
   type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
@@ -110,12 +111,17 @@ export async function setBillableItemAvailability(
   enabled: boolean,
   options: BillableCatalogMutationOptions,
 ): Promise<AdminBillableItemAvailability> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  // Publish and delete stay enforced and keep the required-reason helper.
+  const operatorReason = options.operatorReason.trim()
   try {
     const body = await setControlCatalogAvailability(
       sku,
       { enabled, reason: operatorReason },
-      { headers: buildControlMutationHeaders(options) },
+      {
+        headers: buildRoutineControlMutationHeaders(options),
+      },
     )
     return normalizeAvailability(
       requireContractData<BillableItemAvailability>(

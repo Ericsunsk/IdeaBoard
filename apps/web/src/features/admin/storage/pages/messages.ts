@@ -5,17 +5,14 @@
 // `useStorageFeedback.ts` next to the feedback factory; table/dialog copy for
 // `components/AdminStorageTable.vue` / `components/AdminStorageEditorDialog.vue`
 // lives here; preset keywords in `PRESET_MATCHERS` are matching constants,
-// not user-visible copy, and stay inline. Preset catalog labels, profile status
-// text, and workspace confirm copy stay in `meta.ts` / `profiles.ts` /
-// `workspace.ts` next to the logic that owns them.
+// not user-visible copy, and stay inline. Preset catalog labels and workspace
+// confirm copy stay in `meta.ts` / `workspace.ts` next to the logic that owns
+// them.
 
 export const STORAGE_MESSAGES = {
   storageTitle: '存储',
   storageSubtitle: '对象存储服务供应商与凭据管理',
   create: '新增存储',
-  current: '使用中',
-  configured: '已配置',
-  unconfigured: '未配置',
   localEndpoint: '服务器本地',
   save: '保存',
   applyCurrent: '设为当前',
@@ -24,17 +21,12 @@ export const STORAGE_MESSAGES = {
   switchLogoTitle: '点击切换存储 Logo',
   switchLogoAria: '切换存储 Logo',
   // Table.
-  tableLoadingAria: '加载存储配置中',
-  tableLoadFailed: '加载存储配置失败',
-  retry: '重试',
-  tableEmptyTitle: '暂无存储配置',
-  tableEmptyHint: '当前没有已注册的对象存储配置。点击右上角新增存储开始配置。',
   tableSectionAria: '对象存储',
   tableAria: '对象存储配置列表',
   tableScrollAria: '对象存储配置列表横向滚动区域',
   tableEmptyMatch: '暂无匹配存储',
   serviceColumn: 'Service',
-  enableColumn: '启用',
+  enableColumn: 'Enable',
   bucketColumn: '存储桶 / 路径',
   endpointColumn: '访问端点 / 域名',
   actionsColumn: '操作',
@@ -45,9 +37,7 @@ export const STORAGE_MESSAGES = {
   editorCreateTitle: '新增存储',
   editorFallbackTitle: '存储配置',
   editorDescription: '填写对象存储配置后保存。',
-  editorCreateSubtitle: '选择云存储厂商预设或自定义 S3 兼容接入',
   editorProviderSubtitle: (providerLabel: string) => `供应商：${providerLabel}`,
-  editorCurrentBadge: '当前生效存储',
   editorTabsAria: '存储配置分页',
   editorTabBasic: '基础与凭据',
   editorTabEndpoint: '端点与网络',

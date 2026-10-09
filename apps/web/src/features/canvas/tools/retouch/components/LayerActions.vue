@@ -99,9 +99,9 @@ const { t } = useI18n()
 .retouch-layer-actions__button--apply {
   --node-tool-icon-button-primary-border: var(--canvas-accent-hover);
   --node-tool-icon-button-primary-bg: var(--canvas-accent-hover);
-  --node-tool-icon-button-primary-color: #ffffff;
+  --node-tool-icon-button-primary-color: var(--canvas-text-inverse);
   --node-tool-icon-button-primary-hover-border: var(--canvas-accent-strong);
   --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-strong);
-  --node-tool-icon-button-primary-hover-color: #ffffff;
+  --node-tool-icon-button-primary-hover-color: var(--canvas-text-inverse);
 }
 </style>

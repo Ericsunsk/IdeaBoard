@@ -41,7 +41,7 @@ describe('stripeSettingsResource', () => {
     })
   })
 
-  it('omits an empty API Key while saving the non-secret Stripe settings with a reason', async () => {
+  it('omits an empty API Key while saving the non-secret Stripe settings without a reason', async () => {
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
       http.put('/api/control/v1/payments/providers/stripe', async ({ request }) => {
@@ -49,7 +49,7 @@ describe('stripeSettingsResource', () => {
           payment_method_configuration_id: 'pmc_ideaboard',
           product_tax_code: 'txcd_10105001',
           purchases_enabled: true,
-          reason: 'rotate test key',
+          reason: '',
         })
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
@@ -67,7 +67,7 @@ describe('stripeSettingsResource', () => {
           productTaxCode: ' txcd_10105001 ',
           purchasesEnabled: true,
         },
-        { operatorReason: 'rotate test key' },
+        { operatorReason: '   ' },
       ),
     ).resolves.toMatchObject({
       apiKeyConfigured: true,
@@ -75,19 +75,6 @@ describe('stripeSettingsResource', () => {
       accountId: 'acct_123',
     })
     expect(seenHeaders.idempotencyKey).toMatch(/.+/)
-    expect(seenHeaders.operatorReason).toBe('rotate test key')
-  })
-
-  it('requires an operator reason before saving', async () => {
-    await expect(
-      createAdminStripeSettingsResource().save(
-        {
-          paymentMethodConfigurationId: 'pmc_ideaboard',
-          productTaxCode: 'txcd_10105001',
-          purchasesEnabled: true,
-        },
-        { operatorReason: '   ' },
-      ),
-    ).rejects.toMatchObject({ code: 'control_reason_required' })
+    expect(seenHeaders.operatorReason).toBeNull()
   })
 })

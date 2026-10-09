@@ -40,10 +40,6 @@
         @open-command="openCommand"
       />
 
-      <AdminAlert v-if="walletError || ledgerError" severity="error">
-        {{ t('admin.wallet.loadFailedError') }}
-      </AdminAlert>
-
       <!-- 2. 分段功能导航 Tab -->
       <div class="flex items-center justify-between">
         <div
@@ -114,7 +110,6 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@iconoir/vue'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'

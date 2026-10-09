@@ -75,6 +75,93 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/account/presentation/common/ComingSoonPane.component.spec.ts': [
+    {
+      reason:
+        'Verifies the neutral StatusBadge carrier, card surface override, and lack of a status dot in the coming-soon capsule.',
+    },
+  ],
+  'src/features/account/presentation/profile/ProfilePane.component.spec.ts': [
+    {
+      reason:
+        'Verifies neutral creator and info admin role colors on the shared StatusBadge carrier.',
+    },
+  ],
+  'src/features/admin/credits/pricing/BillingStatusCell.component.spec.ts': [
+    {
+      reason:
+        'Verifies centered status pills in the fixed-width billing status slot without pulse DOM.',
+    },
+  ],
+  'src/features/admin/credits/pricing/ModelPoolEditorPanel.component.spec.ts': [
+    {
+      reason:
+        'Verifies the reserved validation row height that prevents model pool form layout shifts.',
+    },
+  ],
+  'src/features/admin/credits/rewards/AdminRewardCodesPage.component.spec.ts': [
+    {
+      reason: 'Verifies centered reward status pills in the fixed-width SwitchRow slot.',
+    },
+  ],
+  'src/features/admin/models/presentation/controls/ObservedStatsPanel.component.spec.ts': [
+    {
+      reason: 'Verifies success and neutral on-sale status colors without processing pulse DOM.',
+    },
+  ],
+  'src/features/admin/settings/image-library/AdminImageProvidersTable.component.spec.ts': [
+    {
+      reason:
+        'Verifies provider status color transitions and absence of row opacity changes while toggles settle.',
+    },
+  ],
+  'src/features/admin/settings/mail/AdminMailConfigCard.component.spec.ts': [
+    {
+      reason:
+        'Verifies mail readiness semantic colors and centered status pills in the fixed-width header slot.',
+    },
+  ],
+  'src/features/admin/settings/outbound/AdminOutboundPolicyCard.component.spec.ts': [
+    {
+      reason:
+        'Verifies configured outbound allowances use a neutral status instead of a warning tone.',
+    },
+  ],
+  'src/features/admin/settings/payment/AdminPaymentSettingsCard.component.spec.ts': [
+    {
+      reason:
+        'Verifies payment configuration remains neutral while product and webhook health use readiness tones.',
+    },
+  ],
+  'src/features/admin/shared/components/AdminStatusPill.component.spec.ts': [
+    {
+      reason: 'Verifies the Badge carrier, semantic tone and dot colors, and fixed size tokens.',
+    },
+  ],
+  'src/features/admin/shared/components/AdminSwitch.component.spec.ts': [
+    {
+      reason:
+        'Verifies the switch track opacity transition, shared timing token, and thumb translation classes.',
+    },
+  ],
+  'src/features/admin/shared/components/SwitchRow.component.spec.ts': [
+    {
+      reason:
+        'Verifies centered fixed-width status geometry, absolute pulse layering, nonshrinking switches, and row gap tokens.',
+    },
+  ],
+  'src/features/admin/storage/pages/AdminStoragePage.component.spec.ts': [
+    {
+      reason:
+        'Verifies storage status color transitions and stable row opacity during toggle updates.',
+    },
+  ],
+  'src/shared/components/StatusBadge.component.spec.ts': [
+    {
+      reason:
+        'Verifies the shared Badge carrier, semantic tone and dot colors, fixed sizes, and caller class merging.',
+    },
+  ],
   'src/features/account/presentation/dialog/AccountDialog.component.spec.ts': [
     {
       reason:

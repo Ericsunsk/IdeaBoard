@@ -46,9 +46,10 @@ func TestReconcilerSweepAuthSyncConvergesCommittedIntent(t *testing.T) {
 		storageUID: "SWSYNC", role: "user", status: StatusActive,
 	})
 	var intentID int64
+	// Seed an already-due intent; TIMESTAMPTZ(3) can round now() past the sweep clock.
 	if err := pool.QueryRow(ctx, `
-INSERT INTO identity_auth_sync_intents (user_id, auth_user_id, op, desired_role, desired_banned, base_version)
-VALUES ($1, 'auth-sweep-sync', 'role', 'user', false, 0)
+INSERT INTO identity_auth_sync_intents (user_id, auth_user_id, op, desired_role, desired_banned, base_version, next_attempt_at)
+VALUES ($1, 'auth-sweep-sync', 'role', 'user', false, 0, CURRENT_TIMESTAMP - INTERVAL '1 second')
 RETURNING id`, userID).Scan(&intentID); err != nil {
 		t.Fatalf("seed sync intent: %v", err)
 	}

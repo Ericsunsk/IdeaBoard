@@ -12,11 +12,13 @@
  * Public capabilities never imply control capabilities.
  *
  * Mutations: every POST/PUT/PATCH/DELETE requires a header-only
- * Idempotency-Key and an operator reason (reason/operator_note body field
- * or X-Operator-Reason header), else 400. Every guarded call emits a
- * Control AuditRecord (operator, target, capability, request_id,
- * idempotency key, reason, outcome, timestamp); audit records never enter
- * the public event layer.
+ * Idempotency-Key, else 400. High-risk mutations additionally require an
+ * operator reason (reason/operator_note body field or X-Operator-Reason
+ * header), else 400; routine config mutations (x-audit reason: false)
+ * accept an optional reason and audit the empty reason as-is. Every
+ * guarded call emits a Control AuditRecord (operator, target,
+ * capability, request_id, idempotency key, reason, outcome, timestamp);
+ * audit records never enter the public event layer.
  *
  * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
@@ -374,7 +376,7 @@ export const getSetControlCatalogAvailabilityUrl = (sku: string) => {
 }
 
 /**
- * @summary Set SKU availability (operator reason required)
+ * @summary Set SKU availability (operator reason optional)
  */
 export const setControlCatalogAvailability = async (
   sku: string,
@@ -468,7 +470,7 @@ export type SetControlCatalogAvailabilityMutationVariables = {
 }
 
 /**
- * @summary Set SKU availability (operator reason required)
+ * @summary Set SKU availability (operator reason optional)
  */
 export const useSetControlCatalogAvailability = <
   TError =
@@ -687,7 +689,7 @@ export const getReplaceControlCatalogModelPoolUrl = (sku: string) => {
 }
 
 /**
- * @summary Replace the Service Model Pool atomically (operator reason required)
+ * @summary Replace the Service Model Pool atomically (operator reason optional)
  */
 export const replaceControlCatalogModelPool = async (
   sku: string,
@@ -775,7 +777,7 @@ export type ReplaceControlCatalogModelPoolMutationVariables = {
 }
 
 /**
- * @summary Replace the Service Model Pool atomically (operator reason required)
+ * @summary Replace the Service Model Pool atomically (operator reason optional)
  */
 export const useReplaceControlCatalogModelPool = <
   TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse,

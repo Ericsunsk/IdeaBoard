@@ -15,7 +15,6 @@ import {
   defineAdminChartOptions,
 } from '../shared/lib/chart'
 import { buildAdminTimeRangeBuckets, shouldShowAdminTimeRangeTick } from '../shared/lib/timeRange'
-import { useUsageStatisticsBreakdownCharts } from './usageStatisticsBreakdownCharts'
 import {
   baseChartOptions,
   baseChartPlugins,
@@ -238,8 +237,6 @@ export function useUsageStatisticsCharts(options: {
 
   const qualityTrendCharts = useUsageStatisticsQualityTrendCharts(options)
 
-  const breakdownCharts = useUsageStatisticsBreakdownCharts(options.adminStatistics)
-
   return {
     trendChartData,
     trendChartOptions,
@@ -247,6 +244,5 @@ export function useUsageStatisticsCharts(options: {
     modelRiskChartData,
     modelRiskChartOptions,
     ...qualityTrendCharts,
-    ...breakdownCharts,
   }
 }

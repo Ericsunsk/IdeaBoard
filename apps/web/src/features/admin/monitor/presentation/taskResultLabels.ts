@@ -31,15 +31,17 @@ export function getAttemptStatusLabel(status: string) {
   )
 }
 
-export function getAttemptStatusSeverity(status: string) {
-  const severityByStatus: Record<string, 'success' | 'danger' | 'warn' | 'secondary' | 'info'> = {
+export function getAttemptStatusVariant(
+  status: string,
+): 'success' | 'danger' | 'warning' | 'neutral' | 'info' {
+  const variantByStatus: Record<string, 'success' | 'danger' | 'warning' | 'neutral' | 'info'> = {
     running: 'info',
     completed: 'success',
     failed: 'danger',
-    requeued: 'warn',
-    cancelled: 'secondary',
+    requeued: 'warning',
+    cancelled: 'neutral',
   }
-  return severityByStatus[status] || 'secondary'
+  return variantByStatus[status] || 'neutral'
 }
 
 export function getAttemptStageLabel(stage: string) {

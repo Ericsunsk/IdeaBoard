@@ -20,7 +20,7 @@
           class="group relative flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-colors select-none"
           :class="
             selectedProvider === provider.value
-              ? 'border-primary bg-primary/10 shadow-2xs'
+              ? 'border-primary bg-primary-faint shadow-2xs'
               : 'border-border bg-muted/40 hover:border-border hover:bg-muted'
           "
           @click="selectedProvider = provider.value"
@@ -74,29 +74,23 @@
 
       <!-- 2. 当前选中 Provider 的凭据与回调配置区 -->
       <div class="flex flex-col gap-3.5 rounded-xl border border-border bg-card p-4 shadow-2xs">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-muted p-1"
-              :aria-label="OAUTH_MESSAGES.oauthSelectLogoAria(providerLabel)"
-              @click="openLogoPicker($event, selectedProvider)"
-            >
-              <img
-                :src="oauthProviderLogo(selectedProvider)"
-                class="size-full object-contain"
-                alt=""
-                aria-hidden="true"
-              />
-            </button>
-            <h3 class="m-0 text-admin-body-sm font-bold text-foreground">
-              {{ OAUTH_MESSAGES.oauthCredentialsTitle(providerLabel) }}
-            </h3>
-          </div>
-          <AdminStatusPill
-            :label="OAUTH_MESSAGES.oauthEnabledLabel(form.values.enabled)"
-            :variant="form.values.enabled ? 'success' : 'neutral'"
-          />
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-muted p-1"
+            :aria-label="OAUTH_MESSAGES.oauthSelectLogoAria(providerLabel)"
+            @click="openLogoPicker($event, selectedProvider)"
+          >
+            <img
+              :src="oauthProviderLogo(selectedProvider)"
+              class="size-full object-contain"
+              alt=""
+              aria-hidden="true"
+            />
+          </button>
+          <h3 class="m-0 text-admin-body-sm font-bold text-foreground">
+            {{ OAUTH_MESSAGES.oauthCredentialsTitle(providerLabel) }}
+          </h3>
         </div>
 
         <AdminFormField
@@ -173,8 +167,6 @@
           </p>
         </AdminFormField>
       </div>
-
-      <AdminAlert v-if="saveError" severity="error">{{ saveError }}</AdminAlert>
     </form>
 
     <template #footer="{ requestClose }">
@@ -204,7 +196,6 @@
 import { computed, reactive, ref, watch } from 'vue'
 import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
@@ -212,11 +203,8 @@ import AdminSelect from '../../shared/components/AdminSelect.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminLogoPickerPopover from '../../shared/components/AdminLogoPickerPopover.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import { secretField } from '../../shared/lib/secretSchema'
 import {
@@ -244,7 +232,6 @@ const emit = defineEmits<{
 
 const defaultResource = createOAuthProviderSettingsResource()
 const toast = useAdminToast()
-const confirm = useAdminConfirm()
 const logoPickerPopoverRef = ref<InstanceType<typeof AdminLogoPickerPopover> | null>(null)
 const activeLogoProvider = ref<OAuthProviderCode | null>(null)
 const oauthLoginProviders = [
@@ -260,7 +247,6 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const providerSwitching = ref(false)
 const loadError = ref('')
-const saveError = ref('')
 const form = useForm({
   initialValues: { enabled: false, clientId: '', clientSecret: '' },
   schema: () =>
@@ -293,7 +279,6 @@ function openLogoPicker(event: Event, provider: OAuthProviderCode) {
 watch(selectedProvider, (provider) => {
   if (!props.visible) return
   clearSensitiveState()
-  saveError.value = ''
   loadError.value = ''
   const cachedSummary = providerSummaries.value[provider]
   if (cachedSummary) applySummary(cachedSummary)
@@ -306,7 +291,6 @@ function activeResource() {
 
 function resetAndLoad() {
   clearSensitiveState()
-  saveError.value = ''
   loadError.value = ''
   void load()
 }
@@ -363,18 +347,13 @@ const submit = form.handleSubmit(async (values) => {
     (provider) => providerEnabled[provider] && !providerSummaries.value[provider]?.configured,
   )
   if (incompleteProvider) {
-    saveError.value = OAUTH_MESSAGES.oauthIncompleteProvider(
-      getOAuthProviderLabel(incompleteProvider),
-    )
+    toast.error(OAUTH_MESSAGES.oauthIncompleteProvider(getOAuthProviderLabel(incompleteProvider)))
     return
   }
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: OAUTH_MESSAGES.oauthSaveTitle,
-    message: OAUTH_MESSAGES.oauthSaveMessage,
-  })
-  if (!operatorReason) return
+  // Routine config write (backend ReasonOptional): save directly without
+  // the confirm dialog; the audit records an empty reason.
+  const operatorReason = ''
   isSaving.value = true
-  saveError.value = ''
   try {
     const currentProvider = selectedProvider.value
     const saveRequests = [
@@ -413,7 +392,7 @@ const submit = form.handleSubmit(async (values) => {
     }
   } catch (error) {
     clearSensitiveState()
-    saveError.value = formatAdminDisplayError(error, OAUTH_MESSAGES.oauthSaveFailed)
+    toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthSaveFailed))
   } finally {
     isSaving.value = false
   }

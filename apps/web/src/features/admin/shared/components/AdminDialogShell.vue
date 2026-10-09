@@ -3,7 +3,7 @@
     <DialogPortal>
       <DialogOverlay
         data-admin-dialog-mask
-        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         @click="requestCloseFromMask"
       />
       <DialogContent
@@ -13,7 +13,7 @@
         :aria-busy="ariaBusy"
         :data-size="props.size ?? 'form'"
         :class="[
-          'fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-1.5rem)] translate-x-[-50%] translate-y-[-50%] gap-0 overflow-hidden border shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+          'fixed top-[50%] left-[50%] z-admin-dialog grid max-h-[calc(100dvh-1.5rem)] translate-x-[-50%] translate-y-[-50%] gap-0 overflow-hidden border shadow-admin-dialog data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           adminDialogChromeClass,
           dialogWidthClasses[props.size ?? 'form'],
         ]"
@@ -40,7 +40,7 @@
               type="button"
               aria-label="关闭"
               :class="[
-                '!bg-transparent !shadow-none inline-flex size-8 shrink-0 items-center justify-center rounded-lg border-0 p-0 hover:!bg-transparent focus:!outline-none focus-visible:!outline-none focus-visible:!shadow-none focus-visible:!ring-0 cursor-pointer transition-colors font-[650]',
+                '!bg-transparent !shadow-none inline-flex size-8 shrink-0 items-center justify-center rounded-lg border-0 p-0 hover:!bg-transparent focus:!outline-none focus-visible:!outline-none focus-visible:!shadow-none focus-visible:!ring-0 cursor-pointer transition-colors font-admin-strong',
                 adminDialogChromeCloseClass,
               ]"
               @click="requestCloseFromControl"

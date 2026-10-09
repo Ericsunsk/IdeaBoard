@@ -1,25 +1,21 @@
-import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
-} from '../../shared/lib/controlMutation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import {
   getControlMediaUploadSetting,
   updateControlMediaUploadSetting,
 } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '../../../../shared/api/contractKernel'
+import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
 import type { AdminMediaUploadSettingsFeedback } from '../shared/useSettingsFeedback'
 import { useSettingsLifecycle } from '../shared/useSettingsLifecycle'
-import type { AdminConfirmPort } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
 // Admin media upload boundary (W2 transports). Reads and writes go through
 // the Control Plane with the contract envelope (`{data}`); every mutation
-// carries a header-only Idempotency-Key plus an operator reason collected
-// through the shared confirm dialog, and emits a control audit record. The
+// carries a header-only Idempotency-Key and emits a control audit record.
+// Media upload is a routine config write (backend ReasonOptional), so saves
+// skip the confirm dialog and audit an empty reason. The
 // deleted `/api/admin/settings/media-upload` route is gone; this module is
 // the single transport.
 export type MediaUploadSetting = {
@@ -35,10 +31,7 @@ export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
 export const MEDIA_UPLOAD_MIN_CONCURRENT = 1
 export const MEDIA_UPLOAD_MAX_CONCURRENT = 64
 
-export function useMediaUploadSettings(options: {
-  feedback: AdminMediaUploadSettingsFeedback
-  confirm: AdminConfirmPort
-}) {
+export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSettingsFeedback }) {
   const queryClient = useQueryClient()
   const query = useQuery<MediaUploadSetting, Error>({
     queryKey: ADMIN_MEDIA_UPLOAD_QUERY_KEY,
@@ -46,13 +39,8 @@ export function useMediaUploadSettings(options: {
   })
   const setting = computed(() => query.data.value)
   const loading = computed(() => query.isLoading.value || query.isFetching.value)
-  // The lifecycle save runs inside saveSetting below with the reason
-  // collected first; the ref bridges the two without changing the
-  // lifecycle contract.
-  const pendingOperatorReason = ref<string | null>(null)
   const saveMutation = useMutation({
-    mutationFn: (draft: MediaUploadSetting) =>
-      saveMediaUploadSetting(draft, pendingOperatorReason.value ?? ''),
+    mutationFn: (draft: MediaUploadSetting) => saveMediaUploadSetting(draft),
   })
   const saving = computed(() => saveMutation.isPending.value)
   const lifecycle = useSettingsLifecycle({
@@ -73,18 +61,9 @@ export function useMediaUploadSettings(options: {
   })
 
   async function saveSetting(): Promise<boolean> {
-    const operatorReason = await confirmSettingsSave(options.confirm, {
-      title: '保存上传设置',
-      message: '确定保存上传并发配置吗？该操作将记录操作人与原因。',
-      confirmLabel: '保存',
-    })
-    if (!operatorReason) return false
-    pendingOperatorReason.value = operatorReason
-    try {
-      return await lifecycle.save()
-    } finally {
-      pendingOperatorReason.value = null
-    }
+    // Routine config write (backend ReasonOptional): save directly without
+    // the confirm dialog; the audit records an empty reason.
+    return lifecycle.save()
   }
 
   return {
@@ -107,16 +86,15 @@ async function fetchMediaUploadSetting(signal?: AbortSignal): Promise<MediaUploa
   }
 }
 
-async function saveMediaUploadSetting(
-  draft: MediaUploadSetting,
-  operatorReason: string,
-): Promise<MediaUploadSetting> {
-  const reason = requireOperatorReason(operatorReason)
+async function saveMediaUploadSetting(draft: MediaUploadSetting): Promise<MediaUploadSetting> {
   try {
     const body = await updateControlMediaUploadSetting(
       { upload_max_concurrent: draft.upload_max_concurrent },
       {
-        headers: buildControlMutationHeaders({ operatorReason: reason }),
+        // Routine config write (backend ReasonOptional): no operator-reason
+        // header, the audit records an empty reason. Idempotency-Key stays
+        // required on both tiers.
+        headers: buildRoutineControlMutationHeaders(),
       },
     )
     return requireContractData<MediaUploadSetting>(body, '保存上传设置失败')

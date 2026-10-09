@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
+import { useOptimisticToggle } from '../../shared/composables/useOptimisticToggle'
+import { requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
   createAdminRewardCodeResource,
@@ -17,7 +18,10 @@ export function useRewardCodeRowActions(options: {
   const resource = options.resource ?? createAdminRewardCodeResource()
   const feedback = useRewardCodesFeedback()
   const confirm = useAdminConfirm()
-  const enabledPending = reactive<Record<number, boolean>>({})
+  // 行开关乐观收口到共享 useOptimisticToggle：intent 同 tick 翻转，
+  // pending 只压开关；成功后保留覆盖等回填 reconcile，失败回滚。
+  // Status 胶囊四态仍跟服务端 status，投影只覆盖 enabled。
+  const toggle = useOptimisticToggle<number>()
   const deletePending = reactive<Record<number, boolean>>({})
 
   function replaceRewardCode(updated: RewardCode) {
@@ -30,25 +34,27 @@ export function useRewardCodeRowActions(options: {
   }
 
   async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
-    if (enabledPending[rewardCode.id]) return
-    // Enable/disable toggles are reversible: the note is optional and an
-    // empty field falls back to a default so one click proceeds.
-    const operatorReason = await confirmSettingsSave(confirm, {
-      title: enabled ? '启用兑换码' : '停用兑换码',
-      message: `确定${enabled ? '启用' : '停用'}“${rewardCode.displayName}”吗？该操作将记录审计。`,
-      confirmLabel: enabled ? '确认启用' : '确认停用',
-    })
-    if (!operatorReason) return
-    enabledPending[rewardCode.id] = true
-    try {
-      replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled, { operatorReason }))
-      feedback.enabledToggled(enabled)
-      options.refreshRewardCodes()
-    } catch (error) {
-      feedback.toggleFailed(error, enabled)
-    } finally {
-      enabledPending[rewardCode.id] = false
-    }
+    // Enable/disable toggles are routine config writes (backend
+    // ReasonOptional): no confirm dialog, the audit records an empty reason.
+    // 乐观翻转与 pending/回滚收口到共享 composable，失败 toast 由 feedback 传入。
+    await toggle.toggle(
+      rewardCode.id,
+      enabled,
+      async (key, next) => {
+        const updated = await resource.setEnabled(key, next, { operatorReason: '' })
+        replaceRewardCode(updated)
+        toggle.reconcile(key, updated.enabled)
+      },
+      {
+        onSuccess: (_, next) => {
+          feedback.enabledToggled(next)
+          options.refreshRewardCodes()
+        },
+        onFailure: (_, next, error) => {
+          feedback.toggleFailed(error, next)
+        },
+      },
+    )
   }
 
   async function deleteRewardCode(rewardCode: RewardCode, operatorReason: string) {
@@ -85,7 +91,7 @@ export function useRewardCodeRowActions(options: {
   }
 
   return {
-    enabledPending,
+    toggle,
     deletePending,
     replaceRewardCode,
     setRewardCodeEnabled,

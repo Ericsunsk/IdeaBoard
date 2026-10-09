@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { createDeferred } from '../../../test/deferred'
 import { createAdminStorageWorkspace } from './workspace'
-import { ADMIN_PROBE_OPERATOR_REASON } from '../shared/lib/confirmSettingsSave'
 import type { AdminStorageResource } from './resource'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 
@@ -38,18 +37,16 @@ afterEach(() => {
 })
 
 describe('admin storage workspace facade', () => {
-  it('exposes a recoverable load failure and clears it on retry', async () => {
+  it('surfaces load failures through feedback and recovers on retry', async () => {
     const error = new Error('load failed')
     mockResource.fetchProfiles.mockRejectedValueOnce(error)
     const { workspace, feedback } = createWorkspace()
 
     await workspace.loadData()
-    expect(workspace.loadFailed.value).toBe(true)
     expect(workspace.storages.value).toEqual([])
     expect(feedback.loadProfilesFailed).toHaveBeenCalledWith(error)
 
     await workspace.loadData()
-    expect(workspace.loadFailed.value).toBe(false)
     expect(workspace.storages.value).toHaveLength(1)
     expect(workspace.loading.value).toBe(false)
   })
@@ -58,12 +55,18 @@ describe('admin storage workspace facade', () => {
     'toggles enabled state to %s without overwriting masked secrets',
     async (enabled) => {
       mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled: !enabled })])
+      // 刷新回填与请求一致，避免覆盖残留遮挡外部变更的断言失真。
+      mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled })])
+      mockResource.saveProfile.mockResolvedValueOnce({
+        message: 'saved',
+        profile: makeProfile({ id: 'profile-1', enabled }),
+      })
       const { workspace, feedback, confirm } = createWorkspace()
       await workspace.loadData()
 
       await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, enabled)
 
-      expect(confirm.confirm).toHaveBeenCalledOnce()
+      expect(confirm.confirm).not.toHaveBeenCalled()
       expect(mockResource.saveProfile).toHaveBeenCalledWith(
         {
           id: 'profile-1',
@@ -74,11 +77,84 @@ describe('admin storage workspace facade', () => {
             config: { bucket_name: 'images' },
           },
         },
-        { operatorReason: 'storage review' },
+        { operatorReason: '' },
       )
       expect(feedback.saveDraftSucceeded).toHaveBeenCalledWith('saved')
-      expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(2)
-      expect(workspace.togglingId.value).toBeNull()
+      expect(workspace.toggle.isPending('profile-1')).toBe(false)
+      // 服务端已追上：覆盖已 reconcile，不再遮挡。
+      expect(workspace.toggle.effective('profile-1', enabled)).toBe(enabled)
+    },
+  )
+
+  it.each([false, true])(
+    'keeps saved state %s while refreshing and allows later external changes',
+    async (enabled) => {
+      const saveRequest = createDeferred<{ message: string; profile: StorageProfile }>()
+      const refreshRequest = createDeferred<StorageProfile[]>()
+      const savedProfile = makeProfile({ enabled, name: 'Saved storage' })
+      mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled: !enabled })])
+      mockResource.fetchProfiles.mockReturnValueOnce(refreshRequest.promise)
+      mockResource.saveProfile.mockReturnValueOnce(saveRequest.promise)
+      const { workspace, feedback } = createWorkspace()
+      await workspace.loadData()
+
+      const run = workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, enabled)
+      await vi.waitFor(() => expect(mockResource.saveProfile).toHaveBeenCalledOnce())
+      expect(workspace.toggle.isPending('profile-1')).toBe(true)
+      expect(workspace.toggle.effective('profile-1', !enabled)).toBe(enabled)
+      expect(workspace.storages.value[0]?.enabled).toBe(!enabled)
+
+      saveRequest.resolve({ message: 'saved', profile: savedProfile })
+      await vi.waitFor(() => expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(2))
+
+      expect(workspace.storages.value[0]).toMatchObject({
+        name: 'Saved storage',
+        enabled,
+        secretConfigured: true,
+        config: { bucket_name: 'images', secret_access_key: '' },
+      })
+      expect(workspace.toggle.effective('profile-1', workspace.storages.value[0]!.enabled)).toBe(
+        enabled,
+      )
+      expect(workspace.toggle.isPending('profile-1')).toBe(true)
+
+      refreshRequest.resolve([savedProfile])
+      await run
+      expect(workspace.toggle.isPending('profile-1')).toBe(false)
+      expect(feedback.saveDraftSucceeded).toHaveBeenCalledWith('saved')
+
+      mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled: !enabled })])
+      await workspace.refreshData()
+      expect(workspace.toggle.effective('profile-1', workspace.storages.value[0]!.enabled)).toBe(
+        !enabled,
+      )
+    },
+  )
+
+  it.each([false, true])(
+    'keeps saved state %s and successful save feedback when refresh fails',
+    async (enabled) => {
+      const refreshError = new Error('refresh failed')
+      mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled: !enabled })])
+      mockResource.fetchProfiles.mockRejectedValueOnce(refreshError)
+      mockResource.saveProfile.mockResolvedValueOnce({
+        message: 'saved',
+        profile: makeProfile({ enabled }),
+      })
+      const { workspace, feedback } = createWorkspace()
+      await workspace.loadData()
+
+      await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, enabled)
+
+      expect(workspace.storages.value[0]?.enabled).toBe(enabled)
+      expect(workspace.toggle.effective('profile-1', workspace.storages.value[0]!.enabled)).toBe(
+        enabled,
+      )
+      expect(workspace.storages.value[0]?.config.secret_access_key).toBe('')
+      expect(workspace.toggle.isPending('profile-1')).toBe(false)
+      expect(feedback.refreshFailed).toHaveBeenCalledWith(refreshError)
+      expect(feedback.saveDraftSucceeded).toHaveBeenCalledWith('saved')
+      expect(feedback.saveDraftFailed).not.toHaveBeenCalled()
     },
   )
 
@@ -95,9 +171,16 @@ describe('admin storage workspace facade', () => {
     expect(feedback.saveDraftFailed).toHaveBeenCalledWith(error)
     expect(feedback.saveDraftSucceeded).not.toHaveBeenCalled()
     expect(workspace.storages.value[0]?.enabled).toBe(true)
-    expect(workspace.togglingId.value).toBeNull()
+    expect(workspace.toggle.isPending('profile-1')).toBe(false)
+    // 失败回滚：覆盖已删，有效值回到服务端。
+    expect(workspace.toggle.effective('profile-1', true)).toBe(true)
     expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(1)
 
+    mockResource.saveProfile.mockResolvedValueOnce({
+      message: 'saved',
+      profile: makeProfile({ id: 'profile-1', enabled: false }),
+    })
+    mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled: false })])
     await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
     expect(feedback.saveDraftSucceeded).toHaveBeenCalledOnce()
   })
@@ -116,25 +199,6 @@ describe('admin storage workspace facade', () => {
     },
   )
 
-  it('serializes toggles and treats confirmation cancellation as a no-op', async () => {
-    const { workspace, feedback, confirm } = createWorkspace()
-    await workspace.loadData()
-    const confirmation = createDeferred<boolean>()
-    confirm.confirm.mockReturnValueOnce(confirmation.promise)
-
-    const toggle = workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
-    expect(workspace.togglingId.value).toBe('profile-1')
-    await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
-    expect(confirm.confirm).toHaveBeenCalledOnce()
-
-    confirmation.resolve(false)
-    await toggle
-    expect(workspace.togglingId.value).toBeNull()
-    expect(mockResource.saveProfile).not.toHaveBeenCalled()
-    expect(feedback.saveDraftFailed).not.toHaveBeenCalled()
-    expect(feedback.saveDraftSucceeded).not.toHaveBeenCalled()
-  })
-
   it('exposes only the table-consumed card projection without search/count scaffolding', async () => {
     const { workspace } = createWorkspace()
 
@@ -143,11 +207,13 @@ describe('admin storage workspace facade', () => {
     expect(Object.keys(workspace.cards).sort()).toEqual(['items'])
     expect(workspace.cards.items.value[0]).toMatchObject({
       providerLabel: 'S3 兼容存储',
-      statusText: '已配置',
       supportsTest: true,
       canTest: true,
       canApply: true,
     })
+    expect(workspace.cards.items.value[0]).not.toHaveProperty('statusText')
+    expect(workspace.cards.items.value[0]).not.toHaveProperty('statusClass')
+    expect(workspace.cards.items.value[0]).not.toHaveProperty('statusSeverity')
     expect(workspace.cards.items.value[0]).not.toHaveProperty('searchableText')
   })
 
@@ -172,7 +238,6 @@ describe('admin storage workspace facade', () => {
     ])
     expect(workspace.cards.items.value[0]).toMatchObject({
       providerLabel: 'S3 兼容存储',
-      statusText: '已配置',
       supportsTest: true,
       canTest: true,
       canApply: true,
@@ -263,7 +328,7 @@ describe('admin storage workspace facade', () => {
 
     expect(mockResource.saveProfile).toHaveBeenCalledWith(
       { payload: makePayload() },
-      { operatorReason: 'storage review' },
+      { operatorReason: '' },
     )
     expect(feedback.refreshFailed).toHaveBeenCalledWith(refreshError)
     expect(workspace.storages.value[0]?.config.secret_access_key).toBe('')
@@ -295,23 +360,11 @@ describe('admin storage workspace facade', () => {
     await workspace.testStorage({ id: 'profile-1', name: '对象存储' })
 
     expect(confirm.confirm).not.toHaveBeenCalled()
+    // 探针 reason 对齐 routine 空 reason（后端 POST read-guard 非 Mutation，
+    // 无需 reason/Idempotency 仪式，审计记空 reason）。
     expect(mockResource.testProfile).toHaveBeenCalledWith('profile-1', {
-      operatorReason: ADMIN_PROBE_OPERATOR_REASON,
+      operatorReason: '',
     })
-  })
-
-  it('treats apply confirmation cancellation as a no-op without failure feedback', async () => {
-    const { workspace, feedback, confirm } = createWorkspace()
-
-    await workspace.loadData()
-    confirm.confirm.mockResolvedValueOnce(false)
-
-    await workspace.applyStorage({ id: 'profile-1', name: '对象存储' })
-
-    expect(mockResource.applyProfile).not.toHaveBeenCalled()
-    expect(feedback.applyCurrentFailed).not.toHaveBeenCalled()
-    expect(feedback.applyCurrentSucceeded).not.toHaveBeenCalled()
-    expect(workspace.applyingId.value).toBeNull()
   })
 
   it('keeps delete confirmation and refresh sequencing inside the workspace', async () => {

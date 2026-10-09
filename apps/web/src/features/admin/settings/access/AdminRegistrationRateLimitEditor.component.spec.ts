@@ -7,13 +7,6 @@ import AdminRegistrationRateLimitEditor from './AdminRegistrationRateLimitEditor
 
 vi.mock('../../../../shared/composables/useAppToast')
 
-const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('access review'))
-
-vi.mock('../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
-}))
-
 describe('AdminRegistrationRateLimitEditor', () => {
   const registrationPuts: Array<{ body: unknown; operatorReason: string | null }> = []
   const rateLimitPuts: Array<{ body: unknown; operatorReason: string | null }> = []
@@ -44,6 +37,9 @@ describe('AdminRegistrationRateLimitEditor', () => {
         })
         return HttpResponse.json({ data: body })
       }),
+      http.get('/api/control/v1/platform/settings/login-lockout', () =>
+        HttpResponse.json({ data: { threshold: 5, duration_seconds: 300 } }),
+      ),
     )
   }
 
@@ -59,8 +55,6 @@ describe('AdminRegistrationRateLimitEditor', () => {
   beforeEach(() => {
     mockAppToast()
     vi.clearAllMocks()
-    confirmMock.mockResolvedValue(true)
-    readReasonMock.mockReturnValue('access review')
     registrationPuts.length = 0
     rateLimitPuts.length = 0
     registrationEnabled = false
@@ -77,7 +71,17 @@ describe('AdminRegistrationRateLimitEditor', () => {
     expect(screen.getByDisplayValue('120')).toBeVisible()
   })
 
-  it('toggles registration with an operator reason (handleToggleRegistration)', async () => {
+  it('renders a single reset/save pair in the card footer actions', async () => {
+    renderEditor()
+    await screen.findByDisplayValue('60')
+
+    // 去重回归：模板内只保留 #actions 单组 AdminEditorActions，登录锁定内联栏已移除。
+    expect(screen.getAllByRole('button', { name: '重置' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: '保存' })).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: '登录锁定' })).not.toBeInTheDocument()
+  })
+
+  it('toggles registration without a confirm dialog (handleToggleRegistration)', async () => {
     const { user } = renderEditor()
     const toggle = await screen.findByRole('switch', { name: '开放注册' })
 
@@ -85,24 +89,11 @@ describe('AdminRegistrationRateLimitEditor', () => {
 
     await waitFor(() => expect(registrationPuts).toHaveLength(1))
     expect(registrationPuts[0]?.body).toEqual({ enabled: true })
-    expect(registrationPuts[0]?.operatorReason).toBe('access review')
-    expect(confirmMock).toHaveBeenCalledOnce()
+    expect(registrationPuts[0]?.operatorReason).toBeNull()
     await waitFor(() => expect(toggle).toBeChecked())
   })
 
-  it('reverts the registration switch when the confirm dialog is cancelled', async () => {
-    confirmMock.mockResolvedValueOnce(false)
-    const { user } = renderEditor()
-    const toggle = await screen.findByRole('switch', { name: '开放注册' })
-
-    await user.click(toggle)
-
-    await waitFor(() => expect(confirmMock).toHaveBeenCalledOnce())
-    expect(registrationPuts).toHaveLength(0)
-    expect(toggle).not.toBeChecked()
-  })
-
-  it('saves edited rate-limit values with an operator reason (saveRateLimit)', async () => {
+  it('saves edited rate-limit values without a confirm dialog (saveRateLimit)', async () => {
     const { user } = renderEditor()
     await screen.findByDisplayValue('60')
     const maxRequests = await screen.findByDisplayValue('120')
@@ -113,7 +104,7 @@ describe('AdminRegistrationRateLimitEditor', () => {
 
     await waitFor(() => expect(rateLimitPuts).toHaveLength(1))
     expect(rateLimitPuts[0]?.body).toEqual({ window_seconds: 60, max_requests: 240 })
-    expect(rateLimitPuts[0]?.operatorReason).toBe('access review')
+    expect(rateLimitPuts[0]?.operatorReason).toBeNull()
   })
 
   it('restores saved rate-limit values without network traffic (resetRateLimit)', async () => {

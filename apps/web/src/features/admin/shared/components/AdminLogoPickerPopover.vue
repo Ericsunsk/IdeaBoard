@@ -3,7 +3,7 @@
     <PopoverAnchor v-if="anchorEl" :reference="anchorEl" />
     <PopoverPortal>
       <PopoverContent
-        class="z-50 w-[288px] max-w-[calc(100vw_-_48px)] rounded-xl border border-border bg-card p-3 text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+        class="z-admin-dialog w-[288px] max-w-[calc(100vw_-_48px)] rounded-admin-card border border-border bg-card p-3 text-foreground shadow-admin-popover outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
         :side-offset="6"
         align="start"
       >

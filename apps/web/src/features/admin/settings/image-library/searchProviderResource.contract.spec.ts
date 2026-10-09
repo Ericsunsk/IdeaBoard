@@ -108,15 +108,38 @@ describe('searchProviderResource', () => {
     expect(result).toMatchObject({ provider: 'pexels', test_state: 'passed' })
   })
 
-  it('refuses to send mutations without an operator reason', async () => {
+  it('sends update/test mutations without an operator reason while keeping the idempotency key', async () => {
+    const seen: Array<{ route: string; operatorReason: string | null; key: string | null }> = []
+    useMswHandlers(
+      http.put('/api/control/v1/platform/search/providers/unsplash', ({ request }) => {
+        seen.push({
+          route: 'update',
+          operatorReason: request.headers.get('X-Operator-Reason'),
+          key: request.headers.get('Idempotency-Key'),
+        })
+        return HttpResponse.json({ data: {} })
+      }),
+      http.post('/api/control/v1/platform/search/providers/pexels/test', ({ request }) => {
+        seen.push({
+          route: 'test',
+          operatorReason: request.headers.get('X-Operator-Reason'),
+          key: request.headers.get('Idempotency-Key'),
+        })
+        return HttpResponse.json({
+          data: { provider: 'pexels', test_state: 'passed', message: 'ok' },
+        })
+      }),
+    )
     const resource = createAdminSearchProviderResource()
 
-    await expect(
-      resource.update('unsplash', { enabled: true }, { operatorReason: '   ' }),
-    ).rejects.toThrow('需要填写操作原因')
-    await expect(resource.test('pexels', { operatorReason: '' })).rejects.toThrow(
-      '需要填写操作原因',
-    )
+    await resource.update('unsplash', { enabled: true }, { operatorReason: '   ' })
+    await resource.test('pexels', { operatorReason: '' })
+
+    expect(seen).toHaveLength(2)
+    expect(seen[0]?.operatorReason).toBeNull()
+    expect(seen[0]?.key).toMatch(/.+/)
+    expect(seen[1]?.operatorReason).toBeNull()
+    expect(seen[1]?.key).toMatch(/.+/)
   })
 
   it('maps control error codes to operator copy', async () => {

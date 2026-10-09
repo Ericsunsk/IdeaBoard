@@ -5,7 +5,10 @@ import {
 import type { ControlOAuthProviderSummary } from '../../../../shared/api/generated-query/control/model/controlOAuthProviderSummary'
 import type { ControlOAuthProviderUpdateRequest } from '../../../../shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest'
 import type { OAuthProviderCode } from '../../../../shared/auth/oauthProviders'
-import { loadControlSetting, storeControlSetting } from '../../shared/lib/controlResource'
+import { requireContractData } from '../../../../shared/api/contractKernel'
+import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
+import { loadControlSetting } from '../../shared/lib/controlResource'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 
 export type OAuthProviderSettingsSummary = {
   enabled: boolean
@@ -47,24 +50,38 @@ export function createOAuthProviderSettingsResource(): OAuthProviderSettingsReso
         fallback: '加载 OAuth Provider 设置失败，请重试',
         map: toSummary,
       }),
-    save: (provider, input, operatorReason) =>
-      storeControlSetting(
-        input,
-        { operatorReason },
-        {
-          fallback: '保存 OAuth Provider 设置失败，请重试',
-          map: toSummary,
-          toRequest: (settings: SaveOAuthProviderSettingsInput, reason: string) => ({
-            enabled: settings.enabled,
-            client_id: settings.clientId,
-            client_secret: settings.clientSecret,
-            reason,
-          }),
-          persist: (body, headers) =>
-            updateControlOAuthProvider(provider, body as ControlOAuthProviderUpdateRequest, {
-              headers,
-            }),
-        },
+    save: saveOAuthProviderSettings,
+  }
+}
+
+async function saveOAuthProviderSettings(
+  provider: OAuthProviderCode,
+  input: SaveOAuthProviderSettingsInput,
+  operatorReason: string,
+): Promise<OAuthProviderSettingsSummary> {
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const reason = operatorReason.trim()
+  try {
+    const body = await updateControlOAuthProvider(
+      provider,
+      {
+        enabled: input.enabled,
+        client_id: input.clientId,
+        client_secret: input.clientSecret,
+        reason,
+      } as ControlOAuthProviderUpdateRequest,
+      {
+        headers: buildRoutineControlMutationHeaders({ operatorReason: reason }),
+      },
+    )
+    return toSummary(
+      requireContractData<ControlOAuthProviderSummary>(
+        body,
+        '保存 OAuth Provider 设置失败，请重试',
       ),
+    )
+  } catch (error) {
+    throw withControlCopy(error, '保存 OAuth Provider 设置失败，请重试')
   }
 }

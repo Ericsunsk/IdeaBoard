@@ -6,6 +6,7 @@ import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
+import { REWARD_CODES_MESSAGES } from './messages'
 const resource = vi.hoisted(() => ({
   create: vi.fn(),
   delete: vi.fn(),
@@ -272,10 +273,14 @@ describe('AdminRewardCodesPage', () => {
       value: { writeText },
     })
     await user.click(screen.getByRole('button', { name: '复制' }))
-    expect(await screen.findByText('复制失败，请手动选择并复制 Code。')).toBeVisible()
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(REWARD_CODES_MESSAGES.plaintextCopyFailed),
+    )
+    expect(screen.queryByText(REWARD_CODES_MESSAGES.plaintextCopyFailed)).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '复制' }))
     expect(screen.getByRole('button', { name: '已复制' })).toBeVisible()
-    expect(screen.queryByText('复制失败，请手动选择并复制 Code。')).not.toBeInTheDocument()
+    expect(screen.queryByText(REWARD_CODES_MESSAGES.plaintextCopyFailed)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '我已保存' }))
     await waitFor(() => expect(screen.queryByText('ABCD12342026')).not.toBeInTheDocument())
@@ -361,8 +366,9 @@ describe('AdminRewardCodesPage', () => {
         maxRedemptions: 100,
         code: 'NEWC-ODE1-WXYZ',
       }),
-      { operatorReason: '运营复核' },
+      { operatorReason: '' },
     )
+    expect(confirm.confirm).not.toHaveBeenCalled()
     expect(await screen.findByRole('dialog', { name: '保存新 Code' })).toBeVisible()
     expect(screen.getByText('NEWC-ODE1-WXYZ')).toBeVisible()
 
@@ -401,8 +407,9 @@ describe('AdminRewardCodesPage', () => {
         maxRedemptions: 100,
         expiresAt: '',
       },
-      { operatorReason: '运营复核' },
+      { operatorReason: '' },
     )
+    expect(confirm.confirm).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog', { name: '保存新 Code' })).not.toBeInTheDocument()
   })
 
@@ -424,7 +431,7 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.queryByRole('dialog', { name: '保存新 Code' })).not.toBeInTheDocument()
   })
 
-  it('keeps the enabled intent stable while pending and after a failed Toggle', async () => {
+  it('flips the switch optimistically while pending and rolls back on Toggle failure', async () => {
     let rejectToggle: (error: Error) => void = () => undefined
     resource.setEnabled.mockReturnValueOnce(
       new Promise((_resolve, reject) => {
@@ -436,16 +443,87 @@ describe('AdminRewardCodesPage', () => {
     const toggle = screen.getByRole('switch', { name: '新用户奖励启用状态' })
 
     expect(toggle).toBeChecked()
+    expect(screen.getByText('可兑换')).toBeVisible()
     await user.click(toggle)
-    expect(screen.getByRole('switch', { name: '新用户奖励启用状态' })).toBeChecked()
-    expect(screen.getByRole('switch', { name: '新用户奖励启用状态' })).toBeDisabled()
+    await waitFor(() =>
+      expect(resource.setEnabled).toHaveBeenCalledWith(7, false, { operatorReason: '' }),
+    )
+    expect(confirm.confirm).not.toHaveBeenCalled()
+    // 乐观 intent 同 tick 翻转：同一 DOM 节点即时 unchecked + disabled，
+    // Status 胶囊仍跟服务端（可兑换），不随开关预翻。
+    const pendingToggle = screen.getByRole('switch', { name: '新用户奖励启用状态' })
+    expect(pendingToggle).toBe(toggle)
+    expect(pendingToggle).not.toBeChecked()
+    expect(pendingToggle).toBeDisabled()
+    expect(screen.getByText('可兑换')).toBeVisible()
+    expect(screen.queryByText('已停用')).not.toBeInTheDocument()
     rejectToggle(new Error('network unavailable'))
 
     await waitFor(() =>
       expect(screen.getByRole('switch', { name: '新用户奖励启用状态' })).toBeEnabled(),
     )
-    expect(screen.getByRole('switch', { name: '新用户奖励启用状态' })).toBeChecked()
+    const recoveredToggle = screen.getByRole('switch', { name: '新用户奖励启用状态' })
+    expect(recoveredToggle).toBe(toggle)
+    expect(recoveredToggle).toBeChecked()
+    expect(screen.getByText('可兑换')).toBeVisible()
     expect(toast.error).toHaveBeenCalledWith('network unavailable')
+  })
+
+  it('keeps the same Switch DOM node across a successful Toggle without remounting', async () => {
+    // 初载停用行（unchecked），后台 refetch 回填启用行，避免默认 mock 覆盖。
+    let resolveToggle!: (value: unknown) => void
+    resource.search
+      .mockResolvedValueOnce({
+        rewardCodes: [makeRewardCode({ enabled: false, status: 'disabled' })],
+        total: 21,
+        nextBeforeId: 6,
+      })
+      .mockResolvedValue({
+        rewardCodes: [makeRewardCode({ enabled: true, status: 'enabled' })],
+        total: 21,
+        nextBeforeId: 6,
+      })
+    resource.setEnabled.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveToggle = resolve
+      }),
+    )
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+    const toggle = screen.getByRole('switch', { name: '新用户奖励启用状态' })
+    expect(toggle).not.toBeChecked()
+    expect(screen.getByText('已停用')).toBeVisible()
+
+    await user.click(toggle)
+    await waitFor(() =>
+      expect(resource.setEnabled).toHaveBeenCalledWith(7, true, { operatorReason: '' }),
+    )
+    // 乐观链路同一 DOM 节点即时翻转 checked（不等服务端），胶囊仍跟服务端。
+    const pending = screen.getByRole('switch', { name: '新用户奖励启用状态' })
+    expect(pending).toBe(toggle)
+    expect(pending).toBeChecked()
+    expect(pending).toBeDisabled()
+    expect(screen.getByText('已停用')).toBeVisible()
+
+    resolveToggle(makeRewardCode({ enabled: true, status: 'enabled' }))
+    // 成功后同一节点保持 checked，胶囊跟服务端翻为可兑换，不重建。
+    const toggled = await screen.findByRole('switch', { name: '新用户奖励启用状态' })
+    expect(toggled).toBe(toggle)
+    await waitFor(() => expect(toggled).toBeChecked())
+    await waitFor(() => expect(toggled).toBeEnabled())
+    expect(await screen.findByText('可兑换')).toBeVisible()
+  })
+
+  it('pins the StatusPill width so the Switch never shifts with the status text', async () => {
+    renderPage()
+    await screen.findByText('新用户奖励')
+
+    const pill = screen.getByText('可兑换').parentElement
+    // SwitchRow：68px status 槽锁宽（style），胶囊同宽居中，开关固定位。
+    expect(screen.getByTestId('switch-row-status-slot').style.minWidth).toBe('68px')
+    expect(pill?.style.minWidth).toBe('68px')
+    expect(pill).toHaveClass('justify-center')
+    expect(screen.getByRole('switch', { name: '新用户奖励启用状态' })).toBeVisible()
   })
 
   it('confirms deletion and preserves a row when the backend rejects a redeemed Code', async () => {

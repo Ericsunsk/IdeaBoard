@@ -22,6 +22,8 @@ test('native authentication security configuration stays explicit', async (t) =>
       registrationEnabled: false,
       windowSeconds: 60,
       maxRequests: 30,
+      lockoutThreshold: 10,
+      lockoutDurationSeconds: 900,
     }),
   })
   const options = createBetterAuthOptions({

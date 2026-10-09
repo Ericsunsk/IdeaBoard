@@ -5,14 +5,9 @@ import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))
-const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('oauth update'))
-vi.mock('../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
-}))
 import type { OAuthProviderSettingsResource, OAuthProviderSettingsSummary } from './resource'
 
-const toast = vi.hoisted(() => ({ success: vi.fn() }))
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../shared/lib/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../shared/lib/toast')>()),
@@ -57,7 +52,11 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(within(dialog).getByRole('group', { name: 'OAuth 登录方式' })).toBeVisible()
     expect(within(dialog).getAllByRole('switch')).toHaveLength(2)
     expect(within(dialog).queryByText('Google 登录')).not.toBeInTheDocument()
-    expect(within(dialog).getByText('已启用')).toBeVisible()
+    // 方案 A：启用表达只用开关，凭据区冗余 Status pill 已删除。
+    expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('未启用')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Google 登录' })).toBeChecked()
+    expect(within(dialog).getByRole('switch', { name: 'Discord 登录' })).toBeChecked()
     expect(within(dialog).getByLabelText('OAuth Provider')).toHaveTextContent('Google')
     const callback = within(dialog).getByLabelText('Callback URL') as HTMLInputElement
     expect(callback).toHaveValue('https://example.com/api/auth/callback/google')
@@ -101,7 +100,7 @@ describe('OAuthProviderSettingsDialog', () => {
           clientId: 'google-client.apps.googleusercontent.com',
           clientSecret: '',
         },
-        'oauth update',
+        '',
       ),
     )
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(4))
@@ -109,6 +108,54 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(toast.success).toHaveBeenCalledWith('Google OAuth 设置已保存')
   })
 
+  it('routes save failure to toast error without an inline alert', async () => {
+    vi.mocked(resource.save).mockRejectedValueOnce(new Error('toast-probe-save'))
+    const { user } = renderDialog()
+    const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
+    await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
+
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-save')),
+    )
+    expect(toast.success).not.toHaveBeenCalled()
+    // 精简目标：saveError 内嵌 AdminAlert 已删除，失败一律 toast。
+    expect(within(dialog).queryByText(/toast-probe-save/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    // 方案 A：启用真相源是开关（Status pill 已删除），弹窗保持打开可重试。
+    expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Google 登录' })).toBeChecked()
+  })
+
+  it('routes incomplete provider to toast error without an inline alert', async () => {
+    vi.mocked(resource.get).mockImplementation(async (provider) =>
+      provider === 'discord'
+        ? {
+            ...configuredSummary,
+            enabled: false,
+            configured: false,
+            clientId: '',
+            clientSecretConfigured: false,
+          }
+        : configuredSummary,
+    )
+    const { user } = renderDialog()
+    const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
+    await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
+
+    const switches = within(dialog).getAllByRole('switch')
+    await user.click(switches[1]!)
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('请先配置 Discord 的 Client ID 和 Client Secret'),
+      ),
+    )
+    expect(resource.save).not.toHaveBeenCalled()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+  })
   it('renders a retryable load error and disables Save', async () => {
     vi.mocked(resource.get).mockRejectedValueOnce(new Error('auth unavailable'))
     renderDialog()

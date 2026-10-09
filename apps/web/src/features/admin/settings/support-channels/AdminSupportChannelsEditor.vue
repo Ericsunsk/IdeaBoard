@@ -22,11 +22,6 @@
       >
     </div>
 
-    <AdminAlert v-if="query.error.value" severity="error">
-      {{ M.supportLoadFailed }}
-      <AdminButton variant="outline" @click="query.refetch()">{{ M.retry }}</AdminButton>
-    </AdminAlert>
-
     <!-- 全局标准表格 -->
     <div :class="adminTableCardClass">
       <AdminTable
@@ -142,7 +137,6 @@
       </AdminTable>
     </div>
 
-    <AdminAlert v-if="validationError" severity="error">{{ validationError }}</AdminAlert>
     <AdminEditorActions
       :save-disabled="disabled || !isDirty"
       :reset-disabled="disabled || !isDirty"
@@ -157,7 +151,6 @@
 import { computed } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { NavArrowDown, NavArrowUp, Plus, Trash } from '@iconoir/vue'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
@@ -167,8 +160,6 @@ import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminSelect from '../../shared/components/AdminSelect.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import {
   adminTableCardClass,
   adminTableClass,
@@ -192,15 +183,12 @@ import {
 const props = defineProps<{ resource?: AdminSupportChannelsResource }>()
 const resource = props.resource ?? createAdminSupportChannelsResource()
 const queryClient = useQueryClient()
-const confirm = useAdminConfirm()
 const query = useQuery({ queryKey: supportChannelsQueryKey, queryFn: () => resource.get() })
 const mutation = useMutation({
-  mutationFn: (input: { draft: SupportChannelsSetting; reason: string }) =>
-    resource.update(input.draft, input.reason),
+  mutationFn: (draft: SupportChannelsSetting) => resource.update(draft, ''),
 })
 const loading = computed(() => query.isPending.value || query.isFetching.value)
 const saving = computed(() => mutation.isPending.value)
-let operatorReason = ''
 const lifecycle = useSettingsLifecycle<SupportChannelsSetting>({
   defaultValue: { channels: [] },
   source: query.data,
@@ -236,14 +224,14 @@ const lifecycle = useSettingsLifecycle<SupportChannelsSetting>({
     }
     return ''
   },
-  save: (draft) => mutation.mutateAsync({ draft, reason: operatorReason }),
+  save: (draft) => mutation.mutateAsync(draft),
   synchronizeCache: async (saved) => {
     queryClient.setQueryData(supportChannelsQueryKey, saved)
     await queryClient.invalidateQueries({ queryKey: SUPPORT_CHANNELS_QUERY_KEY })
   },
   feedback: useAdminSupportChannelsFeedback(),
 })
-const { form, isDirty, reset, validationError } = lifecycle
+const { form, isDirty, reset } = lifecycle
 const disabled = computed(() => loading.value || saving.value || Boolean(query.error.value))
 const kindOptions = supportChannelKinds.map((kind) => ({
   value: kind,
@@ -266,12 +254,8 @@ function move(index: number, offset: number) {
   if (channel) form.value.channels.splice(target, 0, channel)
 }
 async function save() {
-  const reason = await confirmSettingsSave(confirm, {
-    title: M.supportSave,
-    message: M.supportSaveConfirm,
-  })
-  if (!reason) return
-  operatorReason = reason
+  // Routine config write (backend ReasonOptional): save directly without
+  // the confirm dialog; the audit records an empty reason.
   await lifecycle.save()
 }
 </script>

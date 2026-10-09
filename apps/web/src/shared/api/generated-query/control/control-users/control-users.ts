@@ -12,11 +12,13 @@
  * Public capabilities never imply control capabilities.
  *
  * Mutations: every POST/PUT/PATCH/DELETE requires a header-only
- * Idempotency-Key and an operator reason (reason/operator_note body field
- * or X-Operator-Reason header), else 400. Every guarded call emits a
- * Control AuditRecord (operator, target, capability, request_id,
- * idempotency key, reason, outcome, timestamp); audit records never enter
- * the public event layer.
+ * Idempotency-Key, else 400. High-risk mutations additionally require an
+ * operator reason (reason/operator_note body field or X-Operator-Reason
+ * header), else 400; routine config mutations (x-audit reason: false)
+ * accept an optional reason and audit the empty reason as-is. Every
+ * guarded call emits a Control AuditRecord (operator, target,
+ * capability, request_id, idempotency key, reason, outcome, timestamp);
+ * audit records never enter the public event layer.
  *
  * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
@@ -972,7 +974,7 @@ export const getUpdateControlOAuthProviderUrl = (provider: string) => {
 
 /**
  * Updates the social login channel (enabled, client_id, client_secret) through the Auth-owned social-provider seam. reason/operator_note body fields are tolerated so a body-carried operator note survives strict binding; the guard already enforced its presence.
- * @summary Update one social OAuth provider channel (operator reason required)
+ * @summary Update one social OAuth provider channel (operator reason optional)
  */
 export const updateControlOAuthProvider = async (
   provider: string,
@@ -1066,7 +1068,7 @@ export type UpdateControlOAuthProviderMutationVariables = {
 }
 
 /**
- * @summary Update one social OAuth provider channel (operator reason required)
+ * @summary Update one social OAuth provider channel (operator reason optional)
  */
 export const useUpdateControlOAuthProvider = <
   TError =

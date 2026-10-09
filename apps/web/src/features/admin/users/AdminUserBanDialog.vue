@@ -10,8 +10,8 @@
     <template #header>
       <div :class="[adminDialogHeaderContentClass, 'pr-4']">
         <div class="mb-3 flex flex-wrap gap-2">
-          <AdminBadge severity="secondary">{{ USERS_MESSAGES.banAccessBadge }}</AdminBadge>
-          <AdminBadge severity="danger">{{ USERS_MESSAGES.banForceBadge }}</AdminBadge>
+          <AdminBadge variant="secondary">{{ USERS_MESSAGES.banAccessBadge }}</AdminBadge>
+          <AdminBadge variant="danger">{{ USERS_MESSAGES.banForceBadge }}</AdminBadge>
         </div>
         <h2 :class="adminDialogTitleClass">{{ USERS_MESSAGES.banTitle }}</h2>
         <p class="mt-2.5 mb-0 text-admin-content leading-7 text-muted-foreground">
@@ -22,7 +22,7 @@
 
     <label
       for="admin-ban-duration-select"
-      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
     >
       <span>{{ USERS_MESSAGES.banDurationLabel }}</span>
       <AdminSelect
@@ -35,7 +35,7 @@
     </label>
     <label
       for="admin-ban-reason-textarea"
-      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
     >
       <span>{{ USERS_MESSAGES.banReasonLabel }}</span>
       <AdminTextarea

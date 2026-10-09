@@ -65,15 +65,36 @@ describe('OAuth Provider settings resource', () => {
     expect(key).toBeTruthy()
   })
 
-  it('refuses unaudited writes and surfaces control errors with copy', async () => {
-    await expect(
-      createOAuthProviderSettingsResource().save(
-        'google',
-        { enabled: true, clientId: 'id', clientSecret: 'secret' },
-        ' ',
-      ),
-    ).rejects.toThrow('需要填写操作原因')
+  it('saves without an operator reason while keeping the idempotency key', async () => {
+    let body: unknown
+    let reason: string | null = 'unset'
+    let key: string | null = null
+    useMswHandlers(
+      http.put('/api/control/v1/users/oauth/google', async ({ request }) => {
+        body = await request.json()
+        reason = request.headers.get('X-Operator-Reason')
+        key = request.headers.get('Idempotency-Key')
+        return HttpResponse.json({ data: { ...CONTROL_SUMMARY, enabled: false } })
+      }),
+    )
 
+    const saved = await createOAuthProviderSettingsResource().save(
+      'google',
+      { enabled: false, clientId: 'google-client.apps.googleusercontent.com', clientSecret: '' },
+      ' ',
+    )
+    expect(saved).toEqual({ ...VIEW_SUMMARY, enabled: false })
+    expect(body).toMatchObject({
+      enabled: false,
+      client_id: 'google-client.apps.googleusercontent.com',
+      client_secret: '',
+      reason: '',
+    })
+    expect(reason).toBeNull()
+    expect(key).toBeTruthy()
+  })
+
+  it('surfaces control errors with copy', async () => {
     useMswHandlers(
       http.get('/api/control/v1/users/oauth/google', () => HttpResponse.json({ data: null })),
     )

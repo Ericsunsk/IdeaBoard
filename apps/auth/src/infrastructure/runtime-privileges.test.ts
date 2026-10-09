@@ -34,11 +34,40 @@ test('configureAuthRuntimePrivileges grants only Better Auth tables atomically',
     queries[5] || '',
     /GRANT EXECUTE ON FUNCTION "public"\.get_auth_runtime_settings\(\) TO "ideaboard_auth"/,
   )
+  assert.match(
+    queries[6] || '',
+    /GRANT EXECUTE ON FUNCTION "public"\.get_auth_login_lockout_settings\(\) TO "ideaboard_auth"/,
+  )
   assert.equal(queries.at(-1), 'COMMIT')
   assert.equal(
     queries.some((sql) => sql.includes('credit_')),
     false,
   )
+})
+
+test('configureAuthRuntimePrivileges uses the configured role and schema for login lockout', async () => {
+  const queries: string[] = []
+  const client = {
+    async query(sql: string) {
+      queries.push(sql)
+      return { rows: sql === 'SELECT current_schema()' ? [{ current_schema: 'tenant"auth' }] : [] }
+    },
+    release() {},
+  }
+  const pool = { connect: async () => client } as unknown as Pool
+
+  await configureAuthRuntimePrivileges(pool, ' custom"auth ')
+
+  assert.ok(
+    queries.includes(
+      'GRANT EXECUTE ON FUNCTION "tenant""auth".get_auth_login_lockout_settings() TO "custom""auth"',
+    ),
+  )
+  assert.equal(
+    queries.some((sql) => sql.includes('ideaboard_auth')),
+    false,
+  )
+  assert.equal(queries.at(-1), 'COMMIT')
 })
 
 test('verifyAuthRuntimePrivileges rejects a role that can write Credits', async () => {
@@ -86,6 +115,19 @@ for (const { name, row, expected } of [
       can_execute_credit_functions: false,
     },
     expected: /execute_auth_settings=false/,
+  },
+  {
+    name: 'a role without the login-lockout settings seam',
+    row: {
+      current_user: 'ideaboard_auth',
+      can_execute_auth_settings: true,
+      can_execute_auth_lockout_settings: false,
+      can_read_system_configs: false,
+      can_read_auth_users: true,
+      can_write_credits: false,
+      can_execute_credit_functions: false,
+    },
+    expected: /execute_auth_lockout_settings=false/,
   },
   {
     name: 'direct access to raw system settings',

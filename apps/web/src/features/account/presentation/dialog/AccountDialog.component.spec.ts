@@ -2,6 +2,7 @@ import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountDialog from './AccountDialog.vue'
 import { renderWithUser, screen } from '../../../../test/render'
+import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
 import { defaultAccountTab, type AccountTab } from '../../domain'
 
 const DialogRootStub = defineComponent({
@@ -132,6 +133,14 @@ describe('AccountDialog', () => {
     renderAccountDialog(true)
 
     expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass('shadow-xl')
+  })
+
+  it('reuses the shared dialog mask token for the overlay veil (no dialog-specific overlay token)', () => {
+    expect(ibDialogMaskClass).toContain('var(--color-dialog-mask)')
+
+    renderAccountDialog(true)
+
+    expect(screen.getByTestId('account-dialog-mask')).toHaveClass('!bg-[var(--color-dialog-mask)]')
   })
 
   it('renders dialog-ready account management content when visible', () => {

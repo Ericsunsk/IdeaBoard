@@ -133,7 +133,7 @@ const brandMarkClass = computed(() =>
   ),
 )
 const loginCardClass =
-  'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[var(--radius-board-dialog)] border border-border bg-card shadow-login-card'
+  'admin-login-card w-admin-login-card overflow-hidden rounded-[var(--radius-board-dialog)] border border-border bg-card shadow-login-card'
 
 const loading = ref(false)
 const showPassword = ref(false)

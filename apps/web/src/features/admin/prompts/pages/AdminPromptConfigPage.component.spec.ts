@@ -12,13 +12,6 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
   useAdminToast: () => toast,
 }))
 
-vi.mock('../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({
-    confirm: vi.fn().mockResolvedValue(true),
-    readReason: () => 'prompt review',
-  }),
-}))
-
 describe('AdminPromptConfigPage', () => {
   let storedPrompts: Array<{ feature_slug: string; prompt: string; updated_at?: string }> = []
 

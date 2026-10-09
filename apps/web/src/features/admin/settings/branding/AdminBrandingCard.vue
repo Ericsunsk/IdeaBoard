@@ -28,7 +28,7 @@
 
           <button
             v-if="brandingForm.logo_url"
-            class="absolute -top-1.5 -right-1.5 z-10 grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground leading-none shadow-xs transition-colors hover:text-destructive focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
+            class="absolute -top-1.5 -right-1.5 z-admin-sticky grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground leading-none shadow-xs transition-colors hover:text-destructive focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
             :class="
               brandingLoading || brandingSaving || uploading
                 ? 'opacity-40'
@@ -133,7 +133,6 @@ import {
   useAdminBrandingSettingsFeedback,
   useAdminUnsupportedLogoFileFeedback,
 } from '../shared/useSettingsFeedback'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminLogoButtonClass } from '../../shared/lib/uiClasses'
 import { SETTINGS_MESSAGES } from '../pages/messages'
 
@@ -154,7 +153,6 @@ const brandingLogoButtonClass = [
 
 const branding = useBrandingSettings({
   feedback: useAdminBrandingSettingsFeedback(),
-  confirm: useAdminConfirm(),
 })
 const unsupportedLogoFileFeedback = useAdminUnsupportedLogoFileFeedback()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)

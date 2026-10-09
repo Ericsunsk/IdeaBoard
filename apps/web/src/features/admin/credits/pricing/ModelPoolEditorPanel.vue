@@ -49,12 +49,13 @@
             {{ resolution.toUpperCase() }}
           </button>
         </div>
-        <p
-          v-if="showError && entry.enabled && entry.resolutions.length === 0"
-          class="text-xs text-destructive"
-          role="alert"
-        >
-          {{ BILLING_PRICING_MESSAGES.poolEnabledWithoutResolution }}
+        <!-- 错误行恒占一行高度：无错误时留空，避免校验出现时纵向重排。 -->
+        <p class="min-h-4 text-xs text-destructive" role="alert">
+          {{
+            poolEntryErrorVisible(entry)
+              ? BILLING_PRICING_MESSAGES.poolEnabledWithoutResolution
+              : ''
+          }}
         </p>
       </li>
     </ul>
@@ -186,6 +187,10 @@ function setEnabled(index: number, enabled: boolean) {
   if (entry) entry.enabled = enabled
 }
 
+function poolEntryErrorVisible(entry: AdminModelPoolEntry): boolean {
+  return showError.value && entry.enabled && entry.resolutions.length === 0
+}
+
 function toggleResolution(index: number, resolution: PoolResolution) {
   const entry = draft.value[index]
   if (!entry) return
@@ -209,7 +214,7 @@ function addSelected() {
 
 function resolutionBadgeClass(on: boolean): string {
   return on
-    ? 'rounded px-1.5 py-0.5 font-mono text-admin-caption font-bold text-foreground bg-primary/15 ring-1 ring-inset ring-primary/40 cursor-pointer'
+    ? 'rounded px-1.5 py-0.5 font-mono text-admin-caption font-bold text-foreground bg-primary-faint-strong ring-1 ring-inset ring-primary-line-strong cursor-pointer'
     : 'rounded px-1.5 py-0.5 font-mono text-admin-caption text-muted-foreground bg-muted cursor-pointer'
 }
 

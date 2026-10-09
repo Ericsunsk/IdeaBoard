@@ -3,24 +3,20 @@
     :icon="SETTINGS_SECTIONS.outbound.icon"
     :title="SETTINGS_SECTIONS.outbound.title"
     :description="SETTINGS_MESSAGES.outboundDescription"
-    :status="props.plain ? undefined : statusLabel"
-    :status-severity="props.plain ? undefined : statusSeverity"
     :plain="props.plain"
     :class="props.class"
   >
+    <template #header-actions>
+      <AdminStatusPill v-if="!props.plain && statusLabel" :label="statusLabel" variant="neutral" />
+    </template>
     <template #default>
       <div class="flex flex-col gap-5">
-        <AdminAlert v-if="error" severity="error">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <span>{{ SETTINGS_MESSAGES.outboundLoadFailed }}</span>
-            <ActionButton variant="outline" @click="refetch()">
-              {{ SETTINGS_MESSAGES.retry }}
-            </ActionButton>
-          </div>
-        </AdminAlert>
-        <AdminAlert v-else-if="loading && !setting" severity="secondary">
-          {{ SETTINGS_MESSAGES.outboundLoading }}
-        </AdminAlert>
+        <div v-if="loading && !setting" class="flex items-center gap-2" role="status">
+          <AdminSpinner class="size-4" :aria-label="SETTINGS_MESSAGES.outboundLoading" />
+          <span class="text-admin-body text-muted-foreground">{{
+            SETTINGS_MESSAGES.outboundLoading
+          }}</span>
+        </div>
 
         <AdminFormField
           v-slot="{ describedbyId }"
@@ -37,10 +33,6 @@
             :aria-describedby="describedbyId"
           />
         </AdminFormField>
-
-        <AdminAlert v-if="validationError" severity="error">
-          {{ validationError }}
-        </AdminAlert>
       </div>
     </template>
 
@@ -58,15 +50,14 @@
 
 <script setup lang="ts">
 import { computed, type HTMLAttributes } from 'vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminEditorActions from '../../shared/components/AdminEditorActions.vue'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
+import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminTextarea from '../../shared/components/AdminTextarea.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import SettingEditorCard from '../shared/SettingEditorCard.vue'
 import { SETTINGS_SECTIONS } from '../shared/sections'
 import { SETTINGS_MESSAGES } from '../pages/messages'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { useOutboundPolicy } from './useOutboundPolicy'
 import { useAdminOutboundPolicyFeedback } from '../shared/useSettingsFeedback'
 
@@ -79,20 +70,15 @@ const props = withDefaults(
 )
 
 const feedback = useAdminOutboundPolicyFeedback()
-const confirm = useAdminConfirm()
-const { error, form, loading, refetch, reset, save, saving, setting, validationError } =
-  useOutboundPolicy({ feedback, confirm })
+const { error, form, loading, reset, save, saving, setting } = useOutboundPolicy({ feedback })
 
 const controlsDisabled = computed(() => loading.value || saving.value || Boolean(error.value))
+// 方案 A：加载中/加载失败不进 Status（只 toast），Status 仅反映已加载的真相源；
+// 已额外放行是正常态（非默认但正常），走中性 secondary，不用 warn 黄。
 const statusLabel = computed(() => {
-  if (error.value) return SETTINGS_MESSAGES.settingsLoadFailed
-  if (!setting.value) return SETTINGS_MESSAGES.settingsLoading
+  if (error.value) return undefined
+  if (!setting.value) return undefined
   const count = setting.value.allow_hosts.length
   return count ? SETTINGS_MESSAGES.outboundExtraAllowed(count) : SETTINGS_MESSAGES.outboundNoneExtra
-})
-const statusSeverity = computed(() => {
-  if (error.value) return 'danger'
-  if (!setting.value) return 'secondary'
-  return setting.value.allow_hosts.length ? 'warn' : 'secondary'
 })
 </script>

@@ -2,7 +2,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
+import { requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import {
@@ -176,16 +176,10 @@ export function useAdminModelCatalogWorkspace(
           return model
         })
         if (enrichedCount > 0) {
-          // Best-effort enrichment still writes through control, so it
-          // needs an operator reason like any other catalog save.
-          const operatorReason = await confirmSettingsSave(adminConfirm, {
-            title: '保存模型富化结果',
-            message: `探测补全了 ${enrichedCount} 个模型的官方简介或上下文信息，确定保存吗？该操作将记录操作人与原因。`,
-            confirmLabel: '保存',
-          })
-          if (operatorReason) {
-            await resource.save(currentList, { operatorReason })
-          }
+          // Best-effort enrichment writes through control as a routine
+          // config write (backend ReasonOptional): no confirm dialog, the
+          // audit records an empty reason.
+          await resource.save(currentList, { operatorReason: '' })
         }
       } catch {
         // 探测富化是 best-effort：网络异常不阻塞刷新，列表仍按服务端当前数据展示。
@@ -221,15 +215,11 @@ export function useAdminModelCatalogWorkspace(
         addDialogVisible.value = false
         return
       }
-      const operatorReason = await confirmSettingsSave(adminConfirm, {
-        title: '导入模型',
-        message: `确定导入 ${toAdd.length} 个模型吗？该操作将记录操作人与原因。`,
-        confirmLabel: '导入',
-      })
-      if (!operatorReason) return
+      // Routine config write (backend ReasonOptional): import directly
+      // without the confirm dialog; the audit records an empty reason.
       await saveCatalogMutation.mutateAsync({
         items: [...toAdd, ...allModels.value],
-        operatorReason,
+        operatorReason: '',
       })
       addDialogVisible.value = false
       feedback.imported(toAdd.length)
@@ -275,13 +265,9 @@ export function useAdminModelCatalogWorkspace(
         }
         nextList = [item, ...allModels.value]
       }
-      const operatorReason = await confirmSettingsSave(adminConfirm, {
-        title: editingModel.value ? '保存模型' : '新增模型',
-        message: `确定保存模型「${item.name} (${item.id})」吗？该操作将记录操作人与原因。`,
-        confirmLabel: '保存',
-      })
-      if (!operatorReason) return
-      await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason })
+      // Routine config write (backend ReasonOptional): save directly
+      // without the confirm dialog; the audit records an empty reason.
+      await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason: '' })
       editDialogVisible.value = false
       feedback.saved(editingModel.value != null)
       editingModel.value = null

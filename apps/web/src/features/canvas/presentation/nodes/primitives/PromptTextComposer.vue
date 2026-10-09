@@ -196,7 +196,7 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
  * ring as the primary indicator.
  */
 .prompt-text-composer.variant-node:focus-within {
-  border-radius: 8px;
+  border-radius: var(--canvas-radius-md);
   box-shadow: 0 0 0 2px var(--focus-outline-color);
 }
 

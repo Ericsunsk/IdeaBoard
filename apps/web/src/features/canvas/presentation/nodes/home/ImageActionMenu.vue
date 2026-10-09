@@ -385,7 +385,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
 .image-action-strength-range::-webkit-slider-runnable-track {
   height: var(--canvas-range-track-height);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(
     90deg,
     var(--image-action-strength-fill) 0%,
@@ -410,14 +410,14 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
 .image-action-strength-range::-moz-range-track {
   height: var(--canvas-range-track-height);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--canvas-range-track-background);
 }
 
 .image-action-strength-range::-moz-range-progress {
   height: var(--canvas-range-track-height);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--image-action-strength-fill);
 }
 

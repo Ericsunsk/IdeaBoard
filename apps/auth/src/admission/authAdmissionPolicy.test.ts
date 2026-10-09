@@ -13,6 +13,8 @@ describe('AuthAdmissionPolicy', () => {
           registrationEnabled: false,
           windowSeconds: 60,
           maxRequests: 1,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         }
       },
       isMailReady: async () => {
@@ -50,6 +52,8 @@ describe('AuthAdmissionPolicy', () => {
           registrationEnabled: true,
           windowSeconds: 60,
           maxRequests: 1,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         }
       },
       isMailReady: async () => {
@@ -80,6 +84,8 @@ describe('AuthAdmissionPolicy', () => {
         registrationEnabled,
         windowSeconds: 60,
         maxRequests: 30,
+        lockoutThreshold: 10,
+        lockoutDurationSeconds: 900,
       }),
       isMailReady: async () => true,
     })
@@ -103,6 +109,8 @@ describe('AuthAdmissionPolicy', () => {
         registrationEnabled: true,
         windowSeconds: 60,
         maxRequests: 1,
+        lockoutThreshold: 10,
+        lockoutDurationSeconds: 900,
       }),
       isMailReady: async () => isMailReady,
     })
@@ -137,6 +145,8 @@ describe('AuthAdmissionPolicy', () => {
           registrationEnabled: true,
           windowSeconds: 60,
           maxRequests: 30,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         }
       },
       getSocialProviderReadiness: async () => {
@@ -166,6 +176,8 @@ describe('AuthAdmissionPolicy', () => {
           registrationEnabled: true,
           windowSeconds: 60,
           maxRequests: 30,
+          lockoutThreshold: 10,
+          lockoutDurationSeconds: 900,
         }
       },
     })
@@ -202,6 +214,8 @@ describe('AuthAdmissionPolicy', () => {
         registrationEnabled: true,
         windowSeconds: 60,
         maxRequests: 30,
+        lockoutThreshold: 10,
+        lockoutDurationSeconds: 900,
       }),
     })
 
@@ -230,6 +244,8 @@ describe('AuthAdmissionPolicy', () => {
         registrationEnabled: true,
         windowSeconds: 60,
         maxRequests: 30,
+        lockoutThreshold: 10,
+        lockoutDurationSeconds: 900,
       }),
     })
 
@@ -255,6 +271,8 @@ describe('AuthAdmissionPolicy', () => {
         registrationEnabled: false,
         windowSeconds: 60,
         maxRequests: 30,
+        lockoutThreshold: 10,
+        lockoutDurationSeconds: 900,
       }),
     })
 

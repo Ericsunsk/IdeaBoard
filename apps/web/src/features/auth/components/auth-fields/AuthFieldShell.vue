@@ -31,12 +31,22 @@
             required: slotRequired,
           }"
         />
+        <span
+          v-if="loading"
+          class="pointer-events-none absolute top-1/2 right-3.5 z-10 flex -translate-y-1/2 items-center justify-center text-muted-foreground"
+        >
+          <span role="status" class="flex items-center">
+            <Spinner class="size-4 shrink-0" aria-hidden="true" />
+            <span class="sr-only">{{ loadingLabel }}</span>
+          </span>
+        </span>
       </div>
     </template>
   </IbFormField>
 </template>
 
 <script setup lang="ts">
+import { Spinner } from '@/components/ui/spinner'
 import IbFormField, {
   type IbFormFieldSlotProps,
 } from '../../../../shared/components/IbFormField.vue'
@@ -50,6 +60,8 @@ withDefaults(
     fieldClass?: string
     iconClass?: string | undefined
     required?: boolean
+    loading?: boolean
+    loadingLabel?: string | undefined
   }>(),
   {
     error: '',
@@ -57,6 +69,8 @@ withDefaults(
     fieldClass: '',
     iconClass: ibFormInputIconClass,
     required: true,
+    loading: false,
+    loadingLabel: 'Sending…',
   },
 )
 

@@ -12,11 +12,13 @@
  * Public capabilities never imply control capabilities.
  *
  * Mutations: every POST/PUT/PATCH/DELETE requires a header-only
- * Idempotency-Key and an operator reason (reason/operator_note body field
- * or X-Operator-Reason header), else 400. Every guarded call emits a
- * Control AuditRecord (operator, target, capability, request_id,
- * idempotency key, reason, outcome, timestamp); audit records never enter
- * the public event layer.
+ * Idempotency-Key, else 400. High-risk mutations additionally require an
+ * operator reason (reason/operator_note body field or X-Operator-Reason
+ * header), else 400; routine config mutations (x-audit reason: false)
+ * accept an optional reason and audit the empty reason as-is. Every
+ * guarded call emits a Control AuditRecord (operator, target,
+ * capability, request_id, idempotency key, reason, outcome, timestamp);
+ * audit records never enter the public event layer.
  *
  * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
@@ -1463,7 +1465,7 @@ export const getUpdateControlRewardCodeUrl = (id: number) => {
 
 /**
  * Data shape is ControlUpdatedRewardCode inside the legacy admin envelope. Lowering max_redemptions below redemption_count renders 409 reward_code_cap_invalid.
- * @summary Update a reward code (operator reason required)
+ * @summary Update a reward code (operator reason optional)
  */
 export const updateControlRewardCode = async (
   id: number,
@@ -1556,7 +1558,7 @@ export type UpdateControlRewardCodeMutationVariables = {
 }
 
 /**
- * @summary Update a reward code (operator reason required)
+ * @summary Update a reward code (operator reason optional)
  */
 export const useUpdateControlRewardCode = <
   TError =
@@ -1694,7 +1696,7 @@ export const getSetControlRewardCodeEnabledUrl = (id: number) => {
 
 /**
  * Data shape is ControlRewardCode inside the legacy admin envelope.
- * @summary Enable or disable a reward code (operator reason required)
+ * @summary Enable or disable a reward code (operator reason optional)
  */
 export const setControlRewardCodeEnabled = async (
   id: number,
@@ -1788,7 +1790,7 @@ export type SetControlRewardCodeEnabledMutationVariables = {
 }
 
 /**
- * @summary Enable or disable a reward code (operator reason required)
+ * @summary Enable or disable a reward code (operator reason optional)
  */
 export const useSetControlRewardCodeEnabled = <
   TError =

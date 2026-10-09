@@ -55,6 +55,52 @@
   --color-admin-accent-soft: rgba(146, 120, 230, 0.08);
   --color-admin-accent-softer: rgba(146, 120, 230, 0.05);
   --color-admin-focus-ring: rgba(146, 120, 230, 0.18);
+  /*
+   * Primary transparent tiers (accent-faint family). Derived from
+   * --color-primary via color-mix so they track the brand violet in light
+   * mode and the white accent in dark mode with no per-mode redeclaration.
+   * Covers the bg-primary/*, border-primary/*, and ring-primary/* carriers
+   * used across Admin surfaces.
+   */
+  --color-primary-faint: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  --color-primary-faint-soft: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  --color-primary-faint-strong: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  --color-primary-faintest: color-mix(in srgb, var(--color-primary) 3%, transparent);
+  --color-primary-line: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  --color-primary-line-strong: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  --color-primary-line-emphasis: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  --color-primary-line-bold: color-mix(in srgb, var(--color-primary) 60%, transparent);
+  /*
+   * Task status glow/bloom pair (monitor domain visual contract). The banner
+   * gradient start (glow) and end stop (wash) plus the dot halo rings live
+   * here so table and detail views share one source instead of raw rgba().
+   */
+  --color-admin-status-default-glow: rgba(152, 162, 179, 0.12);
+  --color-admin-status-pending-glow: rgba(71, 117, 168, 0.1);
+  --color-admin-status-running-glow: rgba(164, 105, 37, 0.1);
+  --color-admin-status-success-glow: rgba(40, 134, 97, 0.1);
+  --color-admin-status-danger-glow: rgba(201, 74, 86, 0.095);
+  --color-admin-status-wash: rgba(255, 255, 255, 0.74);
+  /*
+   * Provider brand hues (model catalog badges). Semantic success/info/warning
+   * cover openai/google/workers; the four hues below have no semantic
+   * equivalent, so each provider owns one token and derives soft/border
+   * carriers via opacity modifiers.
+   */
+  --color-provider-purple: #7e22bb;
+  --color-provider-orange: #c2410c;
+  --color-provider-blue: #1d4ed8;
+  --color-provider-rose: #be123c;
+  /* Overlay scrims (mobile drawer veil vs dialog/drawer veil). */
+  --color-scrim: rgba(0, 0, 0, 0.4);
+  --color-scrim-soft: rgba(0, 0, 0, 0.3);
+  /*
+   * Image overlay action fills (search result cards). Translucent black pills
+   * floating over imagery/scrims; distinct from the full-veil scrims above.
+   * Search keeps its overlay-btn aliases sourced from these two.
+   */
+  --color-overlay-btn-bg: rgba(0, 0, 0, 0.42);
+  --color-overlay-btn-bg-hover: rgba(0, 0, 0, 0.68);
   --color-admin-surface-muted: var(--palette-light-2);
   --color-admin-surface-hover: var(--palette-light-hover);
   --color-admin-surface-pressed: var(--palette-light-surface-pressed);
@@ -106,6 +152,12 @@
   --color-canvas-accent-hover: #7a6bd5;
   --color-canvas-accent-pressed: #6d5fd0;
   --color-canvas-accent-soft: var(--color-brand-creative-accent-soft);
+  /*
+   * Tonal-range wash (retouch/editing gradient end stop, segmented active
+   * fill). Pinned to the Tier-3 soft value so the surface-skin alias resolves
+   * identically with or without var() support.
+   */
+  --color-canvas-accent-wash: rgba(122, 107, 213, 0.08);
   --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
   --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
   --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
@@ -295,6 +347,7 @@
   --color-destructive: var(--primitive-red-500);
   --color-destructive-hover: var(--primitive-red-600);
   --color-destructive-foreground: var(--color-admin-text-inverse);
+  --color-destructive-soft: rgb(239 68 68 / 15%);
   --color-success: #16a34a;
   --color-success-hover: #15803d;
   --color-success-foreground: var(--palette-light-1);
@@ -316,9 +369,29 @@
   --radius-panel: 14px;
   --radius-overlay: 14px;
   --radius-pill: 999px;
+  /* Admin chrome radius aliases (zero-delta: match the framework scale). */
+  --radius-admin-card: 12px;
+  --radius-admin-control: 8px;
+  --radius-admin-chip: 6px;
+
+  /* Admin layout spacing (shell/popover/drawer/empty-state/login widths). */
+  --spacing-admin-shell: 1600px;
+  --spacing-admin-popover: 340px;
+  --spacing-admin-drawer: min(38rem, calc(100vw - 1rem));
+  --spacing-admin-empty-state: 260px;
+  --spacing-admin-login-card: min(420px, 100%);
+
+  /* Admin display weights for optical one-offs between semibold and bold. */
+  --font-weight-admin-strong: 650;
+  --font-weight-admin-emphasis: 680;
+  --font-weight-admin-display: 760;
 
   /* ── App stacking layers (ascending numeric order is the contract) ── */
   --z-content: 1;
+  --z-admin-sticky: 10;
+  --z-admin-header: 30;
+  --z-admin-overlay: 40;
+  --z-admin-dialog: 50;
   --z-popover: 80;
   --z-banner: 1200;
   --z-lightbox: 2000;
@@ -335,6 +408,19 @@
   /* Neutral slate entry shadow for the Admin login card (kept distinct from
      the brand-tinted auth shell glow). */
   --shadow-login-card: 0 24px 70px rgba(45, 64, 89, 0.12);
+  /*
+   * Admin elevation tiers. Aliases of the framework shadow scale so overlay
+   * chrome (dialog/drawer/popover) and status dot halos resolve through
+   * named tokens instead of raw shadow-[...] values.
+   */
+  --shadow-admin-dialog: var(--shadow-xl);
+  --shadow-admin-drawer: var(--shadow-2xl);
+  --shadow-admin-popover: var(--shadow-lg);
+  --shadow-admin-status-dot-default: 0 0 0 4px rgba(152, 162, 179, 0.14);
+  --shadow-admin-status-dot-pending: 0 0 0 4px rgba(71, 117, 168, 0.15);
+  --shadow-admin-status-dot-running: 0 0 0 4px rgba(164, 105, 37, 0.15);
+  --shadow-admin-status-dot-success: 0 0 0 4px rgba(40, 134, 97, 0.14);
+  --shadow-admin-status-dot-danger: 0 0 0 4px rgba(201, 74, 86, 0.14);
   --shadow-auth-input: inset 0 1px 2px color-mix(in srgb, var(--color-foreground) 2%, transparent);
   --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
   --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
@@ -351,6 +437,23 @@
 
   --font-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
   --font-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
+}
+
+/* Tailwind does not generate utilities for the --z-* token namespace. */
+@utility z-admin-sticky {
+  z-index: var(--z-admin-sticky);
+}
+
+@utility z-admin-header {
+  z-index: var(--z-admin-header);
+}
+
+@utility z-admin-overlay {
+  z-index: var(--z-admin-overlay);
+}
+
+@utility z-admin-dialog {
+  z-index: var(--z-admin-dialog);
 }
 
 @media (prefers-reduced-motion: reduce) {

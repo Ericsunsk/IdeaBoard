@@ -1,5 +1,5 @@
 import {
-  buildControlMutationHeaders,
+  buildRoutineControlMutationHeaders,
   type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import {
@@ -19,11 +19,12 @@ import type {
 // Admin search provider boundary (final cut). Reads ride the generated
 // Control hook (`listControlSearchProviders`); writes already go through
 // the Control Plane (`updateControlSearchProvider` /
-// `testControlSearchProvider`, operator reason required). All routes use
-// the unified contract envelope (`{ data }` success / `{ error: { code,
-// message, request_id } }` errors); only the binary brand-logo and SSE
-// monitor stream stay raw. Guards (Idempotency-Key + X-Operator-Reason,
-// audit) are enforced.
+// `testControlSearchProvider`). All routes use the unified contract
+// envelope (`{ data }` success / `{ error: { code, message, request_id } }`
+// errors); only the binary brand-logo and SSE monitor stream stay raw.
+// Update is a routine config write (backend ReasonOptional) and test is a
+// POST read-guard, so both skip the operator-reason ceremony and audit an
+// empty reason while keeping the header-only Idempotency-Key.
 
 export type SearchProviderMutationOptions = ControlMutationOptions
 
@@ -71,7 +72,7 @@ async function updateSearchProvider(
     const body = await updateControlSearchProvider(
       provider,
       { ...input },
-      { headers: buildControlMutationHeaders(options) },
+      { headers: buildRoutineControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存图片搜索供应商配置失败')
@@ -86,7 +87,7 @@ async function testSearchProvider(
 ): Promise<SearchProviderTestResult> {
   try {
     const body = await testControlSearchProvider(provider, {
-      headers: buildControlMutationHeaders(options),
+      headers: buildRoutineControlMutationHeaders(options),
     })
     return requireContractData<SearchProviderTestResult>(body, '测试图片搜索供应商连接失败')
   } catch (error) {

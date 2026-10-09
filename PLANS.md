@@ -161,3 +161,89 @@ hard cut without weakening release guards.
 - Legacy cleanup is a hard cut: deleted symbols and files have no compatibility
   aliases, dual reads, dual writes, or fail-open fallbacks. Rollback is the
   commit revert before deployment.
+
+---
+
+## 本轮审计修复 ExecPlan
+
+## Goal
+
+修复本轮审计确认的 5 项缺陷，并使新增测试符合现有 guardrails。
+
+## Scope
+
+保持当前 checkout 与 branch；保留已有 diff。由 subagents 依次修复：
+
+1. [x] Auth login lockout 并发计数丢失；真实 PostgreSQL 与 Auth 209/209 tests、build、lint 通过。
+2. [x] Schema / migration 对固定 runtime role 的依赖；fresh snapshot、Atlas replay/parity、sqlc、DB targeted tests、Auth privilege tests 通过。
+3. [x] Admin z-index utilities 未生成；Tailwind compile regression、production CSS、typecheck、style lint、build 通过。
+4. [x] Storage toggle 成功后状态回跳；workspace/page 29/29 regression tests、scope lint、Prettier 通过。
+5. [x] Search provider 同一行并发写入状态失真；同时保护父级列表乱序回填，page/component/resource/helper 49/49 tests、typecheck、scope lint、Prettier 通过。
+6. [x] 修复新增测试的 guardrails 问题，完成整体验证与独立复核。
+
+## Verification Results
+
+- Auth 210/210 tests（真实 PostgreSQL，0 skipped）、build、lint 通过。
+- Web 全量 3282/3282 tests、lint、test typecheck、style lint、build 通过；追加乱序回填补修后，相关 49/49 tests、typecheck、build 通过。
+- OpenAPI client 经 Orval 生成，api:check-generated 通过；schema release、Atlas replay/parity、sqlc 及真实 DB settings/http tests 通过，Go build 通过。
+- 独立 verifier 最终 PASS；补修后独立 page/table 36/36 tests 通过。
+- Go 全量仍有原有 worker integration fixture 缺少 task_status_event_outbox 的失败；该目录与 events 无本轮 diff。Identity 全量出现一次失败，单独复跑通过。
+- 全局 Prettier 仍有 4 个 pristine 文件警告：routes.ts、pricing/demoData.ts、canvas/CONTEXT.md、SiteBrandLogo.vue；当前 diff 的格式检查已修正。
+
+## Success Criteria
+
+每项有覆盖实际触发场景的 regression check。相关 tests、typecheck/build、lint
+通过；Auth 并发与 PostgreSQL schema/runtime privileges 尽可能使用 isolated local
+database 验证。说明任何未完成的环境验证，不将 skipped tests 视为通过。
+
+## Risks
+
+Auth 并发必须覆盖多实例，而非仅进程内锁。Schema 修改不手改 generated snapshot；
+不改写已应用 migration。保留 fail-open policy 与 runtime least privilege。
+
+## Rollback
+
+仅撤销本轮针对目标文件的补丁，保留用户已有改动。数据库验证使用 isolated schema / 临时
+database；本轮不执行生产 migration、部署、branch 切换或 remote push。
+
+---
+
+## Fixture 与 Diff 收尾 ExecPlan
+
+### Goal
+
+修复 worker integration fixture 缺少 task_status_event_outbox，审计并清理当前 diff
+中的确定性冗余，完成验证后提交当前已审计的改动。
+
+### Scope
+
+- [x] 对齐 worker fixture 与既有 outbox schema，真实 PostgreSQL worker tests 通过；追加成功提交与失败清理断言。
+- [x] 由 subagents 审计 Web 与 API/Auth diff 的重复、无调用代码、过时注释及多余分支，按证据做最小清理。
+- [x] 完成 Go 全量及受影响 Web/Auth checks，独立复核。
+- [x] 创建 local commit（与本 ExecPlan 一并提交）。
+
+### Success Criteria
+
+worker integration tests 不再缺表；Go 全量使用真实 UTF8 PostgreSQL；冗余清理保留行为
+与 regression coverage；生成代码使用生成器更新。提交前检查 staged diff 与敏感内容。
+
+### Risks And Rollback
+
+当前 diff 含 auth/permission 与 migration 改动，必须保留既有 least privilege、transaction
+和 schema replay 契约。本轮 fixture 不变更生产 schema。仅在当前 branch 提交，不部署或 push；
+回滚本轮补丁或 local commit 时保留用户其余工作。
+
+### Progress
+
+Go 全量再次复现 Identity sweep fixture 的毫秒 rounding 竞赛：TIMESTAMPTZ(3)
+DEFAULT now() 可能晚于立即执行的 app clock。测试 seed 改为明确已到期 intent，
+保留严格行为断言；目标测试连续 100 次、Identity 全套均通过，无 production 改动。
+
+### Verification Results
+
+- Go 全量 `-count=1 -p 2 ./...` 使用真实 UTF8 PostgreSQL 且设置 required，通过；Go build、schema release 通过。
+- Auth 210/210 tests（真实 PostgreSQL，0 skipped）、build、lint 通过。
+- Web 516 files / 3287 tests、build、lint、test typecheck、style lint、generated drift 通过。
+- 冗余清理：删除未发布重复 REVOKE migration；StatusBadge 成为单一状态渲染实现；删除 18 个同值 dark overrides；16 处 routine headers 构造收口，保留 reason/retry-key contracts；清理空分支和过时注释。
+- 独立 verifier PASS；focused Web 38/38、真实 PostgreSQL settlement test、diff check 通过。
+- 全局 Prettier 的 4 个原有 pristine 文件警告未纳入本轮清理；当前修改文件的格式检查通过。

@@ -59,12 +59,11 @@ export function useStorageContext(options: UseAdminStorageContextOptions) {
     // Workspace-owned: apply/test/delete/enable orchestration.
     cards: workspace.cards,
     loading: workspace.loading,
-    loadFailed: workspace.loadFailed,
     storages: workspace.storages,
     creatableProviders: workspace.creatableProviders,
     applyingId: workspace.applyingId,
     testingId: workspace.testingId,
-    togglingId: workspace.togglingId,
+    toggle: workspace.toggle,
     toggleEnabled: workspace.toggleEnabled,
     applyStorage: workspace.applyStorage,
     handleTest: workspace.testStorage,

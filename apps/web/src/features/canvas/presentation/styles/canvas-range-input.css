@@ -24,7 +24,7 @@
   .canvas-range-input::-webkit-slider-runnable-track {
     height: var(--canvas-range-track-height, 4px);
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(
       --canvas-range-track-background,
       var(--canvas-range-track-color, var(--canvas-surface-muted))
@@ -38,7 +38,7 @@
     height: var(--canvas-range-thumb-size, 9px);
     margin-top: var(--canvas-range-thumb-offset, -2.5px);
     border: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(
       --canvas-range-thumb-color,
       var(--canvas-range-fill-color, var(--canvas-accent))
@@ -50,7 +50,7 @@
   .canvas-range-input::-moz-range-track {
     height: var(--canvas-range-track-height, 4px);
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(
       --canvas-range-track-background,
       var(--canvas-range-track-color, var(--canvas-surface-muted))
@@ -61,7 +61,7 @@
     width: var(--canvas-range-thumb-size, 9px);
     height: var(--canvas-range-thumb-size, 9px);
     border: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(
       --canvas-range-thumb-color,
       var(--canvas-range-fill-color, var(--canvas-accent))
@@ -72,7 +72,7 @@
   .canvas-range-input:focus-visible {
     outline: var(--focus-outline-width) solid var(--canvas-range-focus-color, var(--canvas-accent));
     outline-offset: var(--focus-outline-offset);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
   }
 
   .canvas-range-input:disabled {

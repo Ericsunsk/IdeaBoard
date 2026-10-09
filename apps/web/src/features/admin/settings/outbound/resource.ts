@@ -1,6 +1,5 @@
 import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
+  buildRoutineControlMutationHeaders,
   type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
 import { useQuery } from '@tanstack/vue-query'
@@ -14,10 +13,11 @@ import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './contr
 
 // Admin outbound policy boundary (W2 transports). Reads and writes go
 // through the Control Plane (`getControlOutboundPolicy` /
-// `updateControlOutboundPolicy`, operator reason required) with the
-// contract envelope, so every save carries an explicit operator note and an
-// audit record. The deleted `/api/admin/settings/outbound-policy` route is
-// gone; this module is the single transport.
+// `updateControlOutboundPolicy`) with the contract envelope; the update is a
+// routine config write (backend ReasonOptional), so saves skip the confirm
+// dialog and audit an empty reason while keeping the header-only
+// Idempotency-Key. The deleted `/api/admin/settings/outbound-policy` route
+// is gone; this module is the single transport.
 export const outboundPolicyQueryKey = ['admin', 'settings', 'outbound-policy'] as const
 
 export type OutboundPolicyMutationOptions = ControlMutationOptions
@@ -47,12 +47,14 @@ async function updateOutboundPolicy(
   request: UpdateOutboundPolicyRequest,
   options: OutboundPolicyMutationOptions,
 ): Promise<OutboundPolicySetting> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+  // Routine config write (backend ReasonOptional): the reason may be empty
+  // (audit records it as-is) while Idempotency-Key stays required.
+  const operatorReason = options.operatorReason.trim()
   try {
     const body = await updateControlOutboundPolicy(
       { allow_hosts: [...request.allow_hosts], reason: operatorReason },
       {
-        headers: buildControlMutationHeaders(options),
+        headers: buildRoutineControlMutationHeaders(options),
       },
     )
     return requireContractData<OutboundPolicySetting>(body, '保存私有地址访问策略失败')

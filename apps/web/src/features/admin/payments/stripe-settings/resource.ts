@@ -3,18 +3,18 @@ import {
   updateControlStripeConfig,
 } from '../../../../shared/api/generated-query/control/control-payments/control-payments'
 import type { ControlStripeConfigRequest } from '../../../../shared/api/generated-query/control/model/controlStripeConfigRequest'
-import { createControlSettingResource } from '../../shared/lib/controlResource'
-import type {
-  AdminStripeSettingsResource,
-  SaveStripeConfigurationInput,
-  StripeConfigurationSummary,
-} from './types'
+import { requireContractData } from '../../../../shared/api/contractKernel'
+import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
+import { loadControlSetting } from '../../shared/lib/controlResource'
+import { withControlCopy } from '../../shared/lib/controlCopy'
+import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './types'
 
 // Admin Stripe settings boundary (W2 transports). Reads and writes go
 // through the Control Plane payment operations with the contract envelope
-// (`{data}` over the same configuration summary); writes carry a
-// header-only Idempotency-Key plus an operator reason (mirrored into the
-// body `reason` field) and emit a control audit record. The deleted
+// (`{data}` over the same configuration summary). Writes are routine config
+// writes (backend ReasonOptional): they skip the operator-reason ceremony
+// and audit an empty reason (mirrored into the body `reason` field) while
+// keeping a header-only Idempotency-Key. The deleted
 // `/api/admin/payments/stripe-config` route is gone; this module is the
 // single transport.
 export type ApiStripeConfigurationSummary = {
@@ -32,24 +32,40 @@ export type ApiStripeConfigurationSummary = {
   updated_at?: string
 }
 
-const stripeResource = createControlSettingResource({
-  getFallback: '加载 Stripe 设置失败',
-  saveFallback: '保存 Stripe 设置失败',
-  map: normalizeStripeConfiguration,
-  toRequest: (input: SaveStripeConfigurationInput, reason: string) => ({
-    ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
-    payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
-    product_tax_code: input.productTaxCode.trim(),
-    purchases_enabled: input.purchasesEnabled,
-    reason,
-  }),
-  fetch: () => getControlStripeConfig('stripe'),
-  persist: (body, headers) =>
-    updateControlStripeConfig('stripe', body as ControlStripeConfigRequest, { headers }),
-})
-
 export function createAdminStripeSettingsResource(): AdminStripeSettingsResource {
-  return stripeResource
+  return {
+    get: () =>
+      loadControlSetting(() => getControlStripeConfig('stripe'), {
+        fallback: '加载 Stripe 设置失败',
+        map: normalizeStripeConfiguration,
+      }),
+    save: async (input, mutation) => {
+      // Routine config write (backend ReasonOptional): the reason may be
+      // empty (audit records it as-is) while Idempotency-Key stays required.
+      const reason = mutation.operatorReason.trim()
+      try {
+        const data = requireContractData<ApiStripeConfigurationSummary>(
+          await updateControlStripeConfig(
+            'stripe',
+            {
+              ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
+              payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
+              product_tax_code: input.productTaxCode.trim(),
+              purchases_enabled: input.purchasesEnabled,
+              reason,
+            } as ControlStripeConfigRequest,
+            {
+              headers: buildRoutineControlMutationHeaders(mutation),
+            },
+          ),
+          '保存 Stripe 设置失败',
+        )
+        return normalizeStripeConfiguration(data)
+      } catch (error) {
+        throw withControlCopy(error, '保存 Stripe 设置失败')
+      }
+    },
+  }
 }
 
 function normalizeStripeConfiguration(

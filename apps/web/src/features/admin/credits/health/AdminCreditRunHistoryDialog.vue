@@ -12,7 +12,7 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-foreground">
+              <div class="text-admin-title-sm font-admin-display text-foreground">
                 {{ CREDIT_HEALTH_MESSAGES.runHistoryTitle }}
               </div>
             </div>
@@ -99,10 +99,10 @@
         </AdminColumn>
         <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryStatusColumn" style="width: 110px">
           <template #body="{ data }">
-            <AdminBadge
-              :value="getRunStatusLabel(data.status)"
-              :severity="getRunStatusSeverity(data.status)"
-              class="text-admin-caption"
+            <AdminStatusPill
+              :label="getRunStatusLabel(data.status)"
+              :variant="getRunStatusVariant(data.status)"
+              size="small"
             />
           </template>
         </AdminColumn>
@@ -152,7 +152,7 @@
               class="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4"
             >
               <div>
-                <dt class="text-admin-caption font-[700] text-muted-foreground">
+                <dt class="text-admin-caption font-bold text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryTechId }}
                 </dt>
                 <dd class="mt-1 mb-0 font-mono text-admin-body text-foreground">
@@ -160,7 +160,7 @@
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-muted-foreground">
+                <dt class="text-admin-caption font-bold text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryAttempts }}
                 </dt>
                 <dd class="mt-1 mb-0 text-admin-body text-foreground">
@@ -168,7 +168,7 @@
                 </dd>
               </div>
               <div class="sm:col-span-2">
-                <dt class="text-admin-caption font-[700] text-muted-foreground">
+                <dt class="text-admin-caption font-bold text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryReason }}
                 </dt>
                 <dd class="mt-1 mb-0 break-words text-admin-body text-foreground">
@@ -176,7 +176,7 @@
                 </dd>
               </div>
               <div v-if="selectedRun.error_message" class="sm:col-span-2 xl:col-span-4">
-                <dt class="text-admin-caption font-[700] text-muted-foreground">
+                <dt class="text-admin-caption font-bold text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryError }}
                 </dt>
                 <dd class="mt-1 mb-0 break-words text-admin-body text-destructive">
@@ -203,7 +203,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useIntervalFn } from '@vueuse/core'
 import { Refresh } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
@@ -223,7 +223,7 @@ import {
   formatAdminDateTimeWithSeconds,
   formatReconciliationRunError,
   getRunStatusLabel,
-  getRunStatusSeverity,
+  getRunStatusVariant,
 } from '../shared/format'
 import {
   adminTableClass,

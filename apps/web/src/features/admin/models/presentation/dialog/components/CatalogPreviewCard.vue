@@ -7,7 +7,7 @@
           MODELS_MESSAGES.previewTitle
         }}</span>
         <span
-          class="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-admin-micro font-semibold text-primary"
+          class="inline-flex items-center rounded bg-primary-faint px-1.5 py-0.5 text-admin-micro font-semibold text-primary"
         >
           Live Preview
         </span>
@@ -44,7 +44,7 @@
             {{ routePreview.providerSlug }}
             <span
               v-if="routePreview.isFirstParty"
-              class="ml-1 inline-flex rounded bg-emerald-100 px-1 text-admin-micro font-medium text-emerald-700"
+              class="ml-1 inline-flex rounded bg-success-soft px-1 text-admin-micro font-medium text-success"
             >
               {{ MODELS_MESSAGES.routeFirstParty }}
             </span>

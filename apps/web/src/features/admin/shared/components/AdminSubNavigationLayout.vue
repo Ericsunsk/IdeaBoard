@@ -1,7 +1,7 @@
 <template>
   <Teleport :to="teleportTarget" :disabled="!teleportTarget">
     <div
-      class="mx-auto flex h-14 w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8"
+      class="mx-auto flex h-14 w-full max-w-admin-shell items-center justify-between gap-3 px-4 sm:px-6 lg:px-8"
     >
       <AdminTabs
         :model-value="activePath"

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildUsageTrendChart, type UsageChartTheme } from './chart'
+import { buildUsageTrendChart, resolveUsageChartTheme, type UsageChartTheme } from './chart'
 
 const theme: UsageChartTheme = {
   accent: '#9278e6',
@@ -122,6 +122,20 @@ describe('buildUsageTrendChart', () => {
     expect(yearlyTicks(null, septemberFirstIndex)).toBe('09/01')
     expect(yearlyTicks(null, septemberSecondIndex)).toBe('')
     expect(yearlyTicks(null, 364)).toBe('07/13')
+  })
+})
+
+describe('resolveUsageChartTheme fallbacks', () => {
+  it('mirrors the light token hex when CSS vars cannot resolve', () => {
+    expect(resolveUsageChartTheme(null)).toMatchObject({
+      accent: '#9278e6',
+      accentFill: 'rgba(146, 120, 230, 0.1)',
+      axisText: '#62626a',
+      axisLine: '#ececec',
+      grid: '#ececec',
+      surface: '#ffffff',
+      text: '#313131',
+    })
   })
 })
 

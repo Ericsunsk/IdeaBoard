@@ -3,15 +3,35 @@
     :icon="SETTINGS_SECTIONS.mail.icon"
     :title="SETTINGS_SECTIONS.mail.title"
     :description="SETTINGS_MESSAGES.mailSubtitle"
-    :status="props.plain ? undefined : statusLabel"
-    :status-severity="props.plain ? undefined : statusSeverity"
     :plain="props.plain"
     :class="props.class"
   >
     <template #header-actions>
+      <!-- 防抖占位收口到 SwitchRow：无状态（加载中/加载失败）时保留与最长胶囊
+        （Unverified 10 字符）同宽的空槽，开关 x 坐标不动；失败回滚逻辑
+        （toggleEnabled）不受影响。占位为空 span（无文案），加载失败“无胶囊”
+        的 toast 语义不变；有状态时胶囊同样锁宽，短长文案不推挤开关。
+        Switch 永不绑状态 key。 -->
+      <SwitchRow
+        v-if="!props.plain"
+        :model-value="enabled"
+        :pill="statusLabel"
+        :pill-variant="statusVariant"
+        status-min-width="104px"
+        pill-size="medium"
+        gap-class="gap-2"
+        :switch-attrs="{
+          id: 'admin-mail-enabled',
+          disabled: switchDisabled,
+          'aria-label': SETTINGS_MESSAGES.mailEnabledLabel,
+        }"
+        @update:model-value="toggleEnabled"
+      />
+      <!-- plain 嵌入模式（设置总览页）沿用旧语义：无 status 槽，只保留开关。 -->
       <AdminSwitch
+        v-else
         id="admin-mail-enabled"
-        v-model="enabled"
+        :model-value="enabled"
         :aria-label="SETTINGS_MESSAGES.mailEnabledLabel"
         :disabled="switchDisabled"
         @update:model-value="toggleEnabled"
@@ -19,17 +39,12 @@
     </template>
     <template #default>
       <div class="flex flex-col gap-5">
-        <AdminAlert v-if="error" severity="error">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <span>{{ error }}</span>
-            <ActionButton variant="outline" @click="load">
-              {{ SETTINGS_MESSAGES.retry }}
-            </ActionButton>
-          </div>
-        </AdminAlert>
-        <AdminAlert v-else-if="loading" severity="secondary">{{
-          SETTINGS_MESSAGES.mailLoading
-        }}</AdminAlert>
+        <div v-if="loading" class="flex items-center gap-2" role="status">
+          <AdminSpinner class="size-4" :aria-label="SETTINGS_MESSAGES.mailLoading" />
+          <span class="text-admin-body text-muted-foreground">{{
+            SETTINGS_MESSAGES.mailLoading
+          }}</span>
+        </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <AdminFormField
@@ -103,21 +118,14 @@
               type="email"
               :aria-label="SETTINGS_MESSAGES.mailTestRecipientLabel"
               :disabled="controlsDisabled || testing || !summary?.configured"
+              :loading="testing"
               class="w-full"
             />
           </AdminFormField>
-          <ActionButton
-            variant="outline"
-            :loading="testing"
-            :disabled="testDisabled"
-            @click="sendTest"
-          >
+          <ActionButton variant="outline" :disabled="testDisabled" @click="sendTest">
             {{ SETTINGS_MESSAGES.mailSendTest }}
           </ActionButton>
         </div>
-        <AdminAlert v-if="testError" severity="error">
-          {{ testError }}
-        </AdminAlert>
         <div
           class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 p-4"
           role="group"
@@ -162,12 +170,12 @@ import AdminEditorActions from '../../shared/components/AdminEditorActions.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
+import AdminSpinner from '../../shared/components/AdminSpinner.vue'
+import SwitchRow from '../../shared/components/SwitchRow.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
+import { useOptimisticToggle } from '../../shared/composables/useOptimisticToggle'
 import { secretField } from '../../shared/lib/secretSchema'
-import {
-  ADMIN_PROBE_OPERATOR_REASON,
-  confirmSettingsSave,
-} from '../../shared/lib/confirmSettingsSave'
+import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { useAdminMailSettingsFeedback } from '../shared/useSettingsFeedback'
@@ -193,12 +201,15 @@ const summary = ref<MailConfigSummary | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
-const toggling = ref(false)
-// 启用开关即改即存：状态来自 summary.enabled，v-model 先行
-// 翻转 UI，toggleEnabled 走保存通道确认并持久化，取消/失败回滚。
-const enabled = ref(true)
+// 启用开关乐观收口到共享 useOptimisticToggle：intent 同 tick 翻转，
+// pending 只压开关；成功后等回填 reconcile，失败回滚。toast 语义不变。
+const MAIL_TOGGLE_KEY = 'mail' as const
+const mailToggle = useOptimisticToggle<string>()
+// 启用真相源是 summary.enabled，显示值走乐观覆盖；无 summary 时默认 true。
+const enabled = computed(() =>
+  mailToggle.effective(MAIL_TOGGLE_KEY, summary.value?.enabled ?? true),
+)
 const error = ref('')
-const testError = ref('')
 const recipient = ref('')
 // Key 是否必填取决于服务端状态（首次配置必须、已有可留空保持），schema 以函数
 // 形式传入，读取时按当前 summary 重建。
@@ -236,36 +247,53 @@ const firstValidationError = computed(() =>
 
 const resource = computed(() => props.resource ?? defaultResource)
 const controlsDisabled = computed(
-  () => loading.value || saving.value || testing.value || toggling.value || Boolean(error.value),
+  () =>
+    loading.value ||
+    saving.value ||
+    testing.value ||
+    mailToggle.isPending(MAIL_TOGGLE_KEY) ||
+    Boolean(error.value),
 )
 const switchDisabled = computed(() => controlsDisabled.value || !summary.value)
 const testDisabled = computed(
   () => controlsDisabled.value || !summary.value?.configured || !recipient.value.trim(),
 )
+// 健康三态（方案 A）：Ready/异常/未验证，载体统一 AdminStatusPill。
+// - ready → Ready(success)
+// - unavailable → 异常(danger)
+// - not_tested / not_configured → 未验证(neutral)：not_tested 只是“保存后待一次
+//   Test Email”的中间态，已有输入区 hint 与发送按钮引导，不属于阻塞性待行动，
+//   故不用 warning，避免黄牌疲劳；warning 仅保留给阻塞性待行动。
+// - 加载中/加载失败不进 Status：只走 toast + spinner，无胶囊。
+const MAIL_STATUS_READY = 'Ready'
+const MAIL_STATUS_ABNORMAL = 'Error'
+const MAIL_STATUS_UNVERIFIED = 'Unverified'
 const statusLabel = computed(() => {
-  if (error.value) return SETTINGS_MESSAGES.settingsLoadFailed
-  if (loading.value && !summary.value) return SETTINGS_MESSAGES.settingsLoading
-  if (summary.value?.readiness === 'ready') return 'Ready'
-  if (summary.value?.readiness === 'not_tested') return SETTINGS_MESSAGES.mailStatusUntested
-  return SETTINGS_MESSAGES.mailStatusUnconfigured
+  if (error.value) return undefined
+  if (loading.value && !summary.value) return undefined
+  const readiness = summary.value?.readiness
+  if (!readiness) return undefined
+  if (readiness === 'ready') return MAIL_STATUS_READY
+  if (readiness === 'unavailable') return MAIL_STATUS_ABNORMAL
+  return MAIL_STATUS_UNVERIFIED
 })
-const statusSeverity = computed(() => {
-  if (error.value) return 'danger'
-  if (summary.value?.readiness === 'ready') return 'success'
-  if (summary.value?.readiness === 'not_tested') return 'warn'
-  return 'secondary'
+const statusVariant = computed(() => {
+  if (error.value) return 'neutral' as const
+  const readiness = summary.value?.readiness
+  if (readiness === 'ready') return 'success' as const
+  if (readiness === 'unavailable') return 'danger' as const
+  return 'neutral' as const
 })
 
 function populate(data: MailConfigSummary) {
   summary.value = data
-  enabled.value = data.enabled
+  mailToggle.reconcile(MAIL_TOGGLE_KEY, data.enabled)
   form.resetForm({
     from_name: data.from_name,
     from_email: data.from_email,
     api_key: '',
     reply_to: data.reply_to ?? '',
   })
-  testError.value = ''
 }
 
 async function load() {
@@ -276,6 +304,7 @@ async function load() {
     populate(data)
   } catch (err) {
     error.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.mailLoadFailed)
+    feedback.loadFailed(err)
   } finally {
     loading.value = false
   }
@@ -285,7 +314,6 @@ function reset() {
   if (summary.value) {
     populate(summary.value)
   } else {
-    enabled.value = true
     form.resetForm({ from_name: '', from_email: '', api_key: '', reply_to: '' })
   }
 }
@@ -313,18 +341,12 @@ function buildUpdatePayload(values: MailFormValues, enabledValue: boolean): Mail
 }
 
 const save = form.handleSubmit(async (values) => {
-  // Control Plane writes require an operator reason (audit); a cancelled
-  // dialog aborts the save silently.
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: SETTINGS_MESSAGES.mailSave,
-    message: SETTINGS_MESSAGES.mailSaveMessage,
-    confirmLabel: SETTINGS_MESSAGES.mailSave,
-  })
-  if (!operatorReason) return
+  // Routine config write (backend ReasonOptional): save directly without
+  // the confirm dialog; the audit records an empty reason.
   saving.value = true
   try {
     const updated = await resource.value.update(buildUpdatePayload(values, enabled.value), {
-      operatorReason,
+      operatorReason: '',
     })
     populate(updated)
     feedback.saved()
@@ -336,43 +358,36 @@ const save = form.handleSubmit(async (values) => {
 })
 
 async function toggleEnabled(next: boolean) {
-  // v-model 已先行翻转 UI；已提交状态（summary）是回滚基准。
   const committed = summary.value
-  const previous = committed?.enabled ?? !next
-  if (!committed || toggling.value) {
-    enabled.value = previous
-    return
-  }
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: next ? SETTINGS_MESSAGES.mailEnableTitle : SETTINGS_MESSAGES.mailDisableTitle,
-    message: next ? SETTINGS_MESSAGES.mailEnableMessage : SETTINGS_MESSAGES.mailDisableMessage,
-    confirmLabel: next ? SETTINGS_MESSAGES.mailEnableTitle : SETTINGS_MESSAGES.mailDisableTitle,
-  })
-  if (!operatorReason) {
-    enabled.value = previous
-    return
-  }
-  toggling.value = true
-  try {
-    const updated = await resource.value.update(
-      {
-        from_name: committed.from_name,
-        from_email: committed.from_email,
-        reply_to: committed.reply_to,
-        enabled: next,
+  if (!committed || mailToggle.isPending(MAIL_TOGGLE_KEY)) return
+  // Routine config write (backend ReasonOptional): persist directly without
+  // the confirm dialog; the audit records an empty reason. 乐观翻转与
+  // pending/回滚收口到共享 composable，失败 toast 由 feedback 传入。
+  await mailToggle.toggle(
+    MAIL_TOGGLE_KEY,
+    next,
+    async (_, nextVal) => {
+      const updated = await resource.value.update(
+        {
+          from_name: committed.from_name,
+          from_email: committed.from_email,
+          reply_to: committed.reply_to,
+          enabled: nextVal,
+        },
+        { operatorReason: '' },
+      )
+      summary.value = updated
+      mailToggle.reconcile(MAIL_TOGGLE_KEY, updated.enabled)
+    },
+    {
+      onSuccess: () => {
+        feedback.saved()
       },
-      { operatorReason },
-    )
-    summary.value = updated
-    enabled.value = updated.enabled
-    testError.value = ''
-    feedback.saved()
-  } catch (err) {
-    enabled.value = previous
-    feedback.saveFailed(err)
-  } finally {
-    toggling.value = false
-  }
+      onFailure: (_, __, err) => {
+        feedback.saveFailed(err)
+      },
+    },
+  )
 }
 
 async function clear() {
@@ -398,18 +413,18 @@ async function clear() {
 async function sendTest() {
   const target = recipient.value.trim()
   if (!target || !target.includes('@')) {
-    testError.value = SETTINGS_MESSAGES.mailTestRecipientInvalid
+    feedback.testFailed(new Error(SETTINGS_MESSAGES.mailTestRecipientInvalid))
     return
   }
-  // Connectivity probes use a fixed operator reason and skip interactive confirmation.
-  testError.value = ''
+  // Routine probe (backend ReasonOptional): send directly without
+  // interactive confirmation; the audit records an empty reason.
   testing.value = true
   try {
-    await resource.value.test(target, { operatorReason: ADMIN_PROBE_OPERATOR_REASON })
+    await resource.value.test(target, { operatorReason: '' })
     await load()
     feedback.testSent()
   } catch (err) {
-    testError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.mailTestFailed)
+    feedback.testFailed(err)
   } finally {
     testing.value = false
   }

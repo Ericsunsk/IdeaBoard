@@ -7,13 +7,10 @@ export { default as PasswordField } from './PasswordField.vue'
 export { default as OtpField } from './OtpField.vue'
 export {
   AUTH_DISPLAY_NAME_LIMIT,
-  emailFieldError,
   emailFormatError,
   lengthRangeError,
   otpFieldError,
-  passwordFieldError,
   passwordLengthFieldError,
   requiredFieldError,
   useAuthForm,
 } from './useAuthForm'
-export type { AuthFieldMessages } from './useAuthForm'

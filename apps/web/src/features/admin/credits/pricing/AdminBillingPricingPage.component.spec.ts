@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { expectDomOrder } from '../../../../test/domOrder'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 import {
   createBillingCatalogHandlers,
@@ -91,10 +92,10 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('cutout')).toBeVisible()
     expect(screen.getByText('upscale')).toBeVisible()
     expect(screen.getByText('legacy:removed')).toBeVisible()
-    expect(screen.getByText('未定价')).toBeVisible()
-    expect(screen.getByText('生效中')).toBeVisible()
-    expect(screen.getByText('已停用')).toBeVisible()
-    expect(screen.getByText('已归档')).toBeVisible()
+    expect(screen.getByText('Unpriced')).toBeVisible()
+    expect(screen.getByText('Active')).toBeVisible()
+    expect(screen.getByText('Disabled')).toBeVisible()
+    expect(screen.getByText('Archived')).toBeVisible()
     expect(screen.getAllByText('1')).toHaveLength(3)
     expect(screen.getByRole('heading', { name: 'Image' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Other' })).toBeVisible()
@@ -190,7 +191,7 @@ describe('AdminBillingPricingPage', () => {
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(await screen.findByText('0')).toBeVisible()
-    expect(screen.getAllByText('生效中')).toHaveLength(2)
+    expect(screen.getAllByText('Active')).toHaveLength(2)
     expectTextOrder(['inpaint', 'cutout'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(publishRequests).toBe(1)
@@ -222,6 +223,7 @@ describe('AdminBillingPricingPage', () => {
     await user.click(switchControl)
     await waitFor(() => expect(switchControl).toBeChecked())
     expect(requests).toEqual([false, true])
+    expect(confirmMock).not.toHaveBeenCalled()
 
     // 未定价行开关常驻但锁死：入口只有设置按钮
     expect(screen.getByRole('switch', { name: '局部重绘功能状态' })).toBeDisabled()
@@ -401,10 +403,5 @@ function renderPricingPage() {
 
 function expectTextOrder(labels: string[]) {
   const elements = labels.map((label) => screen.getByText(label))
-  for (let index = 0; index < elements.length - 1; index += 1) {
-    expect(
-      elements[index]!.compareDocumentPosition(elements[index + 1]!) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-  }
+  expectDomOrder(elements)
 }

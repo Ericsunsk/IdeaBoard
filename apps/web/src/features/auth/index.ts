@@ -22,15 +22,12 @@ export {
   OtpField,
   useAuthForm,
   AUTH_DISPLAY_NAME_LIMIT,
-  emailFieldError,
   emailFormatError,
   lengthRangeError,
   otpFieldError,
-  passwordFieldError,
   passwordLengthFieldError,
   requiredFieldError,
 } from './components/auth-fields'
-export type { AuthFieldMessages } from './components/auth-fields'
 
 /**
  * Lazily loads the OAuth callback page through the auth entrypoint so route

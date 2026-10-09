@@ -46,20 +46,22 @@ export function getCreditCommandSign(command: string) {
   return command === 'grant' || command === 'release' || command === 'refund' ? '+' : '-'
 }
 
-export function getCreditCommandSeverity(command: string) {
+export function getCreditCommandVariant(command: string): 'success' | 'danger' | 'warning' {
   if (command === 'grant' || command === 'release' || command === 'refund') return 'success'
   if (command === 'deduction' || command === 'capture') return 'danger'
-  return 'warn'
+  return 'warning'
 }
 
 export function getRunStatusLabel(status: CreditReconciliationRun['status']) {
   return { queued: '排队中', running: '执行中', completed: '已完成', failed: '失败' }[status]
 }
 
-export function getRunStatusSeverity(status: CreditReconciliationRun['status']) {
+export function getRunStatusVariant(
+  status: CreditReconciliationRun['status'],
+): 'success' | 'danger' | 'warning' {
   if (status === 'completed') return 'success'
   if (status === 'failed') return 'danger'
-  return 'warn'
+  return 'warning'
 }
 
 export function formatReconciliationRunError(message?: string) {

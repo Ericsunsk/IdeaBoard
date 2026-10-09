@@ -48,7 +48,7 @@
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_CLOUDFLARE
-                  ? 'bg-card text-emerald-700 shadow-xs font-semibold'
+                  ? 'bg-card text-success shadow-xs font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
               "
               @click="emit('update:hosting', MODEL_HOSTING_CLOUDFLARE)"
@@ -95,7 +95,7 @@
             v-for="tag in MODELS_MESSAGES.specsPopularCapabilities"
             :key="tag"
             type="button"
-            class="rounded-md border border-dashed border-border px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:border-primary/40 hover:text-primary cursor-pointer"
+            class="rounded-md border border-dashed border-border px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:border-primary-line-strong hover:text-primary cursor-pointer"
             @click="addCapabilityTag(tag)"
           >
             + {{ tag }}

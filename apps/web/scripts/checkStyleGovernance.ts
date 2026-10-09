@@ -68,10 +68,11 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/monitor/domain/status.ts': {
     counts: {
-      'raw-color': 10,
-      'raw-shadow': 5,
+      'raw-color': 0,
+      'raw-shadow': 0,
     },
-    reason: 'Task status palette is a domain visual contract shared by table and detail views.',
+    reason:
+      'Cleared: status glow/wash resolve through admin status tokens and dot halos through shadow-admin-status-dot-* (see legacy-token allowance). Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
   'src/features/admin/shared/lib/adminThemeTokens.ts': {
     counts: {
@@ -268,12 +269,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Fabric canvas object default is a canvas drawing constant.',
   },
-  'src/features/canvas/tools/retouch/components/LayerActions.vue': {
-    counts: {
-      'hex-color': 2,
-    },
-    reason: 'Retouch layer action icons use canvas drawing constants.',
-  },
   'src/features/canvas/tools/retouch/components/styles/retouch-control-points.css': {
     counts: {
       'hex-color': 1,
@@ -377,6 +372,13 @@ const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRul
 // Token declarations themselves are checked by the separate forbidden-alias
 // rule below. There is no product-prefixed color alias tier.
 const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/admin/monitor/domain/status.ts': {
+    counts: {
+      'legacy-token': 10,
+    },
+    reason:
+      'Task status banner gradients resolve glow/wash through admin status tokens (5 banners × glow/wash refs); dot halos use shadow-admin-status-dot-* utilities. Table and detail views share this one domain visual contract.',
+  },
   'src/features/admin/monitor/presentation/AdminTaskResultDialog.vue': {
     counts: {
       'legacy-token': 0,

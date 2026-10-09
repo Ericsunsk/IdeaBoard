@@ -1,12 +1,8 @@
 import { computed, ref } from 'vue'
 import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
-import {
-  ADMIN_PROBE_OPERATOR_REASON,
-  confirmSettingsSave,
-  requireDestructiveReason,
-  type AdminConfirmRisk,
-} from '../shared/lib/confirmSettingsSave'
+import { useOptimisticToggle } from '../shared/composables/useOptimisticToggle'
+import { requireDestructiveReason } from '../shared/lib/confirmSettingsSave'
 import {
   createAdminStorageResource,
   type AdminStorageResource,
@@ -21,10 +17,7 @@ import {
   normalizeProfile,
   providerLabel as resolveProviderLabel,
   providerSupportsTest,
-  statusClass as resolveStatusClass,
-  statusText as resolveStatusText,
   storageMetaItems as resolveStorageMetaItems,
-  storageStatusSeverity,
   storageDisableReason,
   storageSubtitle as resolveStorageSubtitle,
   toProviderMetaMap,
@@ -51,9 +44,9 @@ type DeleteStorageProfileCommandOptions = {
 export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOptions) {
   const resource = options.resource ?? createAdminStorageResource()
   const loading = ref(false)
-  const loadFailed = ref(false)
-  const togglingId = ref<string | null>(null)
-  const togglingPending = ref(false)
+  // 行开关乐观收口到共享 useOptimisticToggle：intent 同 tick 翻转，
+  // pending 按 id 独立；成功后等回填 reconcile，失败回滚。toast 语义不变。
+  const toggle = useOptimisticToggle<string>()
   const applyingId = ref<string | null>(null)
   const testingId = ref<string | null>(null)
   const applyingPending = ref(false)
@@ -80,12 +73,8 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
   async function loadData() {
     await options.runAsyncAction(refreshStorageData, {
       loading,
-      before: () => {
-        loadFailed.value = false
-      },
       feedback: {
         error: (error) => {
-          loadFailed.value = true
           options.feedback.loadProfilesFailed(error)
         },
       },
@@ -109,19 +98,16 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     }
   }
 
-  // Workspace owns every storage mutation's confirmation, operator reason,
-  // and refresh-after-command. The profile editor only supplies form payloads
-  // through saveProfile; apply/test/delete/enable orchestration lives here.
+  // Workspace owns storage mutation orchestration and refresh-after-command.
+  // Save/apply are routine config writes (backend ReasonOptional): no
+  // confirm dialog, the audit records an empty reason. The profile editor
+  // only supplies form payloads through saveProfile; apply/test/delete/
+  // enable orchestration lives here. Delete stays a destructive confirm
+  // with a required reason.
   async function saveProfile(
     input: SaveStorageProfileInput,
   ): Promise<StorageProfileCommandResult | null> {
-    const operatorReason = await confirmStorageWrite({
-      title: input.id ? '保存存储配置' : '新建存储配置',
-      message: '确定保存该存储配置吗？该操作将记录操作人与原因。',
-      confirmLabel: '保存配置',
-    })
-    if (!operatorReason) return null
-    const response = await resource.saveProfile(input, { operatorReason })
+    const response = await resource.saveProfile(input, { operatorReason: '' })
     await refreshAfterCommand()
     return response
   }
@@ -132,13 +118,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     await options.runAsyncAction(
       async () => {
-        const operatorReason = await confirmStorageWrite({
-          title: '设为当前存储',
-          message: '确定将该存储设为当前存储吗？该操作将记录操作人与原因。',
-          confirmLabel: '设为当前',
-        })
-        if (!operatorReason) return
-        const response = await resource.applyProfile(storage.id, { operatorReason })
+        const response = await resource.applyProfile(storage.id, { operatorReason: '' })
         await refreshAfterCommand()
         options.feedback.applyCurrentSucceeded(response.message)
       },
@@ -161,23 +141,34 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     const storage = resolveStorageTarget(target)
     if (!storage || (!enabled && storageDisableReason(storage))) return
 
-    await options.runAsyncAction(
-      async () => {
-        const response = await saveProfile({
-          id: storage.id,
-          payload: buildPayload({ ...storage, enabled }, providerMap.value),
-        })
+    // Routine config write (backend ReasonOptional): no confirm dialog,
+    // the audit records an empty reason. 乐观翻转与 pending/回滚收口到共享
+    // composable，toast 仍走 saveDraft 通道。
+    await toggle.toggle(
+      storage.id,
+      enabled,
+      async (key, next) => {
+        const response = await resource.saveProfile(
+          {
+            id: key,
+            payload: buildPayload({ ...storage, enabled: next }, providerMap.value),
+          },
+          { operatorReason: '' },
+        )
+        const savedStorage = normalizeProfile(response.profile, providerMap.value)
+        storages.value = storages.value.map((candidate) =>
+          candidate.id === key ? savedStorage : candidate,
+        )
+        toggle.reconcile(key, response.profile.enabled)
+        await refreshAfterCommand()
+        const current = storages.value.find((candidate) => candidate.id === key)
+        if (current) toggle.reconcile(key, current.enabled)
         if (response) options.feedback.saveDraftSucceeded(response.message)
       },
       {
-        loading: togglingPending,
-        before: () => {
-          togglingId.value = storage.id
+        onFailure: (_, __, error) => {
+          options.feedback.saveDraftFailed(error)
         },
-        after: () => {
-          togglingId.value = null
-        },
-        feedback: { error: options.feedback.saveDraftFailed },
       },
     )
   }
@@ -188,11 +179,11 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     await options.runAsyncAction(
       async () => {
-        // Connectivity probes skip the confirm dialog (backend POST
-        // read-guard: no reason ceremony); the fixed probe note still lands
-        // on the audit record.
+        // Connectivity probe is a POST read-guard (backend non-Mutation):
+        // no confirm dialog, the audit records an empty reason (routine
+        // 空 reason，与 mail/搜索探针对齐）。
         const response = await resource.testProfile(storage.id, {
-          operatorReason: ADMIN_PROBE_OPERATOR_REASON,
+          operatorReason: '',
         })
         if (!response) return
         options.feedback.testConnectionSucceeded(response.message)
@@ -243,21 +234,6 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     return resource.fetchBucketDomains(id)
   }
 
-  // Control storage mutations require an operator reason (audit). Collect
-  // it through the shared confirm dialog; a cancelled dialog aborts
-  // silently (null) so no failure feedback fires. Reversible writes default
-  // to the optional-note tier; destructive deletes pass risk explicitly.
-  function confirmStorageWrite(
-    dialog: {
-      title: string
-      message: string
-      confirmLabel: string
-    },
-    risk: AdminConfirmRisk = 'reversible',
-  ): Promise<string | null> {
-    return confirmSettingsSave(options.confirm, { ...dialog, risk })
-  }
-
   function providerLabel(provider: string) {
     return resolveProviderLabel(provider, providerMap.value)
   }
@@ -266,9 +242,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     const vendorLogo = storageVendorLogo(storage)
     const vendorIcon = storageVendorIcon(storage)
     const providerName = providerLabel(storage.provider)
-    const storageStatusClass = resolveStatusClass(storage, providerMap.value)
     const metaItems = resolveStorageMetaItems(storage)
-    const storageStatusText = resolveStatusText(storage, providerMap.value)
     const subtitle = resolveStorageSubtitle(storage)
 
     return {
@@ -278,9 +252,6 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
       avatarLabel: vendorLogo || vendorIcon ? undefined : providerName.slice(0, 2).toUpperCase(),
       providerLabel: providerName,
       subtitle,
-      statusText: storageStatusText,
-      statusClass: storageStatusClass,
-      statusSeverity: storageStatusSeverity(storageStatusClass),
       metaItems,
       supportsTest: providerSupportsTest(storage.provider, providerMap.value),
       canTest: canTestProfile(storage, providerMap.value),
@@ -299,8 +270,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
   return {
     loading,
-    loadFailed,
-    togglingId,
+    toggle,
     applyingId,
     testingId,
     providers,

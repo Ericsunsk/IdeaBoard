@@ -3,8 +3,10 @@
   --search-card-radius: 16px;
   --search-overlay-btn-size: 28px;
   --search-dock-height: 44px;
-  --search-overlay-btn-bg: rgba(0, 0, 0, 0.42);
-  --search-overlay-btn-bg-hover: rgba(0, 0, 0, 0.68);
+  /* Image overlay action fills source the app overlay-btn tokens; the local
+     names stay so card markup keeps referencing the Search contract. */
+  --search-overlay-btn-bg: var(--color-overlay-btn-bg, rgba(0, 0, 0, 0.42));
+  --search-overlay-btn-bg-hover: var(--color-overlay-btn-bg-hover, rgba(0, 0, 0, 0.68));
 }
 
 .search-reference-control {

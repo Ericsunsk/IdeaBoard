@@ -1,4 +1,4 @@
-import { useAdminToast } from '../shared/lib/toast'
+import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
 import type { AdminToastPort } from '../shared/lib/toast'
 import { PAYMENTS_MESSAGES } from './messages'
 
@@ -7,6 +7,8 @@ import { PAYMENTS_MESSAGES } from './messages'
 
 export type StripeSettingsFeedback = {
   saved: () => void
+  saveFailed: (error: unknown) => void
+  loadFailed: (error: unknown) => void
 }
 
 export type PaymentOrdersFeedback = {
@@ -16,6 +18,10 @@ export type PaymentOrdersFeedback = {
 function createStripeSettingsFeedback(toast: AdminToastPort): StripeSettingsFeedback {
   return {
     saved: () => toast.success(PAYMENTS_MESSAGES.stripeSettingsSaved),
+    saveFailed: (error) =>
+      toast.error(formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeSaveFailed)),
+    loadFailed: (error) =>
+      toast.error(formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeLoadFailed)),
   }
 }
 

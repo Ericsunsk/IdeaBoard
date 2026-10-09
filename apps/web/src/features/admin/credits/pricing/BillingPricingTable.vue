@@ -30,12 +30,11 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn
-          field="status"
-          header="Status"
-          :style="{ width: billingPricingColumnWidths.status }"
-        >
+        <AdminColumn field="status" header="Status" :style="{ width: '112px', minWidth: '112px' }">
           <template #body="{ data }">
+            <!-- Status 固定槽 84px（见 BillingStatusCell）+ 单元格 px-3×2=24px：
+              token 的 105px 会溢出 3px 挤占 enabled 列，此处锁定 112px。
+              其他列仍以 billingPricingColumnWidths 为单源。 -->
             <BillingStatusCell :status="data.status" />
           </template>
         </AdminColumn>

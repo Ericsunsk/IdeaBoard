@@ -88,12 +88,17 @@ describe('Admin Billable Catalog resource', () => {
     expect(seenHeaders.operatorReason).toBe('pricing review')
   })
 
-  it('sets feature availability with an operator reason', async () => {
+  it('sets feature availability without an operator reason while keeping the idempotency key', async () => {
     let requestBody: unknown
+    let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
       http.put('/api/control/v1/billing/catalog/:sku/availability', async ({ request, params }) => {
         requestBody = await request.json()
         expect(params.sku).toBe('ai-image:inpaint')
+        seenHeaders = {
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        }
         return HttpResponse.json({
           data: {
             sku: 'ai-image:inpaint',
@@ -104,12 +109,16 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(setBillableItemAvailability('ai-image:inpaint', false, reason)).resolves.toEqual({
+    await expect(
+      setBillableItemAvailability('ai-image:inpaint', false, { operatorReason: '  ' }),
+    ).resolves.toEqual({
       sku: 'ai-image:inpaint',
       status: 'disabled',
       updatedAt: '2026-07-16T10:00:00Z',
     })
-    expect(requestBody).toEqual({ enabled: false, reason: 'pricing review' })
+    expect(requestBody).toEqual({ enabled: false, reason: '' })
+    expect(seenHeaders.idempotencyKey).toMatch(/.+/)
+    expect(seenHeaders.operatorReason).toBeNull()
   })
 
   it('deletes an Archived item through the control plane', async () => {

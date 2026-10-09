@@ -6,7 +6,6 @@ import {
   defineChartNumericScale,
   defineChartOptions,
   formatCompactNumber,
-  resolveChartScaleMax,
   type ChartOptions,
   withAlpha,
 } from '../../../../shared/lib/chartPrimitives'
@@ -177,21 +176,6 @@ export function defineAdminChartPercentScale(input: AdminChartNumericScaleInput 
     borderColor: input.borderColor,
     formatTick: (value) => formatAdminChartPercent(value, input.suffix),
   })
-}
-
-export function defineAdminChartRadialCountScale(input: AdminChartNumericScaleInput = {}) {
-  return {
-    beginAtZero: true,
-    max: resolveChartScaleMax(input),
-    ticks: {
-      backdropColor: 'transparent',
-      color: adminChartTheme.axisText,
-      precision: 0,
-      stepSize: input.stepSize,
-      callback: (value: string | number) => formatCompactNumber(Number(value)),
-    },
-    grid: { color: input.gridColor ?? adminChartTheme.splitLine },
-  }
 }
 
 export function defineAdminChartPointClipStyle() {

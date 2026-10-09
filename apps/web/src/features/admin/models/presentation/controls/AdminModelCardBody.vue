@@ -4,7 +4,7 @@
     <div class="flex items-center min-w-0">
       <div
         class="flex size-7 shrink-0 items-center justify-center rounded-lg mr-2.5 overflow-hidden transition-colors"
-        :class="brandLogo ? 'bg-muted/60 border border-border/60' : 'bg-primary/10 text-primary'"
+        :class="brandLogo ? 'bg-muted/60 border border-border/60' : 'bg-primary-faint text-primary'"
       >
         <img
           v-if="brandLogo && !logoLoadFailed"
@@ -62,7 +62,7 @@
       <!-- prompt cache 徽标 (支持才展示；目录仅保留能力位，价格走参照接口) -->
       <span
         v-if="model.supportsPromptCaching"
-        class="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-admin-caption font-medium text-sky-700"
+        class="inline-flex items-center rounded-md bg-info-soft px-2 py-0.5 text-admin-caption font-medium text-info"
         :title="MODELS_MESSAGES.cardCacheTitle"
       >
         cache √
@@ -73,7 +73,7 @@
         class="inline-flex items-center rounded-md px-2 py-0.5 text-admin-caption font-medium"
         :class="
           model.hosting === MODEL_HOSTING_CLOUDFLARE
-            ? 'bg-emerald-50 text-emerald-700'
+            ? 'bg-success-soft text-success'
             : 'bg-muted/80 text-muted-foreground'
         "
       >

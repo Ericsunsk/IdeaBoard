@@ -45,25 +45,38 @@ describe('AdminPaymentSettingsCard', () => {
 
     expect(await screen.findByText('支付')).toBeVisible()
     expect(await screen.findByText('收款配置')).toBeVisible()
-    expect(await screen.findByText('Product 已就绪')).toBeVisible()
-    expect(await screen.findByText('Webhook 未就绪')).toBeVisible()
+    expect(await screen.findByText('Product Ready')).toBeVisible()
+    expect(await screen.findByText('Webhook Not ready')).toBeVisible()
+    // 方案 A：收款配置是配置态，走中性（不用 success 绿）；Product/Webhook 是健康态。
+    expect(screen.getByText('Configured').parentElement).toHaveClass('bg-muted')
+    expect(screen.getByText('Configured').parentElement).not.toHaveClass('bg-success-soft')
+    expect(screen.getByText('Product Ready').parentElement).toHaveClass('bg-success-soft')
+    expect(screen.getByText('Webhook Not ready').parentElement).toHaveClass('bg-muted')
 
     await user.click(screen.getByRole('button', { name: '配置' }))
     const dialog = await screen.findByRole('dialog', { name: 'Stripe 设置' })
     expect(within(dialog).getByLabelText('Stripe API Key')).toBeVisible()
   })
 
-  it('renders a retryable load error', async () => {
-    mockAppToast()
+  it('routes load failure to toast error without an inline alert', async () => {
+    const toast = mockAppToast()
     useMswHandlers(
       http.get('/api/control/v1/payments/providers/stripe', () =>
         HttpResponse.json({ error: { code: 'internal', message: 'stripe down' } }, { status: 500 }),
       ),
     )
-    const { user } = renderCard()
+    renderCard()
 
-    expect(await screen.findByText('加载 Stripe 设置失败，请重试')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '重试' }))
-    expect(await screen.findByText('加载 Stripe 设置失败，请重试')).toBeVisible()
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('stripe down')),
+    )
+    expect(toast.success).not.toHaveBeenCalled()
+    // 精简目标：底部 globalError AdminAlert 已删除，失败一律 toast；Status 列保留为真相源。
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
+    expect(await screen.findByText('收款配置')).toBeVisible()
+    expect(screen.getByText('Not configured')).toBeVisible()
+    expect(screen.getByText('Product Not ready')).toBeVisible()
+    expect(screen.getByText('Webhook Not ready')).toBeVisible()
   })
 })

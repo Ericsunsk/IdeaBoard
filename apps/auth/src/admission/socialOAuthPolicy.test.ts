@@ -15,6 +15,8 @@ function createPolicy(getRegistrationEnabled: () => Promise<boolean>, providerRe
       registrationEnabled: await getRegistrationEnabled(),
       windowSeconds: 60,
       maxRequests: 30,
+      lockoutThreshold: 10,
+      lockoutDurationSeconds: 900,
     }),
     isMailReady: async () => true,
     getSocialProviderReadiness: async () => providerReady,

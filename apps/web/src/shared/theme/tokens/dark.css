@@ -59,6 +59,15 @@
     --color-admin-focus-ring: rgba(255, 255, 255, 0.25);
     --color-admin-text-inverse: var(--palette-dark-0);
 
+    /* Destructive soft tint tracks the dark destructive (red-400) tier. */
+    --color-destructive-soft: rgb(248 113 113 / 15%);
+
+    /* Provider hues step up to the 400 scale for dark-surface contrast. */
+    --color-provider-purple: #c084fc;
+    --color-provider-orange: #fb923c;
+    --color-provider-blue: #60a5fa;
+    --color-provider-rose: #fb7185;
+
     --color-admin-model-indigo: #818cf8;
     --color-admin-model-purple: #a78bfa;
     --color-admin-model-cyan: #38bdf8;
@@ -137,6 +146,11 @@
     --color-canvas-accent-hover: #fcfcfc;
     --color-canvas-accent-pressed: #ebebeb;
     --color-canvas-accent-soft: rgba(255, 255, 255, 0.12);
+    /*
+     * Tonal-range wash tracks the dark accent-soft (white Tier): translucent
+     * end stop for editing gradients and segmented active fills.
+     */
+    --color-canvas-accent-wash: rgba(255, 255, 255, 0.12);
     --color-canvas-accent-border: rgba(255, 255, 255, 0.25);
     --color-canvas-accent-border-soft: rgba(255, 255, 255, 0.15);
     --color-canvas-accent-tooltip-border: rgba(255, 255, 255, 0.2);

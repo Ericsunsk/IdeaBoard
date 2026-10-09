@@ -28,7 +28,10 @@
       </AdminFormField>
 
       <div class="flex min-w-0 flex-col gap-1.5">
-        <label for="reward-code-value" class="text-admin-meta font-[680] text-muted-foreground">
+        <label
+          for="reward-code-value"
+          class="text-admin-meta font-admin-emphasis text-muted-foreground"
+        >
           {{ t('admin.rewardCode.codeLabel') }}
           <span v-if="!isEditing" class="text-destructive" aria-hidden="true">*</span>
         </label>
@@ -166,7 +169,9 @@
     <template #footer>
       <AdminDialogActions
         :cancel-label="t('admin.common.cancel')"
-        :confirm-label="isEditing ? t('admin.common.saveChanges') : t('admin.rewardCode.createTitle')"
+        :confirm-label="
+          isEditing ? t('admin.common.saveChanges') : t('admin.rewardCode.createTitle')
+        "
         :loading="pending"
         :disabled="pending"
         :cancel-disabled="pending"

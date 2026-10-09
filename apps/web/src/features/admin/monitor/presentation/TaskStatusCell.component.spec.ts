@@ -25,7 +25,8 @@ describe('TaskStatusCell', () => {
   it('renders the metric pill for known statuses', () => {
     renderWithUser(TaskStatusCell, { props: { row: makeRow({ status: 'failed' }) } })
 
-    expect(screen.getByText('Errors')).toBeInTheDocument()
+    // 方案 A：载体统一 AdminStatusPill，文案收敛中文（domain/status 单源）。
+    expect(screen.getByText('失败')).toBeInTheDocument()
   })
 
   it('falls back to raw status text for unknown statuses', () => {

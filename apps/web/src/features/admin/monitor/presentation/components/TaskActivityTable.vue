@@ -22,7 +22,7 @@
               v-if="getTaskRowView(data).serviceIcon"
               class="size-4 shrink-0 text-muted-foreground"
             />
-            <FastArrowRight v-else class="size-3.5 text-orange-500 shrink-0" />
+            <FastArrowRight v-else class="size-3.5 text-warning shrink-0" />
             <span class="truncate text-foreground">{{
               emptyPlaceholder(getTaskRowView(data).serviceSlug)
             }}</span>

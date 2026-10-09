@@ -4,7 +4,9 @@ package httpapi
 //
 // Additive only: this file and its control_* siblings mount a SEPARATE
 // middleware chain and route group under /api/control/v1. Legacy
-// /api/admin/* routes and their handlers were removed in #809.
+// /api/admin/* routes were removed in #809 (hard cut); their handler
+// methods are reused under the control guard (dedicated control handlers
+// plus controlProxy adapters).
 //
 // Separation guarantees (Baseline 2.2):
 //   - Auth: same session transport as Public, but authorization is
@@ -289,9 +291,19 @@ type controlRoute struct {
 	// Route is the method + path template for the audit record
 	// (e.g. "POST /users/{user_id}/role").
 	Route string
-	// Mutation marks high-risk writes: reason + header Idempotency-Key
-	// are required and the outcome is success/failed.
+	// Mutation marks a guarded write: the header Idempotency-Key is always
+	// required and the outcome is success/failed. The operator reason is
+	// required unless ReasonOptional exempts the route (routine config
+	// mutations only; fund/safety-affecting writes keep the default).
 	Mutation bool
+	// ReasonOptional exempts a Mutation from the operator-reason
+	// requirement (secure by default: false means reason is enforced).
+	// The header Idempotency-Key stays required, the audit record is
+	// still emitted (with an empty reason when none was supplied), and
+	// a supplied reason must still be well-formed. Set it only for
+	// routine config mutations; fund/safety-affecting writes keep the
+	// default and fail closed with 400 when the reason is missing.
+	ReasonOptional bool
 	// Detached keeps a Mutation on the detached guard path (reason +
 	// header Idempotency-Key + L1 fast-path + durable winner election
 	// through short independent transactions + observer audit) instead

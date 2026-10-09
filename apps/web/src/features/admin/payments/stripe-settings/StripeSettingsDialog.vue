@@ -31,22 +31,24 @@
           {{ modeLabel }}
         </div>
       </div>
-      <div class="flex items-center gap-1.5 text-admin-caption text-muted-foreground">
-        <span
-          class="size-1.5 rounded-full"
-          :class="summary.productReady ? 'bg-success' : 'bg-warning'"
+      <div class="flex items-center gap-1.5">
+        <AdminStatusPill
+          :label="PAYMENTS_MESSAGES.productReadyState(summary.productReady)"
+          :variant="summary.productReady ? 'success' : 'neutral'"
+          size="small"
         />
-        {{ PAYMENTS_MESSAGES.productReadyState(summary.productReady) }}
       </div>
-      <div class="flex items-center gap-1.5 text-admin-caption text-muted-foreground">
-        <span
-          class="size-1.5 rounded-full"
-          :class="summary.webhookReady ? 'bg-success' : 'bg-warning'"
+      <div class="flex items-center gap-1.5">
+        <AdminStatusPill
+          :label="PAYMENTS_MESSAGES.webhookReadyState(summary.webhookReady)"
+          :variant="summary.webhookReady ? 'success' : 'neutral'"
+          size="small"
         />
-        {{ PAYMENTS_MESSAGES.webhookReadyState(summary.webhookReady) }}
       </div>
     </div>
 
+    <!-- 表单只在提交时锁定：后台重载复用 stale summary 就地刷新，
+      此时保持可交互可避免整表 opacity 闪烁；保存按钮仍由 isLoading 禁用兜底。 -->
     <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
@@ -62,7 +64,7 @@
           placeholder="pmc_..."
           maxlength="255"
           aria-label="Payment Method Configuration ID"
-          :disabled="isBusy"
+          :disabled="isSaving"
           :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('paymentMethodConfigurationId')"
@@ -85,7 +87,7 @@
           autocomplete="off"
           aria-label="Stripe API Key"
           :placeholder="apiKeyPlaceholder"
-          :disabled="isBusy"
+          :disabled="isSaving"
           :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('apiKey')"
@@ -105,7 +107,7 @@
           class="w-full"
           :placeholder="PAYMENTS_MESSAGES.taxCodePlaceholder"
           aria-label="Product Tax Code"
-          :disabled="isBusy"
+          :disabled="isSaving"
           :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('productTaxCode')"
@@ -126,12 +128,10 @@
             id="admin-stripe-purchases-enabled"
             v-model="form.values.purchasesEnabled"
             :aria-label="PAYMENTS_MESSAGES.purchasesLabel"
-            :disabled="isBusy"
+            :disabled="isSaving"
           />
         </div>
       </AdminFormField>
-
-      <AdminAlert v-if="saveError" severity="error">{{ saveError }}</AdminAlert>
     </form>
 
     <template #footer="{ requestClose }">
@@ -151,16 +151,14 @@
 import { computed, ref } from 'vue'
 import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
-import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { useStripeSettingsFeedback } from '../useStripeSettingsFeedback'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { secretField } from '../../shared/lib/secretSchema'
 import { createAdminStripeSettingsResource } from './resource'
 import { PAYMENTS_MESSAGES } from '../messages'
@@ -179,12 +177,10 @@ const emit = defineEmits<{
 
 const defaultResource = createAdminStripeSettingsResource()
 const feedback = useStripeSettingsFeedback()
-const adminConfirm = useAdminConfirm()
 const summary = ref<StripeConfigurationSummary | null>(null)
 const isLoading = ref(false)
 const isSaving = ref(false)
 const loadError = ref('')
-const saveError = ref('')
 const form = useForm({
   initialValues: {
     apiKey: '',
@@ -226,7 +222,6 @@ function activeResource() {
 
 function resetAndLoad() {
   clearSensitiveState()
-  saveError.value = ''
   loadError.value = ''
   void load()
 }
@@ -245,7 +240,9 @@ async function load() {
       purchasesEnabled: nextSummary.purchasesEnabled,
     })
   } catch (error) {
+    // 加载失败一律走 toast；loadError 保留为 frame 状态真相源（可重试 + 禁用保存）。
     loadError.value = formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeLoadFailed)
+    feedback.loadFailed(error)
   } finally {
     isLoading.value = false
   }
@@ -257,17 +254,10 @@ function clearError(field: 'apiKey' | 'paymentMethodConfigurationId' | 'productT
 
 const submit = form.handleSubmit(async (values) => {
   if (isBusy.value) return
-  // Control writes collect the operator reason through the shared confirm
-  // shell (reversible tier: note optional, empty falls back to a default);
-  // a cancelled dialog aborts the save silently.
-  const operatorReason = await confirmSettingsSave(adminConfirm, {
-    title: PAYMENTS_MESSAGES.stripeSaveTitle,
-    message: PAYMENTS_MESSAGES.stripeSaveMessage,
-    confirmLabel: PAYMENTS_MESSAGES.stripeSaveConfirm,
-  })
-  if (!operatorReason) return
+  // Routine config write (backend ReasonOptional): save directly without
+  // the confirm dialog; the audit records an empty reason.
+  const operatorReason = ''
   isSaving.value = true
-  saveError.value = ''
   try {
     const nextSummary = await activeResource().save(
       {
@@ -290,7 +280,8 @@ const submit = form.handleSubmit(async (values) => {
     emit('update:visible', false)
   } catch (error) {
     clearSensitiveState()
-    saveError.value = formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeSaveFailed)
+    // 精简目标：saveError 内嵌 AdminAlert 已删除，失败一律 toast。
+    feedback.saveFailed(error)
   } finally {
     isSaving.value = false
   }

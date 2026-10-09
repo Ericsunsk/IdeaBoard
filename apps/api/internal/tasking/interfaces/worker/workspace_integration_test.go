@@ -9,7 +9,7 @@ package worker
 // broken — parent #809 scope): minimal throwaway schemas with the
 // verbatim table definitions the three stores touch (users, workspaces,
 // upload_sessions, media_assets, media_asset_derivatives,
-// billing_accounts, tasks, task_outputs, library_folders,
+// billing_accounts, tasks, task_status_event_outbox, task_outputs, library_folders,
 // library_assets), following the #818/#820 fixture-DDL pattern. Tests
 // SKIP gracefully without API_TEST_DATABASE_DSN.
 //
@@ -223,6 +223,39 @@ CREATE TABLE tasks (
   CONSTRAINT chk_tasks_workflow_input CHECK (jsonb_typeof(workflow_input) = 'object'),
   CONSTRAINT chk_tasks_routing_snapshot CHECK (routing_snapshot IS NULL OR jsonb_typeof(routing_snapshot) = 'object')
 );
+
+CREATE TABLE task_status_event_outbox (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  event_type TEXT NULL,
+  event_version INT NULL,
+  actor_type TEXT NOT NULL DEFAULT 'service',
+  actor_id TEXT NOT NULL DEFAULT 'tasking',
+  resource_type TEXT NOT NULL DEFAULT 'task',
+  resource_id TEXT NOT NULL,
+  event_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  status_state TEXT NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  delivered_at TIMESTAMPTZ NULL,
+  last_error TEXT NOT NULL DEFAULT '',
+  CONSTRAINT uq_task_status_event_outbox_event_id UNIQUE (event_id),
+  CONSTRAINT chk_task_status_event_outbox_event_id CHECK (event_id LIKE 'evt\_%'),
+  CONSTRAINT chk_task_status_event_outbox_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
+  CONSTRAINT chk_task_status_event_outbox_state CHECK (status_state IN ('pending','delivered')),
+  CONSTRAINT chk_task_status_event_outbox_attempts CHECK (attempts >= 0),
+  CONSTRAINT chk_task_status_event_outbox_workspace CHECK (length(btrim(workspace_id)) > 0),
+  CONSTRAINT chk_task_status_event_outbox_task CHECK (length(btrim(task_id)) > 0),
+  CONSTRAINT chk_task_status_event_outbox_data CHECK (jsonb_typeof(event_data) = 'object')
+);
+
+CREATE INDEX idx_task_status_event_outbox_pending
+  ON task_status_event_outbox (next_attempt_at, internal_id)
+  WHERE status_state = 'pending';
 
 CREATE TABLE task_execution_attempts (
   -- Minimal match to the canonical task_execution_attempts: only the
@@ -713,6 +746,13 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	if !held {
 		t.Fatal("hold missing after settlement Create")
 	}
+	var outboxCount int
+	if err := env.pool.QueryRow(ctx, `SELECT count(*) FROM task_status_event_outbox WHERE task_id=$1 AND status='pending'`, created.ID).Scan(&outboxCount); err != nil {
+		t.Fatalf("read submission outbox: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("submission outbox rows = %d, want 1", outboxCount)
+	}
 
 	// Enqueue failure rolls back: no row, hold released.
 	queue.mu.Lock()
@@ -730,6 +770,19 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	holder.mu.Unlock()
 	if released != 1 {
 		t.Fatalf("released holds = %d, want 1 (rollback)", released)
+	}
+	taskCount, err := env.tasks.CountTasks(ctx, env.wsA)
+	if err != nil {
+		t.Fatalf("read tasks after failed submission: %v", err)
+	}
+	if taskCount != 1 {
+		t.Fatalf("tasks after failed submission = %d, want only the successful submission", taskCount)
+	}
+	if err := env.pool.QueryRow(ctx, `SELECT count(*) FROM task_status_event_outbox WHERE workspace_id=$1`, env.wsA).Scan(&outboxCount); err != nil {
+		t.Fatalf("read outbox after failed submission: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("outbox rows after failed submission = %d, want only the successful submission", outboxCount)
 	}
 }
 

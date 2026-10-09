@@ -129,22 +129,18 @@
               </template>
             </AdminColumn>
 
-            <!-- 2. Status (1:1 对齐功能定价页 Status 规范) -->
+            <!-- 2. Status（方案 A：载体统一 AdminStatusPill） -->
             <AdminColumn field="status" header="Status" :style="{ width: '105px' }">
               <template #body="{ data }">
-                <span
-                  :class="[
-                    'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none',
-                    rowView(data.slug).metric.activePillClass,
-                  ]"
-                >
-                  <span :class="['size-1.5 rounded-full', rowView(data.slug).metric.dotClass]" />
-                  <span>{{
+                <AdminStatusPill
+                  :label="
                     rowView(data.slug).configured
                       ? PROMPTS_MESSAGES.configured
                       : PROMPTS_MESSAGES.unconfigured
-                  }}</span>
-                </span>
+                  "
+                  :variant="rowView(data.slug).configured ? 'success' : 'info'"
+                  size="small"
+                />
               </template>
             </AdminColumn>
 
@@ -243,6 +239,7 @@ import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
 import AdminRefreshButton from '../../shared/components/AdminRefreshButton.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import PromptConfigEditorDialog from '../components/PromptConfigEditorDialog.vue'
 import { usePromptConfigFilters } from '../filtering'
@@ -254,11 +251,9 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
-import { taskMetricDefinitions } from '../../shared/lib/taskMetricTokens'
 import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
 import { useAdminPromptConfigWorkspace } from '../workspace'
 import type { FeaturePromptVariable } from '../workspace'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import {
   featureMap,
   groupedFeatureGroups,
@@ -271,7 +266,6 @@ import { PROMPTS_MESSAGES } from './messages'
 const feedback = usePromptConfigFeedback()
 const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   feedback,
-  confirm: useAdminConfirm(),
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
 })
 const {
@@ -305,11 +299,6 @@ function isConfigured(slug: FeatureSlug): boolean {
   return getSavedPrompt(slug).trim().length > 0
 }
 
-const completedMetric =
-  taskMetricDefinitions.find((m) => m.key === 'completed') ?? taskMetricDefinitions[0]!
-const pendingMetric =
-  taskMetricDefinitions.find((m) => m.key === 'pending') ?? taskMetricDefinitions[0]!
-
 function getFeatureIcon(slug: string): Component {
   return getServiceIcon(slug) ?? Spark
 }
@@ -333,7 +322,9 @@ const {
 })
 
 // 行级 view-model: 模板每行只读一次 map, 避免同一单元格内重复调用
-// getSavedPrompt/statusMetricFor/getVarsForSlug (6 行规模下是可读性问题, 非性能瓶颈)。
+// getSavedPrompt/getVarsForSlug (6 行规模下是可读性问题, 非性能瓶颈)。
+// 方案 A：状态载体统一 AdminStatusPill，variant 由 configured 直映
+// （已配置 success / 未配置 info），不再经 taskMetricTokens 中转。
 const rowViewMap = computed(() => {
   const map: Record<
     string,
@@ -341,7 +332,6 @@ const rowViewMap = computed(() => {
       saved: string
       configured: boolean
       vars: readonly FeaturePromptVariable[]
-      metric: typeof completedMetric
     }
   > = {}
   for (const group of featureGroups.value) {
@@ -352,7 +342,6 @@ const rowViewMap = computed(() => {
         saved,
         configured,
         vars: getVarsForSlug(item.slug),
-        metric: configured ? completedMetric : pendingMetric,
       }
     }
   }
@@ -372,7 +361,6 @@ const emptyRowView = {
   saved: '',
   configured: false,
   vars: [] as readonly FeaturePromptVariable[],
-  metric: pendingMetric,
 }
 
 function rowView(slug: string): typeof emptyRowView {

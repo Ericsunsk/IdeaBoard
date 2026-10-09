@@ -12,6 +12,11 @@ var apiOwnedTableNames = []string{
 	"board_revisions",
 	"board_share_tokens",
 	"boards",
+	// control_idempotency_records shares the full-DML grant: Claim inserts
+	// the in-progress fact, Complete/Abandon settle it, and PurgeExpired
+	// reclaims expired completions (#891). Same privilege shape as the
+	// api-owned tables, so it rides this rule instead of a duplicate.
+	"control_idempotency_records",
 	"event_deliveries",
 	"event_delivery_attempts",
 	"event_subscriptions",

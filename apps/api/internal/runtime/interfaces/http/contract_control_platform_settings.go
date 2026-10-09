@@ -4,10 +4,11 @@ package httpapi
 // and updates behind control:platform.
 //
 // Handlers delegate to the shared *settings.RuntimeSettingsService seam
-// (the same instance serving legacy admin settings); updates carry the
-// operator as actor where the seam supports it (outbound policy) and
-// always carry the guard-enforced operator reason in the audit record.
-// Legacy /api/admin/settings/* routes are untouched.
+// (the same shared instance; the legacy /api/admin/settings/* routes were
+// removed in #809); updates carry the operator as actor where the seam
+// supports it (outbound policy) and always carry the guard-resolved
+// operator reason in the audit record (possibly empty on ReasonOptional
+// routes).
 
 import (
 	"net/http"
@@ -82,6 +83,37 @@ func (d *ContractControlDeps) updateControlRateLimitSetting(c *gin.Context, _ co
 		return
 	}
 	updated, err := runtimeSettings.UpdateRateLimit(c.Request.Context(), req)
+	if err != nil {
+		writeControlSettingsError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, updated)
+}
+
+func (d *ContractControlDeps) getControlLoginLockoutSetting(c *gin.Context, _ controlContext) {
+	runtimeSettings, ok := d.requireControlSettings(c)
+	if !ok {
+		return
+	}
+	setting, err := runtimeSettings.GetLoginLockout(c.Request.Context())
+	if err != nil {
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
+		return
+	}
+	contract.RenderSuccess(c, setting)
+}
+
+func (d *ContractControlDeps) updateControlLoginLockoutSetting(c *gin.Context, _ controlContext) {
+	runtimeSettings, ok := d.requireControlSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.LoginLockoutSetting
+	if err := contract.BindStrictJSON(c, &req); err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
+		return
+	}
+	updated, err := runtimeSettings.UpdateLoginLockout(c.Request.Context(), req)
 	if err != nil {
 		writeControlSettingsError(c, err)
 		return

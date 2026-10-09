@@ -12,11 +12,12 @@
           <component :is="icon" class="size-5" />
         </span>
         <p class="mt-5 mb-0 text-xs font-semibold text-muted-foreground">{{ t(categoryKey) }}</p>
-        <span
-          class="mt-1.5 inline-flex h-6 items-center rounded-pill border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground"
-        >
-          {{ t('account.comingSoon') }}
-        </span>
+        <StatusBadge
+          tone="neutral"
+          :dot="false"
+          :label="t('account.comingSoon')"
+          class="mt-1.5 bg-card hover:bg-card"
+        />
       </div>
     </section>
   </AccountPane>
@@ -25,6 +26,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { useI18n } from 'vue-i18n'
+import StatusBadge from '../../../../shared/components/StatusBadge.vue'
 import AccountPane from './AccountPane.vue'
 
 defineProps<{

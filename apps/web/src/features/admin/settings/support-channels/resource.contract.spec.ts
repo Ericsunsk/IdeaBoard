@@ -12,9 +12,9 @@ describe('support-channels/resource', () => {
     expect(await createAdminSupportChannelsResource().get()).toEqual({ channels: [] })
   })
 
-  it('writes settings with audit and idempotency headers', async () => {
+  it('writes settings without an operator reason while keeping the idempotency key', async () => {
     let body: unknown
-    let reason: string | null = null
+    let reason: string | null = 'unset'
     let key: string | null = null
     useMswHandlers(
       http.put('/api/control/v1/platform/settings/support-channels', async ({ request }) => {
@@ -24,18 +24,15 @@ describe('support-channels/resource', () => {
         return HttpResponse.json({ data: body })
       }),
     )
-    expect(
-      await createAdminSupportChannelsResource().update({ channels: [] }, ' update channels '),
-    ).toEqual({ channels: [] })
+    expect(await createAdminSupportChannelsResource().update({ channels: [] }, '')).toEqual({
+      channels: [],
+    })
     expect(body).toEqual({ channels: [] })
-    expect(reason).toBe('update channels')
+    expect(reason).toBeNull()
     expect(key).toBeTruthy()
   })
 
-  it('refuses unaudited writes and malformed responses', async () => {
-    await expect(
-      createAdminSupportChannelsResource().update({ channels: [] }, ' '),
-    ).rejects.toThrow('需要填写操作原因')
+  it('rejects malformed responses', async () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/support-channels', () =>
         HttpResponse.json({ data: {} }),

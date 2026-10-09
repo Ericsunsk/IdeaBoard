@@ -62,21 +62,6 @@
           :plugins="adminChartPlugins"
           :show-chart="isChartReady"
         />
-
-        <AdminChartCard
-          :title="STATISTICS_MESSAGES.bottleneckTitle"
-          chart-size="compact"
-          span-class="xl:col-span-4"
-        >
-          <ChartRenderer
-            v-if="isChartReady"
-            type="polarArea"
-            :class="adminChartCanvasClass"
-            :data="bottleneckSourceChartData"
-            :options="bottleneckSourceChartOptions"
-            :plugins="adminChartPlugins"
-          />
-        </AdminChartCard>
       </div>
     </template>
   </div>
@@ -131,8 +116,6 @@ const {
   modelRiskChartOptions,
   qualityTrendChartData,
   qualityTrendChartOptions,
-  bottleneckSourceChartData,
-  bottleneckSourceChartOptions,
 } = useUsageStatisticsCharts({
   adminStatistics,
   timeRange,

@@ -4,7 +4,7 @@ import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
 
 export type AdminUserRole = 'admin' | 'user'
 export type AdminUserStatus = 0 | 1
-export type AdminUserTagSeverity = 'danger' | 'secondary' | 'success'
+export type AdminUserTagVariant = 'danger' | 'neutral' | 'success'
 
 export type AdminUserCommandTarget = {
   publicId: string
@@ -26,9 +26,9 @@ export type AdminUserRowView = AdminUserCommandTarget & {
   isAdmin: boolean
   isActive: boolean
   roleLabel: string
-  roleSeverity: AdminUserTagSeverity
+  roleVariant: AdminUserTagVariant
   statusLabel: string
-  statusSeverity: AdminUserTagSeverity
+  statusVariant: AdminUserTagVariant
 }
 
 export type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
@@ -91,9 +91,9 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
     isAdmin,
     isActive,
     roleLabel: isAdmin ? 'Admin' : 'User',
-    roleSeverity: isAdmin ? 'danger' : 'secondary',
+    roleVariant: isAdmin ? 'danger' : 'neutral',
     statusLabel: isActive ? '正常' : '封禁',
-    statusSeverity: isActive ? 'success' : 'danger',
+    statusVariant: isActive ? 'success' : 'danger',
   }
 }
 

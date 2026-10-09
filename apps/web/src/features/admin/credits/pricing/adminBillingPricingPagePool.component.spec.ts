@@ -57,9 +57,25 @@ function poolHandlers(failSkus: string[] = []) {
         },
       })
     }),
-    // The editor's add-from-catalog list reuses the existing model catalog.
+    // The editor's add-from-catalog list reuses the existing model catalog
+    // (full GatewayModelCatalogItem shape; minimal id/name would trip
+    // `toAdminModelItem` on `capabilities` and surface a spurious catalog error).
     http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
-      HttpResponse.json({ data: [{ id: 'a/first', name: 'First' }] }),
+      HttpResponse.json({
+        data: [
+          {
+            id: 'a/first',
+            name: 'First',
+            provider: 'test',
+            description: '',
+            context_or_resolution: '',
+            capabilities: [],
+            hosting: 'test',
+            terms_url: '',
+            docs_url: '',
+          },
+        ],
+      }),
     ),
   ]
 }
@@ -137,7 +153,7 @@ describe('AdminBillingPricingPage model pools', () => {
           reason: string
         }
         expect(body.expected_version).toBe(2)
-        expect(body.reason).toBe('pool review')
+        expect(body.reason).toBe('')
         return HttpResponse.json({
           data: {
             service: 'cutout',
@@ -159,6 +175,7 @@ describe('AdminBillingPricingPage model pools', () => {
     await waitFor(() => {
       expect(replaceRequests).toBe(1)
     })
+    expect(confirmMock).not.toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalledWith('模型池已保存')
   })
 
@@ -305,16 +322,123 @@ describe('AdminBillingPricingPage model pools', () => {
     await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(await screen.findByText('pool unavailable')).toBeVisible()
+    // 组合保存部分失败仅 toast 命名失败部分，不写 inline，避免双通知重复。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
+    const combinedToast = String(toast.error.mock.calls[0]?.[0] ?? '')
+    expect(combinedToast).toContain('部分配置保存失败，请重试')
+    expect(combinedToast).not.toContain('请根据提示')
+    expect(combinedToast).toContain('Model')
+    expect(combinedToast).toContain('pool unavailable')
+    expect(screen.queryByText('pool unavailable')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeVisible()
     expect(publishRequests).toBe(1)
     expect(replaceRequests).toBe(1)
-    expect(toast.error).toHaveBeenCalledWith('部分配置保存失败，请根据提示重试')
 
     await user.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() => expect(replaceRequests).toBe(2))
     expect(publishRequests).toBe(1)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(toast.success).toHaveBeenCalledWith('模型池已保存')
+  })
+
+  it('names the pricing part in the toast without inline duplication when combined pricing fails', async () => {
+    let publishRequests = 0
+    let replaceRequests = 0
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      ...poolHandlers(),
+      http.post('/api/control/v1/billing/catalog/:sku/prices', () => {
+        publishRequests += 1
+        return HttpResponse.json(
+          { error: { code: 'service_unavailable', message: 'pricing unavailable' } },
+          { status: 503 },
+        )
+      }),
+      http.put('/api/control/v1/billing/catalog/:sku/pool', async ({ request }) => {
+        replaceRequests += 1
+        const body = (await request.json()) as { entries: unknown[] }
+        return HttpResponse.json({
+          data: {
+            service: 'cutout',
+            sku: 'ai-image:cutout',
+            version: 3,
+            entries: body.entries,
+          },
+        })
+      }),
+    )
+    const { user } = renderPricingPage()
+
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
+    await user.clear(screen.getByRole('spinbutton', { name: '1K' }))
+    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '5')
+    await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
+    const combinedToast = String(toast.error.mock.calls[0]?.[0] ?? '')
+    expect(combinedToast).toContain('部分配置保存失败，请重试')
+    expect(combinedToast).not.toContain('请根据提示')
+    expect(combinedToast).toContain('定价设置')
+    expect(combinedToast).toContain('pricing unavailable')
+    expect(screen.queryByText('pricing unavailable')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeVisible()
+    expect(publishRequests).toBe(1)
+    expect(replaceRequests).toBe(1)
+  })
+
+  it('offers a reload entry when the combined pool save hits a 409 conflict', async () => {
+    let publishRequests = 0
+    let replaceRequests = 0
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      ...poolHandlers(),
+      http.post('/api/control/v1/billing/catalog/:sku/prices', async () => {
+        publishRequests += 1
+        return HttpResponse.json({
+          data: {
+            prices: {
+              '1k': {
+                output_resolution: '1k',
+                price_version_id: 11,
+                version: 2,
+                unit_credits: 5,
+                created_at: '2026-07-16T12:00:00Z',
+              },
+            },
+          },
+        })
+      }),
+      http.put('/api/control/v1/billing/catalog/:sku/pool', () => {
+        replaceRequests += 1
+        return HttpResponse.json(
+          { error: { code: 'conflict', message: 'stale', request_id: 'req-1' } },
+          { status: 409 },
+        )
+      }),
+    )
+    const { user } = renderPricingPage()
+
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
+    await user.clear(screen.getByRole('spinbutton', { name: '1K' }))
+    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '5')
+    await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
+    const combinedToast = String(toast.error.mock.calls[0]?.[0] ?? '')
+    expect(combinedToast).toContain('部分配置保存失败，请重试')
+    expect(combinedToast).not.toContain('请根据提示')
+    expect(combinedToast).toContain('Model')
+    expect(combinedToast).toContain('模型池已被更新，请刷新后重试')
+    // 409 时对话框内保留“重新加载”入口（不写 inline 明细，避免双通知）。
+    expect(await screen.findByRole('button', { name: '重新加载' })).toBeVisible()
+    expect(screen.getByRole('dialog')).toBeVisible()
+    expect(publishRequests).toBe(1)
+    expect(replaceRequests).toBe(1)
   })
 })
 

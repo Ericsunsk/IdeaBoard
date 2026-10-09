@@ -34,12 +34,14 @@
         @reset="resetFilters"
       >
         <div class="flex min-w-0 flex-col gap-3.5">
-          <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
+          <label
+            class="flex flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
+          >
             <span>{{ PAYMENT_ORDERS_MESSAGES.statusLabel }}</span>
             <AdminSelect v-model="statusFilter" :options="paymentOrderStatusOptions" size="small" />
           </label>
           <label
-            class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-muted-foreground"
+            class="flex items-center justify-between gap-4 text-admin-meta font-admin-strong text-muted-foreground"
           >
             <span>{{ PAYMENT_ORDERS_MESSAGES.anomalyOnly }}</span>
             <AdminSwitch
@@ -67,11 +69,7 @@
       <AdminAlert v-if="initialError" severity="error" class="m-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ PAYMENT_ORDERS_MESSAGES.initialError }}</span>
-          <ActionButton
-            variant="outline"
-            :disabled="loading"
-            @click="refreshOrders"
-          >
+          <ActionButton variant="outline" :disabled="loading" @click="refreshOrders">
             {{ PAYMENT_ORDERS_MESSAGES.retry }}
           </ActionButton>
         </div>
@@ -80,11 +78,7 @@
       <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ PAYMENT_ORDERS_MESSAGES.backgroundError }}</span>
-          <ActionButton
-            variant="outline"
-            :disabled="loading"
-            @click="refreshOrders"
-          >
+          <ActionButton variant="outline" :disabled="loading" @click="refreshOrders">
             {{ PAYMENT_ORDERS_MESSAGES.retry }}
           </ActionButton>
         </div>
