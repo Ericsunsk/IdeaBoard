@@ -268,17 +268,13 @@ export function createDemoModelPools(): Record<string, AdminModelPool> {
       service: 'variations',
       sku: 'ai-image:variations',
       version: 1,
-      entries: [
-        { modelId: 'midjourney/v6-style', enabled: true, resolutions: ['1k', '2k', '4k'] },
-      ],
+      entries: [{ modelId: 'midjourney/v6-style', enabled: true, resolutions: ['1k', '2k', '4k'] }],
     },
     'ai-image:outpaint': {
       service: 'outpaint',
       sku: 'ai-image:outpaint',
       version: 1,
-      entries: [
-        { modelId: 'stabilityai/sdxl-outpaint', enabled: true, resolutions: ['1k', '2k'] },
-      ],
+      entries: [{ modelId: 'stabilityai/sdxl-outpaint', enabled: true, resolutions: ['1k', '2k'] }],
     },
     'ai-image:fusion': {
       service: 'fusion',
