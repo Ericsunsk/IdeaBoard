@@ -63,7 +63,7 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
         'Unmounts one Testing Library render result between multiple render() calls; the component harness still goes through src/test/render.',
     },
   ],
-  'src/features/admin/settings/components/AdminSettingsOnThisPage.component.spec.ts': [
+  'src/features/admin/settings/shared/components/AdminSettingsOnThisPage.component.spec.ts': [
     {
       rule: 'document-div-host',
       reason:
@@ -87,10 +87,22 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the auth field prefix-icon absolute positioning contract shared by Email and Password inputs.',
     },
   ],
-  'src/features/admin/settings/AdminBrandingCard.component.spec.ts': [
+  'src/features/admin/settings/branding/AdminBrandingCard.component.spec.ts': [
     {
       reason:
         'Verifies the brand logo preview keeps object-cover parity with the Sidebar/Login/account rendering paths instead of silently switching to object-contain.',
+    },
+  ],
+  'src/features/admin/shared/components/AdminDrawer.component.spec.ts': [
+    {
+      reason:
+        'Verifies the drawer positioning contract (right-anchored full-height panel) that distinguishes AdminDrawer from the centered AdminDialogShell.',
+    },
+  ],
+  'src/features/admin/shared/components/AdminTable.component.spec.ts': [
+    {
+      reason:
+        'Verifies the table visual contracts added with sticky headers, disabled-row hover suppression, checkbox density, and stale-row opacity; class strings are the contract surface AdminTable exposes.',
     },
   ],
   'src/features/auth/pages/oauthFlow.component.spec.ts': [

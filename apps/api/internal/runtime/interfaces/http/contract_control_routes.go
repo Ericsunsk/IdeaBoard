@@ -185,16 +185,17 @@ func (d *ContractControlDeps) registerControlPaymentRoutes(control *gin.RouterGr
 	// so atomic is kept and the cash durability note lives here.
 	control.POST("/payments/orders/:order_number/refunds", d.guard(ControlCapabilityPayments,
 		controlRoute{Operation: "payments.create_refund", Route: "POST /payments/orders/{order_number}/refunds", Mutation: true, Target: orderTarget}, d.createControlPaymentRefund))
-	control.GET("/payments/stripe-config", d.guard(ControlCapabilityPayments,
-		controlRoute{Operation: "payments.get_stripe_config", Route: "GET /payments/stripe-config"}, d.getControlStripeConfig))
+	providerTarget := controlTargetParam("provider", "payment_provider")
+	control.GET("/payments/providers/:provider", d.guard(ControlCapabilityPayments,
+		controlRoute{Operation: "payments.get_stripe_config", Route: "GET /payments/providers/{provider}", Target: providerTarget}, d.getControlStripeConfig))
 	// update_stripe_config is detached: the Stripe account/product/
 	// webhook precheck runs first as an external call, then the active
 	// generation publishes in a short compare-and-swap transaction. No
 	// long guard transaction ever wraps the Stripe call; the audit row
 	// stays an observer and durable replay (M1 short-claim) prevents a
 	// retry from re-preparing.
-	control.PUT("/payments/stripe-config", d.guard(ControlCapabilityPayments,
-		controlRoute{Operation: "payments.update_stripe_config", Route: "PUT /payments/stripe-config", Mutation: true, Detached: true}, d.updateControlStripeConfig))
+	control.PUT("/payments/providers/:provider", d.guard(ControlCapabilityPayments,
+		controlRoute{Operation: "payments.update_stripe_config", Route: "PUT /payments/providers/{provider}", Mutation: true, Detached: true, Target: providerTarget}, d.updateControlStripeConfig))
 }
 
 func (d *ContractControlDeps) registerControlTaskRoutes(control *gin.RouterGroup) {
@@ -209,10 +210,10 @@ func (d *ContractControlDeps) registerControlTaskRoutes(control *gin.RouterGroup
 
 func (d *ContractControlDeps) registerControlOAuthRoutes(control *gin.RouterGroup) {
 	providerTarget := controlTargetParam("provider", "oauth_provider")
-	control.GET("/users/oauth-providers/:provider", d.guard(ControlCapabilityUsers,
-		controlRoute{Operation: "users.get_oauth_provider", Route: "GET /users/oauth-providers/{provider}", Target: providerTarget}, d.getControlOAuthProvider))
-	control.PUT("/users/oauth-providers/:provider", d.guard(ControlCapabilityUsers,
-		controlRoute{Operation: "users.update_oauth_provider", Route: "PUT /users/oauth-providers/{provider}", Mutation: true, Target: providerTarget}, d.updateControlOAuthProvider))
+	control.GET("/users/oauth/:provider", d.guard(ControlCapabilityUsers,
+		controlRoute{Operation: "users.get_oauth_provider", Route: "GET /users/oauth/{provider}", Target: providerTarget}, d.getControlOAuthProvider))
+	control.PUT("/users/oauth/:provider", d.guard(ControlCapabilityUsers,
+		controlRoute{Operation: "users.update_oauth_provider", Route: "PUT /users/oauth/{provider}", Mutation: true, Target: providerTarget}, d.updateControlOAuthProvider))
 }
 
 func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin.RouterGroup) {

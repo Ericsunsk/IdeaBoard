@@ -4,9 +4,13 @@
     <div class="flex flex-wrap items-center justify-between gap-3 pb-1">
       <div class="flex min-w-0 flex-col gap-0.5">
         <div class="flex items-center gap-2">
-          <Database class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <component
+            :is="SETTINGS_SECTIONS.storage.icon"
+            class="size-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <h3 class="text-admin-title-sm font-bold text-foreground">
-            {{ STORAGE_MESSAGES.storageTitle }}
+            {{ SETTINGS_SECTIONS.storage.title }}
           </h3>
         </div>
         <p class="text-admin-caption text-muted-foreground">
@@ -46,7 +50,11 @@
       @test-storage="handleTest"
       @remove-storage="requestRemoveProfile"
       @toggle-enabled="toggleEnabled"
-    />
+    >
+      <template #footer>
+        <slot name="footer" />
+      </template>
+    </AdminStorageTable>
   </div>
 
   <!-- 3. 存储配置独立弹窗（含厂商预设选择与多 Tab 表单） -->
@@ -89,12 +97,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Database, Plus } from '@iconoir/vue'
+import { Plus } from '@iconoir/vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminLogoPickerPopover from '../../shared/components/AdminLogoPickerPopover.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import { vendorPresetCatalog } from '../meta'
 import { STORAGE_MESSAGES } from './messages'
+import { SETTINGS_SECTIONS } from '../../settings/shared/sections'
 import { useStorageContext } from '../useStorageContext'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import type { StorageCard } from '../profiles'

@@ -44,12 +44,11 @@
     </p>
     <ul>
       <li>
-        <strong>Payment processor (Stripe)</strong>: Processes order payments and settlement. We do
-        not store your sensitive card details on our servers.
+        <strong>Payment processor</strong>: Processes order payments and settlement. We do not store
+        your sensitive card details on our servers.
       </li>
       <li>
-        <strong>Email provider (Resend)</strong>: Delivers verification codes and service
-        notifications.
+        <strong>Email provider</strong>: Delivers verification codes and service notifications.
       </li>
       <li>
         <strong>Infrastructure provider (Cloudflare)</strong>: Provides network proxying, page

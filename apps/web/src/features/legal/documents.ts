@@ -1,9 +1,9 @@
 import { SUPPORT_EMAIL } from '../../shared/constants/contacts'
 
 export const LEGAL_DOCUMENT_VERSIONS = {
-  terms: '2026-08-01',
-  privacy: '2026-08-01',
-  refund: '2026-08-01',
+  terms: '2026-10-09',
+  privacy: '2026-10-09',
+  refund: '2026-10-09',
   acceptableUse: '2026-08-01',
 } as const
 

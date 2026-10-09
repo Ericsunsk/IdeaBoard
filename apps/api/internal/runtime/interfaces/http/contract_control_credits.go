@@ -122,9 +122,8 @@ type controlCreditLinkRequest struct {
 // resolveControlCreditUser maps a usr_ user_id to the internal identity
 // the credits seam consumes. Only usr_ shapes are accepted.
 func (d *ContractControlDeps) resolveControlCreditUser(c *gin.Context, rawUserID string) (userID int64, publicID uuid.UUID, displayName string, ok bool) {
-	parsed, err := tenancy.ParseUserPublicID(strings.TrimSpace(rawUserID))
-	if err != nil || parsed == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
+	parsed, ok := parseControlUserPublicID(c, rawUserID)
+	if !ok {
 		return 0, uuid.Nil, "", false
 	}
 	if d == nil || d.CreditUsers == nil {
@@ -175,10 +174,7 @@ func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context, ctx co
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest10)
 		return 0, uuid.Nil, "", 0, "", "", "", "", false
 	}
-	reason = strings.TrimSpace(req.Reason)
-	if reason == "" {
-		reason = ctx.Reason
-	}
+	reason = controlReasonOr(ctx, req.Reason)
 	return userID, publicID, displayName, parsed,
 		strings.TrimSpace(req.ChargeTransactionID), strings.TrimSpace(req.OriginalTransactionID),
 		strings.TrimSpace(req.BusinessReferenceID), reason, true
@@ -335,23 +331,17 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 	if !ok {
 		return
 	}
-	var before int64
-	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
-		decoded, err := contract.DecodeCursor[controlLedgerCursor](raw)
-		if err != nil || decoded == nil || decoded.Before <= 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
-			return
-		}
-		before = decoded.Before
+	cursor, ok := parseControlPageCursor(c, func(cursor *controlLedgerCursor) bool { return cursor.Before > 0 })
+	if !ok {
+		return
 	}
-	limit := contract.DefaultPageSize
-	if raw := strings.TrimSpace(c.Query("page_size")); raw != "" {
-		parsed, err := contract.ParsePageSize(raw)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
-			return
-		}
-		limit = parsed
+	var before int64
+	if cursor != nil {
+		before = cursor.Before
+	}
+	limit, ok := parseControlPageSize(c, contract.DefaultPageSize)
+	if !ok {
+		return
 	}
 	page, err := d.CreditReads.ListLedger(c.Request.Context(), creditsdomain.ListLedgerInput{
 		UserID:         userID,
@@ -406,10 +396,7 @@ func (d *ContractControlDeps) startControlReconciliation(c *gin.Context, ctx con
 			return
 		}
 	}
-	reason := strings.TrimSpace(req.Reason)
-	if reason == "" {
-		reason = ctx.Reason
-	}
+	reason := controlReasonOr(ctx, req.Reason)
 	action, err := adminaction.New(ctx.Operator.UserID(), reason)
 	if err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest14)

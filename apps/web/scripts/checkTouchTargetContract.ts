@@ -214,7 +214,7 @@ const RULES: Rule[] = [
   {
     kind: 'required',
     label: 'admin settings section navigation',
-    rel: 'features/admin/settings/components/AdminSettingsOnThisPage.vue',
+    rel: 'features/admin/settings/shared/components/AdminSettingsOnThisPage.vue',
     pattern: /<button\b[^>]*\bclass="[^"]*\bmin-h-8\b/,
     fix: 'keep `min-h-8` on the section navigation button',
   },

@@ -372,7 +372,7 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   { key: 'discord', label: 'Discord', logoSrc: logoDiscord, category: 'auth' },
 ]
 
-const adminBrandLogoMap: Record<string, string> = Object.fromEntries(
+export const adminBrandLogoMap: Record<string, string> = Object.fromEntries(
   ALL_ADMIN_BRAND_LOGOS.map((item) => [item.key, item.logoSrc]),
 )
 

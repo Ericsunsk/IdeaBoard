@@ -195,7 +195,7 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/brand-logo?provider=openai"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/models-observed"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/brand-logo-overrides"},
-		{method: http.MethodGet, path: "/api/control/v1/users/oauth-providers/google"},
+		{method: http.MethodGet, path: "/api/control/v1/users/oauth/google"},
 		{method: http.MethodGet, path: "/api/control/v1/rewards/codes/7/redemptions"},
 		{method: http.MethodGet, path: "/api/control/v1/rewards/codes/7/redemptions/3"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/monitor/stream"},
@@ -208,7 +208,7 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 			headers: controlMutationHeaders("ext-matrix-2", "matrix reason")},
 		{method: http.MethodDelete, path: "/api/control/v1/platform/brand-logo-overrides/oauth-provider/google",
 			headers: controlMutationHeaders("ext-matrix-3", "matrix reason")},
-		{method: http.MethodPut, path: "/api/control/v1/users/oauth-providers/google", body: `{"enabled":true,"client_id":"x"}`,
+		{method: http.MethodPut, path: "/api/control/v1/users/oauth/google", body: `{"enabled":true,"client_id":"x"}`,
 			headers: controlMutationHeaders("ext-matrix-4", "matrix reason")},
 		{method: http.MethodPost, path: "/api/control/v1/rewards/codes/search", body: `{}`},
 		{method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{"display_name":"x","code":"ABCDEFGH","credit_amount":10,"max_redemptions":0}`,
@@ -258,7 +258,7 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 		for _, call := range []controlCall{
 			{method: http.MethodGet, path: "/api/control/v1/rewards/codes/7/redemptions",
 				userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityPlatform}},
-			{method: http.MethodGet, path: "/api/control/v1/users/oauth-providers/google",
+			{method: http.MethodGet, path: "/api/control/v1/users/oauth/google",
 				userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityPlatform}},
 		} {
 			status, _, _ := h.serve(call)
@@ -311,7 +311,7 @@ func TestControlExtendedNilDepsFailClosed(t *testing.T) {
 	// (The harness always wires the Tasks fake, so nil-Tasks 503 is
 	// covered by the adapter fail-closed test below, not here.)
 	for _, call := range []controlCall{
-		{method: http.MethodGet, path: "/api/control/v1/users/oauth-providers/google"},
+		{method: http.MethodGet, path: "/api/control/v1/users/oauth/google"},
 	} {
 		call.userID = controlOperatorID
 		call.role = "admin"
@@ -331,7 +331,7 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 
 	t.Run("mutations require reason", func(t *testing.T) {
 		cases := []controlCall{
-			{method: http.MethodPut, path: "/api/control/v1/users/oauth-providers/google", body: `{"enabled":true}`,
+			{method: http.MethodPut, path: "/api/control/v1/users/oauth/google", body: `{"enabled":true}`,
 				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-2"}},
 			{method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{}`,
 				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-3"}},
@@ -547,7 +547,7 @@ func TestControlOAuthHandlers(t *testing.T) {
 
 	t.Run("get provider", func(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
-			method: http.MethodGet, path: "/api/control/v1/users/oauth-providers/google",
+			method: http.MethodGet, path: "/api/control/v1/users/oauth/google",
 			userID: admin.userID, role: admin.role,
 		})
 		if status != http.StatusOK {
@@ -566,7 +566,7 @@ func TestControlOAuthHandlers(t *testing.T) {
 
 	t.Run("update provider carries reason", func(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
-			method: http.MethodPut, path: "/api/control/v1/users/oauth-providers/discord",
+			method: http.MethodPut, path: "/api/control/v1/users/oauth/discord",
 			body:   `{"enabled":true,"client_id":"cid","client_secret":"sek"}`,
 			userID: admin.userID, role: admin.role,
 			headers: controlMutationHeaders("ext-oauth-1", "enable discord"),
@@ -585,7 +585,7 @@ func TestControlOAuthHandlers(t *testing.T) {
 
 	t.Run("unknown provider 404", func(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
-			method: http.MethodGet, path: "/api/control/v1/users/oauth-providers/github",
+			method: http.MethodGet, path: "/api/control/v1/users/oauth/github",
 			userID: admin.userID, role: admin.role,
 		})
 		if status != http.StatusNotFound {
@@ -593,6 +593,46 @@ func TestControlOAuthHandlers(t *testing.T) {
 		}
 		if code := controlErrorCode(t, payload); code != string(contract.CodeControlNotFound) {
 			t.Fatalf("code = %q, want control_not_found", code)
+		}
+	})
+}
+
+func TestControlStripeProviderAllowlist(t *testing.T) {
+	h := newControlHarness(t, func(deps *ContractControlDeps) {
+		deps.Payments = &fakeControlPayments{}
+	})
+	admin := controlCall{userID: controlOperatorID, role: "admin"}
+
+	t.Run("stripe provider resolves", func(t *testing.T) {
+		status, _, payload := h.serve(controlCall{
+			method: http.MethodGet, path: "/api/control/v1/payments/providers/stripe",
+			userID: admin.userID, role: admin.role,
+		})
+		if status != http.StatusOK {
+			t.Fatalf("status = %d (%v), want 200", status, payload)
+		}
+	})
+
+	t.Run("unknown provider 404", func(t *testing.T) {
+		status, _, payload := h.serve(controlCall{
+			method: http.MethodGet, path: "/api/control/v1/payments/providers/adyen",
+			userID: admin.userID, role: admin.role,
+		})
+		if status != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", status)
+		}
+		if code := controlErrorCode(t, payload); code != string(contract.CodeControlNotFound) {
+			t.Fatalf("code = %q, want control_not_found", code)
+		}
+
+		status, _, _ = h.serve(controlCall{
+			method: http.MethodPut, path: "/api/control/v1/payments/providers/adyen",
+			body:   `{"enabled":true}`,
+			userID: admin.userID, role: admin.role,
+			headers: controlMutationHeaders("ext-stripe-allowlist", "allowlist probe"),
+		})
+		if status != http.StatusNotFound {
+			t.Fatalf("update status = %d, want 404", status)
 		}
 	})
 }

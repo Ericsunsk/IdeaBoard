@@ -2,6 +2,7 @@ import {
   buildControlMutationHeaders,
   type ControlMutationOptions,
 } from '../shared/lib/controlMutation'
+import { loadControlSetting, storeControlSetting } from '../shared/lib/controlResource'
 import {
   applyControlStorageProfile,
   createControlStorageProfile,
@@ -110,67 +111,54 @@ export function createAdminStorageResource(): AdminStorageResource {
 }
 
 async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
-  let body: unknown
-  try {
-    body = await listControlStorageProviders()
-  } catch (error) {
-    throw withControlCopy(error, '加载存储供应商失败', {
+  return loadControlSetting(listControlStorageProviders, {
+    fallback: '加载存储供应商失败',
+    domainMessages: {
       control_not_found: '加载存储供应商失败',
       not_found: '加载存储供应商失败',
       404: '加载存储供应商失败',
-    })
-  }
-  const data = requireContractData<{ providers: GeneratedStorageProviderMeta[] }>(
-    body,
-    '加载存储供应商失败',
-  )
-  return (data.providers ?? []).map(normalizeGeneratedProvider)
+    },
+    map: (data: { providers: GeneratedStorageProviderMeta[] }) =>
+      (data.providers ?? []).map(normalizeGeneratedProvider),
+  })
 }
 
 async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
-  let body: unknown
-  try {
-    body = await listControlStorageProfiles()
-  } catch (error) {
-    throw withControlCopy(error, '加载存储配置失败', {
+  return loadControlSetting(listControlStorageProfiles, {
+    fallback: '加载存储配置失败',
+    domainMessages: {
       control_not_found: '加载存储配置失败',
       not_found: '加载存储配置失败',
       404: '加载存储配置失败',
-    })
-  }
-  const data = requireContractData<{ profiles: GeneratedStorageProfile[] }>(
-    body,
-    '加载存储配置失败',
-  )
-  return (data.profiles ?? []).map(normalizeGeneratedProfile)
+    },
+    map: (data: { profiles: GeneratedStorageProfile[] }) =>
+      (data.profiles ?? []).map(normalizeGeneratedProfile),
+  })
 }
 
 async function saveAdminStorageProfile(
   input: SaveStorageProfileInput,
   options: StorageProfileMutationOptions,
 ): Promise<StorageProfileCommandResult> {
-  const headers = buildControlMutationHeaders(options)
-  const payload = { ...(input.payload as unknown as Record<string, unknown>) }
-  let body: unknown
-  try {
-    body = input.id
-      ? await updateControlStorageProfile(input.id, payload, { headers })
-      : await createControlStorageProfile(payload, { headers })
-  } catch (error) {
-    throw withControlCopy(error, '保存存储配置失败', {
+  return storeControlSetting(input, options, {
+    fallback: '保存存储配置失败',
+    domainMessages: {
       control_not_found: '保存存储配置失败',
       not_found: '保存存储配置失败',
       404: '保存存储配置失败',
-    })
-  }
-  const saved = requireContractData<{ message: string; profile: GeneratedStorageProfile }>(
-    body,
-    '保存存储配置失败',
-  )
-  return {
-    message: saved.message,
-    profile: normalizeGeneratedProfile(saved.profile),
-  }
+    },
+    toRequest: (save: SaveStorageProfileInput) => ({
+      ...(save.payload as unknown as Record<string, unknown>),
+    }),
+    persist: (body, headers) =>
+      input.id
+        ? updateControlStorageProfile(input.id, body as Record<string, unknown>, { headers })
+        : createControlStorageProfile(body as Record<string, unknown>, { headers }),
+    map: (saved: { message: string; profile: GeneratedStorageProfile }) => ({
+      message: saved.message,
+      profile: normalizeGeneratedProfile(saved.profile),
+    }),
+  })
 }
 
 async function applyAdminStorageProfileRecord(

@@ -66,6 +66,9 @@ func TestServiceClientMailConfigProxyUsesInternalContractAndActor(t *testing.T) 
 			body := decodeContractBody(t, r)
 			assertContractField(t, body, "actor_id", float64(42))
 			assertContractField(t, body, "api_key", "re_secret")
+			if _, exists := body["enabled"]; exists {
+				t.Fatal("omitted enabled must remain absent from the Auth request")
+			}
 			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"config_version": 3, "readiness": "not_tested"}})
 		case r.Method == http.MethodPost && r.URL.Path == "/internal/mail/config/test":
 			body := decodeContractBody(t, r)
@@ -95,6 +98,43 @@ func TestServiceClientMailConfigProxyUsesInternalContractAndActor(t *testing.T) 
 	}
 	if err := client.ClearMailConfig(context.Background(), 42); err != nil {
 		t.Fatalf("ClearMailConfig: %v", err)
+	}
+}
+
+func TestServiceClientMailConfigUpdatePreservesOptionalEnabled(t *testing.T) {
+	for _, name := range []string{"omitted", "disabled", "enabled"} {
+		t.Run(name, func(t *testing.T) {
+			var enabled *bool
+			if name != "omitted" {
+				value := name == "enabled"
+				enabled = &value
+			}
+			server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+				assertContractRequest(t, r, http.MethodPut, "/internal/mail/config")
+				body := decodeContractBody(t, r)
+				value, exists := body["enabled"]
+				if enabled == nil {
+					if exists {
+						t.Error("omitted enabled must remain absent")
+					}
+				} else if !exists || value != *enabled {
+					t.Errorf("enabled = %v, present = %v, want %v", value, exists, *enabled)
+				}
+				writeContractJSON(w, http.StatusOK, map[string]any{
+					"code": 0, "msg": "success", "data": map[string]any{"enabled": false},
+				})
+			})
+			defer server.Close()
+			summary, err := newContractClient(server).UpdateMailConfig(context.Background(), MailConfigUpdate{
+				FromName: "IdeaBoard", FromEmail: "auth@example.com", Enabled: enabled,
+			}, 42)
+			if err != nil {
+				t.Fatalf("UpdateMailConfig: %v", err)
+			}
+			if summary.Enabled {
+				t.Fatal("disabled Auth summary must remain disabled")
+			}
+		})
 	}
 }
 

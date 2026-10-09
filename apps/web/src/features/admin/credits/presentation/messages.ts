@@ -9,5 +9,4 @@ export const CREDITS_BILLING_LAYOUT_MESSAGES = {
   navRewards: '兑换码',
   navPayments: '支付订单',
   navUnknownBadge: '未知',
-  stripeSettings: 'Stripe 设置',
 } as const

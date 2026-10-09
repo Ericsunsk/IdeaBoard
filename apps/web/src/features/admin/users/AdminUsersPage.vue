@@ -19,18 +19,6 @@
     </template>
 
     <template #toolbar-end>
-      <AdminButton
-        :title="USERS_MESSAGES.oauthSettings"
-        variant="ghost"
-        size="sm"
-        :class="adminFramedIconButtonClass"
-        :aria-label="USERS_MESSAGES.oauthSettings"
-        aria-haspopup="dialog"
-        @click="oauthSettingsVisible = true"
-      >
-        <Settings class="size-4 text-muted-foreground" />
-      </AdminButton>
-
       <AdminFilterPopover
         :active="hasUserFilter"
         :filter-label="USERS_MESSAGES.filterUsers"
@@ -269,11 +257,10 @@
     @refresh-users="loadUsers"
   />
 
-  <OAuthProviderSettingsDialog v-model:visible="oauthSettingsVisible" />
 </template>
 
 <script setup lang="ts">
-import { Discord, Globe, Google, Mail, MoreHoriz, Refresh, Settings } from '@iconoir/vue'
+import { Discord, Globe, Google, Mail, MoreHoriz, Refresh } from '@iconoir/vue'
 import { computed, ref } from 'vue'
 import AdminBadge from '../shared/components/AdminBadge.vue'
 import AdminButton from '../shared/components/AdminButton.vue'
@@ -301,7 +288,6 @@ import { AdminUserWalletDialog } from '../credits/wallets'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './commands'
 import { useAdminUsersContext } from './context'
-import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { useUsersFeedback } from './useUsersFeedback'
 import { USERS_MESSAGES } from './messages'
 import { getCountryFlag, getCountryLabel, type AdminUserRowView, type UserActionKey } from './view'
@@ -315,7 +301,6 @@ const feedback = useUsersFeedback()
 const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<ActionPopupPanel | null>(null)
 const walletDialogUser = ref<AdminUserRowView | null>(null)
-const oauthSettingsVisible = ref(false)
 const walletDialogVisible = computed({
   get: () => Boolean(walletDialogUser.value),
   set: (visible: boolean) => {

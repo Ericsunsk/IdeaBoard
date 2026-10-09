@@ -141,6 +141,42 @@ func TestControlMailSettingGet(t *testing.T) {
 }
 
 func TestControlMailSettingUpdate(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		field string
+	}{
+		{name: "omitted"},
+		{name: "disabled", field: `,"enabled":false`},
+		{name: "enabled", field: `,"enabled":true`},
+	} {
+		t.Run("preserves enabled "+tc.name, func(t *testing.T) {
+			mail := newFakeControlMail()
+			h := newMailHarness(t, mail)
+			status, _, payload := h.serve(controlCall{
+				method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
+				body:   `{"from_name":"IdeaBoard","from_email":"auth@example.com"` + tc.field + `}`,
+				userID: controlOperatorID, role: "admin",
+				headers: mailMutationHeaders("mail-enabled-"+tc.name, "update mail"),
+			})
+			if status != http.StatusOK {
+				t.Fatalf("status = %d, want 200 (%v)", status, payload)
+			}
+			mail.mu.Lock()
+			defer mail.mu.Unlock()
+			if len(mail.updates) != 1 {
+				t.Fatalf("updates = %d, want 1", len(mail.updates))
+			}
+			got := mail.updates[0].Enabled
+			if tc.name == "omitted" {
+				if got != nil {
+					t.Fatal("omitted enabled must remain nil")
+				}
+			} else if got == nil || *got != (tc.name == "enabled") {
+				t.Fatalf("enabled = %v, want %s", got, tc.name)
+			}
+		})
+	}
+
 	t.Run("update delegates with the operator as actor and audits the reason", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)

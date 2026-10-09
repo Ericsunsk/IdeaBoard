@@ -5,6 +5,7 @@ export type MailReadiness = 'not_configured' | 'not_tested' | 'ready' | 'unavail
 export type MailConfigSummary = {
   configured: boolean
   apiKeyConfigured: boolean
+  enabled: boolean
   fromName: string
   fromEmail: string
   replyTo: string
@@ -17,6 +18,7 @@ export type MailConfigSummary = {
 
 export type MailConfigInput = {
   apiKey?: string
+  enabled?: boolean
   fromName: string
   fromEmail: string
   replyTo?: string
@@ -27,6 +29,7 @@ export type MailTestInput = { recipient: string; actorId: number }
 
 export type StoredMailConfig = {
   encryptedApiKey: string
+  enabled: boolean
   fromName: string
   fromEmail: string
   replyTo: string
@@ -102,12 +105,14 @@ export class MailConfigService {
 
     for (let attempt = 0; attempt < MAX_CONFIG_MUTATION_ATTEMPTS; attempt += 1) {
       const current = await this.repository.get()
+      const nextEnabled = input.enabled ?? current?.enabled ?? true
       const encryptedApiKey = rotatedAPIKey
         ? rotatedEncryptedAPIKey
         : (current?.encryptedApiKey ?? '')
       const changed =
         !current ||
         rotatedAPIKey ||
+        current.enabled !== nextEnabled ||
         current.fromName !== fromName ||
         current.fromEmail !== fromEmail ||
         current.replyTo !== replyTo
@@ -118,6 +123,7 @@ export class MailConfigService {
       const saved = await this.repository.put(
         {
           encryptedApiKey,
+          enabled: nextEnabled,
           fromName,
           fromEmail,
           replyTo,
@@ -149,6 +155,9 @@ export class MailConfigService {
       throw new MailConfigError('invalid_input', '测试收件地址无效')
     }
     const current = await this.repository.get()
+    if (current && !current.enabled) {
+      throw new MailConfigError('mail_disabled', '邮件服务未启用')
+    }
     if (!current?.encryptedApiKey || !current.fromName || !current.fromEmail) {
       throw new MailConfigError('not_configured', '邮件服务尚未配置')
     }
@@ -202,6 +211,9 @@ export class MailConfigService {
 
   async send(input: MailSendInput): Promise<void> {
     const current = await this.repository.get()
+    if (current && !current.enabled) {
+      throw new MailConfigError('mail_disabled', '邮件服务未启用')
+    }
     if (!current?.encryptedApiKey || !current.fromName || !current.fromEmail) {
       throw new MailConfigError('not_configured', '邮件服务尚未配置')
     }
@@ -249,6 +261,7 @@ function emptySummary(): MailConfigSummary {
   return {
     configured: false,
     apiKeyConfigured: false,
+    enabled: true,
     fromName: '',
     fromEmail: '',
     replyTo: '',
@@ -264,6 +277,7 @@ function summarize(value: StoredMailConfig): MailConfigSummary {
   return {
     configured: Boolean(value.encryptedApiKey && value.fromName && value.fromEmail),
     apiKeyConfigured: Boolean(value.encryptedApiKey),
+    enabled: value.enabled,
     fromName: value.fromName,
     fromEmail: value.fromEmail,
     replyTo: value.replyTo,

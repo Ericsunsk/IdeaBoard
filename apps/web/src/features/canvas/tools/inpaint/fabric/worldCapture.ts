@@ -1,10 +1,9 @@
 /**
- * Reserved world-capture-to-canvas reflow seam (stub only).
+ * Reserved world-capture-to-canvas reflow type contract.
  *
  * A future 3D world capture producer will implement `WorldCaptureToCanvas`
  * and hand its image result back into the Canvas as ordinary image input.
- * Until that producer exists, `createNoopWorldCaptureToCanvas()` is the sole
- * implementation: it reports unavailable and captures nothing.
+ * No runtime implementation or consumer is attached until that producer exists.
  *
  * Contract notes for the future producer (not implemented here):
  *
@@ -34,15 +33,8 @@ export type WorldCaptureResult = {
 } | null
 
 export type WorldCaptureToCanvas = {
-  /** Whether a live 3D capture producer is attached. The stub is never live. */
+  /** Whether a live 3D capture producer is attached. */
   readonly isAvailable: boolean
-  /** Flows one capture into the Canvas; the stub always resolves `null`. */
+  /** Captures image content for reflow, or returns `null` when unavailable. */
   captureToCanvas(intent: WorldCaptureIntent): WorldCaptureResult
-}
-
-export function createNoopWorldCaptureToCanvas(): WorldCaptureToCanvas {
-  return {
-    isAvailable: false,
-    captureToCanvas: (_intent: WorldCaptureIntent): WorldCaptureResult => null,
-  }
 }

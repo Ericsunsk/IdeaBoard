@@ -461,7 +461,7 @@ describe('RechargePane', () => {
     const status = (await screen.findByText('Confirming your payment result')).closest(
       '[role="status"]',
     )!
-    expect(status).toHaveTextContent('The final result depends on Stripe confirmation')
+    expect(status).toHaveTextContent('The final result depends on payment provider confirmation')
     await waitFor(() => expect(status).toHaveFocus())
   })
 

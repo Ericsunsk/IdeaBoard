@@ -350,7 +350,7 @@ paths:
           $ref: '#/components/responses/ControlNotFound'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
-  /users/oauth-providers/{provider}:
+  /users/oauth/{provider}:
     get:
       tags: [ControlUsers]
       operationId: getControlOAuthProvider
@@ -367,7 +367,7 @@ paths:
         reason: false
         outcome: read
       parameters:
-        - $ref: '#/components/parameters/ControlOAuthProvider'
+        - $ref: '#/components/parameters/ControlProviderSlug'
       responses:
         '200':
           description: OAuth provider channel summary.
@@ -401,7 +401,7 @@ paths:
         reason: true
         outcome: success
       parameters:
-        - $ref: '#/components/parameters/ControlOAuthProvider'
+        - $ref: '#/components/parameters/ControlProviderSlug'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/OperatorReason'
       requestBody:
@@ -1346,17 +1346,23 @@ paths:
           $ref: '#/components/responses/ControlNotFound'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
-  /payments/stripe-config:
+  /payments/providers/{provider}:
     get:
       tags: [ControlPayments]
       operationId: getControlStripeConfig
       summary: Read the Stripe configuration summary
+      description: >-
+        Reads the payment-provider configuration behind control:payments.
+        Only stripe is implemented; unknown or malformed slugs fail closed
+        with 404 (invisible, never 403).
       x-capability: control:payments
       x-audit:
         operator: true
-        target: null
+        target: payment_provider
         reason: false
         outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlProviderSlug'
       responses:
         '200':
           description: Stripe configuration summary.
@@ -1371,6 +1377,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
     put:
       tags: [ControlPayments]
       operationId: updateControlStripeConfig
@@ -1378,10 +1386,11 @@ paths:
       x-capability: control:payments
       x-audit:
         operator: true
-        target: null
+        target: payment_provider
         reason: true
         outcome: success
       parameters:
+        - $ref: '#/components/parameters/ControlProviderSlug'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/OperatorReason'
       requestBody:
@@ -1406,6 +1415,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
   /tasks:
@@ -3597,11 +3608,11 @@ components:
       schema:
         type: string
         minLength: 1
-    ControlOAuthProvider:
+    ControlProviderSlug:
       name: provider
       in: path
       required: true
-      description: Social OAuth provider slug (lowercase allowlist; unknown slugs fail closed with 404).
+      description: Provider slug (lowercase allowlist; unknown slugs fail closed with 404).
       schema:
         type: string
         pattern: '^[a-z0-9_-]{1,64}$'
@@ -4286,8 +4297,10 @@ components:
       properties:
         reason:
           type: string
+          description: Operator note (or X-Operator-Reason header).
         operator_note:
           type: string
+          description: Operator note alias (or X-Operator-Reason header).
         expires_in_days:
           type: integer
           minimum: 0
@@ -4297,8 +4310,10 @@ components:
       properties:
         reason:
           type: string
+          description: Operator note (or X-Operator-Reason header).
         operator_note:
           type: string
+          description: Operator note alias (or X-Operator-Reason header).
     ControlWorkspaceMemberRequest:
       type: object
       required: [user_id, role]
@@ -4421,6 +4436,12 @@ components:
       required: [user_id, amount_credits, business_reference_id]
       additionalProperties: false
       properties:
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
         user_id:
           type: string
           pattern: '^usr_[A-Za-z0-9_-]+$'
@@ -4429,38 +4450,62 @@ components:
           minimum: 1
         business_reference_id:
           type: string
+    ControlCreditRefundRequest:
+      type: object
+      required: [user_id, amount_credits, business_reference_id, charge_transaction_id]
+      additionalProperties: false
+      properties:
         reason:
           type: string
+          description: Operator note (or X-Operator-Reason header).
         operator_note:
           type: string
-    ControlCreditRefundRequest:
-      allOf:
-        - $ref: '#/components/schemas/ControlCreditCommandRequest'
-        - type: object
-          required: [charge_transaction_id]
-          properties:
-            charge_transaction_id:
-              type: string
+          description: Operator note alias (or X-Operator-Reason header).
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9_-]+$'
+        amount_credits:
+          type: integer
+          minimum: 1
+        business_reference_id:
+          type: string
+        charge_transaction_id:
+          type: string
     ControlCreditCorrectionRequest:
-      allOf:
-        - $ref: '#/components/schemas/ControlCreditCommandRequest'
-        - type: object
-          required: [original_transaction_id]
-          properties:
-            original_transaction_id:
-              type: string
+      type: object
+      required: [user_id, amount_credits, business_reference_id, original_transaction_id]
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9_-]+$'
+        amount_credits:
+          type: integer
+          minimum: 1
+        business_reference_id:
+          type: string
+        original_transaction_id:
+          type: string
     ControlPaymentRefundRequest:
       type: object
       required: [idea_quantity]
       additionalProperties: false
       properties:
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
         idea_quantity:
           type: integer
           minimum: 1
-        reason:
-          type: string
-        operator_note:
-          type: string
     ControlStripeConfigRequest:
       type: object
       required: [purchases_enabled]
@@ -4488,13 +4533,16 @@ components:
           type: string
     ControlMailConfig:
       type: object
-      required: [configured, api_key_configured, from_name, from_email, reply_to, config_version, readiness]
+      required: [configured, api_key_configured, from_name, from_email, reply_to, config_version, readiness, enabled]
       additionalProperties: false
       properties:
         configured:
           type: boolean
         api_key_configured:
           type: boolean
+        enabled:
+          type: boolean
+          description: 关闭后停止一切外发，凭据保留。存量默认为 true。
         from_name:
           type: string
         from_email:
@@ -4529,35 +4577,38 @@ components:
       required: [from_name, from_email]
       additionalProperties: false
       properties:
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
         api_key:
           type: string
-          description: Resend API key; omit to keep the stored key.
+          description: Mail provider API key; omit to keep the stored key.
         from_name:
           type: string
         from_email:
           type: string
         reply_to:
           type: string
-        reason:
-          type: string
-          description: Operator note (or X-Operator-Reason header).
-        operator_note:
-          type: string
-          description: Operator note alias (or X-Operator-Reason header).
+        enabled:
+          type: boolean
+          description: 关闭后停止一切外发，凭据保留。省略时保持原值，存量默认为 true。
     ControlMailTestRequest:
       type: object
       required: [recipient]
       additionalProperties: false
       properties:
-        recipient:
-          type: string
-          format: email
         reason:
           type: string
           description: Operator note (or X-Operator-Reason header).
         operator_note:
           type: string
           description: Operator note alias (or X-Operator-Reason header).
+        recipient:
+          type: string
+          format: email
     PaginatedControlUsers:
       type: object
       required: [data, meta]
@@ -4782,6 +4833,12 @@ components:
       type: object
       additionalProperties: false
       properties:
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
         enabled:
           type: boolean
         client_id:
@@ -4789,12 +4846,6 @@ components:
         client_secret:
           type: string
           description: Omit to keep the stored secret.
-        reason:
-          type: string
-          description: Operator note (or X-Operator-Reason header).
-        operator_note:
-          type: string
-          description: Operator note alias (or X-Operator-Reason header).
     ControlBrandingLogoUpload:
       type: object
       required: [logo_url]
@@ -4952,6 +5003,12 @@ components:
       type: object
       additionalProperties: false
       properties:
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
         display_name:
           type: string
         code:
@@ -4968,16 +5025,16 @@ components:
         expires_at:
           type: string
           format: date-time
+    ControlRewardCodeUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
         reason:
           type: string
           description: Operator note (or X-Operator-Reason header).
         operator_note:
           type: string
           description: Operator note alias (or X-Operator-Reason header).
-    ControlRewardCodeUpdateRequest:
-      type: object
-      additionalProperties: false
-      properties:
         display_name:
           type: string
         credit_amount:
@@ -4993,25 +5050,19 @@ components:
         code:
           type: string
           description: Present only to rotate the code plaintext.
-        reason:
-          type: string
-          description: Operator note (or X-Operator-Reason header).
-        operator_note:
-          type: string
-          description: Operator note alias (or X-Operator-Reason header).
     ControlRewardCodeEnabledRequest:
       type: object
       required: [enabled]
       additionalProperties: false
       properties:
-        enabled:
-          type: boolean
         reason:
           type: string
           description: Operator note (or X-Operator-Reason header).
         operator_note:
           type: string
           description: Operator note alias (or X-Operator-Reason header).
+        enabled:
+          type: boolean
     ControlAdminRedemption:
       type: object
       required: [id, reward_code_id, user_public_id, display_name, credited_amount, redeemed_at]

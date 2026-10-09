@@ -60,8 +60,10 @@ import (
 	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Control family capabilities (frozen audit labels; mirrored in
@@ -317,4 +319,97 @@ func controlTargetParam(param, targetType string) func(*gin.Context, []byte) (st
 		}
 		return targetType, raw
 	}
+}
+
+// parseControlUserPublicID resolves a usr_ external id to the UUID the
+// identity/credit/tenancy seams consume. Malformed shapes fail with 400;
+// unknown users surface as 404 from the seams.
+func parseControlUserPublicID(c *gin.Context, raw string) (uuid.UUID, bool) {
+	parsed, err := tenancy.ParseUserPublicID(strings.TrimSpace(raw))
+	if err != nil || parsed == uuid.Nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
+		return uuid.Nil, false
+	}
+	return parsed, true
+}
+
+// parseControlSKU validates a {sku} path param's presence. Empty shapes
+// fail with 400; unknown SKUs surface as 404 from the catalog seams.
+func parseControlSKU(c *gin.Context) (string, bool) {
+	sku := strings.TrimSpace(c.Param("sku"))
+	if sku == "" {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest5)
+		return "", false
+	}
+	return sku, true
+}
+
+// parseControlPageCursor decodes the opaque cursor query param into T.
+// An absent cursor yields nil (the caller applies its default); a
+// malformed or predicate-rejected cursor fails with 400
+// pagination_cursor_invalid. Callers provide cursor-specific validation.
+func parseControlPageCursor[T any](c *gin.Context, valid func(*T) bool) (*T, bool) {
+	raw := strings.TrimSpace(c.Query("cursor"))
+	if raw == "" {
+		return nil, true
+	}
+	decoded, err := contract.DecodeCursor[T](raw)
+	if err != nil || decoded == nil || (valid != nil && !valid(decoded)) {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
+		return nil, false
+	}
+	return decoded, true
+}
+
+// parseControlPageSize parses the page_size query param with the shared
+// page-size dialect. Absent yields def; malformed fails with 400.
+func parseControlPageSize(c *gin.Context, def int) (int, bool) {
+	raw := strings.TrimSpace(c.Query("page_size"))
+	if raw == "" {
+		return def, true
+	}
+	parsed, err := contract.ParsePageSize(raw)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
+		return 0, false
+	}
+	return parsed, true
+}
+
+// controlReasonOr prefers the body-carried operator note, falling back
+// to the guard-extracted reason (X-Operator-Reason header wins there).
+func controlReasonOr(ctx controlContext, reason string) string {
+	if trimmed := strings.TrimSpace(reason); trimmed != "" {
+		return trimmed
+	}
+	return ctx.Reason
+}
+
+// nonEmptyControlMessage returns the trimmed message or the fallback
+// when blank. Shared by the Auth-seam error mappers (mail, OAuth)
+// whose errors.As dispatch stays at the call sites.
+func nonEmptyControlMessage(message, fallback string) string {
+	if trimmed := strings.TrimSpace(message); trimmed != "" {
+		return trimmed
+	}
+	return fallback
+}
+
+// parseControlProviderSlug validates a {provider} path param's shape
+// (lowercase slug, allowlisted charset, max length). Unknown or malformed
+// slugs fail closed with 404 (invisible, never 403). Callers apply their
+// own allowlist (static set or service capabilities) after this check.
+func parseControlProviderSlug(c *gin.Context) (string, bool) {
+	provider := strings.ToLower(strings.TrimSpace(c.Param("provider")))
+	if provider == "" || len(provider) > 64 {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
+		return "", false
+	}
+	for _, character := range provider {
+		if (character < 'a' || character > 'z') && character != '-' && character != '_' && (character < '0' || character > '9') {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
+			return "", false
+		}
+	}
+	return provider, true
 }

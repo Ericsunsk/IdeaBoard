@@ -94,7 +94,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     reason:
       'Sidebar shell motion (width/max-height choreography) uses Motion Policy var() tokens; color/transform feedback inside the shell uses plain Tailwind transition utilities.',
   },
-  'src/features/admin/settings/components/AdminSettingsOnThisPage.vue': {
+  'src/features/admin/settings/shared/components/AdminSettingsOnThisPage.vue': {
     counts: {
       'raw-motion': 3,
     },

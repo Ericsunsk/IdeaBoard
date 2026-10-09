@@ -31,8 +31,16 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { ControlCreditCommandRequest } from './controlCreditCommandRequest'
 
-export type ControlCreditRefundRequest = ControlCreditCommandRequest & {
+export interface ControlCreditRefundRequest {
+  /** Operator note (or X-Operator-Reason header). */
+  reason?: string
+  /** Operator note alias (or X-Operator-Reason header). */
+  operator_note?: string
+  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
+  user_id: string
+  /** @minimum 1 */
+  amount_credits: number
+  business_reference_id: string
   charge_transaction_id: string
 }

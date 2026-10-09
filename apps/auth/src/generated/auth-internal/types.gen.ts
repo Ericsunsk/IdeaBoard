@@ -14,6 +14,7 @@ export type MailConfigRequest = {
     from_email: string;
     reply_to?: string;
     actor_id: number;
+    enabled?: boolean;
 };
 
 export type MailTestRequest = {
@@ -32,6 +33,7 @@ export type MailConfigSummary = {
     updated_at: string | null;
     last_tested_at: string | null;
     last_test_error_code: string | null;
+    enabled: boolean;
 };
 
 export type MailConfigEnvelope = {

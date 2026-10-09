@@ -33,6 +33,10 @@
  */
 
 export interface ControlRewardCodeUpdateRequest {
+  /** Operator note (or X-Operator-Reason header). */
+  reason?: string
+  /** Operator note alias (or X-Operator-Reason header). */
+  operator_note?: string
   display_name?: string
   credit_amount?: number
   max_redemptions?: number
@@ -40,8 +44,4 @@ export interface ControlRewardCodeUpdateRequest {
   expires_at?: string | null
   /** Present only to rotate the code plaintext. */
   code?: string
-  /** Operator note (or X-Operator-Reason header). */
-  reason?: string
-  /** Operator note alias (or X-Operator-Reason header). */
-  operator_note?: string
 }

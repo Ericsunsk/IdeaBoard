@@ -33,6 +33,8 @@
  */
 
 export interface ControlReasonRequest {
+  /** Operator note (or X-Operator-Reason header). */
   reason?: string
+  /** Operator note alias (or X-Operator-Reason header). */
   operator_note?: string
 }

@@ -33,7 +33,9 @@
  */
 
 export interface ControlBanRequest {
+  /** Operator note (or X-Operator-Reason header). */
   reason?: string
+  /** Operator note alias (or X-Operator-Reason header). */
   operator_note?: string
   /** @minimum 0 */
   expires_in_days?: number

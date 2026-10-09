@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS auth_mail_settings (
   from_name VARCHAR(100) NOT NULL CHECK (char_length(btrim(from_name)) BETWEEN 1 AND 100),
   from_email VARCHAR(320) NOT NULL CHECK (from_email = lower(btrim(from_email))),
   reply_to VARCHAR(320) NOT NULL DEFAULT '' CHECK (reply_to = lower(btrim(reply_to))),
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
   config_version BIGINT NOT NULL CHECK (config_version > 0),
   readiness VARCHAR(24) NOT NULL CHECK (readiness IN ('not_configured', 'not_tested', 'ready', 'unavailable')),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
@@ -24,6 +25,12 @@ CREATE TABLE IF NOT EXISTS auth_mail_settings_audit (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object'),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp()
 );
+`)
+  // Backfill for deployments created before the enabled switch.
+  // ADD COLUMN IF NOT EXISTS keeps this migration idempotent and defaults
+  // existing rows to true, preserving current sending behavior.
+  await pool.query(`
+ALTER TABLE auth_mail_settings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
 `)
   await pool.query(`
 SELECT setval(

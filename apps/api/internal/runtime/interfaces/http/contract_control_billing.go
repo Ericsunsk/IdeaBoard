@@ -107,9 +107,8 @@ func (d *ContractControlDeps) publishControlCatalogPrices(c *gin.Context, ctx co
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable)
 		return
 	}
-	sku := strings.TrimSpace(c.Param("sku"))
-	if sku == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest5)
+	sku, ok := parseControlSKU(c)
+	if !ok {
 		return
 	}
 	var req controlPublishPricesRequest
@@ -145,9 +144,8 @@ func (d *ContractControlDeps) setControlCatalogAvailability(c *gin.Context, ctx 
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable)
 		return
 	}
-	sku := strings.TrimSpace(c.Param("sku"))
-	if sku == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest5)
+	sku, ok := parseControlSKU(c)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -171,9 +169,8 @@ func (d *ContractControlDeps) deleteControlCatalogItem(c *gin.Context, ctx contr
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable)
 		return
 	}
-	sku := strings.TrimSpace(c.Param("sku"))
-	if sku == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest5)
+	sku, ok := parseControlSKU(c)
+	if !ok {
 		return
 	}
 	result, err := d.Catalog.DeleteArchived(c.Request.Context(), sku, ctx.Operator.UserID())

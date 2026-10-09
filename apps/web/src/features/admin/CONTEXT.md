@@ -28,7 +28,8 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 - `app/navigation.ts` — `navigationByKey` / `groups` consumed by `AdminLayout` in `app` (`navigationItems` is an internal intermediate, not exported).
 - `pages` — thin login route assembly plus per-vertical pages under `<vertical>/pages/`; lazy-loaded by `app/routes.ts`; pages import sibling-domain workspace/context, never build their own transport.
 - `shared` — sole Admin horizontal dependency: Dialog/Table/Toolbar/Pager kit, confirm/toast, collection/pagination/polling primitives, chart, validation; deep `from '../shared/...'` imports, no barrel.
-- `useAdminUsersResource` (`users/resource.ts`) — user search/role/ban/kick/impersonate/OAuth-settings transport.
+- `useAdminUsersResource` (`users/resource.ts`) — user search/role/ban/kick/impersonate transport.
+- `createOAuthProviderSettingsResource` (`settings/oauth/resource.ts`) — OAuth login settings transport; `settings/oauth` owns the dialog, provider logos, and operator copy.
 - `useAdminUsersContext` (`users/context.ts`) — user use-case orchestration.
 - `useAdminUserCommands` (`users/commands.ts`) — user commands.
 - `credits/wallets/index.ts` — sole cross-vertical barrel exporting `AdminUserWalletDialog` (referenced by users pages); all other verticals have no barrel.

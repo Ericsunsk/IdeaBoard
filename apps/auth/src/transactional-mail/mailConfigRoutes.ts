@@ -27,6 +27,7 @@ export function registerMailConfigRoutes(
         const body = request.body as Record<string, unknown>
         const summary = await options.service.update({
           apiKey: stringValue(body.api_key) || undefined,
+          ...(typeof body.enabled === 'boolean' ? { enabled: body.enabled } : {}),
           fromName: stringValue(body.from_name),
           fromEmail: stringValue(body.from_email),
           replyTo: stringValue(body.reply_to) || undefined,
@@ -78,6 +79,7 @@ function serializeSummary(summary: Awaited<ReturnType<MailConfigService['getSumm
   return {
     configured: summary.configured,
     api_key_configured: summary.apiKeyConfigured,
+    enabled: summary.enabled,
     from_name: summary.fromName,
     from_email: summary.fromEmail,
     reply_to: summary.replyTo,
@@ -99,7 +101,11 @@ function numberValue(value: unknown): number {
 function sendMailConfigError(reply: import('fastify').FastifyReply, error: unknown) {
   if (error instanceof MailConfigError) {
     const status =
-      error.code === 'invalid_input' ? 400 : error.code === 'not_configured' ? 409 : 502
+      error.code === 'invalid_input'
+        ? 400
+        : error.code === 'not_configured' || error.code === 'mail_disabled'
+          ? 409
+          : 502
     sendError(reply, status, error.message)
     return
   }

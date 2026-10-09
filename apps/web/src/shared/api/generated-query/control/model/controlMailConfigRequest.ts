@@ -33,13 +33,15 @@
  */
 
 export interface ControlMailConfigRequest {
-  /** Resend API key; omit to keep the stored key. */
-  api_key?: string
-  from_name: string
-  from_email: string
-  reply_to?: string
   /** Operator note (or X-Operator-Reason header). */
   reason?: string
   /** Operator note alias (or X-Operator-Reason header). */
   operator_note?: string
+  /** Mail provider API key; omit to keep the stored key. */
+  api_key?: string
+  from_name: string
+  from_email: string
+  reply_to?: string
+  /** 关闭后停止一切外发，凭据保留。省略时保持原值，存量默认为 true。 */
+  enabled?: boolean
 }

@@ -883,7 +883,7 @@ export const useImpersonateControlUser = <
   return useMutation(getImpersonateControlUserMutationOptions(options), queryClient)
 }
 export const getGetControlOAuthProviderUrl = (provider: string) => {
-  return `/users/oauth-providers/${encodeURIComponent(String(provider))}`
+  return `/users/oauth/${encodeURIComponent(String(provider))}`
 }
 
 /**
@@ -901,7 +901,7 @@ export const getControlOAuthProvider = async (
 }
 
 export const getGetControlOAuthProviderQueryKey = (provider: MaybeRefOrGetter<string>) => {
-  return ['users', 'oauth-providers', provider] as const
+  return ['users', 'oauth', provider] as const
 }
 
 export const getGetControlOAuthProviderQueryOptions = <
@@ -967,7 +967,7 @@ export function useGetControlOAuthProvider<
 }
 
 export const getUpdateControlOAuthProviderUrl = (provider: string) => {
-  return `/users/oauth-providers/${encodeURIComponent(String(provider))}`
+  return `/users/oauth/${encodeURIComponent(String(provider))}`
 }
 
 /**

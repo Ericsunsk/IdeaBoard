@@ -74,6 +74,7 @@ func (d *ContractControlDeps) updateControlMailSetting(c *gin.Context, ctx contr
 		FromName     string `json:"from_name"`
 		FromEmail    string `json:"from_email"`
 		ReplyTo      string `json:"reply_to"`
+		Enabled      *bool  `json:"enabled"`
 		Reason       string `json:"reason"`
 		OperatorNote string `json:"operator_note"`
 	}
@@ -83,6 +84,7 @@ func (d *ContractControlDeps) updateControlMailSetting(c *gin.Context, ctx contr
 	}
 	summary, err := mail.UpdateMailConfig(c.Request.Context(), auth.MailConfigUpdate{
 		APIKey: req.APIKey, FromName: req.FromName, FromEmail: req.FromEmail, ReplyTo: req.ReplyTo,
+		Enabled: req.Enabled,
 	}, ctx.Operator.UserID())
 	if err != nil {
 		writeControlMailError(c, err)
@@ -152,20 +154,13 @@ func writeControlMailError(c *gin.Context, err error) {
 		switch configErr.Status {
 		case http.StatusBadRequest:
 			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest,
-				nonEmptyControlMailMessage(configErr.Message, msgBadRequest4))
+				nonEmptyControlMessage(configErr.Message, msgBadRequest4))
 			return
 		case http.StatusConflict:
 			contract.RenderError(c, http.StatusConflict, contract.CodeConflict,
-				nonEmptyControlMailMessage(configErr.Message, msgWriteControlMailError))
+				nonEmptyControlMessage(configErr.Message, msgWriteControlMailError))
 			return
 		}
 	}
 	contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable11)
-}
-
-func nonEmptyControlMailMessage(message, fallback string) string {
-	if trimmed := strings.TrimSpace(message); trimmed != "" {
-		return trimmed
-	}
-	return fallback
 }

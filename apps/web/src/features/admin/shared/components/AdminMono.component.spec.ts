@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render } from '@testing-library/vue'
+import { render } from '../../../../test/render'
 import AdminMono from './AdminMono.vue'
 
 /**

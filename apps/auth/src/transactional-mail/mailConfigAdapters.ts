@@ -88,7 +88,7 @@ export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {
   return {
     async get() {
       const result = await pool.query<MailConfigRow>(
-        'SELECT encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code FROM auth_mail_settings WHERE id = 1',
+        'SELECT encrypted_api_key, enabled, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code FROM auth_mail_settings WHERE id = 1',
       )
       return result.rows[0] ? fromRow(result.rows[0]) : null
     },
@@ -97,6 +97,7 @@ export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {
       return withMailConfigTransaction(pool, async (client) => {
         const values = [
           value.encryptedApiKey,
+          value.enabled,
           value.fromName,
           value.fromEmail,
           value.replyTo,
@@ -105,11 +106,11 @@ export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {
         const result =
           expectedConfigVersion === 0
             ? await client.query<MailConfigRow>(
-                "INSERT INTO auth_mail_settings (id, encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code) VALUES (1, $1, $2, $3, $4, nextval('auth_mail_settings_config_version_seq'), $5, clock_timestamp(), NULL, NULL) ON CONFLICT (id) DO NOTHING RETURNING encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code",
+                "INSERT INTO auth_mail_settings (id, encrypted_api_key, enabled, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code) VALUES (1, $1, $2, $3, $4, $5, nextval('auth_mail_settings_config_version_seq'), $6, clock_timestamp(), NULL, NULL) ON CONFLICT (id) DO NOTHING RETURNING encrypted_api_key, enabled, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code",
                 values,
               )
             : await client.query<MailConfigRow>(
-                "UPDATE auth_mail_settings SET encrypted_api_key = $1, from_name = $2, from_email = $3, reply_to = $4, readiness = $5, config_version = nextval('auth_mail_settings_config_version_seq'), updated_at = clock_timestamp(), last_tested_at = NULL, last_test_error_code = NULL WHERE id = 1 AND config_version = $6 RETURNING encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code",
+                "UPDATE auth_mail_settings SET encrypted_api_key = $1, enabled = $2, from_name = $3, from_email = $4, reply_to = $5, readiness = $6, config_version = nextval('auth_mail_settings_config_version_seq'), updated_at = clock_timestamp(), last_tested_at = NULL, last_test_error_code = NULL WHERE id = 1 AND config_version = $7 RETURNING encrypted_api_key, enabled, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code",
                 [...values, expectedConfigVersion],
               )
         const row = result.rows[0]
@@ -117,7 +118,7 @@ export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {
 
         await client.query(
           'INSERT INTO auth_mail_settings_audit (actor_id, action, metadata) VALUES ($1, $2, $3)',
-          [actorId, action, JSON.stringify({ readiness: value.readiness })],
+          [actorId, action, JSON.stringify({ readiness: value.readiness, enabled: value.enabled })],
         )
         return fromRow(row)
       })
@@ -164,6 +165,7 @@ export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {
 
 type MailConfigRow = {
   encrypted_api_key: string
+  enabled: boolean
   from_name: string
   from_email: string
   reply_to: string
@@ -177,6 +179,7 @@ type MailConfigRow = {
 function fromRow(row: MailConfigRow): StoredMailConfig {
   return {
     encryptedApiKey: row.encrypted_api_key,
+    enabled: row.enabled,
     fromName: row.from_name,
     fromEmail: row.from_email,
     replyTo: row.reply_to,

@@ -36,6 +36,8 @@ import type { ControlMailConfigReadiness } from './controlMailConfigReadiness'
 export interface ControlMailConfig {
   configured: boolean
   api_key_configured: boolean
+  /** 关闭后停止一切外发，凭据保留。存量默认为 true。 */
+  enabled: boolean
   from_name: string
   from_email: string
   reply_to: string

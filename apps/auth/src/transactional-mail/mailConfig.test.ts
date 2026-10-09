@@ -357,6 +357,132 @@ describe('MailConfigService', () => {
         !error.message.includes('re_secret'),
     )
   })
+
+  it('defaults enabled to true and carries it in the summary', async () => {
+    const repository = createFakeRepository()
+    const service = new MailConfigService(repository.port, { send: async () => {} }, secretCipher)
+
+    const created = await service.update({
+      apiKey: 're_runtime',
+      fromName: 'IdeaBoard',
+      fromEmail: 'auth@example.com',
+      actorId: 1,
+    })
+
+    assert.equal(created.enabled, true)
+    assert.equal(repository.value?.enabled, true)
+    assert.equal((await service.getSummary()).enabled, true)
+  })
+
+  it('persists an explicit enabled flag through saves', async () => {
+    const repository = createFakeRepository()
+    const service = new MailConfigService(repository.port, { send: async () => {} }, secretCipher)
+
+    const disabled = await service.update({
+      apiKey: 're_runtime',
+      enabled: false,
+      fromName: 'IdeaBoard',
+      fromEmail: 'auth@example.com',
+      actorId: 1,
+    })
+    assert.equal(disabled.enabled, false)
+    assert.equal(repository.value?.enabled, false)
+
+    const updatedWhileDisabled = await service.update({
+      fromName: 'IdeaBoard Mail',
+      fromEmail: 'auth@example.com',
+      actorId: 2,
+    })
+    assert.equal(updatedWhileDisabled.enabled, false)
+    assert.equal(repository.value?.enabled, false)
+    assert.equal(repository.value?.fromName, 'IdeaBoard Mail')
+
+    const reEnabled = await service.update({
+      enabled: true,
+      fromName: 'IdeaBoard',
+      fromEmail: 'auth@example.com',
+      actorId: 2,
+    })
+    assert.equal(reEnabled.enabled, true)
+    assert.equal(repository.value?.enabled, true)
+  })
+
+  it('refuses test and transactional sends while disabled without touching the transport', async () => {
+    const repository = createFakeRepository()
+    let sends = 0
+    const service = new MailConfigService(
+      repository.port,
+      {
+        send: async () => {
+          sends += 1
+        },
+      },
+      secretCipher,
+    )
+    await service.update({
+      apiKey: 're_runtime',
+      enabled: false,
+      fromName: 'IdeaBoard',
+      fromEmail: 'auth@example.com',
+      actorId: 1,
+    })
+
+    await assert.rejects(
+      () => service.sendTest({ recipient: 'admin@example.com', actorId: 2 }),
+      (error) =>
+        error instanceof MailConfigError &&
+        error.code === 'mail_disabled' &&
+        error.message.includes('邮件服务未启用'),
+    )
+    await assert.rejects(
+      () =>
+        service.send({
+          to: 'user@example.com',
+          content: { subject: 'Test', html: '<p>Test</p>', text: 'Test' },
+        }),
+      (error) =>
+        error instanceof MailConfigError &&
+        error.code === 'mail_disabled' &&
+        error.message.includes('邮件服务未启用'),
+    )
+    assert.equal(sends, 0)
+  })
+
+  it('allows sends again after re-enabling and passing a test', async () => {
+    const repository = createFakeRepository()
+    let sends = 0
+    const service = new MailConfigService(
+      repository.port,
+      {
+        send: async () => {
+          sends += 1
+        },
+      },
+      secretCipher,
+    )
+    await service.update({
+      apiKey: 're_runtime',
+      enabled: false,
+      fromName: 'IdeaBoard',
+      fromEmail: 'auth@example.com',
+      actorId: 1,
+    })
+    await service.update({
+      enabled: true,
+      fromName: 'IdeaBoard',
+      fromEmail: 'auth@example.com',
+      actorId: 2,
+    })
+
+    await service.sendTest({ recipient: 'admin@example.com', actorId: 2 })
+    await service.send({
+      to: 'user@example.com',
+      content: { subject: 'Test', html: '<p>Test</p>', text: 'Test' },
+    })
+
+    assert.equal(sends, 2)
+    assert.equal(repository.value?.readiness, 'ready')
+  })
 })
 
 function createFakeRepository() {

@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen } from '../../../../test/render'
 import {
   createCreditHealthHandlers,
@@ -89,36 +89,5 @@ describe('AdminCreditsBillingLayout', () => {
     await user.click(screen.getByText('支付订单'))
 
     expect(routerMocks.push).toHaveBeenCalledWith(ADMIN_PAYMENT_ORDERS_PATH)
-  })
-
-  it('opens Stripe settings from the gear left of the billing navigation', async () => {
-    useMswHandlers(
-      ...createCreditHealthHandlers(createCreditHealthMswState()),
-      http.get('/api/control/v1/payments/stripe-config', () =>
-        HttpResponse.json({
-          data: {
-            configured: false,
-            api_key_configured: false,
-            webhook_secret_configured: false,
-            charges_enabled: false,
-            product_tax_code: '',
-            product_ready: false,
-            webhook_ready: false,
-            purchases_enabled: false,
-          },
-        }),
-      ),
-    )
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { user } = renderWithUser(AdminCreditsBillingLayout, {
-      global: {
-        plugins: [[VueQueryPlugin, { queryClient }]],
-        stubs: { RouterView: true, transition: false },
-      },
-    })
-
-    await user.click(screen.getByRole('button', { name: 'Stripe 设置' }))
-
-    expect(await screen.findByRole('dialog', { name: 'Stripe 设置' })).toBeVisible()
   })
 })

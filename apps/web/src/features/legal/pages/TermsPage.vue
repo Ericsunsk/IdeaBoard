@@ -18,16 +18,17 @@
     <h2>2. Ideas and Purchases</h2>
     <p>
       Ideas are virtual credits used only for features within IdeaBoard. They are not currency,
-      deposits, or transferable assets. The price shown at Checkout controls the purchase price.
-      Stripe Checkout displays the payment method, currency, and required billing information
-      according to the current configuration. Stripe Automatic Tax is not currently enabled for
-      recharges, so Stripe does not automatically calculate taxes for this service.
+      deposits, or transferable assets. The price shown at Checkout controls the purchase price. The
+      checkout page displays the payment method, currency, and required billing information
+      according to the current configuration. Automatic tax calculation is not currently enabled for
+      recharges, so taxes are not automatically calculated for this service.
     </p>
 
     <h2>3. Payment and Credit Delivery</h2>
     <p>
-      Payments are processed by Stripe. Returning to IdeaBoard in your browser does not mean that
-      payment succeeded. Ideas are credited only after the system confirms the Stripe payment.
+      Payments are processed by our payment provider. Returning to IdeaBoard in your browser does
+      not mean that payment succeeded. Ideas are credited only after the system confirms the
+      payment.
     </p>
 
     <h2>4. User Content and AI Content</h2>

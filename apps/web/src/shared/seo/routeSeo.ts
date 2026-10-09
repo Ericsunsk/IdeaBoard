@@ -101,7 +101,7 @@ const baseRouteSeo = {
   refund: {
     title: 'Refund Policy | IdeaBoard',
     description:
-      'Refund Policy for Ideas purchased through IdeaBoard Stripe Checkout, including eligibility and processing.',
+      'Refund Policy for Ideas purchased through IdeaBoard Checkout, including eligibility and processing.',
     canonicalPath: '/refund-policy',
     robots: 'index,follow',
   },

@@ -16,7 +16,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/platform/contract"
@@ -45,16 +44,9 @@ func (d *ContractControlDeps) requireControlOAuth(c *gin.Context) (ControlOAuthS
 // allowlisted provider slug. Unknown or malformed slugs fail closed with
 // 404 (invisible, never 403), mirroring the legacy admin handler.
 func parseControlOAuthProvider(c *gin.Context, svc ControlOAuthService) (string, bool) {
-	provider := strings.ToLower(strings.TrimSpace(c.Param("provider")))
-	if provider == "" || len(provider) > 64 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
+	provider, ok := parseControlProviderSlug(c)
+	if !ok {
 		return "", false
-	}
-	for _, character := range provider {
-		if (character < 'a' || character > 'z') && character != '-' && character != '_' && (character < '0' || character > '9') {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
-			return "", false
-		}
 	}
 	capabilities, err := svc.GetSocialProviderCapabilities(c.Request.Context())
 	if err != nil {
@@ -132,10 +124,7 @@ func (d *ContractControlDeps) updateControlOAuthProvider(c *gin.Context, _ contr
 func writeControlOAuthError(c *gin.Context, err error) {
 	var providerErr *auth.SocialProviderSettingsError
 	if errors.As(err, &providerErr) {
-		message := strings.TrimSpace(providerErr.Message)
-		if message == "" {
-			message = msgWriteControlOAuthError
-		}
+		message := nonEmptyControlMessage(providerErr.Message, msgWriteControlOAuthError)
 		switch providerErr.Status {
 		case http.StatusBadRequest:
 			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, message)

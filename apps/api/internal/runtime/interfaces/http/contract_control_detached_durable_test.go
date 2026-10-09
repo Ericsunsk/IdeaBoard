@@ -166,7 +166,7 @@ func TestControlDetachedStripeConfigReplayAcrossInstances(t *testing.T) {
 	pay1 := &fakeControlPayments{}
 	h1 := newDetachedStripeHarness(t, pool, pay1)
 	call := controlCall{
-		method: http.MethodPut, path: "/api/control/v1/payments/stripe-config",
+		method: http.MethodPut, path: "/api/control/v1/payments/providers/stripe",
 		body:   `{"purchases_enabled":true}`,
 		userID: controlOperatorID, role: "admin",
 		headers: controlMutationHeaders("detached-stripe-1", "rotate keys"),

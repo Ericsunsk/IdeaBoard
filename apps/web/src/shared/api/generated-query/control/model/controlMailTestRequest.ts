@@ -33,9 +33,9 @@
  */
 
 export interface ControlMailTestRequest {
-  recipient: string
   /** Operator note (or X-Operator-Reason header). */
   reason?: string
   /** Operator note alias (or X-Operator-Reason header). */
   operator_note?: string
+  recipient: string
 }

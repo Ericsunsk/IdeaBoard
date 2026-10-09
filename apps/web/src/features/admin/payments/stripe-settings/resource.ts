@@ -1,14 +1,9 @@
 import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
-  type ControlMutationOptions,
-} from '../../shared/lib/controlMutation'
-import {
   getControlStripeConfig,
   updateControlStripeConfig,
 } from '../../../../shared/api/generated-query/control/control-payments/control-payments'
-import { requireContractData } from '../../../../shared/api/contractKernel'
-import { withControlCopy } from '../../shared/lib/controlCopy'
+import type { ControlStripeConfigRequest } from '../../../../shared/api/generated-query/control/model/controlStripeConfigRequest'
+import { createControlSettingResource } from '../../shared/lib/controlResource'
 import type {
   AdminStripeSettingsResource,
   SaveStripeConfigurationInput,
@@ -37,55 +32,24 @@ export type ApiStripeConfigurationSummary = {
   updated_at?: string
 }
 
-export type UpdateStripeConfigurationRequest = {
-  api_key?: string
-  payment_method_configuration_id: string
-  product_tax_code: string
-  purchases_enabled: boolean
-}
-
-export type StripeSettingsMutationOptions = ControlMutationOptions
-
-export function createAdminStripeSettingsResource(): AdminStripeSettingsResource {
-  return {
-    get: getStripeConfiguration,
-    save: saveStripeConfiguration,
-  }
-}
-
-export async function getStripeConfiguration(): Promise<StripeConfigurationSummary> {
-  try {
-    const body = await getControlStripeConfig()
-    return normalizeStripeConfiguration(
-      requireContractData<ApiStripeConfigurationSummary>(body, '加载 Stripe 设置失败'),
-    )
-  } catch (error) {
-    throw withControlCopy(error, '加载 Stripe 设置失败')
-  }
-}
-
-export async function saveStripeConfiguration(
-  input: SaveStripeConfigurationInput,
-  options: StripeSettingsMutationOptions,
-): Promise<StripeConfigurationSummary> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
-  const body = {
+const stripeResource = createControlSettingResource({
+  getFallback: '加载 Stripe 设置失败',
+  saveFallback: '保存 Stripe 设置失败',
+  map: normalizeStripeConfiguration,
+  toRequest: (input: SaveStripeConfigurationInput, reason: string) => ({
     ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
     payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
     product_tax_code: input.productTaxCode.trim(),
     purchases_enabled: input.purchasesEnabled,
-    reason: operatorReason,
-  }
-  try {
-    const response = await updateControlStripeConfig(body, {
-      headers: buildControlMutationHeaders(options),
-    })
-    return normalizeStripeConfiguration(
-      requireContractData<ApiStripeConfigurationSummary>(response, '保存 Stripe 设置失败'),
-    )
-  } catch (error) {
-    throw withControlCopy(error, '保存 Stripe 设置失败')
-  }
+    reason,
+  }),
+  fetch: () => getControlStripeConfig('stripe'),
+  persist: (body, headers) =>
+    updateControlStripeConfig('stripe', body as ControlStripeConfigRequest, { headers }),
+})
+
+export function createAdminStripeSettingsResource(): AdminStripeSettingsResource {
+  return stripeResource
 }
 
 function normalizeStripeConfiguration(
@@ -106,5 +70,3 @@ function normalizeStripeConfiguration(
     updatedAt: configuration.updated_at,
   }
 }
-
-// withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

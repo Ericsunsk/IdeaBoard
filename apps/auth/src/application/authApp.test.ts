@@ -111,6 +111,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
   const mailSummary: MailConfigSummary = {
     configured: true,
     apiKeyConfigured: true,
+    enabled: true,
     fromName: 'IdeaBoard',
     fromEmail: 'auth@example.com',
     replyTo: '',

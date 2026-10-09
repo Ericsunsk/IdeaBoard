@@ -188,13 +188,13 @@ export default {
     returnedDetail:
       'Este pedido no se ha completado y volver a esta página no añade Ideas por sí mismo.',
     confirmingTitle: 'Confirmando el resultado de su pago',
-    confirmingDetail: 'El resultado final depende de la confirmación de Stripe. Espere.',
+    confirmingDetail: 'El resultado final depende de la confirmación del pago. Espere.',
     recheck: 'Comprobar de nuevo',
     failedTitle: 'Pago incompleto',
     failedDetail: 'No se añadieron Ideas para este pago. Intente pagar de nuevo.',
     delayedTitle: 'Procesando Ideas',
     delayedDetail:
-      'Todavía estamos esperando la confirmación de Stripe. No es necesario pagar de nuevo.',
+      'Todavía estamos esperando la confirmación del pago. No es necesario pagar de nuevo.',
   },
   toast: {
     avatarFileUnsupported: 'Solo se pueden subir archivos de imagen.',

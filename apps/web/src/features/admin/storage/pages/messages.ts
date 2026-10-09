@@ -10,7 +10,7 @@
 // `workspace.ts` next to the logic that owns them.
 
 export const STORAGE_MESSAGES = {
-  storageTitle: '存储配置',
+  storageTitle: '存储',
   storageSubtitle: '对象存储服务供应商与凭据管理',
   create: '新增存储',
   current: '使用中',

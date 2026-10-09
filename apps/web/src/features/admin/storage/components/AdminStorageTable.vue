@@ -216,6 +216,9 @@
           </template>
         </AdminColumn>
       </AdminTable>
+      <div v-if="$slots.footer" :class="adminTableFooterClass">
+        <slot name="footer" />
+      </div>
     </div>
   </section>
 </template>
@@ -231,6 +234,7 @@ import {
   adminLogoButtonClass,
   adminTableCardClass,
   adminTableClass,
+  adminTableFooterClass,
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'

@@ -188,12 +188,13 @@ export default {
     returnedDetail:
       'This order has not been completed, and returning to this page does not add Ideas by itself.',
     confirmingTitle: 'Confirming your payment result',
-    confirmingDetail: 'The final result depends on Stripe confirmation. Please wait.',
+    confirmingDetail: 'The final result depends on payment provider confirmation. Please wait.',
     recheck: 'Check again',
     failedTitle: 'Payment incomplete',
     failedDetail: 'No Ideas were added for this payment. Please try paying again.',
     delayedTitle: 'Processing Ideas',
-    delayedDetail: 'We are still waiting for Stripe to confirm. No need to pay again.',
+    delayedDetail:
+      'We are still waiting for the payment provider to confirm. No need to pay again.',
   },
   toast: {
     avatarFileUnsupported: 'Only image files can be uploaded.',

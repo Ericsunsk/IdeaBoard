@@ -74,7 +74,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         path: 'settings',
         name: 'AdminSettings',
         component: adminPageComponents['settings'],
-        meta: { requiresAuth: true, title: '系统设置', fullWidth: true, hidePageHeader: true },
+        meta: { requiresAuth: true, title: '系统设置', fullWidth: true },
       },
       // 旧子路径兼容：合并前的 /admin/settings/{general,storage,mail,security}
       // 书签重定向到统一设置页，避免 404。

@@ -99,9 +99,6 @@ describe('AdminUsersPage', () => {
               : { next_cursor: 'cursor-page-2', has_more: true },
         }),
       ),
-      // OAuth providers have no control equivalent (fail-closed): no
-      // transport handler. The dialog opens against the fail-closed
-      // resource; see oauthProviderSettingsResource.contract.spec.ts.
       http.post('/api/control/v1/credits/grants', async ({ request }) => {
         commandRequests.push({
           body: (await request.json()) as Record<string, unknown>,
@@ -125,20 +122,6 @@ describe('AdminUsersPage', () => {
         })
       }),
     )
-  })
-
-  it('opens OAuth settings from the settings icon immediately before the filter control', async () => {
-    const { user } = renderPage()
-
-    const settingsButton = await screen.findByRole('button', { name: 'OAuth Provider 设置' })
-    const filterButton = screen.getByRole('button', { name: '筛选用户' })
-    expect(settingsButton).toHaveAttribute('aria-haspopup', 'dialog')
-    expect(
-      settingsButton.compareDocumentPosition(filterButton) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-
-    await user.click(settingsButton)
-    expect(await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })).toBeVisible()
   })
 
   it('opens the operational account overview from the available Idea balance', async () => {

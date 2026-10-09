@@ -367,53 +367,60 @@ export const useCreateControlPaymentRefund = <
 > => {
   return useMutation(getCreateControlPaymentRefundMutationOptions(options), queryClient)
 }
-export const getGetControlStripeConfigUrl = () => {
-  return `/payments/stripe-config`
+export const getGetControlStripeConfigUrl = (provider: string) => {
+  return `/payments/providers/${encodeURIComponent(String(provider))}`
 }
 
 /**
+ * Reads the payment-provider configuration behind control:payments. Only stripe is implemented; unknown or malformed slugs fail closed with 404 (invisible, never 403).
  * @summary Read the Stripe configuration summary
  */
 export const getControlStripeConfig = async (
+  provider: string,
   options?: Parameters<typeof controlMutator>[1],
 ): Promise<ControlObjectEnvelope> => {
-  return controlMutator<ControlObjectEnvelope>(getGetControlStripeConfigUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getGetControlStripeConfigUrl(provider), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getGetControlStripeConfigQueryKey = () => {
-  return ['payments', 'stripe-config'] as const
+export const getGetControlStripeConfigQueryKey = (provider: MaybeRefOrGetter<string>) => {
+  return ['payments', 'providers', provider] as const
 }
 
 export const getGetControlStripeConfigQueryOptions = <
   TData = Awaited<ReturnType<typeof getControlStripeConfig>>,
-  TError = UnauthorizedResponse | ForbiddenResponse,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getControlStripeConfig>>, TError, TData>
-  >
-  request?: SecondParameter<typeof controlMutator>
-}) => {
+  TError = UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  provider: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlStripeConfig>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetControlStripeConfigQueryKey()
+  const queryKey = getGetControlStripeConfigQueryKey(provider)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlStripeConfig>>> = ({ signal }) =>
-    getControlStripeConfig({ signal, ...requestOptions })
+    getControlStripeConfig(toValue(provider), { signal, ...requestOptions })
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getControlStripeConfig>>,
-    TError,
-    TData
-  >
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(provider) !== null && toValue(provider) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getControlStripeConfig>>, TError, TData>
 }
 
 export type GetControlStripeConfigQueryResult = NonNullable<
   Awaited<ReturnType<typeof getControlStripeConfig>>
 >
-export type GetControlStripeConfigQueryError = UnauthorizedResponse | ForbiddenResponse
+export type GetControlStripeConfigQueryError =
+  UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
 
 /**
  * @summary Read the Stripe configuration summary
@@ -421,8 +428,9 @@ export type GetControlStripeConfigQueryError = UnauthorizedResponse | ForbiddenR
 
 export function useGetControlStripeConfig<
   TData = Awaited<ReturnType<typeof getControlStripeConfig>>,
-  TError = UnauthorizedResponse | ForbiddenResponse,
+  TError = UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
 >(
+  provider: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getControlStripeConfig>>, TError, TData>
@@ -431,7 +439,7 @@ export function useGetControlStripeConfig<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetControlStripeConfigQueryOptions(options)
+  const queryOptions = getGetControlStripeConfigQueryOptions(provider, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -442,14 +450,15 @@ export function useGetControlStripeConfig<
   return query
 }
 
-export const getUpdateControlStripeConfigUrl = () => {
-  return `/payments/stripe-config`
+export const getUpdateControlStripeConfigUrl = (provider: string) => {
+  return `/payments/providers/${encodeURIComponent(String(provider))}`
 }
 
 /**
  * @summary Update the Stripe configuration (operator reason required)
  */
 export const updateControlStripeConfig = async (
+  provider: string,
   controlStripeConfigRequest: ControlStripeConfigRequest,
   options?: Parameters<typeof controlMutator>[1],
 ): Promise<ControlObjectEnvelope> => {
@@ -472,7 +481,7 @@ export const updateControlStripeConfig = async (
     }
     return headers
   }
-  return controlMutator<ControlObjectEnvelope>(getUpdateControlStripeConfigUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getUpdateControlStripeConfigUrl(provider), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -484,7 +493,11 @@ export const getUpdateControlStripeConfigMutationKey = () => ['updateControlStri
 
 export const getUpdateControlStripeConfigMutationOptions = <
   TError =
-    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -511,9 +524,9 @@ export const getUpdateControlStripeConfigMutationOptions = <
     Awaited<ReturnType<typeof updateControlStripeConfig>>,
     UpdateControlStripeConfigMutationVariables
   > = (props) => {
-    const { data } = props ?? {}
+    const { provider, data } = props ?? {}
 
-    return updateControlStripeConfig(data, requestOptions)
+    return updateControlStripeConfig(provider, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
@@ -524,15 +537,26 @@ export type UpdateControlStripeConfigMutationResult = NonNullable<
 >
 export type UpdateControlStripeConfigMutationBody = ControlStripeConfigRequest
 export type UpdateControlStripeConfigMutationError =
-  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
-export type UpdateControlStripeConfigMutationVariables = { data: ControlStripeConfigRequest }
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | IdempotencyConflictResponse
+export type UpdateControlStripeConfigMutationVariables = {
+  provider: string
+  data: ControlStripeConfigRequest
+}
 
 /**
  * @summary Update the Stripe configuration (operator reason required)
  */
 export const useUpdateControlStripeConfig = <
   TError =
-    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
   TContext = unknown,
 >(
   options?: {

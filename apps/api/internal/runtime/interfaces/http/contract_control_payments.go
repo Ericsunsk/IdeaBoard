@@ -119,10 +119,7 @@ func (d *ContractControlDeps) createControlPaymentRefund(c *gin.Context, ctx con
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest22)
 		return
 	}
-	reason := strings.TrimSpace(req.Reason)
-	if reason == "" {
-		reason = ctx.Reason
-	}
+	reason := controlReasonOr(ctx, req.Reason)
 	refund, err := d.Payments.CreatePaymentRefund(c.Request.Context(), paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: ctx.Operator.UserID(), OrderNumber: strings.TrimSpace(c.Param("order_number")),
 		IdeaQuantity: req.IdeaQuantity, IdempotencyKey: ctx.IdemKey, Reason: reason,
@@ -155,9 +152,27 @@ func writeControlPaymentRefundError(c *gin.Context, err error) {
 	}
 }
 
+// parseControlPaymentProvider resolves a {provider} path param against the
+// implemented payment-provider allowlist. Only stripe is implemented;
+// unknown or malformed slugs fail closed with 404 (invisible, never 403).
+func parseControlPaymentProvider(c *gin.Context) bool {
+	provider, ok := parseControlProviderSlug(c)
+	if !ok {
+		return false
+	}
+	if provider != "stripe" {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
+		return false
+	}
+	return true
+}
+
 func (d *ContractControlDeps) getControlStripeConfig(c *gin.Context, _ controlContext) {
 	if d == nil || d.Payments == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable18)
+		return
+	}
+	if !parseControlPaymentProvider(c) {
 		return
 	}
 	summary, err := d.Payments.GetStripeConfiguration(c.Request.Context())
@@ -171,6 +186,9 @@ func (d *ContractControlDeps) getControlStripeConfig(c *gin.Context, _ controlCo
 func (d *ContractControlDeps) updateControlStripeConfig(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Payments == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable18)
+		return
+	}
+	if !parseControlPaymentProvider(c) {
 		return
 	}
 	var req struct {

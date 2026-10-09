@@ -539,6 +539,7 @@ type MailConfigEnvelopeCode int
 type MailConfigRequest struct {
 	ActorID   int64   `json:"actor_id"`
 	APIKey    *string `json:"api_key,omitempty"`
+	Enabled   *bool   `json:"enabled,omitempty"`
 	FromEmail string  `json:"from_email"`
 	FromName  string  `json:"from_name"`
 	ReplyTo   *string `json:"reply_to,omitempty"`
@@ -549,6 +550,7 @@ type MailConfigSummary struct {
 	ApiKeyConfigured  bool                       `json:"api_key_configured"`
 	ConfigVersion     int                        `json:"config_version"`
 	Configured        bool                       `json:"configured"`
+	Enabled           bool                       `json:"enabled"`
 	FromEmail         string                     `json:"from_email"`
 	FromName          string                     `json:"from_name"`
 	LastTestErrorCode *string                    `json:"last_test_error_code"`

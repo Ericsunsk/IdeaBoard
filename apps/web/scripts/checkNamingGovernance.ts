@@ -144,7 +144,8 @@ const keptGenericOwnership: Record<string, string> = {
 
 /** Permanent documented keeps: composable-family files (same responsibility family). */
 const keptComposableFamilies: Record<string, string> = {
-  'features/admin/settings/useSettingsFeedback.ts': 'admin: settings feedback composable family',
+  'features/admin/settings/shared/useSettingsFeedback.ts':
+    'admin: settings feedback composable family',
   'features/admin/monitor/application/useAdminMonitorFeedback.ts':
     'admin: task feedback composable family',
 }

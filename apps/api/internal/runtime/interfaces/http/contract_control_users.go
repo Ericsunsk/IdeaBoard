@@ -90,13 +90,7 @@ type controlUserCursor struct {
 // to the UUID string the identity seams consume. Malformed shapes fail
 // with 400; unknown users surface as 404 from the seams.
 func parseControlUserID(c *gin.Context) (uuid.UUID, bool) {
-	raw := strings.TrimSpace(c.Param("user_id"))
-	parsed, err := tenancy.ParseUserPublicID(raw)
-	if err != nil || parsed == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
-		return uuid.Nil, false
-	}
-	return parsed, true
+	return parseControlUserPublicID(c, c.Param("user_id"))
 }
 
 // writeControlIdentityCommandError maps identity admin command failures
@@ -134,23 +128,17 @@ func (d *ContractControlDeps) listControlUsers(c *gin.Context, _ controlContext)
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable30)
 		return
 	}
-	page := 1
-	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
-		decoded, err := contract.DecodeCursor[controlUserCursor](raw)
-		if err != nil || decoded == nil || decoded.Page < 1 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
-			return
-		}
-		page = decoded.Page
+	cursor, ok := parseControlPageCursor(c, func(cursor *controlUserCursor) bool { return cursor.Page >= 1 })
+	if !ok {
+		return
 	}
-	pageSize := 20
-	if raw := strings.TrimSpace(c.Query("page_size")); raw != "" {
-		parsed, err := contract.ParsePageSize(raw)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
-			return
-		}
-		pageSize = parsed
+	page := 1
+	if cursor != nil {
+		page = cursor.Page
+	}
+	pageSize, ok := parseControlPageSize(c, 20)
+	if !ok {
+		return
 	}
 	result, err := d.Users.ListUsers(c.Request.Context(), &identityports.UserListRequest{
 		Keyword:  strings.TrimSpace(c.Query("keyword")),
@@ -269,10 +257,7 @@ func (d *ContractControlDeps) banControlUser(c *gin.Context, ctx controlContext)
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest25)
 		return
 	}
-	reason := strings.TrimSpace(req.Reason)
-	if reason == "" {
-		reason = ctx.Reason
-	}
+	reason := controlReasonOr(ctx, req.Reason)
 	outcome, err := commands.Ban(c.Request.Context(), ctx.Operator, id.String(), identityports.IdentityAdminBanInput{
 		Reason:        reason,
 		ExpiresInDays: req.ExpiresInDays,

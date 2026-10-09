@@ -1,11 +1,11 @@
 <template>
   <PublicLegalPage title="Refund Policy" :version="LEGAL_DOCUMENT_VERSIONS.refund">
-    <p>This policy applies to Ideas purchased through IdeaBoard Stripe Checkout.</p>
+    <p>This policy applies to Ideas purchased through IdeaBoard Checkout.</p>
 
     <h2>1. Request Window</h2>
     <p>
-      Refund eligibility lasts for 14 days from the time Stripe confirms payment. Self-service
-      refunds are not currently available; contact the administrator within this period.
+      Refund eligibility lasts for 14 days from the time payment is confirmed. Self-service refunds
+      are not currently available; contact the administrator within this period.
     </p>
 
     <h2>2. Eligible Quantity</h2>
@@ -19,14 +19,14 @@
     <p>
       The product refund amount is calculated in the smallest unit of the original payment currency,
       in proportion to the Ideas in the original order. Any taxes or other adjustments handled by
-      the payment provider are included according to the original Stripe transaction.
+      the payment provider are included according to the original transaction.
     </p>
 
     <h2>4. Processing</h2>
     <p>
       After reviewing a request, the administrator processes the refund through the corresponding
-      original Stripe payment. Completion and the time it takes for funds to arrive are determined
-      by Stripe and the payment institution.
+      original payment. Completion and the time it takes for funds to arrive are determined by the
+      payment provider and the payment institution.
     </p>
 
     <h2>5. Payment Disputes</h2>

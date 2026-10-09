@@ -41,23 +41,17 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable25)
 		return
 	}
-	page := 1
-	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
-		decoded, err := contract.DecodeCursor[controlTaskListCursor](raw)
-		if err != nil || decoded == nil || decoded.Page < 1 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
-			return
-		}
-		page = decoded.Page
+	cursor, ok := parseControlPageCursor(c, func(cursor *controlTaskListCursor) bool { return cursor.Page >= 1 })
+	if !ok {
+		return
 	}
-	pageSize := contract.DefaultPageSize
-	if raw := strings.TrimSpace(c.Query("page_size")); raw != "" {
-		parsed, err := contract.ParsePageSize(raw)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
-			return
-		}
-		pageSize = parsed
+	page := 1
+	if cursor != nil {
+		page = cursor.Page
+	}
+	pageSize, ok := parseControlPageSize(c, contract.DefaultPageSize)
+	if !ok {
+		return
 	}
 	req := tasksdomain.TaskListRequest{
 		Status:   strings.TrimSpace(c.Query("status")),

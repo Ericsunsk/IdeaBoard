@@ -4,7 +4,9 @@ import { h } from 'vue'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen, within } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
-import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../testing'
+import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../shared/testing'
+import { SETTINGS_MESSAGES } from './messages'
+import { STORAGE_MESSAGES } from '../../storage/pages/messages'
 import AdminSettingsUnifiedPage from './AdminSettingsUnifiedPage.vue'
 
 vi.mock('../../../../shared/composables/useAppToast')
@@ -94,11 +96,42 @@ describe('AdminSettingsUnifiedPage', () => {
           data: { window_seconds: 60, max_requests: 100 },
         }),
       ),
+      http.get('/api/control/v1/users/oauth/:provider', ({ params }) => {
+        const provider = String(params.provider)
+        return HttpResponse.json({
+          data: {
+            provider,
+            enabled: false,
+            configured: false,
+            available: true,
+            client_id: '',
+            client_secret_configured: false,
+            scopes: [],
+            config_version: 0,
+            callback_url: `https://example.com/api/auth/callback/${provider}`,
+            updated_at: null,
+          },
+        })
+      }),
+      http.get('/api/control/v1/payments/providers/stripe', () =>
+        HttpResponse.json({
+          data: {
+            configured: false,
+            api_key_configured: false,
+            webhook_secret_configured: false,
+            charges_enabled: false,
+            product_tax_code: '',
+            product_ready: false,
+            webhook_ready: false,
+            purchases_enabled: false,
+          },
+        }),
+      ),
       ...createOutboundPolicyHandlers(createOutboundPolicyMswState()),
     )
   })
 
-  it('renders all 8 sections and on-this-page navigation', async () => {
+  it('renders all 9 sections and on-this-page navigation', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     renderWithUser(h('main', [h(AdminSettingsUnifiedPage)]), {
       global: {
@@ -109,33 +142,40 @@ describe('AdminSettingsUnifiedPage', () => {
     // 目录栏
     const aside = screen.getByRole('complementary')
     expect(within(aside).getByText('本页内容')).toBeVisible()
-    expect(within(aside).getByText('站点设置')).toBeVisible()
+    expect(within(aside).getByText('通用')).toBeVisible()
     expect(within(aside).getByText('客户支持')).toBeVisible()
-    expect(within(aside).getByText('图片库')).toBeVisible()
-    expect(within(aside).getByText('存储配置')).toBeVisible()
-    expect(within(aside).getByText('上传并发限制')).toBeVisible()
+    expect(within(aside).getByText('图片搜索')).toBeVisible()
+    expect(within(aside).getByText('存储')).toBeVisible()
     expect(within(aside).getByText('邮件服务')).toBeVisible()
-    expect(within(aside).getByText('注册与限流')).toBeVisible()
-    expect(within(aside).getByText('私有地址访问')).toBeVisible()
+    expect(within(aside).getByText('注册限流')).toBeVisible()
+    expect(within(aside).getByText('OAuth')).toBeVisible()
+    expect(within(aside).getByText('支付')).toBeVisible()
+    expect(within(aside).getByText(SETTINGS_MESSAGES.outboundTitle)).toBeVisible()
 
-    // 8 个板块在 main 内容区中均呈现
+    // 9 个板块在 main 内容区中均呈现（顺序即目录顺序）
     expect(screen.getAllByRole('main')).toHaveLength(1)
     const main = screen.getByRole('main')
     const sections = [
-      ['站点设置', '站点设置'],
-      ['客户支持', '客户支持'],
-      ['图片库', '图片库'],
-      ['存储配置', '存储配置'],
-      ['上传并发限制', '上传并发设置'],
-      ['邮件发送服务', '邮件服务'],
-      ['注册准入与 API 限流', '注册准入与 API 限流'],
-      ['私有地址访问策略', '私有地址访问'],
+      ['通用', SETTINGS_MESSAGES.brandingTitle],
+      ['客户支持', SETTINGS_MESSAGES.supportTitle],
+      ['存储', STORAGE_MESSAGES.storageTitle],
+      ['图片搜索', SETTINGS_MESSAGES.imageLibraryTitle],
+      ['邮件服务', SETTINGS_MESSAGES.mailTitle],
+      ['OAuth', SETTINGS_MESSAGES.oauthLoginTitle],
+      ['支付', SETTINGS_MESSAGES.paymentTitle],
+      ['注册限流', SETTINGS_MESSAGES.registrationTitle],
+      ['出网白名单', SETTINGS_MESSAGES.outboundTitle],
     ] as const
     await vi.waitFor(() => {
       for (const [name, title] of sections) {
         const section = within(main).getByRole('region', { name })
         expect(within(section).getByText(title)).toBeVisible()
       }
+      const ordered = within(main)
+        .getAllByRole('region')
+        .filter((region) => !region.parentElement?.closest('section'))
+        .map((region) => region.getAttribute('aria-label'))
+      expect(ordered).toEqual(sections.map(([name]) => name))
     })
   })
 

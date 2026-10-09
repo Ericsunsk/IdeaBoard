@@ -90,6 +90,7 @@ func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 type MailConfigSummary struct {
 	Configured        bool    `json:"configured"`
 	APIKeyConfigured  bool    `json:"api_key_configured"`
+	Enabled           bool    `json:"enabled"`
 	FromName          string  `json:"from_name"`
 	FromEmail         string  `json:"from_email"`
 	ReplyTo           string  `json:"reply_to"`
@@ -105,6 +106,7 @@ type MailConfigUpdate struct {
 	FromName  string
 	FromEmail string
 	ReplyTo   string
+	Enabled   *bool
 }
 
 type SocialProviderSettingsSummary struct {
@@ -207,6 +209,7 @@ func (c *ServiceClient) UpdateMailConfig(ctx context.Context, input MailConfigUp
 	}
 	body := internalcontract.UpdateMailConfigJSONRequestBody{
 		FromName: input.FromName, FromEmail: input.FromEmail, ActorID: actorID,
+		Enabled: input.Enabled,
 	}
 	if value := strings.TrimSpace(input.APIKey); value != "" {
 		body.APIKey = &value
@@ -377,6 +380,7 @@ func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string
 func convertMailConfigSummary(value internalcontract.MailConfigSummary) *MailConfigSummary {
 	return &MailConfigSummary{
 		Configured: value.Configured, APIKeyConfigured: value.ApiKeyConfigured,
+		Enabled:  value.Enabled,
 		FromName: value.FromName, FromEmail: value.FromEmail, ReplyTo: value.ReplyTo,
 		ConfigVersion: value.ConfigVersion, Readiness: string(value.Readiness),
 		UpdatedAt: formatContractTime(value.UpdatedAt), LastTestedAt: formatContractTime(value.LastTestedAt),

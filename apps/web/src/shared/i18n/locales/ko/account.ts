@@ -188,12 +188,12 @@ export default {
     returnedDetail:
       '이 주문은 완료되지 않았으며, 이 페이지로 돌아온다고 Ideas가 자동으로 추가되지 않습니다.',
     confirmingTitle: '결제 결과를 확인 중입니다',
-    confirmingDetail: '최종 결과는 Stripe 확인에 따라 달라집니다. 기다려 주세요.',
+    confirmingDetail: '최종 결과는 결제 확인에 따라 달라집니다. 기다려 주세요.',
     recheck: '다시 확인',
     failedTitle: '결제가 완료되지 않았습니다',
     failedDetail: '이 결제에 대해 Ideas가 추가되지 않았습니다. 다시 결제를 시도해 주세요.',
     delayedTitle: 'Ideas 처리 중',
-    delayedDetail: 'Stripe 확인을 기다리는 중입니다. 다시 결제할 필요가 없습니다.',
+    delayedDetail: '결제 확인을 기다리는 중입니다. 다시 결제할 필요가 없습니다.',
   },
   toast: {
     avatarFileUnsupported: '이미지 파일만 업로드할 수 있습니다.',

@@ -33,11 +33,13 @@
  */
 
 export interface ControlCreditCommandRequest {
+  /** Operator note (or X-Operator-Reason header). */
+  reason?: string
+  /** Operator note alias (or X-Operator-Reason header). */
+  operator_note?: string
   /** @pattern ^usr_[A-Za-z0-9_-]+$ */
   user_id: string
   /** @minimum 1 */
   amount_credits: number
   business_reference_id: string
-  reason?: string
-  operator_note?: string
 }

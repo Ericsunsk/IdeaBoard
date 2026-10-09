@@ -9,6 +9,7 @@ import {
 
 const candidate = {
   encryptedApiKey: 'encrypted',
+  enabled: true,
   fromName: 'IdeaBoard',
   fromEmail: 'auth@example.com',
   replyTo: '',
@@ -42,9 +43,13 @@ describe('PostgreSQL mail config adapter', () => {
 
     const mutation = queries.find(({ sql }) => sql.includes('UPDATE auth_mail_settings'))
     assert.match(mutation?.sql ?? '', /nextval\('auth_mail_settings_config_version_seq'/)
-    assert.match(mutation?.sql ?? '', /config_version = \$6/)
+    assert.match(mutation?.sql ?? '', /enabled = \$2/)
+    assert.match(mutation?.sql ?? '', /readiness = \$6/)
+    assert.match(mutation?.sql ?? '', /config_version = \$7/)
+    assert.equal(mutation?.values?.[1], true)
     assert.equal(mutation?.values?.at(-1), 8)
     assert.equal(saved?.configVersion, 9)
+    assert.equal(saved?.enabled, true)
     assert.equal(queries[0]?.sql, 'BEGIN')
     assert.equal(queries.at(-1)?.sql, 'COMMIT')
     assert.equal(released, 1)
@@ -128,6 +133,50 @@ describe('PostgreSQL mail config adapter', () => {
     )
     assert.equal(released, 1)
   })
+
+  it('inserts the enabled flag for new configurations', async () => {
+    const queries: Array<{ sql: string; values?: unknown[] }> = []
+    const client = {
+      async query(sql: string, values?: unknown[]) {
+        queries.push({ sql, values })
+        if (sql.includes('INSERT INTO auth_mail_settings ')) {
+          return { rows: [mailRow(3, false)], rowCount: 1 }
+        }
+        return { rows: [], rowCount: 1 }
+      },
+      release() {},
+    }
+    const pool = { connect: async () => client } as unknown as Pool
+
+    const saved = await createPgMailConfigRepository(pool).put(
+      { ...candidate, enabled: false },
+      0,
+      7,
+      'create_mail_config',
+    )
+
+    const insertion = queries.find(({ sql }) => sql.includes('INSERT INTO auth_mail_settings '))
+    assert.match(insertion?.sql ?? '', /enabled/)
+    assert.equal(insertion?.values?.[1], false)
+    assert.equal(saved?.enabled, false)
+  })
+
+  it('reads the persisted enabled flag', async () => {
+    const poolWith = (row: Record<string, unknown>) =>
+      ({
+        query: async () => ({ rows: [row] }),
+      }) as unknown as Pool
+
+    const disabled = await createPgMailConfigRepository(
+      poolWith({ ...mailRow(4), enabled: false }),
+    ).get()
+    assert.equal(disabled?.enabled, false)
+
+    const enabled = await createPgMailConfigRepository(
+      poolWith({ ...mailRow(4), enabled: true }),
+    ).get()
+    assert.equal(enabled?.enabled, true)
+  })
 })
 
 describe('Resend transport', () => {
@@ -210,9 +259,10 @@ describe('Resend transport', () => {
   })
 })
 
-function mailRow(configVersion: number) {
+function mailRow(configVersion: number, enabled: boolean = candidate.enabled) {
   return {
     encrypted_api_key: candidate.encryptedApiKey,
+    enabled,
     from_name: candidate.fromName,
     from_email: candidate.fromEmail,
     reply_to: candidate.replyTo,

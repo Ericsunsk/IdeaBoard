@@ -20,7 +20,6 @@ import (
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 type controlWorkspace struct {
@@ -73,10 +72,8 @@ func parseControlWorkspaceID(c *gin.Context) (string, bool) {
 // resolveControlMemberUserID maps a usr_ {member_id} to the internal user
 // id for the tenancy seam.
 func (d *ContractControlDeps) resolveControlMemberUserID(c *gin.Context) (int64, bool) {
-	raw := strings.TrimSpace(c.Param("member_id"))
-	parsed, err := tenancy.ParseUserPublicID(raw)
-	if err != nil || parsed == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
+	parsed, ok := parseControlUserPublicID(c, c.Param("member_id"))
+	if !ok {
 		return 0, false
 	}
 	if d == nil || d.UserDirectory == nil {
@@ -161,9 +158,8 @@ func (d *ContractControlDeps) addControlWorkspaceMember(c *gin.Context, ctx cont
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
-	targetUUID, err := tenancy.ParseUserPublicID(strings.TrimSpace(req.UserID))
-	if err != nil || targetUUID == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
+	targetUUID, ok := parseControlUserPublicID(c, req.UserID)
+	if !ok {
 		return
 	}
 	if d.UserDirectory == nil {

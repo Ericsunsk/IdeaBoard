@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { renderWithUser, screen } from '../../../test/render'
+import { renderWithUser, screen, waitFor } from '../../../test/render'
 import AdminLayout from './AdminLayout.vue'
 
 vi.mock('../../../shared/composables/useSupportChannels', () => ({
@@ -123,13 +123,20 @@ describe('AdminLayout', () => {
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   })
 
-  it('pins the topbar title permanently for system settings without scrolling', async () => {
+  it('follows scroll-driven sticky title on system settings instead of pinning', async () => {
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
     await renderLayout('/admin/settings')
 
     const title = await screen.findByTitle('回到顶部')
-    expect(title).toBeVisible()
     expect(title).toHaveTextContent('系统设置')
+    expect(title).toHaveClass('opacity-0')
+
+    Object.defineProperty(window, 'scrollY', { value: 120, configurable: true })
+    window.dispatchEvent(new Event('scroll'))
+
+    await waitFor(() => expect(title).toHaveClass('opacity-100'))
+    expect(title).toHaveTextContent('系统设置')
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   })
 
   it('opens the mobile drawer from the topbar menu button', async () => {

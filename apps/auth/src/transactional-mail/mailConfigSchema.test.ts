@@ -23,6 +23,8 @@ describe('mail config schema and privileges', () => {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS auth_mail_settings/)
     assert.match(sql, /CHECK \(id = 1\)/)
     assert.match(sql, /encrypted_api_key TEXT NOT NULL/)
+    assert.match(sql, /enabled BOOLEAN NOT NULL DEFAULT TRUE/)
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE/)
     assert.match(sql, /config_version BIGINT NOT NULL/)
     assert.match(sql, /CREATE SEQUENCE IF NOT EXISTS auth_mail_settings_config_version_seq/)
     assert.match(sql, /auth_mail_settings_audit_append_only/)

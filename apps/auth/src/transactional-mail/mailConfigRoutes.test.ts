@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import Fastify from 'fastify'
+import { MailConfigError } from './mailConfig.js'
 import type { MailConfigInput, MailConfigSummary, MailTestInput } from './mailConfig.js'
 import { registerMailConfigRoutes } from './mailConfigRoutes.js'
 
@@ -8,6 +9,7 @@ const internalKey = 'mail-config-internal-key'
 const summary: MailConfigSummary = {
   configured: true,
   apiKeyConfigured: true,
+  enabled: true,
   fromName: 'IdeaBoard',
   fromEmail: 'auth@example.com',
   replyTo: 'support@example.com',
@@ -50,6 +52,7 @@ describe('mail config internal HTTP contract', () => {
     assert.equal(getResponse.statusCode, 200)
     assert.equal(getResponse.headers['cache-control'], 'no-store')
     assert.equal(getResponse.json().data.api_key_configured, true)
+    assert.equal(getResponse.json().data.enabled, true)
     assert.doesNotMatch(getResponse.body, /api_key"|re_/)
 
     const updateResponse = await app.inject({
@@ -73,6 +76,52 @@ describe('mail config internal HTTP contract', () => {
       actorId: 19,
     })
     assert.doesNotMatch(updateResponse.body, /re_secret/)
+  })
+
+  it('forwards the enabled flag on audited updates', async (t) => {
+    let updateInput: MailConfigInput | undefined
+    const app = createApp({
+      update: async (input) => {
+        updateInput = input
+        return { ...summary, enabled: input.enabled ?? true }
+      },
+    })
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/internal/mail/config',
+      headers: authHeaders(),
+      payload: {
+        from_name: 'IdeaBoard',
+        from_email: 'auth@example.com',
+        enabled: false,
+        actor_id: 19,
+      },
+    })
+
+    assert.equal(response.statusCode, 200)
+    assert.equal(updateInput?.enabled, false)
+    assert.equal(response.json().data.enabled, false)
+  })
+
+  it('rejects test sends with 409 while mail is disabled', async (t) => {
+    const app = createApp({
+      sendTest: async () => {
+        throw new MailConfigError('mail_disabled', '邮件服务未启用')
+      },
+    })
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/internal/mail/config/test',
+      headers: authHeaders(),
+      payload: { recipient: 'admin@example.com', actor_id: 23 },
+    })
+
+    assert.equal(response.statusCode, 409)
+    assert.match(response.json().msg, /邮件服务未启用/)
   })
 
   it('forwards the Admin actor to test and delete audit commands', async (t) => {

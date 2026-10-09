@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { HttpResponse, http, useMswHandlers } from '../../../../test/msw'
-import { getStripeConfiguration, saveStripeConfiguration } from './resource'
+import { createAdminStripeSettingsResource } from './resource'
 
 const responseData = {
   configured: true,
@@ -20,12 +20,12 @@ const responseData = {
 describe('stripeSettingsResource', () => {
   it('maps the GET safe configuration summary without exposing either Secret', async () => {
     useMswHandlers(
-      http.get('/api/control/v1/payments/stripe-config', () =>
+      http.get('/api/control/v1/payments/providers/stripe', () =>
         HttpResponse.json({ data: responseData }),
       ),
     )
 
-    await expect(getStripeConfiguration()).resolves.toEqual({
+    await expect(createAdminStripeSettingsResource().get()).resolves.toEqual({
       configured: true,
       apiKeyConfigured: true,
       webhookSecretConfigured: true,
@@ -44,7 +44,7 @@ describe('stripeSettingsResource', () => {
   it('omits an empty API Key while saving the non-secret Stripe settings with a reason', async () => {
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
-      http.put('/api/control/v1/payments/stripe-config', async ({ request }) => {
+      http.put('/api/control/v1/payments/providers/stripe', async ({ request }) => {
         expect(await request.json()).toEqual({
           payment_method_configuration_id: 'pmc_ideaboard',
           product_tax_code: 'txcd_10105001',
@@ -60,7 +60,7 @@ describe('stripeSettingsResource', () => {
     )
 
     await expect(
-      saveStripeConfiguration(
+      createAdminStripeSettingsResource().save(
         {
           apiKey: '   ',
           paymentMethodConfigurationId: ' pmc_ideaboard ',
@@ -80,7 +80,7 @@ describe('stripeSettingsResource', () => {
 
   it('requires an operator reason before saving', async () => {
     await expect(
-      saveStripeConfiguration(
+      createAdminStripeSettingsResource().save(
         {
           paymentMethodConfigurationId: 'pmc_ideaboard',
           productTaxCode: 'txcd_10105001',

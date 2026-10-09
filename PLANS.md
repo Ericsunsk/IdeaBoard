@@ -1,5 +1,28 @@
 # ExecPlans
 
+## Archived Settings Diff Audit and Cleanup (2026-10-09)
+
+- Status: implementation, redundancy cleanup and independent review complete.
+- Goal: resolve the five settings audit findings, remove confirmed redundancy
+  from the current batch and commit the reviewed result.
+- Scope: strict Control request schemas; regenerated Auth Mail contracts; OAuth
+  Settings ownership; optional Mail enabled requests and required responses;
+  Mail toggle draft retention; unused resource wrappers/types/options, duplicate
+  SKU validation, unreachable defaults, no-op factory and stale descriptions.
+- Success criteria: valid request payloads pass while unknown fields fail;
+  generated contracts have no drift; omitted enabled preserves disabled Mail;
+  toggles neither save nor discard drafts; cleanup preserves existing behavior.
+- Results: independent review found no remaining defect. Final verification
+  passed 235 Web tests across 42 files, full frontend lint, Web build/test
+  typecheck, generated API consistency, focused Auth tests/build, complete Go
+  Auth/HTTP package tests, formatting and diff whitespace checks. Earlier audit
+  verification also passed the full Auth suite and Go build.
+- Risks: preserve operator reasons, strict binding, secret masking, Mail
+  readiness and UI contracts. No deployment or live data writes.
+- Rollback: revert the resulting commit; no database rollback is needed for
+  cleanup. Retain the additive Mail enabled backfill if reverting application
+  behavior separately.
+
 ## Archived Audit and Acceptance for #904–#914
 
 - Status (2026-10-08): implementation and cleanup verification complete. Git

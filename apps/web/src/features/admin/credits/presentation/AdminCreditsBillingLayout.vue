@@ -14,27 +14,12 @@
         {{ healthBadge.label }}
       </span>
     </template>
-    <template #trailing>
-      <AdminButton
-        variant="outline"
-        size="icon"
-        :title="CREDITS_BILLING_LAYOUT_MESSAGES.stripeSettings"
-        :aria-label="CREDITS_BILLING_LAYOUT_MESSAGES.stripeSettings"
-        class="size-8 shrink-0 rounded-lg"
-        @click="stripeSettingsVisible = true"
-      >
-        <Settings class="size-4" />
-      </AdminButton>
-    </template>
-    <StripeSettingsDialog v-model:visible="stripeSettingsVisible" />
   </AdminSubNavigationLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Settings } from '@iconoir/vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminSubNavigationLayout from '../../shared/components/AdminSubNavigationLayout.vue'
 import {
   ADMIN_CREDIT_HEALTH_PATH,
@@ -45,7 +30,6 @@ import {
 } from '../../../../shared/constants/routePaths'
 import { useAdminCreditHealthResource } from '../health/resource'
 import { getCreditHealthPresentation } from '../health/creditHealthPresentation'
-import StripeSettingsDialog from '../../payments/stripe-settings/StripeSettingsDialog.vue'
 import { CREDITS_BILLING_LAYOUT_MESSAGES } from './messages'
 
 type NavigationPath =
@@ -79,7 +63,6 @@ const navigationItems: Array<{ key: string; path: NavigationPath; label: string 
 
 const route = useRoute()
 const router = useRouter()
-const stripeSettingsVisible = ref(false)
 
 const healthResource = useAdminCreditHealthResource()
 const healthBadge = computed(() => {

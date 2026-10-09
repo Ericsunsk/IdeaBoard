@@ -604,7 +604,8 @@
           "from_name": { "type": "string", "minLength": 1 },
           "from_email": { "type": "string", "minLength": 1 },
           "reply_to": { "type": "string" },
-          "actor_id": { "type": "integer", "format": "int64", "minimum": 1, "x-go-name": "ActorID" }
+          "actor_id": { "type": "integer", "format": "int64", "minimum": 1, "x-go-name": "ActorID" },
+          "enabled": { "type": "boolean" }
         }
       },
       "MailTestRequest": {
@@ -619,7 +620,7 @@
       "MailConfigSummary": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["configured", "api_key_configured", "from_name", "from_email", "reply_to", "config_version", "readiness", "updated_at", "last_tested_at", "last_test_error_code"],
+        "required": ["configured", "api_key_configured", "from_name", "from_email", "reply_to", "config_version", "readiness", "updated_at", "last_tested_at", "last_test_error_code", "enabled"],
         "properties": {
           "configured": { "type": "boolean" },
           "api_key_configured": { "type": "boolean" },
@@ -630,7 +631,8 @@
           "readiness": { "type": "string", "enum": ["not_configured", "not_tested", "ready", "unavailable"] },
           "updated_at": { "type": "string", "format": "date-time", "nullable": true },
           "last_tested_at": { "type": "string", "format": "date-time", "nullable": true },
-          "last_test_error_code": { "type": "string", "nullable": true }
+          "last_test_error_code": { "type": "string", "nullable": true },
+          "enabled": { "type": "boolean" }
         }
       },
       "MailConfigEnvelope": {
