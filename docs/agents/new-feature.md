@@ -42,10 +42,38 @@ path), `issue-tracker.md` / `triage-labels.md` (process), `shared/CONTEXT.md`
 5. **Specs colocate with suffixes** — every module ships its spec next to it:
    `curves.ts` → `curves.unit.spec.ts`, SFC → `*.component.spec.ts`, contract →
    `*.contract.spec.ts`, browser-only → `*.browser.spec.ts` (naming governance
-   rule 10; `checkTestGuardrails` enforces placement).
+   rule 10; `checkTestGuardrails` enforces placement). P0 test conventions
+   (plan §3.7):
+   - Four suffixes: `unit` pins focused deterministic pure logic; `contract`
+     covers exactly three categories (API shape without a real backend,
+     architecture-policy fixtures with valid/invalid samples, observable
+     Seam/singleton identity via `toBe`); `component` pins rendered SFC
+     behavior through `src/test/render`; `browser` is reserved for
+     real-browser-only geometry. Never add a suffix or a parallel test
+     directory for governance.
+   - Behavior sentences: `describe` groups the seam, `test` states observable
+     behavior (`test('restores selection after locale switch')`). Standardize
+     on `test`; grandfathered `it` stays untouched. Never assert private
+     implementation details.
+   - Factories: grandfathered `makeX` seams stay; new factories use
+     `buildX(overrides?)` (`checkTestGuardrails` warns on new exported
+     `makeX`, warn-only).
+   - Query priority in UI specs: prefer Role queries, TestId is the last
+     resort and only for documented visual/layout contracts (same bar as the
+     class-assertion exceptions in `checkTestGuardrails`).
+   - Query placement: new cached server state must justify Query in the
+     feature `CONTEXT.md`; otherwise follow the feature-store pattern
+     (`shared/CONTEXT.md` Query Scope Rule, pinned by
+     `shared/query/queryPlacement.contract.spec.ts`).
 6. **Naming** — kebab-case dirs, `PascalCase.vue` SFCs, `camelCase.ts` modules,
    no parent-prefix stutter (`resource.ts`, not `libraryResource.ts`),
-   `index.ts` is barrel-or-documented-boundary only.
+   `index.ts` is barrel-or-documented-boundary only. P0 subset (warn-only in
+   ESLint; the canvas Query ban is the sole new error rule): default
+   camelCase, typeLike PascalCase, `I-` interface ban, placeholder
+   `id-denylist`, abbreviated-identifier replacements, PascalCase at Vue
+   registration and in templates. New image/avatar URL fields use `*_url`
+   (grandfathered `avatar` shapes stay; `checkNamingGovernance` rule 16
+   warns on new ones, warn-only).
 7. **Verification** — `npm run api:surface:check` (barrel presence + surface
    baseline), `vue-tsc -p tsconfig.app.json --noEmit`, `eslint` on touched
    files, `vitest run` on touched areas, `npm run build`.

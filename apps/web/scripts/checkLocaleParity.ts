@@ -1,6 +1,14 @@
 import { join } from 'node:path'
 import { SUPPORTED_LOCALES } from '../src/shared/i18n/localeCore'
-import { diffLocaleBundles, leafPaths } from '../src/shared/i18n/localeParity'
+import {
+  countLeavesByNamespace,
+  diffLocaleBundles,
+  I18N_MAX_LEAVES_PER_NAMESPACE,
+  I18N_MAX_PATH_SEGMENTS,
+  leafPaths,
+  localeStructureWarnings,
+  maxLeafSegments,
+} from '../src/shared/i18n/localeParity'
 
 /**
  * Locale parity guard: all User locale trees must contain exactly the same keys.
@@ -76,6 +84,16 @@ async function main() {
 
   console.log(
     `Locale parity check passed: ${enKeys.length} keys consistent across ${LOCALES.join(', ')}`,
+  )
+
+  // P0 i18n structure limits (plan §3.7, warn-only): nesting≤3 below the top
+  // namespace and no god-keys. Warnings never fail this lane.
+  for (const warning of localeStructureWarnings(enBundle)) console.warn(warning)
+  const depth = maxLeafSegments(enBundle)
+  const counts = countLeavesByNamespace(enBundle)
+  const largest = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+  console.log(
+    `Locale structure baseline: depth ${depth}/${I18N_MAX_PATH_SEGMENTS} segments, largest namespace ${largest?.[0]} ${largest?.[1]}/${I18N_MAX_LEAVES_PER_NAMESPACE} leaves.`,
   )
 }
 

@@ -49,6 +49,53 @@ export interface LocaleBundleDiff {
   shapeMismatches: string[]
 }
 
+/**
+ * P0 i18n structure limits (plan §3.7, warn-only, enforced by
+ * `scripts/checkLocaleParity.ts` without failing the lane).
+ *
+ * - Nesting: at most 3 levels below the top namespace, i.e. leaf paths carry
+ *   at most 4 segments (`canvas.retouch.brush.size`). Deeper trees split into
+ *   a new namespace instead of growing god-keys.
+ * - No-god-keys: a single top-level namespace holds at most 300 leaves.
+ */
+export const I18N_MAX_PATH_SEGMENTS = 4
+export const I18N_MAX_LEAVES_PER_NAMESPACE = 300
+
+/** Deepest leaf-path segment count in the bundle (0 for an empty bundle). */
+export function maxLeafSegments(obj: unknown): number {
+  return leafPaths(obj).reduce((max, key) => Math.max(max, key.split('.').length), 0)
+}
+
+/** Leaf counts grouped by top-level namespace, e.g. `{ canvas: 270 }`. */
+export function countLeavesByNamespace(obj: Record<string, unknown>): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const key of leafPaths(obj)) {
+    const top = key.split('.')[0] ?? ''
+    counts[top] = (counts[top] ?? 0) + 1
+  }
+  return counts
+}
+
+/** Structure limits produce advisory messages, independent of parity errors. */
+export function localeStructureWarnings(bundle: Record<string, unknown>): string[] {
+  const warnings: string[] = []
+  const depth = maxLeafSegments(bundle)
+  if (depth > I18N_MAX_PATH_SEGMENTS) {
+    warnings.push(
+      `[locale-structure:warn] en nesting depth ${depth} exceeds ${I18N_MAX_PATH_SEGMENTS} path segments; split deep trees into a new namespace.`,
+    )
+  }
+  const counts = countLeavesByNamespace(bundle)
+  for (const [namespace, count] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+    if (count > I18N_MAX_LEAVES_PER_NAMESPACE) {
+      warnings.push(
+        `[locale-structure:warn] en.${namespace} holds ${count} leaves (limit ${I18N_MAX_LEAVES_PER_NAMESPACE}); split the god-key namespace.`,
+      )
+    }
+  }
+  return warnings
+}
+
 export function diffLocaleBundles(
   reference: Record<string, unknown>,
   target: Record<string, unknown>,

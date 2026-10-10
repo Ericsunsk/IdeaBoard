@@ -5,6 +5,9 @@ import vue from 'eslint-plugin-vue'
 import vueA11y from 'eslint-plugin-vuejs-accessibility'
 import prettierConfig from 'eslint-config-prettier'
 import { functionLengthRule } from './scripts/eslint-function-length.mjs'
+import { nameReplacementsRule } from './scripts/eslint-name-replacements.mjs'
+import { queryPlacementRule } from './scripts/eslint-query-placement.mjs'
+import { booleanPrefixRule, noBarrelImportRule } from './scripts/eslint-p0-governance.mjs'
 
 export default tseslint.config(
   {
@@ -27,8 +30,23 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx,vue}'],
-    plugins: { governance: { rules: { 'function-length': functionLengthRule } } },
+    plugins: {
+      governance: {
+        rules: {
+          'function-length': functionLengthRule,
+          'name-replacements': nameReplacementsRule,
+          'query-placement': queryPlacementRule,
+          'boolean-prefix': booleanPrefixRule,
+          'no-barrel-import': noBarrelImportRule,
+        },
+      },
+    },
     languageOptions: {
+      parserOptions: {
+        project: ['tsconfig.app.json', 'tsconfig.test.json', 'tsconfig.test-node.json'],
+        tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions: ['.vue'],
+      },
       globals: {
         ...globals.browser,
         ...globals.es2024,
@@ -42,6 +60,83 @@ export default tseslint.config(
       complexity: ['error', 15],
       'max-depth': ['error', 4],
       'governance/function-length': ['warn', { max: 100 }],
+      // P0 naming subset (plan §3.5, warn-only): default camelCase, typeLike
+      // PascalCase, `I-` interface ban (confirmed zero violations; the custom
+      // regex below is a confirmation-only ratchet). `property` keeps
+      // snake_case for backend-shaped DTOs (API vocabulary §3.6); `variable`
+      // and `import` keep PascalCase for SFC/type imports. `default` is only
+      // the fallback: any name matching a specific selector below is judged
+      // by that selector, not by `default`.
+      '@typescript-eslint/naming-convention': [
+        'warn',
+        {
+          selector: 'default',
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          trailingUnderscore: 'allow',
+        },
+        {
+          selector: 'variable',
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
+          leadingUnderscore: 'allow',
+          trailingUnderscore: 'allow',
+        },
+        { selector: 'import', format: ['camelCase', 'PascalCase', 'UPPER_CASE'] },
+        // PascalCase functions are functional components in SFCs
+        // (`SlotRenderer` in DataTableFrame.vue, called as `<SlotRenderer>`).
+        { selector: 'function', format: ['camelCase', 'PascalCase'], leadingUnderscore: 'allow' },
+        { selector: 'parameter', format: ['camelCase'], leadingUnderscore: 'allow' },
+        {
+          selector: 'property',
+          format: ['camelCase', 'snake_case', 'UPPER_CASE'],
+          leadingUnderscore: 'allowSingleOrDouble',
+          trailingUnderscore: 'allowSingleOrDouble',
+        },
+        // Quoted external vocabularies are not identifiers: BCP 47 locale
+        // codes (`zh-CN`), HTML/ARIA attributes (`aria-hidden`,
+        // `data-testid`), lint rule names (`governance/function-length`),
+        // and domain position keys (`top-left` in fusionBlend).
+        { selector: 'property', modifiers: ['requiresQuotes'], format: null },
+        { selector: 'method', modifiers: ['requiresQuotes'], format: null },
+        // Component registration/stub objects key by SFC name (`{ CanvasScreen }`
+        // in specs); interface/type members stay on the `property` formats above.
+        // Quoted HTML/ARIA keys stay exempt here too: the specific
+        // `objectLiteralProperty` selector otherwise shadows the `property`
+        // requiresQuotes exemption above.
+        { selector: 'objectLiteralProperty', modifiers: ['requiresQuotes'], format: null },
+        {
+          selector: 'objectLiteralProperty',
+          format: ['camelCase', 'PascalCase', 'snake_case', 'UPPER_CASE'],
+          leadingUnderscore: 'allowSingleOrDouble',
+          trailingUnderscore: 'allowSingleOrDouble',
+        },
+        { selector: 'typeLike', format: ['PascalCase'] },
+        { selector: 'typeParameter', format: ['PascalCase'] },
+        {
+          selector: 'interface',
+          format: ['PascalCase'],
+          custom: { regex: '^I[A-Z]', match: false },
+        },
+        { selector: 'enumMember', format: ['PascalCase', 'UPPER_CASE'] },
+      ],
+      // P0 placeholder ban (plan §3.5 id-denylist, warn-only). Kept to
+      // unambiguous placeholders: `temp` scratch buffers are legitimate
+      // image-math vocabulary in canvas/retouch/inpaint (same family as the
+      // allowed single-letter math symbols, §10.5), so they stay out.
+      'id-denylist': ['warn', 'foo', 'bar', 'baz', 'qux'],
+      // unicorn/name-replacements equivalent without a new plugin (warn-only):
+      // abbreviated identifiers must use the full word. `args`/`e` stay out
+      // (idiomatic rest/event names); see the rule module for the subset.
+      'governance/name-replacements': 'warn',
+      'governance/boolean-prefix': 'warn',
+      'governance/no-barrel-import': 'warn',
+      // P0 scope migration remains advisory; Canvas overrides this below.
+      'governance/query-placement': 'warn',
+      // P0 Vue dual-end casing (plan §3.5, warn-only): PascalCase at
+      // registration and in templates. Single-word SFCs stay allowed
+      // (`vue/multi-word-component-names` remains off per §10.5).
+      'vue/component-definition-name-casing': ['warn', 'PascalCase'],
+      'vue/component-name-in-template-casing': ['warn', 'PascalCase'],
       'no-unused-vars': 'off',
       'preserve-caught-error': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
@@ -128,6 +223,15 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // P0 sole new error: Canvas interaction state must stay local. The
+    // independent rule preserves the existing page/app Overlay restrictions.
+    // Query types follow the same scope; test/provider harnesses are exempt.
+    files: ['src/features/canvas/**/*.{ts,tsx,vue}'],
+    rules: {
+      'governance/query-placement': 'error',
     },
   },
   {

@@ -3,8 +3,52 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { format, resolveConfig } from 'prettier'
+import {
+  edgeKey,
+  graphEdges,
+  findImpureRuntimePaths,
+  isOwned,
+  loadSeamInventory,
+  measureSeam,
+  projectPlannedSeam,
+  type CruiseModule,
+  type SeamRecord,
+} from './seamInventory.ts'
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
+
+/** Default fan-in/out report path (overridable with `--report=<path>`). */
+const DEFAULT_REPORT_PATH = path.join(webRoot, 'seam-fan-report.json')
+
+function reportPathFromArgs(): string {
+  const flag = process.argv.find((arg) => arg.startsWith('--report='))
+  return flag ? path.resolve(webRoot, flag.slice('--report='.length)) : DEFAULT_REPORT_PATH
+}
+
+/** Checkpoint SHA recorded in the report (§6.7 phase-start evidence). */
+function checkpointSha(): string {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: webRoot, encoding: 'utf8' })
+  return result.status === 0 ? result.stdout.trim() : 'unknown'
+}
+
+/** Workspace-relative `*.shim.ts` files (the only sanctioned alias kind). */
+function listShims(root: string): string[] {
+  const found: string[] = []
+  const visit = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'generated-query') continue
+      const absolute = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        visit(absolute)
+        continue
+      }
+      if (entry.name.endsWith('.shim.ts')) found.push(toPosix(path.relative(root, absolute)))
+    }
+  }
+  visit(path.join(root, 'src'))
+  return found.sort()
+}
 
 /** The control client module every generated-query fixture points at. */
 const CONTROL_PLATFORM_MODULE =
@@ -458,6 +502,17 @@ function materializeFixture(workspace: string, file: FixtureFile): string {
 }
 
 console.log('--- 1. Running dependency-cruiser on production codebase ---')
+
+let allSeams: SeamRecord[]
+try {
+  allSeams = loadSeamInventory().seams
+} catch (error) {
+  console.error('Seam inventory failed to load; fix docs/frontend-seam-inventory.md first.')
+  console.error(error instanceof Error ? error.message : error)
+  process.exit(1)
+}
+const inventorySeams = allSeams.filter((seam) => seam.status === 'active')
+
 const prodResult = runDepcruise(webRoot, [
   '--config',
   '.dependency-cruiser.cjs',
@@ -467,9 +522,137 @@ const prodResult = runDepcruise(webRoot, [
 ])
 const prodOutput = JSON.parse(prodResult.stdout || '{}') as {
   summary?: { violations?: Array<{ from: string; to: string; rule?: { name?: string } }> }
+  modules?: CruiseModule[]
 }
 const cruiseViolations = prodOutput.summary?.violations ?? []
 const scannedBoardEdges = scanBoardDeepImports(webRoot)
+
+/**
+ * P0 deliverable B: stable-sorted per-seam fan-in/out JSON report.
+ *
+ * Built from the same depcruise pass that gates production, so the report
+ * can never describe a different graph than the one that passed/failed.
+ * `undeclaredDeepImports` per seam = deep-import rule violations + Board
+ * scanner edges whose target sits behind that seam; the production gate
+ * requires every one of these arrays to be empty (§6.2 criterion 1).
+ */
+async function writeFanReport(): Promise<void> {
+  const edges = graphEdges(prodOutput.modules ?? [])
+  const publicEntries = new Set(
+    inventorySeams.filter((seam) => seam.kind === 'canonical').map((seam) => seam.path),
+  )
+  const deepViolations = cruiseViolations.filter((violation) =>
+    (violation.rule?.name ?? '').includes('deep'),
+  )
+  const shims = listShims(webRoot)
+  const seams: Record<string, unknown> = {}
+  for (const seam of inventorySeams) {
+    const measured = measureSeam(seam, edges, publicEntries)
+    const actualTargets = new Set(measured.fanOutTargets)
+    const targetTargets = new Set(seam.targetFanOutTargets)
+    const advisories = {
+      fanInTargetMismatch: measured.fanIn !== seam.targetFanIn,
+      fanOutTargetMismatch: measured.fanOut !== seam.targetFanOut,
+      newFanOutTargets: measured.fanOutTargets.filter((target) => !targetTargets.has(target)),
+      missingFanOutTargets: seam.targetFanOutTargets.filter((target) => !actualTargets.has(target)),
+    }
+    seams[seam.path] = {
+      ...measured,
+      targetFanIn: seam.targetFanIn,
+      targetFanOut: seam.targetFanOut,
+      advisories,
+      shimCount: shims.filter((shim) => isOwned(shim, seam.ownershipScope)).length,
+      scope: seam.scope,
+      ownershipScope: seam.ownershipScope,
+      impureRuntimePaths: seam.purity === 'pure' ? findImpureRuntimePaths(seam.path, edges) : [],
+    }
+  }
+  const report = {
+    version: 2,
+    checkpointSha: checkpointSha(),
+    scanScope:
+      'all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals',
+    inventoryGate: 'P0 advisory; existing cruiser/Board errors remain blocking',
+    cruiserConfig: '.dependency-cruiser.cjs',
+    totals: {
+      seams: inventorySeams.length,
+      violations: cruiseViolations.length,
+      boardDeepImports: scannedBoardEdges.size,
+      shims: shims.length,
+    },
+    shims,
+    undeclaredDeepImports: [
+      ...deepViolations.map(
+        (violation) => `${violation.from}|${violation.to}#${violation.rule?.name ?? ''}`,
+      ),
+      ...[...scannedBoardEdges].map((edge) => `${edge}#board-deep-import-scan`),
+    ].sort(),
+    seams,
+    plannedSeams: allSeams
+      .filter((seam) => seam.status === 'planned')
+      .map((seam) => ({
+        path: seam.path,
+        sourcePaths: seam.sourcePaths,
+        targetFanIn: seam.targetFanIn,
+        targetFanOut: seam.targetFanOut,
+        sourceOwnershipScope: seam.sourceOwnershipScope,
+        projection: projectPlannedSeam(seam, allSeams, edges),
+        accepted: false,
+      })),
+  }
+  const advisoryDeepEdges = new Set(
+    Object.values(seams).flatMap((value) =>
+      (value as ReturnType<typeof measureSeam>).undeclaredDeepImports.map(edgeKey),
+    ),
+  )
+  const reportPath = reportPathFromArgs()
+  fs.writeFileSync(
+    reportPath,
+    await format(JSON.stringify(report), {
+      ...(await resolveConfig(path.join(webRoot, 'package.json'))),
+      parser: 'json',
+    }),
+  )
+  console.log(`  fan-in/out report: ${path.relative(webRoot, reportPathFromArgs())}`)
+  if (advisoryDeepEdges.size)
+    console.warn(
+      `  P0 inventory advisory: ${advisoryDeepEdges.size} distinct undeclared deep edges; see report before P1 acceptance.`,
+    )
+  const impurePaths = Object.values(seams).flatMap(
+    (value) => (value as { impureRuntimePaths: string[][] }).impureRuntimePaths,
+  )
+  if (impurePaths.length)
+    console.warn(
+      `  P0 pure-entry advisory: ${impurePaths.length} forbidden runtime dependency path(s).`,
+    )
+  if (process.argv.includes('--strict')) {
+    const hasMismatch = Object.values(seams).some((value) => {
+      const record = value as ReturnType<typeof measureSeam> & {
+        advisories: {
+          fanInTargetMismatch: boolean
+          fanOutTargetMismatch: boolean
+          newFanOutTargets: string[]
+          missingFanOutTargets: string[]
+        }
+      }
+      return (
+        record.undeclaredConsumers.length ||
+        record.missingConsumers.length ||
+        record.advisories.fanInTargetMismatch ||
+        record.advisories.fanOutTargetMismatch ||
+        record.advisories.newFanOutTargets.length ||
+        record.advisories.missingFanOutTargets.length
+      )
+    })
+    if (advisoryDeepEdges.size || hasMismatch || impurePaths.length) {
+      console.error(
+        'Strict Seam acceptance failed: frozen consumers/targets or deep edges have not converged.',
+      )
+      process.exit(1)
+    }
+  }
+}
+await writeFanReport()
 if (prodResult.status !== 0 || cruiseViolations.length > 0 || scannedBoardEdges.size > 0) {
   console.error('Production dependency boundaries check failed!')
   console.error('Dependency-cruiser violations:', cruiseViolations)
@@ -572,22 +755,99 @@ try {
     console.log('✓ Positive fixture: Vue SFC and dynamic import resolved successfully.')
   }
 
-  const pureLocaleModule = materializeFixture(workspace, {
-    filePath: 'src/features/canvas/tools/retouch/core/boundary-locale-core.fixture.ts',
-    content: `import { SUPPORTED_LOCALES } from '{target:src/shared/i18n/localeCore}'; console.log(SUPPORTED_LOCALES);`,
-  })
-  const pureLocaleResult = runDepcruise(workspace, [
-    '--config',
-    '.dependency-cruiser.cjs',
-    '--output-type',
-    'json',
-    pureLocaleModule,
-  ])
-  if (pureLocaleResult.status !== 0) {
-    console.error('✗ Positive fixture failed: core cannot import pure localeCore constants/types.')
-    hasError = true
-  } else {
-    console.log('✓ Positive fixture: core may import pure localeCore constants/types.')
+  /**
+   * Positive fixtures: dependency shapes that must stay legal.
+   *
+   * - Valid public entries: cross-feature imports through the declared seam
+   *   (`board/index`, `auth/index`) — the §6.2 consumer-convergence shape.
+   * - Pure subpaths: tool `core/` importing `localeCore` constants/types, and
+   *   canvas importing the board `ports/canvas` port instead of the board root.
+   * Each case expects zero violations of any boundary rule.
+   */
+  const positiveCases: Array<{ name: string; file: FixtureFile }> = [
+    {
+      name: 'allows consuming board through its public entrypoint',
+      file: {
+        filePath: 'src/features/admin/boundary-board-public-ok.fixture.ts',
+        content: `import { loadBoardCatalog } from '{target:src/features/board/index}'; console.log(loadBoardCatalog);`,
+      },
+    },
+    {
+      name: 'allows consuming auth through its public entrypoint',
+      file: {
+        filePath: 'src/features/board/boundary-auth-public-ok.fixture.ts',
+        content: `import { useAuthFeedback } from '{target:src/features/auth/index}'; console.log(useAuthFeedback);`,
+      },
+    },
+    {
+      name: 'allows tool core importing the pure localeCore subpath',
+      file: {
+        filePath: 'src/features/canvas/tools/retouch/core/boundary-locale-core.fixture.ts',
+        content: `import { SUPPORTED_LOCALES } from '{target:src/shared/i18n/localeCore}'; console.log(SUPPORTED_LOCALES);`,
+      },
+    },
+  ]
+
+  for (const positive of positiveCases) {
+    const positiveModule = materializeFixture(workspace, positive.file)
+    const positiveResult = runDepcruise(workspace, [
+      '--config',
+      '.dependency-cruiser.cjs',
+      '--output-type',
+      'json',
+      positiveModule,
+    ])
+    if (positiveResult.status !== 0) {
+      console.error(`✗ Positive fixture failed: ${positive.name}.`)
+      hasError = true
+    } else {
+      console.log(`✓ Positive fixture: ${positive.name}.`)
+    }
+  }
+
+  for (const i18nRoot of ['shared', 'core']) {
+    const pure = 'src/core/contracts/generationContract.ts'
+    const bridge = 'src/core/contracts/bridge.ts'
+    const runtime = `src/${i18nRoot}/i18n/i18nRuntime.ts`
+    const pureAbsolute = path.join(workspace, pure)
+    fs.mkdirSync(path.dirname(pureAbsolute), { recursive: true })
+    fs.mkdirSync(path.dirname(path.join(workspace, runtime)), { recursive: true })
+    fs.writeFileSync(path.join(workspace, runtime), 'export const i18n = {}\n')
+    fs.writeFileSync(
+      path.join(workspace, bridge),
+      `export { i18n } from '../../${i18nRoot}/i18n/i18nRuntime'\n`,
+    )
+    for (const [source, expected, label] of [
+      ['export type Output = string\n', 0, 'pure type contract'],
+      [
+        `import type { i18n } from '../../${i18nRoot}/i18n/i18nRuntime'\nexport type Output = typeof i18n\n`,
+        0,
+        'type-only runtime reference',
+      ],
+      [
+        `export { i18n } from '../../${i18nRoot}/i18n/i18nRuntime'\n`,
+        1,
+        'direct runtime inclusion',
+      ],
+      [`export { i18n } from './bridge'\n`, 1, 'transitive runtime inclusion'],
+    ] as const) {
+      fs.writeFileSync(pureAbsolute, source)
+      const result = runDepcruise(workspace, [
+        '--config',
+        '.dependency-cruiser.cjs',
+        '--output-type',
+        'json',
+        pure,
+      ])
+      const output = JSON.parse(result.stdout || '{}') as {
+        modules?: import('./seamInventory.ts').CruiseModule[]
+      }
+      const actual = findImpureRuntimePaths(pure, graphEdges(output.modules ?? []))
+      if (actual.length !== expected || !output.modules?.some((module) => module.source === pure)) {
+        console.error(`✗ Pure-subpath fixture: ${i18nRoot} ${label}.`)
+        hasError = true
+      } else console.log(`✓ Pure-subpath fixture: ${i18nRoot} ${label}.`)
+    }
   }
 
   // 2.2 Negative Fixtures: Rule violation detection

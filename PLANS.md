@@ -1,5 +1,32 @@
 # ExecPlans
 
+## P0 Diff 冗余清理与提交（2026-10-10）
+
+- Goal: 清理当前 P0 diff 中有证据支持的冗余，验证后在当前 branch commit。
+- Scope: 去除治理脚本的重复 inventory 读取、重复 public symbol 扫描、无消费者的扫描结果字段与重复 fixtures 调用；同步本文件中的最终验收数据。保留冻结 inventory、ledgers、public contracts 与所有有效 regression fixtures。
+- Success criteria: surface 与 fan report 内容不变；相关 schema、surface、boundary、ledger fixtures、typecheck、lint 与格式检查通过；完整 P0 diff 提交后工作区干净。
+- Risks: 保留循环 re-export 的预扫描、Vue named exports 和 missing-export 检查；P0 advisory/error 边界与既有 gates 不变；不执行 P1 migration 或 push。
+- Rollback: commit 前仅撤回本轮 cleanup patches；commit 后可 revert 本轮 commit，不切 branch 或创建 worktree。
+- Results: boundary checker 复用一次 inventory 读取（原本 124 次）并移除重复排序；surface scanner 只预收集一次直接/具名 exports，移除未使用的结果字段与单次调用 wrappers，并复用同一 inventory snapshot；migration-ledger fixtures 每次 lint 只执行一次；前轮 P0 记录统一为最终验收数据。冻结的 surface 与 fan report JSON 内容保持一致。
+- Verification: 完整 lint 通过（0 errors / 131 warnings），3 specs / 64 tests、12 surface fixtures、Seam schema/projection fixtures、strict migration ledger、node typecheck、Knip ledger、修改文件 Prettier 与 diff check 通过；原 13 public contracts 不变。前轮全量 3503 tests 与 build 基线保留，本轮仅清理 scripts/docs；完整 format:check 的 14 个既有未修改文件问题与 Full Knip 的 2316 个 P0 baseline issues 保留。
+- Status: COMPLETE；清理与验证完成，通过当前 branch 的一个 commit 交付，commit identity 以 Git history 为准。
+
+## P0 Diff 审计修复（2026-10-10）
+
+- Goal: 依次修复 P0 审计发现，使工具规则、fixtures、Seam inventory 和验收 ledger 满足 SaaS Frontend Standard v4 的 P0 exit criteria。
+- Scope: 保留现有未提交 P0 diff；当前 checkout/branch 内顺序执行，每一步由 subagent 实现或复核：
+  1. [x] i18n structure 保持 warn-only；真实 lint 与边界 fixtures 共用 warning helper，7 tests、locale lint、相关 ESLint/Prettier 通过。
+  2. [x] 冻结 382 Seam records 的 source/target、exports、consumer edges 和目标；report 覆盖 260 active entries，surface 覆盖 237 entries / 3261 symbols，原 13 contracts 不变；schema/surface/boundary fixtures、typecheck、ESLint、Prettier 和既有 Knip gate 通过。
+  3. [x] 将既有 factory/URL 字段豁免收窄到 19 个 file+symbol / 6 个 type.member 身份；9 factory fixtures、74 naming fixtures、537 spec guardrails 与脚本 ESLint/Prettier 通过，实际新增 warnings 为 0。
+  4. [x] Query placement 接入实际 ESLint rule，51 fixtures 覆盖 warn/error、动态/type imports、shared/core paths、harness/virtualization 与 Overlay coexistence；相关 ESLint/Prettier、Overlay smoke 和 test typecheck 通过。
+  5. [x] Knip 6 个真实 CLI fixtures、test dependency 最小 lock 更新、barrel/type-aware boolean warnings 与具名 tooling owner/deadline 完成；逐项登记 2316 个 full Knip baseline issues，既有 subset gate 保留。surface missing/cycle/SFC exports、pure-runtime fixtures 与 shared public-subpath 覆盖已补；schema/projection/boundary/ledger/脚本检查通过。
+  6. [x] 冻结 494 constraints（R=403、18 i18n candidates）/57 behavior scenarios、8 个 P1b packages 的 56h 计划预算、integrator/checkpoint 和 680 source files / 11 CONTEXT mappings；12 schema/AST fixtures 与 strict consistency 通过，settled 验证基线已更新。
+- Success criteria: 每项修复有有效回归验证；P0 新增约束仍 warn-only（Canvas 高频态 Query 禁令除外）；既有 error gates 不削弱；相关 lint/format/type/tests/build 通过，完整 Knip 红项有精确处置；独立 Standards/Spec 复核无遗漏。
+- Risks: 不为双绿删除真实 runtime/types，不手改 generated files，不执行 P1 目录迁移，不编造已有业务覆盖或已执行的迁移事实；配额与未来预算须标明实测/计划含义。
+- Rollback: 仅撤回本轮 patches；保留用户原有未提交工作，不 reset、不切 branch、不创建 worktree、不 commit 或 push。
+- Verification: 全量 Web 526 files / 3503 tests、build/bundle budget、test/node typecheck、完整 lint、各治理 fixtures、Knip ledger 校验与 diff check 通过；独立复核 PASS。完整 format:check 仅在 14 个既有未修改文件失败，修改文件格式通过。Full Knip 保留 2316 个逐项登记的 P0 baseline issues，P1 双绿尚未启用。
+- Status: COMPLETE；审计发现与复核新增漏报已依次修复，保持当前 branch/HEAD，不执行 P1 迁移、commit 或 push。
+
 ## 未提交 Diff 冗余审计与提交（2026-10-10）
 
 - Goal: 审计当前未提交 diff，删除有证据支持的冗余，并在当前 branch 提交验证后的完整改动。

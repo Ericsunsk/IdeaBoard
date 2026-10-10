@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // P0 Knip production config (plan v4 §5.4 C, checklist §11-0.3).
+  //
+  // Independent from knip.jsonc: its existing dead-code entry roots stay
+  // unchanged and must NOT gain `!` markers. Public surface is owned by
+  // docs/frontend-seam-inventory.md, not either Knip entry list.
+  // here — production reachability is derived from the Vite runtime roots
+  // below instead. See docs/architecture/knip-issue-ledger.md for the frozen
+  // per-issue dispositions and real CLI fixture evidence.
+  //
+  // Target commands (from apps/web):
+  //   knip --config knip.jsonc
+  //   knip --config knip.production.jsonc --production --strict
+  //
+  // Production semantics (https://knip.dev/features/production-mode):
+  // every production pattern carries a trailing `!`; test-only exclusions
+  // use `!` on both ends. `--production` already drops plugin-known test
+  // entries and devDependencies. Helpers stay in the project: a runtime
+  // import must make even testing.ts, src/test and lint/build helpers visible.
+  // Unreachable helper files remain real ledger issues rather than ignores.
+  "entry": [
+    // Vite runtime roots: index.html loads src/app/main.ts (confirmed via
+    // `knip --production --strict --debug`: `entry:src/app/main.ts` from the
+    // Vite plugin + package.json). Router + App are listed explicitly so the
+    // production graph does not depend on a single root resolving.
+    "src/app/main.ts!",
+    "src/app/router/index.ts!",
+    "src/app/App.vue!",
+  ],
+  "project": [
+    // Production file set: TS + Vue SFC (Vue plugin default) + CSS.
+    "src/**/*.{ts,vue,css}!",
+    // Vitest spec entries are excluded; helper paths are deliberately tracked.
+    "!src/**/*.spec.ts!",
+  ],
+  // Build-time CSS import: src/app/style.css `@import "tailwindcss"` is
+  // processed by @tailwindcss/vite at build time, never shipped as a runtime
+  // import. tailwindcss correctly stays in devDependencies; the import is
+  // ignored here with the reason frozen in the ledger.
+  "ignoreDependencies": ["tailwindcss"],
+}

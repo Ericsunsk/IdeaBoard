@@ -53,7 +53,13 @@ const allowedBoundaryCases: BoundaryCase[] = [
   },
 ]
 
-const eslint = new ESLint({ cwd: webRoot })
+const eslint = new ESLint({
+  cwd: webRoot,
+  overrideConfig: {
+    languageOptions: { parserOptions: { project: false } },
+    rules: { 'governance/boolean-prefix': 'off' },
+  },
+})
 let failed = false
 
 for (const boundaryCase of restrictedBoundaryCases) {

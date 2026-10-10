@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 type Exception = {
   reason: string
@@ -54,6 +55,126 @@ const allowedSpecSuffixes = [
   '.contract.spec.ts',
   '.browser.spec.ts',
 ] as const
+
+/**
+ * P0 test conventions (plan §3.7, warn-only): new factories use
+ * `buildX(overrides?)`. Exported `makeX` seams below are grandfathered with
+ * their file and public symbol; spec-local (non-exported) `makeX` helpers stay out of
+ * scope. New exported `makeX` factories print a warning and never fail the
+ * lane: P0 adds no error gates (the canvas Query ban in eslint.config.js is
+ * the sole new error rule).
+ */
+const grandfatheredMakeFactories = new Set([
+  'src/test/factories/admin.ts:makeAdminUserCommandTarget',
+  'src/test/factories/admin.ts:makeAdminUserListItem',
+  'src/test/factories/admin.ts:makeControlUserPayload',
+  'src/test/factories/admin.ts:makePaymentOrderSummary',
+  'src/test/factories/admin.ts:makePaymentOrderDetail',
+  'src/test/factories/user.ts:makeSessionUser',
+  'src/features/board/testing/factories.ts:makePendingImageNodeSnapshot',
+  'src/features/board/testing/factories.ts:makeBoardSnapshot',
+  'src/features/board/testing/factories.ts:makeBoardState',
+  'src/features/admin/credits/health/testing.ts:makeCreditHealth',
+  'src/features/admin/credits/health/testing.ts:makeReconciliationRun',
+  'src/features/admin/credits/health/testing.ts:makeCreditFinding',
+  'src/features/admin/credits/pricing/testing.ts:makeCatalogItems',
+  'src/features/canvas/application/testing/boardFixtures.ts:makeBoardSnapshot',
+  'src/features/canvas/application/testing/boardFixtures.ts:makeBoardState',
+  'src/features/canvas/tools/retouch/core/ids.ts:makeRetouchLayerId',
+  'src/features/canvas/tools/retouch/core/ids.ts:makeCurvePointId',
+  'src/features/canvas/tools/retouch/core/ids.ts:makeCurvePointFallbackId',
+  'src/features/canvas/tools/retouch/core/layers/layerStack.ts:makeRetouchLayerId',
+])
+
+function collectNewMakeFactories(file: string, source: string): string[] {
+  if (file.endsWith('.spec.ts') || file.includes('/generated-query/')) return []
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  const exported = new Set<string>()
+  const add = (name: string) => {
+    if (/^make[A-Z][A-Za-z0-9_]*$/.test(name)) exported.add(name)
+  }
+  for (const statement of parsed.statements) {
+    if (ts.isExportDeclaration(statement)) {
+      if (statement.isTypeOnly || !statement.exportClause) continue
+      if (ts.isNamedExports(statement.exportClause)) {
+        for (const element of statement.exportClause.elements) {
+          if (!element.isTypeOnly) add(element.name.text)
+        }
+      }
+      continue
+    }
+    if (!ts.canHaveModifiers(statement)) continue
+    if (
+      !ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    )
+      continue
+    if (ts.isFunctionDeclaration(statement) && statement.name) add(statement.name.text)
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) add(declaration.name.text)
+      }
+    }
+  }
+  return [...exported].filter((name) => !grandfatheredMakeFactories.has(`${file}:${name}`)).sort()
+}
+
+function checkMakeFactoryFixtures(): void {
+  const cases: Array<[string, string, string, string[]]> = [
+    [
+      'legacy-and-new',
+      'src/test/factories/user.ts',
+      'export function makeSessionUser() {}\nexport const makeAnotherUser = () => ({})',
+      ['makeAnotherUser'],
+    ],
+    [
+      'multiple-declarations',
+      'src/test/factories/new.ts',
+      'export const makeFirst = () => ({}), makeSecond = () => ({})',
+      ['makeFirst', 'makeSecond'],
+    ],
+    [
+      'async-default',
+      'src/test/factories/new.ts',
+      'export async function makeAsync() {}\nexport default function makeDefault() {}',
+      ['makeAsync', 'makeDefault'],
+    ],
+    [
+      'alias-and-reexport',
+      'src/test/factories/new.ts',
+      'function local() {}\nexport { local as makeAlias }; export { buildUser as makeReexport } from "./user"',
+      ['makeAlias', 'makeReexport'],
+    ],
+    [
+      'legacy-reexport-and-new-alias',
+      'src/features/canvas/tools/retouch/core/layers/layerStack.ts',
+      'export { makeRetouchLayerId, makeRetouchLayerId as makeNewId } from "../ids"',
+      ['makeNewId'],
+    ],
+    [
+      'local-and-type-only',
+      'src/test/factories/new.ts',
+      'function makeLocal() {}\nexport type { makeType } from "./types"; export { type makeOtherType } from "./types"',
+      [],
+    ],
+    ['spec-exclusion', 'src/test/factories/new.unit.spec.ts', 'export function makeSpec() {}', []],
+    [
+      'generated-exclusion',
+      'src/shared/api/generated-query/model.ts',
+      'export const makeGenerated = () => ({})',
+      [],
+    ],
+    ['build-convention', 'src/test/factories/new.ts', 'export function buildUser() {}', []],
+  ]
+  for (const [name, file, source, expected] of cases) {
+    const actual = collectNewMakeFactories(file, source)
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(
+        `Factory naming fixture ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+      )
+    }
+  }
+  console.log(`Factory naming fixtures passed (${cases.length} cases).`)
+}
 
 const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
   'src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts': [
@@ -406,6 +527,32 @@ async function listSpecFiles(dir: string, baseDir = dir): Promise<SpecFile[]> {
   return nestedFiles.flat().sort((left, right) => left.sourcePath.localeCompare(right.sourcePath))
 }
 
+async function listSourceFiles(dir: string, baseDir = dir): Promise<SpecFile[]> {
+  if (!existsSync(dir)) return []
+
+  const entries = await readdir(dir)
+  const nestedFiles = await Promise.all(
+    entries.map(async (entry) => {
+      const absolutePath = path.join(dir, entry)
+      const entryStat = await stat(absolutePath)
+
+      if (entryStat.isDirectory()) return listSourceFiles(absolutePath, baseDir)
+      if (!entryStat.isFile() || !entry.endsWith('.ts') || entry.endsWith('.spec.ts')) return []
+
+      const relativePath = toPosixPath(path.relative(baseDir, absolutePath))
+      return [
+        {
+          absolutePath,
+          relativePath,
+          sourcePath: `src/${relativePath}`,
+        },
+      ]
+    }),
+  )
+
+  return nestedFiles.flat().sort((left, right) => left.sourcePath.localeCompare(right.sourcePath))
+}
+
 function toPosixPath(filePath: string): string {
   return filePath.split(path.sep).join('/')
 }
@@ -735,7 +882,31 @@ function printViolations(violations: readonly Violation[]) {
   )
 }
 
+async function warnNewMakeFactories(): Promise<void> {
+  const sourceFiles = await listSourceFiles(srcRoot)
+  const fresh: string[] = []
+
+  for (const file of sourceFiles) {
+    if (file.sourcePath.includes('generated-query')) continue
+    const content = await readFile(file.absolutePath, 'utf8')
+    for (const name of collectNewMakeFactories(file.sourcePath, content)) {
+      fresh.push(`${file.sourcePath} (${name})`)
+    }
+  }
+
+  for (const entry of fresh.sort()) {
+    console.warn(
+      `[guardrail:make-factory-warn] ${entry} :: new factories use buildX(overrides?); existing makeX seams are grandfathered by file and public symbol.`,
+    )
+  }
+  if (fresh.length === 0) {
+    console.log('Factory naming guardrail passed (no new exported makeX factories).')
+  }
+}
+
 async function main() {
+  checkMakeFactoryFixtures()
+  await warnNewMakeFactories()
   const specFiles = await listSpecFiles(srcRoot)
   const violations = await checkSpecFiles(specFiles)
 

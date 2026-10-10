@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import ts from 'typescript'
 
 /**
  * Naming governance ratchet (issues #684, #692).
@@ -75,6 +76,11 @@ import { basename, join } from 'node:path'
  *     Specs mirroring their subject are exempt; pre-existing documented keeps
  *     live in `keptRoleSuffixOwnership`. Any new `*Manager/*Helper/*Util/*Data`
  *     file fails the check.
+ * 16. API vocabulary `*_url` (warn-only, never fails): new image/avatar URL
+ *     fields must use the `*_url` suffix (plan §3.6). Pre-existing `avatar`
+ *     names are grandfathered in `keptLegacyUrlFields` (recorded AIP-140
+ *     deviation); named API/resource declarations or explicit URL annotations
+ *     establish URL semantics. Ordinary display strings and consumers never warn.
  *
  * Migration machinery removed (issue #696): the phase-aware `migrationBaseline`
  * is gone with the final migration phase. Only permanent documented keeps
@@ -167,7 +173,15 @@ const keptRoleSuffixOwnership: Record<string, string> = {
     'admin: pricing demo fixture (pre-existing; new *Data modules banned)',
 }
 
-/** Permanent documented keeps: composable-family files (same responsibility family). */
+/** Permanent documented keeps: pre-existing `image/avatar` URL fields (rule 16, warn-only). */
+const keptLegacyUrlFields = new Set([
+  'shared/api/sessionUserType.ts:User.avatar',
+  'shared/api/upload.ts:UploadAvatarMetadata.avatar',
+  'features/workspace/infrastructure/workspaceResource.ts:PrincipalSummary.avatar',
+  'features/admin/users/resource.ts:AdminUserListItem.avatar',
+  'test/factories/admin.ts:AdminListItemOverrides.avatar',
+  'test/factories/admin.ts:ControlUserPayloadOverrides.avatar',
+])
 const keptComposableFamilies: Record<string, string> = {
   'features/admin/settings/shared/useSettingsFeedback.ts':
     'admin: settings feedback composable family',
@@ -407,6 +421,90 @@ function checkRoleSuffix(relativePath: string, fileName: string): Violation | nu
   return null
 }
 
+/**
+ * Rule 16 (warn-only). New image/avatar URL fields must use the `*_url`
+ * suffix. Parse named API/resource shapes and explicitly documented URL fields;
+ * an arbitrary display string named `image` is not necessarily a URL. Existing
+ * exceptions freeze the declaration/member, never the entire file.
+ */
+function isUrlStringType(type: ts.TypeNode | undefined): boolean {
+  if (!type) return false
+  if (type.kind === ts.SyntaxKind.StringKeyword) return true
+  if (ts.isParenthesizedTypeNode(type)) return isUrlStringType(type.type)
+  if (ts.isArrayTypeNode(type)) return isUrlStringType(type.elementType)
+  if (ts.isTypeReferenceNode(type) && /^(?:ReadonlyArray|Array)$/.test(type.typeName.getText())) {
+    return isUrlStringType(type.typeArguments?.[0])
+  }
+  if (ts.isUnionTypeNode(type)) {
+    const concrete = type.types.filter(
+      (member) =>
+        member.kind !== ts.SyntaxKind.UndefinedKeyword &&
+        !(ts.isLiteralTypeNode(member) && member.literal.kind === ts.SyntaxKind.NullKeyword),
+    )
+    return concrete.length > 0 && concrete.every(isUrlStringType)
+  }
+  return false
+}
+
+function collectUrlSuffixWarnings(
+  relativePath: string,
+  fileName: string,
+  source: string,
+): Array<{ path: string; detail: string }> {
+  if (fileName.endsWith('.spec.ts') || fileName.endsWith('.d.ts')) return []
+  if (relativePath.includes('/generated-query/')) return []
+  const parsed = ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true)
+  const apiBoundary =
+    /^(?:shared\/api\/|api\/|test\/factories\/)/.test(relativePath) ||
+    /(?:^|\/)(?:resource|[A-Za-z0-9]*Resource|[A-Za-z0-9]*Dto|[A-Za-z0-9]*DTO)\.ts$/.test(
+      relativePath,
+    )
+  const warnings: Array<{ path: string; detail: string }> = []
+  const inspectDeclaration = (declaration: ts.InterfaceDeclaration | ts.TypeAliasDeclaration) => {
+    const owner = declaration.name.text
+    const declaredBoundary =
+      apiBoundary || /(?:Resource|DTO|Dto|Payload|Response|Request)$/.test(owner)
+    const inspect = (node: ts.Node, members: string[]) => {
+      if (ts.isPropertySignature(node)) {
+        const member =
+          ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)
+            ? node.name.text
+            : node.name.getText(parsed)
+        const identity = `${owner}.${[...members, member].join('.')}`
+        const documentation = node
+          .getFullText(parsed)
+          .slice(0, node.getStart(parsed) - node.getFullStart())
+        const hasUrlSemantics =
+          declaredBoundary || /\b(?:URL|URI|https?:\/\/)\b/i.test(documentation)
+        if (
+          /^(?:image|images|avatar|avatars)(?:Url|URL)?$/.test(member) &&
+          isUrlStringType(node.type) &&
+          hasUrlSemantics &&
+          !keptLegacyUrlFields.has(`${relativePath}:${identity}`)
+        ) {
+          warnings.push({
+            path: relativePath,
+            detail: `field '${identity}' carries a URL string; name new URL fields '*_url'`,
+          })
+        }
+        if (node.type) ts.forEachChild(node.type, (child) => inspect(child, [...members, member]))
+        return
+      }
+      ts.forEachChild(node, (child) => inspect(child, members))
+    }
+    ts.forEachChild(declaration, (node) => inspect(node, []))
+  }
+  const visit = (node: ts.Node) => {
+    if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+      inspectDeclaration(node)
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(parsed)
+  return warnings
+}
+
 function checkStyleAsset(relativePath: string, fileName: string): Violation | null {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*\.(css|scss|svg|png|jpg|jpeg|webp)$/.test(fileName)) {
     return {
@@ -635,8 +733,12 @@ function checkIndexBarrelSource(
   return checkIndexBarrelBody(relativePath, source)
 }
 
-function collectViolations(): Violation[] {
+function collectViolations(): {
+  violations: Violation[]
+  urlWarnings: Array<{ path: string; detail: string }>
+} {
   const violations: Violation[] = []
+  const urlWarnings: Array<{ path: string; detail: string }> = []
   const visit = (dir: string, root: string) => {
     for (const entry of readdirSync(dir)) {
       const absolute = join(dir, entry)
@@ -721,6 +823,13 @@ function collectViolations(): Violation[] {
         if (roleSuffix) violations.push(roleSuffix)
         const barrel = checkIndexBarrel(relative, absolute, entry)
         if (barrel) violations.push(barrel)
+        try {
+          urlWarnings.push(
+            ...collectUrlSuffixWarnings(relative, entry, readFileSync(absolute, 'utf8')),
+          )
+        } catch {
+          // Unreadable files stay out of the advisory URL-suffix scope.
+        }
       } else if (/\.(css|scss|svg|png|jpg|jpeg|webp)$/.test(entry)) {
         const style = checkStyleAsset(relative, entry)
         if (style) violations.push(style)
@@ -729,7 +838,10 @@ function collectViolations(): Violation[] {
   }
   visit(SRC_ROOT, SRC_ROOT)
   visit(SCRIPTS_ROOT, SCRIPTS_ROOT)
-  return violations.sort((a, b) => a.path.localeCompare(b.path))
+  return {
+    violations: violations.sort((a, b) => a.path.localeCompare(b.path)),
+    urlWarnings: urlWarnings.sort((a, b) => a.path.localeCompare(b.path)),
+  }
 }
 
 function runSelfTest(): void {
@@ -1101,6 +1213,181 @@ function runSelfTest(): void {
       checkIndexBarrelSource('app/router/index.ts', 'index.ts', 'export const routes = build()\n'),
       null,
     ],
+    // --- rule 16: *_url advisory -------------------------------------
+    // New `image/avatar` URL fields warn; `*_url` names, consumers, specs,
+    // and grandfathered backend shapes stay silent. Warn-only: the check
+    // never fails the lane.
+    [
+      'url-suffix-new-avatar-warns',
+      collectUrlSuffixWarnings(
+        'features/example/resource.ts',
+        'resource.ts',
+        'export interface ExampleResource {\n  avatar: string\n}\n',
+      ).length,
+      1,
+    ],
+    [
+      'url-suffix-optional-avatar-warns',
+      collectUrlSuffixWarnings(
+        'features/example/resource.ts',
+        'resource.ts',
+        'export interface ExampleResource {\n  avatar?: string | undefined\n}\n',
+      ).length,
+      1,
+    ],
+    [
+      'url-suffix-suffixed-name-ok',
+      collectUrlSuffixWarnings(
+        'features/example/view.ts',
+        'view.ts',
+        'export interface ExampleView {\n  avatarUrl: string\n}\n',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-wire-camelcase-warns',
+      collectUrlSuffixWarnings(
+        'features/example/resource.ts',
+        'resource.ts',
+        'export interface ExampleResource { imageUrl: string; avatarUrl?: string[] }',
+      ).length,
+      2,
+    ],
+    [
+      'url-suffix-relocated-api-boundary-warns',
+      collectUrlSuffixWarnings(
+        'api/newUser.ts',
+        'newUser.ts',
+        'export interface User { image: string; avatar: string; avatarUrl?: string }',
+      ).length,
+      3,
+    ],
+    [
+      'url-suffix-shared-api-boundary-warns',
+      collectUrlSuffixWarnings(
+        'shared/api/newUser.ts',
+        'newUser.ts',
+        'export interface User { image: string; avatar: string; imageUrl?: string }',
+      ).length,
+      3,
+    ],
+    [
+      'url-suffix-wire-snakecase-ok',
+      collectUrlSuffixWarnings(
+        'api/newUser.ts',
+        'newUser.ts',
+        'export interface User { image_url: string; avatar_url: string; image_urls?: string[] }',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-consumer-ok',
+      collectUrlSuffixWarnings(
+        'features/example/view.ts',
+        'view.ts',
+        'export const label = user.avatar || ""\n',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-spec-mirror-exempt',
+      collectUrlSuffixWarnings(
+        'features/example/resource.unit.spec.ts',
+        'resource.unit.spec.ts',
+        'export interface ExampleResource {\n  avatar: string\n}\n',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-kept-shape-exempt',
+      collectUrlSuffixWarnings(
+        'features/admin/users/resource.ts',
+        'resource.ts',
+        'export interface AdminUserListItem {\n  avatar: string\n}\n',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-existing-file-new-owner-warns',
+      collectUrlSuffixWarnings(
+        'features/admin/users/resource.ts',
+        'resource.ts',
+        'export type AdminUserListItem = { avatar: string }; export interface NewUser { image: string; avatar?: string | null }',
+      ).length,
+      2,
+    ],
+    [
+      'url-suffix-existing-owner-new-member-warns',
+      collectUrlSuffixWarnings(
+        'features/admin/users/resource.ts',
+        'resource.ts',
+        'export type AdminUserListItem = { avatar: string; image: string }',
+      ).length,
+      1,
+    ],
+    [
+      'url-suffix-array-and-single-line-warns',
+      collectUrlSuffixWarnings(
+        'features/example/resource.ts',
+        'resource.ts',
+        'export interface ExampleResource { images?: string[]; avatars: ReadonlyArray<string> | null }',
+      ).length,
+      2,
+    ],
+    [
+      'url-suffix-nested-owner-not-exempt',
+      collectUrlSuffixWarnings(
+        'features/admin/users/resource.ts',
+        'resource.ts',
+        'export type AdminUserListItem = { details: { avatar: string } }',
+      ).length,
+      1,
+    ],
+    [
+      'url-suffix-display-label-not-url',
+      collectUrlSuffixWarnings(
+        'features/example/display.ts',
+        'display.ts',
+        'interface Labels { image: string; avatar: string }',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-documented-url-outside-boundary',
+      collectUrlSuffixWarnings(
+        'features/example/display.ts',
+        'display.ts',
+        'interface Labels { /** URL of the preview. */ image: string }',
+      ).length,
+      1,
+    ],
+    [
+      'url-suffix-nonstring-member-ok',
+      collectUrlSuffixWarnings(
+        'features/example/resource.ts',
+        'resource.ts',
+        'interface ExampleResource { image: Blob; avatars: number[]; images: string | Blob }',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-method-parameter-ok',
+      collectUrlSuffixWarnings(
+        'features/example/resource.ts',
+        'resource.ts',
+        'interface ExampleResource { setAvatar(avatar: string): void }',
+      ),
+      [],
+    ],
+    [
+      'url-suffix-generated-exclusion',
+      collectUrlSuffixWarnings(
+        'shared/api/generated-query/model/user.ts',
+        'user.ts',
+        'interface User { avatar: string }',
+      ),
+      [],
+    ],
   ]
   let failed = 0
   for (const [name, actual, expected] of cases) {
@@ -1121,7 +1408,7 @@ function runSelfTest(): void {
 
 function main() {
   runSelfTest()
-  const violations = collectViolations()
+  const { violations, urlWarnings } = collectViolations()
   const remainingAllowances = new Map(Object.entries(legacyAllowances))
   let failed = false
 
@@ -1138,6 +1425,10 @@ function main() {
     console.warn(
       `[naming-allowance:stale] ${stale} no longer violates; remove it from legacyAllowances`,
     )
+  }
+
+  for (const warning of urlWarnings) {
+    console.warn(`[naming-url-suffix:warn] ${warning.path} :: ${warning.detail}`)
   }
 
   if (failed) {
