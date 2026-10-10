@@ -179,7 +179,7 @@ const keptRoleSuffixOwnership: Record<string, string> = {
 const keptLegacyUrlFields = new Set([
   'api/sessionUserType.ts:User.avatar',
   'api/upload.ts:UploadAvatarMetadata.avatar',
-  'features/workspace/infrastructure/workspaceResource.ts:PrincipalSummary.avatar',
+  'features/workspace/selection/workspaceResource.ts:PrincipalSummary.avatar',
   'features/admin/users/resource.ts:AdminUserListItem.avatar',
   'test/factories/admin.ts:AdminListItemOverrides.avatar',
   'test/factories/admin.ts:ControlUserPayloadOverrides.avatar',

@@ -6,7 +6,7 @@ import { computed, type MaybeRefOrGetter } from 'vue'
 // through it would close a module cycle (`no-circular`). The chain below
 // (`workspaceContext -> workspaceResource -> shared`) never touches
 // account, matching the existing board precedent.
-import { useWorkspaceSelection } from '../../workspace/infrastructure/workspaceContext'
+import { useWorkspaceSelection } from '../../workspace/infrastructure/workspaceContext.shim'
 
 export function useAccountWorkspace(options?: { enabled?: MaybeRefOrGetter<boolean> }) {
   // Thread the caller's gate into the selection query: a bare call fires the

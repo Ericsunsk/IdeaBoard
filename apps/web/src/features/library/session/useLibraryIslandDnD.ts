@@ -1,12 +1,9 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  buildLibraryAssetSavedOutcome,
-  type LibraryMutationPublisher,
-} from '../application/folderFacts'
-import { requireWorkspaceId, type LibrarySearchReference } from '../domain/validators'
-import { saveWorkspaceSearchReference } from '../application/libraryUseCases'
-import type { LibraryAssetView } from '../domain/transfer'
+import { buildLibraryAssetSavedOutcome, type LibraryMutationPublisher } from './folderFacts'
+import { requireWorkspaceId, type LibrarySearchReference } from '../core/validators'
+import { saveWorkspaceSearchReference } from './libraryUseCases'
+import type { LibraryAssetView } from '../core/transfer'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,
@@ -14,14 +11,14 @@ import {
   readSearchReferenceTransfer,
   writeCanvasLibraryImportTransfer,
   writeLibraryFolderMoveTransfer,
-} from '../domain/transfer'
+} from '../core/transfer'
 import { useAppToast } from '../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import {
   LIBRARY_ALL_FOLDER_KEY,
   type LibraryFolderTab,
   type useLibraryWorkspace,
-} from '../application/useLibraryWorkspace'
+} from './useLibraryWorkspace'
 
 export interface LibraryIslandDnDOptions {
   workspace: ReturnType<typeof useLibraryWorkspace>

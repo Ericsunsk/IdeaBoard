@@ -12376,6 +12376,24 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceNavigationAdapter"
         ]
       },
+      "WorkspaceProvisionFn": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceProvisionFn"
+        ]
+      },
+      "WorkspaceSelectionPersist": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceSelectionPersist"
+        ]
+      },
+      "WorkspaceSelectionPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceSelectionPort"
+        ]
+      },
       "WorkspaceSelectionSource": {
         "kind": "canonical-public",
         "evidence": [
@@ -12430,10 +12448,28 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#fetchWorkspacePage"
         ]
       },
+      "getWorkspaceSelectionPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#getWorkspaceSelectionPort"
+        ]
+      },
       "getWorkspaceSelectionStore": {
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#getWorkspaceSelectionStore"
+        ]
+      },
+      "installWorkspaceSelectionPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#installWorkspaceSelectionPort"
+        ]
+      },
+      "installWorkspaceSelectionStore": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#installWorkspaceSelectionStore"
         ]
       },
       "localStorageWorkspacePersist": {
@@ -12446,6 +12482,12 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#memoryWorkspacePersist"
+        ]
+      },
+      "memoryWorkspaceSelectionPersist": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#memoryWorkspaceSelectionPersist"
         ]
       },
       "normalizeWorkspaceListParams": {
@@ -12476,6 +12518,12 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#provisionWorkspace"
+        ]
+      },
+      "resetWorkspaceSelectionPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#resetWorkspaceSelectionPort"
         ]
       },
       "resetWorkspaceSelectionStore": {
@@ -12512,6 +12560,12 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#useWorkspaceSelection"
+        ]
+      },
+      "useWorkspaceSelectionPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#useWorkspaceSelectionPort"
         ]
       },
       "workspaceApiUrls": {
@@ -13173,10 +13227,10 @@
         "evidence": ["src/features/account/application/index.ts#useRewardRedemption"]
       }
     },
-    "src/features/library/domain/validators.ts": {
+    "src/features/library/core/validators.ts": {
       "mapWorkspaceLibraryProvider": {
         "kind": "test-contract",
-        "evidence": ["src/features/library/workspace.contract.spec.ts"]
+        "evidence": ["src/features/library/session/workspace.contract.spec.ts"]
       },
       "LibrarySearchReference": {
         "kind": "canonical-origin",
@@ -13255,14 +13309,14 @@
         "evidence": ["src/features/library/index.ts#toWorkspaceLibraryResolveResult"]
       }
     },
-    "src/features/library/domain/transfer.ts": {
+    "src/features/library/core/transfer.ts": {
       "SEARCH_REFERENCE_MIME": {
         "kind": "test-contract",
-        "evidence": ["src/features/library/domain/transfer.unit.spec.ts"]
+        "evidence": ["src/features/library/core/transfer.unit.spec.ts"]
       },
       "LIBRARY_FOLDER_MOVE_MIME": {
         "kind": "test-contract",
-        "evidence": ["src/features/library/domain/transfer.unit.spec.ts"]
+        "evidence": ["src/features/library/core/transfer.unit.spec.ts"]
       },
       "CANVAS_LIBRARY_IMPORT_MIME": {
         "kind": "canonical-origin",
@@ -13309,10 +13363,10 @@
         "evidence": ["src/features/library/index.ts#writeSearchReferenceTransfer"]
       }
     },
-    "src/features/library/application/folderFacts.ts": {
+    "src/features/library/session/folderFacts.ts": {
       "libraryAffectedFolderKeysForAsset": {
         "kind": "test-contract",
-        "evidence": ["src/features/library/application/folderFacts.unit.spec.ts"]
+        "evidence": ["src/features/library/session/folderFacts.unit.spec.ts"]
       },
       "LIBRARY_ALL_FOLDER_KEY": {
         "kind": "canonical-origin",
@@ -13375,50 +13429,50 @@
         "evidence": ["src/features/library/index.ts#uniqueLibraryFolderKeys"]
       }
     },
-    "src/features/workspace/infrastructure/workspaceResource.ts": {
+    "src/features/workspace/selection/workspaceResource.ts": {
       "WORKSPACE_PAGE_SIZE_DEFAULT": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "WORKSPACE_PAGE_SIZE_MAX": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "WORKSPACE_NAME_MAX_LENGTH": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "parseWorkspaceItem": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "parseWorkspacePage": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "parsePrincipal": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "normalizeWorkspaceListParams": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "buildWorkspaceCreateHeaders": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "fetchAllWorkspaces": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "fetchPrincipal": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "workspaceApiUrls": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceResource.contract.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceResource.contract.spec.ts"]
       },
       "PrincipalSummary": {
         "kind": "canonical-origin",
@@ -13453,38 +13507,38 @@
         "evidence": ["src/features/workspace/index.ts#workspaceQueryKeys"]
       }
     },
-    "src/features/workspace/infrastructure/workspaceContext.ts": {
+    "src/features/workspace/selection/workspaceContext.ts": {
       "WORKSPACE_URL_PARAM": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "WORKSPACE_SELECTION_STORAGE_KEY": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "asWorkspaceId": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "resolveWorkspaceSelection": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "toWorkspaceSelectionStatus": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "localStorageWorkspacePersist": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "memoryWorkspacePersist": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "createWorkspaceSelectionStore": {
         "kind": "test-contract",
-        "evidence": ["src/features/workspace/infrastructure/workspaceContext.unit.spec.ts"]
+        "evidence": ["src/features/workspace/selection/workspaceContext.unit.spec.ts"]
       },
       "ProvisionWorkspaceInput": {
         "kind": "canonical-origin",
@@ -13517,6 +13571,36 @@
       "useWorkspaceSelection": {
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#useWorkspaceSelection"]
+      }
+    },
+    "src/features/workspace/selection/workspaceSelectionPort.ts": {
+      "WORKSPACE_SELECTION_STORAGE_KEY": {
+        "kind": "test-contract",
+        "evidence": ["src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts"]
+      },
+      "WorkspaceSelectionPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#WorkspaceSelectionPort"]
+      },
+      "getWorkspaceSelectionPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#getWorkspaceSelectionPort"]
+      },
+      "installWorkspaceSelectionPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#installWorkspaceSelectionPort"]
+      },
+      "memoryWorkspaceSelectionPersist": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#memoryWorkspaceSelectionPersist"]
+      },
+      "resetWorkspaceSelectionPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#resetWorkspaceSelectionPort"]
+      },
+      "useWorkspaceSelectionPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#useWorkspaceSelectionPort"]
       }
     },
     "src/features/search/presentation/browser/dragGhost.ts": {
@@ -17057,7 +17141,7 @@
         "evidence": ["src/features/legal/index.ts#LEGAL_DOCUMENT_VERSIONS"]
       }
     },
-    "src/features/library/application/libraryUseCases.ts": {
+    "src/features/library/session/libraryUseCases.ts": {
       "LibraryAssetMaterializer": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#LibraryAssetMaterializer"]
@@ -17103,7 +17187,7 @@
         "evidence": ["src/features/library/index.ts#saveWorkspaceSearchReference"]
       }
     },
-    "src/features/library/application/useLibraryWorkspace.ts": {
+    "src/features/library/session/useLibraryWorkspace.ts": {
       "LibraryFolderTab": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#LibraryFolderTab"]
@@ -17117,7 +17201,7 @@
         "evidence": ["src/features/library/index.ts#useLibraryWorkspace"]
       }
     },
-    "src/features/library/infrastructure/resource.ts": {
+    "src/features/library/session/resource.ts": {
       "WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS"]
@@ -17131,7 +17215,7 @@
         "evidence": ["src/features/library/index.ts#workspaceLibraryApi"]
       }
     },
-    "src/features/library/components/confirmations.ts": {
+    "src/features/library/ui/confirmations.ts": {
       "deleteFolderConfirmation": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#deleteFolderConfirmation"]
@@ -20529,10 +20613,10 @@
         "src/features/admin/users/api.contract.spec.ts",
         "src/features/auth/components/authModalsMotion.component.spec.ts",
         "src/features/canvas/application/execution/workspace/useCanvasExecutionWorkspace.unit.spec.ts",
-        "src/features/library/workspace.contract.spec.ts",
+        "src/features/library/session/workspace.contract.spec.ts",
         "src/features/search/infrastructure/visionBillingResource.unit.spec.ts",
         "src/features/search/infrastructure/workspace.contract.spec.ts",
-        "src/features/workspace/infrastructure/workspaceResource.contract.spec.ts",
+        "src/features/workspace/selection/workspaceResource.contract.spec.ts",
         "src/test/setup.ts"
       ]
     },
@@ -20671,7 +20755,7 @@
         "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
         "src/features/canvas/tools/retouch/ui/sharpen/SharpenControl.component.spec.ts",
         "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
-        "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+        "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
         "src/features/search/presentation/components/SearchSavePopover.component.spec.ts",
         "src/features/search/presentation/components/searchComponents.unit.spec.ts",
         "src/features/workspace/shell/components/WorkspaceHeader.component.spec.ts",
@@ -20708,7 +20792,7 @@
         "src/features/auth/components/UserAuthModals.component.spec.ts",
         "src/features/auth/components/authModalsMotion.component.spec.ts",
         "src/features/auth/pages/oauthFlow.component.spec.ts",
-        "src/features/library/application/useLibraryWorkspace.unit.spec.ts",
+        "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
         "src/features/search/application/useVisionQueryLifecycle.unit.spec.ts",
         "src/features/search/presentation/components/SearchSavePopover.component.spec.ts",
         "src/features/search/presentation/useSearchScreenRuntime.unit.spec.ts"

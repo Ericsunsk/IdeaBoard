@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { mockAppToast } from '../../../test/toast'
 import { useLibraryWorkspace } from './useLibraryWorkspace'
 import { createLibraryFolderFacts } from './folderFacts'
-import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from '../domain/validators'
+import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from '../core/validators'
 
 const WORKSPACE_ID = 'ws_test123'
 const WORKSPACE_A_ID = 'ws_test0001'
@@ -36,8 +36,8 @@ vi.mock('./libraryUseCases', async (importOriginal) => {
   }
 })
 
-vi.mock('../infrastructure/resource', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../infrastructure/resource')>()
+vi.mock('./resource', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./resource')>()
   return {
     ...actual,
     workspaceLibraryApi: {

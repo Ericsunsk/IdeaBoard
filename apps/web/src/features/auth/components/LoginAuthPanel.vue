@@ -312,6 +312,7 @@ function passwordLengthMessage() {
 }
 
 async function handleLogin() {
+  if (loading.value) return
   if (!validateForm()) return
 
   const loggedIn = await loginForm.runAsyncAction(
@@ -327,6 +328,7 @@ async function handleLogin() {
 }
 
 async function handleSocialLogin(provider: OAuthProviderCode) {
+  if (loading.value) return
   await loginForm.runAsyncAction(
     async () => {
       if (props.oauthRedirectPath) {
@@ -341,6 +343,7 @@ async function handleSocialLogin(provider: OAuthProviderCode) {
 }
 
 async function handleResetPassword() {
+  if (loading.value) return
   const email = resetForm.value.email.trim()
   resetErrors.value.email = emailFormatError(email, t('auth.errors.invalidEmail'))
   if (resetErrors.value.email) return
@@ -352,6 +355,7 @@ async function handleResetPassword() {
 }
 
 async function handleResetPasswordConfirm() {
+  if (loading.value) return
   resetErrors.value.otp = otpFieldError(resetForm.value.otp, t('auth.errors.sixDigitCode'))
   resetErrors.value.password = passwordLengthFieldError(
     resetForm.value.password,

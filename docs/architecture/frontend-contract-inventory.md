@@ -31,7 +31,7 @@ Historical P0 snapshot: 2026-10-10; integrator: `/root`; current checkpoint: `70
 
 One frozen ID identifies each TypeScript AST matcher call site in specs containing a direct `readFileSync`, `readFile(`, or `?raw` source marker. Loops/table cases are not expanded. Test titles include `it.each` and templates; repeated assertions get occurrence IDs. This scope is a syntactic candidate scan, not helper-derived dataflow analysis. Implementation layout/style constraints retire only after effective replacements. Numerical luminance/contrast and rendered behavior remain protected; tool-policy fixtures remain fixtures. All 18 undecided i18n candidates stay frozen with proposed phase and owner until tool selection, before P7. No assertion is deleted in P0.
 
-Reproduce from `apps/web`: `npx tsx scripts/checkFrontendMigrationLedger.ts`; append `--self-test` for schema/AST/phase-gate fixtures, `--strict` for consistency, or `--phase=P1` for phase acceptance. New source-read files, changed/missing matchers, changed behavior evidence and path drift produce P0 review warnings. `--strict` rejects drift for migration review; passing proves inventory consistency, not completion of pending replacements or scenarios. Each retirement needs an effective positive/negative lint fixture or observable behavior replacement before its original assertion is deleted.
+Reproduce from `apps/web`: `npx tsx scripts/checkFrontendMigrationLedger.ts`; append `--self-test` for schema/AST/phase-gate fixtures, `--strict` for consistency, or `--phase=P1` / `--phase=P2` for cumulative phase acceptance through P1 / P2. Future phase obligations remain pending without blocking earlier phase acceptance. New source-read files, changed/missing matchers, changed behavior evidence and path drift produce P0 review warnings. `--strict` rejects drift for migration review; passing proves inventory consistency, not completion of pending replacements or scenarios. Each retirement needs an effective positive/negative lint fixture or observable behavior replacement before its original assertion is deleted.
 
 | Phase | Frozen R_p | Mandatory B_p | Status at P0 freeze                                   |
 | ----- | ---------: | ------------: | ----------------------------------------------------- |
@@ -302,7 +302,10 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "B_p": 7,
       "zeroRetirementReason": null,
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local",
+      "approver": "plan-owner",
+      "verifiedAt": "2026-10-11",
+      "evidence": "2026-10-11 P2 audit repair: strict ledger P1 and P2 pass with 0 review warnings and 0 unmet requirements; 38 schema/AST/phase fixtures pass. R 2/2 and B 7/7 have current exact assertion evidence, including moving-card DOM/local-state/focus and first-install persisted hydration. Final verification and independent review: see PLANS.md section P2 审计修复（2026-10-11）. This is local evidence, not approval or CI/checkpoint acceptance."
     },
     {
       "phase": "P2.5",
@@ -9239,7 +9242,13 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "requirement": "Rendered gallery output.",
         "status": "unverified-this-task"
       },
-      "reviewRequired": false
+      "reviewRequired": false,
+      "currentAssertion": {
+        "assertion": "expect.poll(() => assertRoundRobinLayout(root, 2, 8)).toBeUndefined()",
+        "reason": "Retained responsive gallery layout is now measured in real Chromium; stable flat card parents replace DOM-column wrappers. The browser assertion verifies card widths/positions/heights and load-more clearance at the original 2/6 lane thresholds.",
+        "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+        "scenario": "preserves the moving card DOM, local state and real focus when lanes change"
+      }
     },
     {
       "id": "source-290f5174e2df36a0-1",
@@ -9308,7 +9317,13 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "requirement": "Rendered gallery output.",
         "status": "unverified-this-task"
       },
-      "reviewRequired": false
+      "reviewRequired": false,
+      "currentAssertion": {
+        "assertion": "expect.poll(() => assertRoundRobinLayout(root, 6, 12)).toBeUndefined()",
+        "reason": "Retained responsive gallery layout is now measured in real Chromium; stable flat card parents replace DOM-column wrappers. The browser assertion verifies card widths/positions/heights and load-more clearance at the original 2/6 lane thresholds.",
+        "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+        "scenario": "preserves the moving card DOM, local state and real focus when lanes change"
+      }
     },
     {
       "id": "source-290f5174e2df36a0-2",
@@ -9370,12 +9385,64 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p2-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "library-gallery/preserve-asset-component-state-across-column-redistribution",
         "requirement": "Existing identical-output test does not prove Vue subtree key identity; add stateful child fixture and viewport rerender.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+            "line": 119,
+            "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+            "assertion": "expect(articleFor('Reference 3')).toBe(movingArticle)",
+            "fingerprint": "6a5c36a44cdfa29d"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+            "line": 121,
+            "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+            "assertion": "expect(Object.getOwnPropertyDescriptor(viewer3, 'localState')?.value).toBe(localState)",
+            "fingerprint": "9f4c9fd7c1372bdf"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+            "line": 122,
+            "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+            "assertion": "expect(document.activeElement).toBe(viewer3)",
+            "fingerprint": "955e71dd15d7667b"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 83,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect(cards(root)[3]).toBe(article)",
+            "fingerprint": "29be88b111a7b6a1"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 87,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect(Object.getOwnPropertyDescriptor(preserved, 'localState')?.value).toBe(localState)",
+            "fingerprint": "91adade5f74bc7b8"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 88,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect(document.activeElement).toBe(viewer)",
+            "fingerprint": "7672d71d23c4cf45"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 82,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect.poll(() => assertRoundRobinLayout(root, 6, 12)).toBeUndefined()",
+            "fingerprint": "bf339372ee488298"
+          }
+        ],
+        "verifiedRun": "2026-10-11 P2 audit fix: targeted Gallery unit (3 tests) and real Chromium Gallery browser (2 tests) passed; moving Reference 3 retains the same DOM/button/local state/focus across measured 2-to-6 lanes. Stable card parents preserve reorder/insertion identity."
       },
       "reviewRequired": false
     },
@@ -9393,12 +9460,64 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p2-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "library-gallery/preserve-asset-component-state-across-column-redistribution",
         "requirement": "Existing identical-output test does not prove Vue subtree key identity; add stateful child fixture and viewport rerender.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+            "line": 119,
+            "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+            "assertion": "expect(articleFor('Reference 3')).toBe(movingArticle)",
+            "fingerprint": "6a5c36a44cdfa29d"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+            "line": 121,
+            "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+            "assertion": "expect(Object.getOwnPropertyDescriptor(viewer3, 'localState')?.value).toBe(localState)",
+            "fingerprint": "9f4c9fd7c1372bdf"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+            "line": 122,
+            "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+            "assertion": "expect(document.activeElement).toBe(viewer3)",
+            "fingerprint": "955e71dd15d7667b"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 83,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect(cards(root)[3]).toBe(article)",
+            "fingerprint": "29be88b111a7b6a1"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 87,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect(Object.getOwnPropertyDescriptor(preserved, 'localState')?.value).toBe(localState)",
+            "fingerprint": "91adade5f74bc7b8"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 88,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect(document.activeElement).toBe(viewer)",
+            "fingerprint": "7672d71d23c4cf45"
+          },
+          {
+            "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+            "line": 82,
+            "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+            "assertion": "expect.poll(() => assertRoundRobinLayout(root, 6, 12)).toBeUndefined()",
+            "fingerprint": "bf339372ee488298"
+          }
+        ],
+        "verifiedRun": "2026-10-11 P2 audit fix: targeted Gallery unit (3 tests) and real Chromium Gallery browser (2 tests) passed; moving Reference 3 retains the same DOM/button/local state/focus across measured 2-to-6 lanes. Stable card parents preserve reorder/insertion identity."
       },
       "reviewRequired": false
     },
@@ -16445,20 +16564,50 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "Legal route URLs/rendered terms remain stable; no structural migration is applied.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Legal route URLs/rendered terms remain stable; no structural migration is applied.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/legal/routePreservation.contract.spec.ts",
+          "line": 21,
+          "scenario": "keeps legal route URLs stable with no structural migration",
+          "assertion": "expect(TERMS_PATH).toBe('/terms')",
+          "fingerprint": "c15d70421be3b6ea"
+        },
+        {
+          "source": "src/features/legal/routePreservation.contract.spec.ts",
+          "line": 61,
+          "scenario": "renders the terms shell with the versioned title and contact links",
+          "assertion": "expect(screen.getByRole('heading', { name: 'Terms of Service' })).toBeTruthy()",
+          "fingerprint": "470ecdd3954d1483"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-11 targeted Vitest: src/features/legal/routePreservation.contract.spec.ts 4 tests passed; checkpoint e44d2930 plus P2 working-tree diff."
     },
     {
       "id": "auth/save-pending-gate",
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "Auth save uses isPending: a second submit is blocked until settle and a failed attempt becomes retryable.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Auth save uses isPending: a second submit is blocked until settle and a failed attempt becomes retryable.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "line": 89,
+          "scenario": "blocks a second auth save while login isPending",
+          "assertion": "expect(loginSpy).toHaveBeenCalledOnce()",
+          "fingerprint": "35a5031a4b679b37"
+        },
+        {
+          "source": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "line": 141,
+          "scenario": "blocks double register submit while isPending",
+          "assertion": "expect(registerSpy).toHaveBeenCalledOnce()",
+          "fingerprint": "e9b8b4790c9b2a36"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-11 targeted Vitest: src/features/auth/components/authSavePendingGate.component.spec.ts 3 tests passed; checkpoint e44d2930 plus P2 working-tree diff."
     },
     {
       "id": "library/identity-output",
@@ -16468,35 +16617,114 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/library/workspace.contract.spec.ts",
+          "source": "src/features/library/session/workspace.contract.spec.ts",
           "line": 303,
           "scenario": "uses one saved identity key format for lookup and UI state",
           "assertion": "expect(libraryAssetKey('pexels', '123')).toBe('pexels:123')",
-          "fingerprint": "8feb3d174815ea47"
+          "fingerprint": "f38a795abcd79409"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-11 targeted Vitest: src/features/library/session/workspace.contract.spec.ts passed as part of 4 files/54 tests (library session + workspace selection + gallery); checkpoint e44d2930 plus P2 working-tree diff."
     },
     {
       "id": "library/masonry-child-identity",
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "Viewport column redistribution preserves stateful child identity and selected/focused asset, not merely identical visible text.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Viewport column redistribution preserves stateful child identity and selected/focused asset, not merely identical visible text.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "line": 119,
+          "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+          "assertion": "expect(articleFor('Reference 3')).toBe(movingArticle)",
+          "fingerprint": "6a5c36a44cdfa29d"
+        },
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "line": 121,
+          "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+          "assertion": "expect(Object.getOwnPropertyDescriptor(viewer3, 'localState')?.value).toBe(localState)",
+          "fingerprint": "9f4c9fd7c1372bdf"
+        },
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "line": 122,
+          "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+          "assertion": "expect(document.activeElement).toBe(viewer3)",
+          "fingerprint": "955e71dd15d7667b"
+        },
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "line": 83,
+          "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+          "assertion": "expect(cards(root)[3]).toBe(article)",
+          "fingerprint": "29be88b111a7b6a1"
+        },
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "line": 87,
+          "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+          "assertion": "expect(Object.getOwnPropertyDescriptor(preserved, 'localState')?.value).toBe(localState)",
+          "fingerprint": "91adade5f74bc7b8"
+        },
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "line": 88,
+          "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+          "assertion": "expect(document.activeElement).toBe(viewer)",
+          "fingerprint": "7672d71d23c4cf45"
+        },
+        {
+          "source": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "line": 82,
+          "scenario": "preserves the moving card DOM, local state and real focus when lanes change",
+          "assertion": "expect.poll(() => assertRoundRobinLayout(root, 6, 12)).toBeUndefined()",
+          "fingerprint": "bf339372ee488298"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-11 P2 audit fix: targeted Gallery unit (3 tests) and real Chromium Gallery browser (2 tests) passed; moving Reference 3 retains the same DOM/button/local state/focus across measured 2-to-6 lanes. Stable card parents preserve reorder/insertion identity."
     },
     {
       "id": "workspace/selection-singleton",
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "Two feature consumers obtain the same installed selection port/reactive state; changing one is observed by the other without constructing another Query client.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Two feature consumers obtain the same installed selection port/reactive state; changing one is observed by the other without constructing another Query client.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "line": 51,
+          "scenario": "installs once: every consumer obtains the same port instance",
+          "assertion": "expect(viaGetter).toBe(installed)",
+          "fingerprint": "d6c393bb7c2385b8"
+        },
+        {
+          "source": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "line": 66,
+          "scenario": "observes a change made through one consumer on the other",
+          "assertion": "expect(consumerB.selectedId.value).toBe('ws_team2')",
+          "fingerprint": "804fc0d3bb5ac9b2"
+        },
+        {
+          "source": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "line": 138,
+          "scenario": "constructs no Query client while obtaining or mutating the port",
+          "assertion": "expect(queryMocks.constructQueryClient).not.toHaveBeenCalled()",
+          "fingerprint": "1490c643d7b31e45"
+        },
+        {
+          "source": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "line": 118,
+          "scenario": "hydrates selectedId from persisted state during first port installation",
+          "assertion": "expect(port.selectedId.value).toBe('ws_team2')",
+          "fingerprint": "97ee114dbaeb45fc"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-11 P2 audit fix: workspaceSelectionPort contract 6 tests passed, covering shared port/store identity, cross-consumer updates, QueryClient construction guard, persisted selection reload and first-install reactive hydration without persistence writes or change events."
     },
     {
       "id": "workspace/access-boundary",
@@ -16506,22 +16734,22 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/workspace/infrastructure/workspaceResource.contract.spec.ts",
+          "source": "src/features/workspace/selection/workspaceResource.contract.spec.ts",
           "line": 138,
           "scenario": "keeps hidden (404) distinct from forbidden (403)",
           "assertion": "expect(classifyWorkspaceAccessError(hidden)).toBe('hidden')",
-          "fingerprint": "1b5a7c85d5f1a49d"
+          "fingerprint": "4daa0a7d21f11ee0"
         },
         {
-          "source": "src/features/workspace/infrastructure/workspaceResource.contract.spec.ts",
+          "source": "src/features/workspace/selection/workspaceResource.contract.spec.ts",
           "line": 140,
           "scenario": "keeps hidden (404) distinct from forbidden (403)",
           "assertion": "expect(classifyWorkspaceAccessError({ status: 403 })).toBe('forbidden')",
-          "fingerprint": "275cf8ce2c135961"
+          "fingerprint": "fdde233f3fe1616a"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-11 targeted Vitest: src/features/workspace/selection/workspaceResource.contract.spec.ts passed as part of 4 files/54 tests; checkpoint e44d2930 plus P2 working-tree diff."
     },
     {
       "id": "workspace/selection-reload",
@@ -16531,22 +16759,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/workspace/infrastructure/workspaceContext.unit.spec.ts",
+          "source": "src/features/workspace/selection/workspaceContext.unit.spec.ts",
           "line": 147,
           "scenario": "survives reloads through the persisted ID",
           "assertion": "expect(reloaded.getSelectedId()).toBe('ws_team2')",
-          "fingerprint": "d3a87d909f194522"
+          "fingerprint": "eb082e398a0e4892"
         },
         {
-          "source": "src/features/workspace/infrastructure/workspaceContext.unit.spec.ts",
+          "source": "src/features/workspace/selection/workspaceContext.unit.spec.ts",
           "line": 148,
           "scenario": "survives reloads through the persisted ID",
           "assertion": "expect(resolveWorkspaceSelection([PERSONAL, TEAM], { storedId: reloaded.getSelectedId() }).source).toBe('stored')",
-          "fingerprint": "f23d7e714de40c79"
+          "fingerprint": "dfd540221ddefb75"
+        },
+        {
+          "source": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "line": 99,
+          "scenario": "restores the persisted selection into reactive state after reload",
+          "assertion": "expect(installWorkspaceSelectionPort().selectedId.value).toBe('ws_team2')",
+          "fingerprint": "5ecf17e0675e4e59"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-11 P2 audit fix: workspaceContext and workspaceSelectionPort contracts passed; real localStorage reload immediately restores the existing selectedId reactive ref under the unchanged key."
     },
     {
       "id": "sync-design/source-of-truth",
@@ -17813,19 +18048,19 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
     },
     {
       "source": "src/features/library/{domain,application,infrastructure,components}/",
-      "target": "src/features/library/{core,session,session/adapters,ui}/",
+      "target": "src/features/library/{core,session,session,ui}/",
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "minimum actual zones, no Library route constants",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/library/workspace.contract.spec.ts",
-      "target": "src/features/library/session/adapters/workspace.contract.spec.ts",
+      "target": "src/features/library/session/workspace.contract.spec.ts",
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "orphan spec follows resource owner",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/workspace/infrastructure/",
@@ -17833,7 +18068,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P2",
       "owner": "/root/p2-lane",
       "requirement": "flat structure, shared installed selection port, singleton behavior before migration",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/admin/shared/{lib,composables,components}/",
@@ -17938,6 +18173,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "owner": "/root/p5-lane",
       "requirement": "cloneImageData remains pure; rename/incorporate only with caller updates",
       "status": "planned"
+    },
+    {
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "target": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+      "phase": "P2",
+      "owner": "/root/p2-lane",
+      "requirement": "Exact relocated observable gallery assertions retain their P0 source/scenario/fingerprint identity; changed DOM column-count implementation maps separately to reviewed real-browser geometry.",
+      "status": "done"
     }
   ],
   "generatedMapping": {
@@ -24839,6 +25082,397 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "verifiedRun": "2026-10-11: actual governance4tests + production/gate8tests passed; final native normal and production strict exit0; independent review PASS."
       },
       "reviewRequired": false
+    },
+    {
+      "id": "source-000a9c6894d891e2-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 87,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(articleFor('Reference 2').textContent).toContain('Image unavailable')",
+      "fingerprint": "000a9c6894d891e2",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-000a9c6894d891e2",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-1cbd70eecd8a4e88-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 92,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(selectedMarker).not.toBe('missing-marker')",
+      "fingerprint": "1cbd70eecd8a4e88",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-1cbd70eecd8a4e88",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-254acde7a39caf91-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 93,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(selectedMarker).not.toBe(unselectedMarker)",
+      "fingerprint": "254acde7a39caf91",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-254acde7a39caf91",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-47163aefd780443b-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 101,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(document.activeElement).toBe(viewer3)",
+      "fingerprint": "47163aefd780443b",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-47163aefd780443b",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-2c1d7ad9ac5f35b8-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 111,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(screen.getAllByRole('article')).toHaveLength(5)",
+      "fingerprint": "2c1d7ad9ac5f35b8",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-2c1d7ad9ac5f35b8",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-000a9c6894d891e2-2",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 113,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(articleFor('Reference 2').textContent).toContain('Image unavailable')",
+      "fingerprint": "000a9c6894d891e2",
+      "occurrence": 2,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-000a9c6894d891e2",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-ee449531c3686250-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 114,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(within(articleFor('Reference 2')).queryByRole('img')).toBeNull()",
+      "fingerprint": "ee449531c3686250",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-ee449531c3686250",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-d210831e3ef80990-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 115,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(within(articleFor('Reference 0')).queryByText('Image unavailable')).toBeNull()",
+      "fingerprint": "d210831e3ef80990",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-d210831e3ef80990",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-e3d294268074a278-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 117,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(markerFor('Reference 3')).toBe(selectedMarker)",
+      "fingerprint": "e3d294268074a278",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-e3d294268074a278",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-c862cedb304e87c8-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 118,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(markerFor('Reference 0')).toBe(unselectedMarker)",
+      "fingerprint": "c862cedb304e87c8",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-c862cedb304e87c8",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-36ea82157a5a3e11-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 119,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(articleFor('Reference 3')).toBe(movingArticle)",
+      "fingerprint": "36ea82157a5a3e11",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-36ea82157a5a3e11",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-04e98cfc828166fc-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 120,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(within(movingArticle).getByRole('button', { name: 'View Reference 3' })).toBe(viewer3)",
+      "fingerprint": "04e98cfc828166fc",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-04e98cfc828166fc",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-0bbee04596cc1e70-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 121,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(Object.getOwnPropertyDescriptor(viewer3, 'localState')?.value).toBe(localState)",
+      "fingerprint": "0bbee04596cc1e70",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-0bbee04596cc1e70",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-47163aefd780443b-2",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 122,
+      "scenario": "preserves stateful asset identity and selected/focused asset across column redistribution",
+      "assertion": "expect(document.activeElement).toBe(viewer3)",
+      "fingerprint": "47163aefd780443b",
+      "occurrence": 2,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-47163aefd780443b",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-a0855b5b0308070d-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 136,
+      "scenario": "keeps each existing card DOM identity through reorder and insertion",
+      "assertion": "expect(screen.getByText(asset.title!).closest('article')).toBe(cards.get(asset.id))",
+      "fingerprint": "a0855b5b0308070d",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-a0855b5b0308070d",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-825cbd8c43ff0e00-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 139,
+      "scenario": "keeps each existing card DOM identity through reorder and insertion",
+      "assertion": "expect(preservedViewer).toBe(viewer)",
+      "fingerprint": "825cbd8c43ff0e00",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-825cbd8c43ff0e00",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-9086a992afe2c41a-1",
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "line": 140,
+      "scenario": "keeps each existing card DOM identity through reorder and insertion",
+      "assertion": "expect(Object.getOwnPropertyDescriptor(preservedViewer, 'localState')?.value).toBe(localState)",
+      "fingerprint": "9086a992afe2c41a",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P2",
+      "proposedPhase": null,
+      "owner": "/root/p2-lane",
+      "risk": "medium",
+      "reason": "P2 audit regression: observable gallery DOM identity, local state, focus, selection and reorder/insertion behavior; exact matcher classified without changing P0 denominator.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "retain-9086a992afe2c41a",
+        "kind": "retained-contract",
+        "requirement": "Keep asset-local DOM/state/focus and selection intact during lane redistribution and asset reorder/insertion.",
+        "status": "verified"
+      },
+      "reviewRequired": false
     }
   ],
   "migrationProgress": {
@@ -24909,7 +25543,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       }
     ],
     "pendingReasons": {},
-    "acceptancePolicy": "No conditional acceptance or P2+ strict ratchet is authorized by this ledger. Run --phase=P1; pending retirements, replacements, mandatory behaviors or source/mapping drift reject P1 acceptance.",
+    "acceptancePolicy": "No conditional acceptance is authorized. Run --phase=P1 for P1a/P1b or --phase=P2 for cumulative P1a/P1b/P2 acceptance; pending retirements, replacements, mandatory behaviors or source/mapping drift reject acceptance. Later pending phases do not block the selected phase.",
     "verification": "2026-10-11: strict P1 gates passed;26 ledgerfixtures/0warnings/0unmet;native normal+productionstrict exit0;254entries/3330symbols;531unitfiles/3571tests plus final governance/production12tests;12browserfiles/47tests;build+bundle budget,test:typecheck,full lint(0errors/139warnings),full Web format,stylelint,generateddrift,diffcheck passed.Independentreview PASS.Local working-tree verification only;CI/checkpoint evidence remains unset.",
     "frozenRetired": 149,
     "supplementalRetired": 5

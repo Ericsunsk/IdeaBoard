@@ -142,7 +142,7 @@ const chromeConsumers = [
   'features/search/presentation/pages/SearchPage.vue',
   'features/search/presentation/components/SearchBatchActionDock.vue',
   'features/board/presentation/catalog/skin.ts',
-  'features/library/components/LibraryFloatingIsland.vue',
+  'features/library/ui/LibraryFloatingIsland.vue',
   'features/canvas/presentation/chrome/components/CanvasChrome.vue',
   'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
   'features/canvas/presentation/chrome/CanvasMiniMap.vue',
@@ -156,7 +156,7 @@ const featureSkins = [
 ]
 const lightboxes = [
   'src/features/search/presentation/components/SearchLightboxModal.vue',
-  'src/features/library/components/LibraryAssetLightbox.vue',
+  'src/features/library/ui/LibraryAssetLightbox.vue',
 ]
 const formFields = [
   'src/features/auth/components/auth-fields/EmailField.vue',

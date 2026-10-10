@@ -3,7 +3,7 @@
 Workspace owns user-side route assembly, shell layout, global navigation, shell account controls, and the share-join entry flow.
 Public `/user/*` URLs are an external product contract and stay unchanged (not a compat shim).
 It does NOT own business content (owned by submodules like `board`) or identity concept components like `UserAccountMenu` in `shared/components`.
-Shape: flat assembly layer (`layout/` + `routes/` + `shell/` + `pages/` + `infrastructure/` for selection state) — it assembles submodule content and owns no domain logic of its own (see `docs/agents/new-feature.md` item 3).
+Shape: flat assembly layer (`layout/` + `routes/` + `shell/` + `pages/` + `selection/` for selection state; `infrastructure/` holds the TTL-governed `workspaceContext.shim.ts` solely for the existing cycle-free `account` consumer, pending its migration) — it assembles submodule content and owns no domain logic of its own (see `docs/agents/new-feature.md` item 3).
 
 ## Domain Language
 

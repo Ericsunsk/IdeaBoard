@@ -101,7 +101,7 @@ export function toWorkspaceSelectionStatus(input: {
   return 'ready'
 }
 
-type WorkspaceSelectionPersist = {
+export type WorkspaceSelectionPersist = {
   readSelectedId: () => string | null
   writeSelectedId: (id: string | null) => void
 }
@@ -138,7 +138,7 @@ export type ProvisionWorkspaceInput = {
   organizationId?: string | undefined
 }
 
-type WorkspaceProvisionFn = (
+export type WorkspaceProvisionFn = (
   input: ProvisionWorkspaceInput,
   request?: { idempotencyKey?: string | undefined; requestId?: string | undefined },
 ) => Promise<WorkspaceSummary>
@@ -215,13 +215,28 @@ export type WorkspaceSelectionStore = ReturnType<typeof createWorkspaceSelection
 
 let sharedStore: WorkspaceSelectionStore | null = null
 
-export function getWorkspaceSelectionStore(): WorkspaceSelectionStore {
-  if (!sharedStore) sharedStore = createWorkspaceSelectionStore()
+/**
+ * Single-registration install for the workspace selection store.
+ *
+ * The first call creates and registers the shared store (honoring the
+ * caller's persist/provision overrides); later calls return the already
+ * installed store so concurrent feature consumers always share one
+ * reactive `selectedId` instead of forking state.
+ */
+export function installWorkspaceSelectionStore(deps?: {
+  persist?: WorkspaceSelectionPersist | undefined
+  provision?: WorkspaceProvisionFn | undefined
+}): WorkspaceSelectionStore {
+  if (!sharedStore) sharedStore = createWorkspaceSelectionStore(deps)
   // IoC registration for `shared/api/mediaAssetDelivery` (which must not
   // import this feature module): resolve implicit workspace ids from the
   // shared singleton. Idempotent; runs on every access.
   setMediaWorkspaceIdResolver(() => sharedStore?.getSelectedId() ?? null)
   return sharedStore
+}
+
+export function getWorkspaceSelectionStore(): WorkspaceSelectionStore {
+  return installWorkspaceSelectionStore()
 }
 
 export function resetWorkspaceSelectionStore(): void {

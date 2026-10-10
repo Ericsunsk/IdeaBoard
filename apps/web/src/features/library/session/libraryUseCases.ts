@@ -2,7 +2,7 @@ import { type ExternalImageProvider } from '../../../core/contracts/externalImag
 // Workspace-scoped library use cases (issue #844; split from `../workspace`).
 //
 // Save/lookup/materialize orchestration over the transport in
-// `../infrastructure/resource`. Pure helpers keep their behavior; transport
+// `../session/resource`. Pure helpers keep their behavior; transport
 // closes over an explicit workspace id resolved from `features/workspace`
 // (never duplicated here). Display media for materialized assets resolves
 // through the shared workspace media delivery boundary with the caller's
@@ -26,13 +26,13 @@ import {
   type LibrarySearchReference,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryFolder,
-} from '../domain/validators'
+} from '../core/validators'
 import { LIBRARY_ALL_FOLDER_KEY, uniqueLibraryFolderKeys } from './folderFacts'
 import {
   WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS,
   workspaceLibraryApi,
   type WorkspaceLibraryRequestOptions,
-} from '../infrastructure/resource'
+} from './resource'
 
 const LIBRARY_FOLDER_PAGE_SIZE = PAGE_SIZES.dense
 const LIBRARY_FOLDER_MAX_PAGES = 10

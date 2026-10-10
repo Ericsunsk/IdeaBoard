@@ -5,11 +5,11 @@
  * this barrel. Deep relative imports into Library internals are not allowed
  * outside this feature.
  *
- * Layout: `domain/` owns pure models, validation, and drag-transfer codecs;
- * `application/` owns use-case orchestration and workspace state;
- * `infrastructure/` owns the workspace-library transport adapter;
- * `components/` owns the floating-island UI. This barrel re-exports the
- * public symbols so the surface stays stable while internals move.
+ * Layout: `core/` owns pure models, validation, and drag-transfer codecs;
+ * `session/` owns use-case orchestration, workspace state, and the
+ * workspace-library transport adapter; `ui/` owns the floating-island UI.
+ * This barrel re-exports the public symbols so the surface stays stable
+ * while internals move.
  */
 export {
   assertLibraryAssetId,
@@ -32,8 +32,8 @@ export {
   type WorkspaceLibraryPage,
   type WorkspaceLibraryResolveResult,
   type WorkspaceLibraryResolveStatus,
-} from './domain/validators'
-export * from './infrastructure/resource'
+} from './core/validators'
+export * from './session/resource'
 export {
   listAllWorkspaceLibraryFolders,
   lookupWorkspaceSavedAssetKeys,
@@ -46,11 +46,11 @@ export {
   type WorkspaceLibraryRemoveResult,
   type WorkspaceLibrarySavedKey,
   type WorkspaceLibrarySaveResult,
-} from './application/libraryUseCases'
-export * from './domain/transfer'
-export * from './application/folderFacts'
-export * from './components/confirmations'
-export * from './application/useLibraryWorkspace'
+} from './session/libraryUseCases'
+export * from './core/transfer'
+export * from './session/folderFacts'
+export * from './ui/confirmations'
+export * from './session/useLibraryWorkspace'
 
 /** Lazily load the floating island shell to keep it out of the initial bundle. */
-export const loadLibraryFloatingIsland = () => import('./components/LibraryFloatingIsland.vue')
+export const loadLibraryFloatingIsland = () => import('./ui/LibraryFloatingIsland.vue')

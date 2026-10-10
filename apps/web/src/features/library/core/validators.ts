@@ -6,8 +6,8 @@ import {
 //
 // Pure opaque-id asserts, snake_case -> camelCase mappers, and save-input
 // shaping. No i18n, no network, no generated code. Transport lives in
-// `../infrastructure/resource`; save/lookup/resolve orchestration in
-// `../application/libraryUseCases`. `../workspace` re-exports this module so the
+// `../session/resource`; save/lookup/resolve orchestration in
+// `../session/libraryUseCases`. `../workspace` re-exports this module so the
 // `features/library` barrel and `./workspace` deep imports stay stable.
 //
 // Id decision (tree truth wins): canonical `l*` everywhere. Backend

@@ -18,8 +18,8 @@ import {
   assertLibraryFolderId,
   requireWorkspaceId,
   type WorkspaceLibraryAsset,
-} from '../domain/validators'
-import { workspaceLibraryApi } from '../infrastructure/resource'
+} from '../core/validators'
+import { workspaceLibraryApi } from './resource'
 import { listAllWorkspaceLibraryFolders } from './libraryUseCases'
 import {
   buildLibraryAssetMovedOutcome,
@@ -32,7 +32,7 @@ import {
   type LibraryFolderView,
   type LibraryMutationPublisher,
 } from './folderFacts'
-import type { LibraryAssetView } from '../domain/transfer'
+import type { LibraryAssetView } from '../core/transfer'
 
 export type LibraryFolderTab = {
   folderKey: string

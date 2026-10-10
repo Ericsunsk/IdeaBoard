@@ -240,7 +240,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'lightbox-shared-skin',
     invalidate: (s) => {
-      const file = 'src/features/library/components/LibraryAssetLightbox.vue'
+      const file = 'src/features/library/ui/LibraryAssetLightbox.vue'
       s[file] = s[file]!.replace(':class="lightboxScrimLinkClass"', 'class="bg-white/10"')
     },
   },

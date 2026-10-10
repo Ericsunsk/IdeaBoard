@@ -369,6 +369,7 @@ function handlePasswordInput() {
 }
 
 async function handleRegister() {
+  if (loading.value) return
   if (!validateForm()) return
 
   const registered = await registerForm.runAsyncAction(
@@ -390,6 +391,7 @@ async function handleRegister() {
 }
 
 async function handleVerifyOTP() {
+  if (loading.value) return
   if (!validateField('otp')) return
   const verified = await registerForm.runAsyncAction(
     () => userStore.verifyRegistrationOTP(formValue.value.email, formValue.value.otp.trim()),

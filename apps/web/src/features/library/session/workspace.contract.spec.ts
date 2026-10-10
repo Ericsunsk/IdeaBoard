@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../test/msw'
+import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import {
   assertLibraryAssetId,
   assertLibraryFolderId,
@@ -11,14 +11,14 @@ import {
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,
   toWorkspaceLibraryResolveResult,
-} from './domain/validators'
-import { WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS, workspaceLibraryApi } from './infrastructure/resource'
+} from '../core/validators'
+import { WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS, workspaceLibraryApi } from './resource'
 import {
   lookupWorkspaceSavedAssetKeys,
   materializeLibraryAssetForCanvas,
   removeWorkspaceSearchReference,
   saveWorkspaceSearchReference,
-} from './application/libraryUseCases'
+} from './libraryUseCases'
 import {
   getDeleteWorkspaceLibraryAssetUrl,
   getDeleteWorkspaceLibraryFolderUrl,
@@ -28,11 +28,11 @@ import {
   getRenameWorkspaceLibraryFolderUrl,
   getResolveWorkspaceLibraryAssetsUrl,
   getSaveWorkspaceLibraryAssetUrl,
-} from '../../api/generated-query/public/workspace-library/workspace-library'
-import { getWorkspaceMediaAssetMetadata } from '../../api/mediaAssetDelivery'
+} from '../../../api/generated-query/public/workspace-library/workspace-library'
+import { getWorkspaceMediaAssetMetadata } from '../../../api/mediaAssetDelivery'
 
-vi.mock('../../api/mediaAssetDelivery', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../api/mediaAssetDelivery')>()
+vi.mock('../../../api/mediaAssetDelivery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/mediaAssetDelivery')>()
   return {
     ...actual,
     getWorkspaceMediaAssetMetadata: vi.fn(async () => ({

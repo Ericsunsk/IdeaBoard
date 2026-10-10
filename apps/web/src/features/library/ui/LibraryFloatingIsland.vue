@@ -219,10 +219,10 @@ import {
   ReportColumns,
   Xmark,
 } from '@iconoir/vue'
-import { useLibraryWorkspace, type LibraryFolderTab } from '../application/useLibraryWorkspace'
-import type { LibraryFolderFacts, LibraryMutationPublisher } from '../application/folderFacts'
-import type { LibraryAssetView } from '../domain/transfer'
-import type { CanvasLibraryImportDescriptor } from '../domain/transfer'
+import { useLibraryWorkspace, type LibraryFolderTab } from '../session/useLibraryWorkspace'
+import type { LibraryFolderFacts, LibraryMutationPublisher } from '../session/folderFacts'
+import type { LibraryAssetView } from '../core/transfer'
+import type { CanvasLibraryImportDescriptor } from '../core/transfer'
 import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../core/composables/useUserConfirmDialog'
 import {
@@ -235,7 +235,7 @@ import LibraryAssetGallery from './LibraryAssetGallery.vue'
 import LibraryAssetLightbox from './LibraryAssetLightbox.vue'
 import LibraryFolderDialogs from './LibraryFolderDialogs.vue'
 import LibraryFolderContextMenu from './LibraryFolderContextMenu.vue'
-import { useLibraryIslandDnD } from './useLibraryIslandDnD'
+import { useLibraryIslandDnD } from '../session/useLibraryIslandDnD'
 import { useAppToast } from '../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 

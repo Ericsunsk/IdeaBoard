@@ -1,11 +1,12 @@
 {
   "version": 2,
-  "checkpointSha": "e43945b9e2e90b1e88c76ee6193309c519e13ddf",
+  "checkpointSha": "e44d29308b78e7f51dc455edd77666b81d8a2f4d",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict P1 current batch; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 273, "violations": 0, "boardDeepImports": 0, "shims": 109 },
+  "totals": { "seams": 275, "violations": 0, "boardDeepImports": 0, "shims": 110 },
   "shims": [
+    "src/features/workspace/infrastructure/workspaceContext.shim.ts",
     "src/shared/api/client.shim.ts",
     "src/shared/api/contractKernel.shim.ts",
     "src/shared/api/idempotencyKey.shim.ts",
@@ -149,7 +150,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
         },
@@ -159,12 +160,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
         },
@@ -379,7 +380,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -394,12 +395,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -2715,7 +2716,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         }
@@ -4182,7 +4183,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/user/user.ts",
           "kind": "runtime"
         }
@@ -4337,12 +4338,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         }
@@ -4557,7 +4558,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/workspaces/workspaces.ts",
           "kind": "runtime"
         }
@@ -4673,7 +4674,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -4827,12 +4828,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -4917,7 +4918,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
         },
@@ -6042,7 +6043,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -6292,7 +6293,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
         }
@@ -6466,7 +6467,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/dialog/dialogClasses.ts",
           "kind": "runtime"
         }
@@ -6924,7 +6925,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
@@ -8344,7 +8345,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/core/components/IbFormField.vue",
           "kind": "runtime"
         },
@@ -8669,7 +8670,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
@@ -8884,17 +8885,17 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -9487,12 +9488,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/composables/useUserConfirmDialog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/confirmations.ts",
+          "from": "src/features/library/ui/confirmations.ts",
           "to": "src/core/composables/useUserConfirmDialog.ts",
           "kind": "type-only"
         },
@@ -9597,12 +9598,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -9712,12 +9713,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -9874,27 +9875,27 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/folderFacts.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/domain/transfer.ts",
+          "from": "src/features/library/core/transfer.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/folderFacts.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "type-only"
         },
@@ -10391,22 +10392,22 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -11082,27 +11083,27 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/folderFacts.ts",
+          "from": "src/features/library/session/folderFacts.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/confirmations.ts",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/ui/confirmations.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -11911,7 +11912,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderContextMenu.vue",
+          "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
           "to": "src/core/interaction/menuKeyboardNavigation.ts",
           "kind": "runtime"
         },
@@ -12847,7 +12848,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -13060,7 +13061,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -13075,12 +13076,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -13291,7 +13292,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -13650,7 +13651,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
@@ -13890,7 +13891,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -14035,7 +14036,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
@@ -14099,7 +14100,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -14177,7 +14178,7 @@
         "src/features/account/infrastructure/usage/resource.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
-        "src/features/workspace/infrastructure/workspaceContext.ts",
+        "src/features/workspace/infrastructure/workspaceContext.shim.ts",
         "src/features/workspace/routePaths.ts",
         "src/test/render.ts"
       ],
@@ -14189,7 +14190,7 @@
         },
         {
           "from": "src/features/account/application/accountWorkspace.ts",
-          "to": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "to": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
           "kind": "runtime"
         },
         {
@@ -14783,8 +14784,11 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": true,
-        "newFanOutTargets": ["src/features/admin/routePaths.ts"],
-        "missingFanOutTargets": []
+        "newFanOutTargets": [
+          "src/features/admin/routePaths.ts",
+          "src/features/workspace/infrastructure/workspaceContext.shim.ts"
+        ],
+        "missingFanOutTargets": ["src/features/workspace/infrastructure/workspaceContext.ts"]
       },
       "shimCount": 0,
       "scope": "intra-feature",
@@ -15082,7 +15086,7 @@
         "src/core/utils/workspaceId.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
-        "src/features/workspace/infrastructure/workspaceContext.ts",
+        "src/features/workspace/infrastructure/workspaceContext.shim.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
         "src/test/deferred.ts",
@@ -15129,7 +15133,7 @@
         },
         {
           "from": "src/features/account/application/accountWorkspace.ts",
-          "to": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "to": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
           "kind": "runtime"
         },
         {
@@ -16722,11 +16726,15 @@
           "src/core/i18n/locales/en/index.ts",
           "src/core/lib/pageChrome.ts",
           "src/features/admin/routePaths.ts",
+          "src/features/workspace/infrastructure/workspaceContext.shim.ts",
           "src/test/domOrder.ts",
           "src/theme/appOverlayMenu.ts",
           "src/theme/composables/useTheme.ts"
         ],
-        "missingFanOutTargets": ["src/core/i18n/locales/en/account.ts"]
+        "missingFanOutTargets": [
+          "src/core/i18n/locales/en/account.ts",
+          "src/features/workspace/infrastructure/workspaceContext.ts"
+        ]
       },
       "shimCount": 0,
       "scope": "cross-feature",
@@ -24923,9 +24931,10 @@
         }
       ],
       "fanIn": 28,
-      "fanOut": 45,
+      "fanOut": 47,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
@@ -24964,6 +24973,7 @@
         "src/features/legal/routePaths.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
+        "src/test/deferred.ts",
         "src/test/factories/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
@@ -25274,6 +25284,41 @@
         },
         {
           "from": "src/features/auth/components/authModalsMotion.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authSavePendingGate.component.spec.ts",
           "to": "src/test/toast.ts",
           "kind": "runtime"
         },
@@ -25608,10 +25653,12 @@
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": true,
         "newFanOutTargets": [
+          "node_modules/@testing-library/vue/dist/index.js",
           "src/api/mediaAssetDelivery.ts",
           "src/api/mediaAssetMetadata.ts",
           "src/api/workspaceEventStream.ts",
-          "src/features/legal/routePaths.ts"
+          "src/features/legal/routePaths.ts",
+          "src/test/deferred.ts"
         ],
         "missingFanOutTargets": []
       },
@@ -40496,12 +40543,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/contacts.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/shared/constants/contacts.shim.ts",
           "to": "src/features/legal/contacts.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 2,
+      "fanIn": 3,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -40509,7 +40561,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1b",
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -40525,11 +40577,14 @@
     "src/features/legal/index.ts": {
       "consumerEdges": [],
       "fanIn": 0,
-      "fanOut": 3,
+      "fanOut": 6,
       "fanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
         "src/core/composables/useSiteBranding.ts",
         "src/core/i18n/index.ts",
-        "src/features/workspace/routePaths.ts"
+        "src/features/workspace/routePaths.ts",
+        "src/test/render.ts"
       ],
       "outboundEdges": [
         {
@@ -40545,6 +40600,21 @@
         {
           "from": "src/features/legal/components/PublicLegalPage.vue",
           "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         }
       ],
@@ -40578,7 +40648,11 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": true,
-        "newFanOutTargets": [],
+        "newFanOutTargets": [
+          "node_modules/vitest/dist/index.js",
+          "node_modules/vue/index.js",
+          "src/test/render.ts"
+        ],
         "missingFanOutTargets": [
           "src/features/legal/contacts.ts",
           "src/features/legal/legalLinks.ts"
@@ -40602,12 +40676,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/legalLinks.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/shared/constants/legalLinks.shim.ts",
           "to": "src/features/legal/legalLinks.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 1,
       "fanOutTargets": ["src/features/legal/routePaths.ts"],
       "outboundEdges": [
@@ -40621,7 +40700,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -40647,6 +40726,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/routes/workspaceRoutes.ts",
           "to": "src/features/legal/routePaths.ts",
           "kind": "runtime"
@@ -40657,7 +40741,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -40665,7 +40749,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -40802,19 +40886,20 @@
         }
       ],
       "fanIn": 23,
-      "fanOut": 37,
+      "fanOut": 39,
       "fanOutTargets": [
-        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/workspace-library/workspace-library.ts",
         "src/api/mediaAssetDelivery.ts",
+        "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -40840,382 +40925,403 @@
         "src/theme/appOverlayMenu.ts",
         "src/theme/dialogMask.ts",
         "src/theme/formControls.ts",
-        "src/theme/lightboxScrim.ts"
+        "src/theme/lightboxScrim.ts",
+        "vitest/browser"
       ],
       "outboundEdges": [
         {
-          "from": "src/features/library/application/folderFacts.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/folderFacts.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/application/folderFacts.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/folderFacts.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
-          "to": "node_modules/vue-router/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/application/useLibraryWorkspace.unit.spec.ts",
-          "to": "src/test/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
-          "to": "fs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
-          "to": "path",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetGallery.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
-          "to": "src/theme/lightboxScrim.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderContextMenu.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderContextMenu.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderContextMenu.vue",
-          "to": "src/core/interaction/menuKeyboardNavigation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/components/ui/dialog/dialogClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/core/components/IbFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
-          "to": "src/theme/formControls.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/confirmations.ts",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/components/confirmations.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.unit.spec.ts",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/components/useLibraryIslandDnD.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/domain/transfer.ts",
+          "from": "src/features/library/core/transfer.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/transfer.unit.spec.ts",
+          "from": "src/features/library/core/transfer.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
-          "to": "src/api/client.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/infrastructure/resource.ts",
-          "to": "src/api/contractKernel.ts",
+          "from": "src/features/library/session/folderFacts.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
-          "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/folderFacts.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/folderFacts.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
-          "to": "src/core/utils/ids.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/folderFacts.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
-          "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/api/client.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.unit.spec.ts",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryIslandDnD.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
+          "to": "node_modules/vue-router/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
+          "to": "src/core/router/queryParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/workspace.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/workspace.contract.spec.ts",
+          "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/workspace.contract.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "vitest/browser",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.vue",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "src/theme/lightboxScrim.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/composables/useUserConfirmDialog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/theme/appOverlayMenu.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
+          "to": "src/core/interaction/menuKeyboardNavigation.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/components/ui/dialog/dialogClasses.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/components/ui/dialog/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/core/components/IbFormField.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/lib/utils.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/theme/dialogMask.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
+          "to": "src/theme/formControls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/confirmations.ts",
+          "to": "src/core/composables/useUserConfirmDialog.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/ui/confirmations.ts",
+          "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         }
       ],
@@ -41227,9 +41333,14 @@
       "targetFanOut": 37,
       "advisories": {
         "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "fanOutTargetMismatch": true,
+        "newFanOutTargets": [
+          "node_modules/@testing-library/vue/dist/index.js",
+          "node_modules/@vueuse/core/dist/index.js",
+          "src/app/style.css",
+          "vitest/browser"
+        ],
+        "missingFanOutTargets": ["fs", "path"]
       },
       "shimCount": 0,
       "scope": "cross-feature",
@@ -42116,116 +42227,6 @@
       ],
       "outboundEdges": [
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "node_modules/vue-router/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/api/client.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/api/mediaWorkspaceScope.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/core/utils/auth.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "to": "src/core/utils/storage.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceContext.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.contract.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.contract.spec.ts",
-          "to": "src/test/msw.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/api/client.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/api/generated-query/public/user/user.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/api/generated-query/public/workspaces/workspaces.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/api/idempotencyKey.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/workspace/layout/WorkspaceLayout.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -42389,6 +42390,131 @@
           "from": "src/features/workspace/routes/workspaceRoutes.ts",
           "to": "src/features/search/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "node_modules/vue-router/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/api/client.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/api/mediaWorkspaceScope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/core/router/queryParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.ts",
+          "to": "src/core/utils/storage.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.contract.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/api/client.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/api/generated-query/public/workspaces/workspaces.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "type-only"
         },
         {
           "from": "src/features/workspace/shell/components/WorkspaceHeader.component.spec.ts",
@@ -42618,11 +42744,6 @@
           "from": "src/app/router/index.ts",
           "to": "src/features/workspace/routes/workspaceRoutes.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/accountWorkspace.ts",
-          "to": "src/features/workspace/infrastructure/workspaceContext.ts",
-          "kind": "runtime"
         }
       ],
       "activationPhase": "pre-P0",
@@ -42638,9 +42759,44 @@
         ],
         "missingFanOutTargets": ["src/features/workspace/routePaths.ts"]
       },
-      "shimCount": 0,
+      "shimCount": 1,
       "scope": "cross-feature",
       "ownershipScope": ["src/features/workspace/"],
+      "impureRuntimePaths": []
+    },
+    "src/features/workspace/infrastructure/workspaceContext.shim.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/account/application/accountWorkspace.ts",
+          "to": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 1,
+      "fanOut": 1,
+      "fanOutTargets": ["src/features/workspace/selection/workspaceContext.ts"],
+      "outboundEdges": [
+        {
+          "from": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "activationPhase": "P2",
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 1,
+      "scope": "workspace",
+      "ownershipScope": ["src/features/workspace/infrastructure/workspaceContext.shim.ts"],
       "impureRuntimePaths": []
     },
     "src/features/workspace/routePaths.ts": {
@@ -42843,6 +42999,65 @@
       "ownershipScope": ["src/features/workspace/routePaths.ts"],
       "impureRuntimePaths": []
     },
+    "src/features/workspace/selection/workspaceSelectionPort.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/workspace/index.ts",
+          "to": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/index.ts",
+          "to": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "to": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 2,
+      "fanOut": 3,
+      "fanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/workspace/selection/workspaceContext.ts",
+        "src/features/workspace/selection/workspaceResource.ts"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "to": "src/features/workspace/selection/workspaceResource.ts",
+          "kind": "type-only"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "activationPhase": "P2",
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "scope": "cross-feature",
+      "ownershipScope": ["src/features/workspace/selection/workspaceSelectionPort.ts"],
+      "impureRuntimePaths": []
+    },
     "src/test/factories/index.ts": {
       "consumerEdges": [
         {
@@ -42977,7 +43192,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
@@ -43220,7 +43435,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -43289,7 +43504,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
@@ -43333,7 +43548,7 @@
     "src/theme/lightboxScrim.ts": {
       "consumerEdges": [
         {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
           "to": "src/theme/lightboxScrim.ts",
           "kind": "runtime"
         },

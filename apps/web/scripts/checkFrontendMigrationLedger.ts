@@ -36,7 +36,7 @@ type Constraint = Assertion & {
     verifiedRun?: string
   }
   reviewRequired: boolean
-  currentAssertion?: { assertion: string; reason: string }
+  currentAssertion?: { assertion: string; reason: string; source?: string; scenario?: string }
 }
 type Behavior = {
   id: string
@@ -218,6 +218,15 @@ function validateLedger(value: Ledger): Ledger {
         nonempty(row.currentAssertion.assertion) && nonempty(row.currentAssertion.reason),
         `${row.id}: reviewed current assertion mapping`,
       )
+    if (row.currentAssertion?.source !== undefined || row.currentAssertion?.scenario !== undefined)
+      requireCondition(
+        nonempty(row.currentAssertion.source) &&
+          row.currentAssertion.source.startsWith('src/') &&
+          path.posix.normalize(row.currentAssertion.source) === row.currentAssertion.source &&
+          !row.currentAssertion.source.includes('\\') &&
+          nonempty(row.currentAssertion.scenario),
+        `${row.id}: reviewed current assertion source/scenario mapping`,
+      )
   }
   for (const row of value.behaviors) {
     requireCondition(
@@ -377,7 +386,7 @@ function collectAssertions(file: string, source: string): Assertion[] {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
-      /^expect\(/.test(node.expression.getText(parsed))
+      /^expect(?:\.poll)?\(/.test(node.expression.getText(parsed))
     ) {
       const assertion = printer.printNode(ts.EmitHint.Expression, node, parsed)
       const fingerprint = hash(`${file}\n${scenario}\n${assertion}`)
@@ -411,13 +420,18 @@ function listFiles(directory: string): string[] {
 }
 function mappedAssertionId(row: Constraint): string {
   const assertion = row.currentAssertion?.assertion ?? row.assertion
-  return `source-${hash(`${row.source}\n${row.scenario}\n${assertion}`)}-${row.occurrence}`
+  const source = row.currentAssertion?.source ?? row.source
+  const scenario = row.currentAssertion?.scenario ?? row.scenario
+  return `source-${hash(`${source}\n${scenario}\n${assertion}`)}-${row.occurrence}`
 }
 function canonicalSource(file: string, ledger: Ledger): string {
   const exact = ledger.sharedFileMappings.find(
     (row) => row.disposition !== 'retired-effective-replacement' && row.targets.includes(file),
   )
-  return exact?.source ?? file
+  const relocation = ledger.pathMappings.find(
+    (row) => row.status === 'done' && row.target === file && row.source.endsWith('.spec.ts'),
+  )
+  return exact?.source ?? relocation?.source ?? file
 }
 function projectGeneratedFiles(files: string[], mapping: Ledger['generatedMapping']): string[] {
   const sourceRoot = mapping.sourcePattern.slice(0, -2)
@@ -492,6 +506,14 @@ function collectCurrentSources(ledger: Ledger): Map<string, Assertion[]> {
   }
   return sources
 }
+function hasCurrentAssertion(row: Constraint, sources: Map<string, Assertion[]>): boolean {
+  const source = row.currentAssertion?.source ?? row.source
+  if (sources.get(source)?.some((current) => current.id === mappedAssertionId(row))) return true
+  if (!row.currentAssertion?.source || !fs.existsSync(path.join(webRoot, source))) return false
+  return collectAssertions(source, fs.readFileSync(path.join(webRoot, source), 'utf8')).some(
+    (current) => current.id === mappedAssertionId(row),
+  )
+}
 function checkCurrentSources(ledger: Ledger, sources: Map<string, Assertion[]>): string[] {
   const warnings = checkFileMappings(ledger)
   const constraints = [...ledger.constraints, ...(ledger.supplementalConstraints ?? [])]
@@ -508,10 +530,7 @@ function checkCurrentSources(ledger: Ledger, sources: Map<string, Assertion[]>):
           )
   }
   for (const row of constraints)
-    if (
-      row.retirementStatus !== 'retired' &&
-      !sources.get(row.source)?.some((current) => current.id === mappedAssertionId(row))
-    )
+    if (row.retirementStatus !== 'retired' && !hasCurrentAssertion(row, sources))
       warnings.push(
         `${row.id} ${row.source}:${row.line}: frozen matcher is missing/changed; preserve denominator and supply reviewed replacement/relocation evidence`,
       )
@@ -543,10 +562,12 @@ function checkCurrentSources(ledger: Ledger, sources: Map<string, Assertion[]>):
 function phaseAcceptanceFailures(
   ledger: Ledger,
   sources = collectCurrentSources(ledger),
+  phase: 'P1' | 'P2' = 'P1',
 ): string[] {
   const failures: string[] = []
+  const acceptedPhases = phase === 'P1' ? ['P1a', 'P1b'] : ['P1a', 'P1b', 'P2']
   for (const row of [...ledger.constraints, ...(ledger.supplementalConstraints ?? [])].filter(
-    (row) => row.disposition === 'retire' && ['P1a', 'P1b'].includes(row.phase ?? ''),
+    (row) => row.disposition === 'retire' && acceptedPhases.includes(row.phase ?? ''),
   )) {
     if (row.retirementStatus !== 'retired') failures.push(`${row.id}: retirement pending`)
     if (
@@ -556,10 +577,10 @@ function phaseAcceptanceFailures(
       !row.replacement.evidence.every(hasAssertionEvidence)
     )
       failures.push(`${row.id}: effective replacement evidence pending`)
-    if (sources.get(row.source)?.some((current) => current.id === mappedAssertionId(row)))
+    if (hasCurrentAssertion(row, sources))
       failures.push(`${row.id}: original implementation-source matcher still present`)
   }
-  for (const row of ledger.behaviors.filter((row) => ['P1a', 'P1b'].includes(row.phase)))
+  for (const row of ledger.behaviors.filter((row) => acceptedPhases.includes(row.phase)))
     if (
       row.status !== 'verified' ||
       !nonempty(row.verifiedRun) ||
@@ -657,6 +678,16 @@ function runFixtures(ledger: Ledger): void {
         value.generatedMapping.sourcePathSha256 = createHash('sha256').update('').digest('hex')
       },
     ],
+    [
+      'incomplete assertion relocation',
+      (value) => {
+        value.constraints[0]!.currentAssertion = {
+          assertion: value.constraints[0]!.assertion,
+          reason: 'reviewed relocation fixture',
+          source: 'src/example.browser.spec.ts',
+        }
+      },
+    ],
   ]
   for (const [name, mutate] of invalid) {
     const value = valid()
@@ -682,6 +713,28 @@ function runFixtures(ledger: Ledger): void {
     'it.each([1])(`case ${value}`, () => { expect(source).toContain("a") })',
   )
   requireCondition(template[0]!.scenario === '`case ${value}`', 'AST template title fixture')
+  const polled = collectAssertions(
+    'src/example.browser.spec.ts',
+    'it("layout", async () => { await expect.poll(() => layout(2)).toBeUndefined() })',
+  )
+  requireCondition(
+    polled.length === 1 && polled[0]!.scenario === 'layout',
+    'AST polled browser assertion fixture',
+  )
+  const relocatedAssertion = {
+    ...ledger.constraints[0]!,
+    currentAssertion: {
+      source: polled[0]!.source,
+      scenario: polled[0]!.scenario,
+      assertion: polled[0]!.assertion,
+      reason: 'reviewed observable layout relocation',
+    },
+  }
+  requireCondition(
+    mappedAssertionId(relocatedAssertion) === polled[0]!.id &&
+      hasCurrentAssertion(relocatedAssertion, new Map([[polled[0]!.source, polled]])),
+    'reviewed observable source/scenario relocation resolves the exact matcher',
+  )
   const mapping = {
     ...ledger.generatedMapping,
     measuredFileCount: 1,
@@ -734,6 +787,22 @@ function runFixtures(ledger: Ledger): void {
     }) === 'src/shared/retired.spec.ts',
     'ordinary relocation must still project the original matcher identity',
   )
+  requireCondition(
+    canonicalSource('src/features/example/ui/example.unit.spec.ts', {
+      ...ledger,
+      pathMappings: [
+        {
+          source: 'src/features/example/components/example.unit.spec.ts',
+          target: 'src/features/example/ui/example.unit.spec.ts',
+          phase: 'P2',
+          owner: 'fixture',
+          requirement: 'exact relocation',
+          status: 'done',
+        },
+      ],
+    }) === 'src/features/example/components/example.unit.spec.ts',
+    'exact feature relocation preserves frozen matcher identity',
+  )
   const pending = valid()
   const pendingRetirement = pending.constraints.find(
     (row) => row.disposition === 'retire' && row.phase === 'P1b',
@@ -769,26 +838,118 @@ function runFixtures(ledger: Ledger): void {
   const existingEvidence = ledger.behaviors.find(
     (row) => row.status === 'verified' && row.evidence.every(hasAssertionEvidence),
   )!.evidence
-  for (const row of [...completed.constraints, ...(completed.supplementalConstraints ?? [])]) {
-    if (row.disposition !== 'retire' || !['P1a', 'P1b'].includes(row.phase ?? '')) continue
-    row.retirementStatus = 'retired'
-    row.replacement = {
-      ...row.replacement,
-      status: 'verified',
-      evidence: existingEvidence,
-      verifiedRun: 'synthetic phase-gate positive fixture',
+  function completeFixturePhase(value: Ledger, phases: string[], verifiedRun: string) {
+    for (const row of [...value.constraints, ...(value.supplementalConstraints ?? [])]) {
+      if (row.disposition !== 'retire' || !phases.includes(row.phase ?? '')) continue
+      row.retirementStatus = 'retired'
+      row.replacement = {
+        ...row.replacement,
+        status: 'verified',
+        evidence: existingEvidence,
+        verifiedRun,
+      }
+    }
+    for (const row of value.behaviors.filter((row) => phases.includes(row.phase))) {
+      row.status = 'verified'
+      row.evidence = existingEvidence
+      row.verifiedRun = verifiedRun
     }
   }
-  for (const row of completed.behaviors.filter((row) => ['P1a', 'P1b'].includes(row.phase))) {
-    row.status = 'verified'
-    row.evidence = existingEvidence
-    row.verifiedRun = 'synthetic phase-gate positive fixture'
-  }
+  completeFixturePhase(completed, ['P1a', 'P1b'], 'synthetic phase-gate positive fixture')
   requireCondition(
     phaseAcceptanceFailures(completed, new Map()).length === 0,
     'P1 completed retirement/replacement/behavior positive fixture',
   )
-  console.log(`Frontend migration ledger fixtures passed (${invalid.length + 14} cases).`)
+  const p2Completed = structuredClone(completed)
+  completeFixturePhase(p2Completed, ['P2'], 'synthetic P2 phase-gate positive fixture')
+  requireCondition(
+    phaseAcceptanceFailures(p2Completed, new Map(), 'P2').length === 0,
+    'P2 accepts completed scopes while future phases remain pending',
+  )
+  const p2Invalid: Array<
+    [string, (value: Ledger, sources: Map<string, Assertion[]>) => void, string]
+  > = [
+    [
+      'pending retirement',
+      (value) => {
+        value.constraints.find(
+          (row) => row.disposition === 'retire' && row.phase === 'P2',
+        )!.retirementStatus = 'not-started'
+      },
+      'retirement pending',
+    ],
+    [
+      'unverified replacement',
+      (value) => {
+        value.constraints.find(
+          (row) => row.disposition === 'retire' && row.phase === 'P2',
+        )!.replacement.status = 'not-implemented'
+      },
+      'replacement evidence pending',
+    ],
+    [
+      'original matcher',
+      (value, sources) => {
+        const row = value.constraints.find(
+          (row) => row.disposition === 'retire' && row.phase === 'P2',
+        )!
+        sources.set(row.source, [{ ...row, id: mappedAssertionId(row) }])
+      },
+      'matcher still present',
+    ],
+    [
+      'reviewed relocated original matcher',
+      (value, sources) => {
+        const row = value.constraints.find(
+          (row) => row.disposition === 'retire' && row.phase === 'P2',
+        )!
+        row.currentAssertion = {
+          source: polled[0]!.source,
+          scenario: polled[0]!.scenario,
+          assertion: polled[0]!.assertion,
+          reason: 'reviewed relocation fixture',
+        }
+        sources.set(polled[0]!.source, [{ ...polled[0]!, id: mappedAssertionId(row) }])
+      },
+      'matcher still present',
+    ],
+    [
+      'nonexistent replacement evidence',
+      (value) => {
+        value.constraints.find(
+          (row) => row.disposition === 'retire' && row.phase === 'P2',
+        )!.replacement.evidence![0]!.source = 'src/nonexistent-evidence.spec.ts'
+      },
+      'replacement evidence pending',
+    ],
+    [
+      'pending behavior',
+      (value) => {
+        value.behaviors.find((row) => row.phase === 'P2')!.status = 'pending'
+      },
+      'behavior verification pending',
+    ],
+    [
+      'nonexistent behavior evidence',
+      (value) => {
+        value.behaviors.find((row) => row.phase === 'P2')!.evidence[0]!.source =
+          'src/nonexistent-evidence.spec.ts'
+      },
+      'behavior verification pending',
+    ],
+  ]
+  for (const [name, mutate, expected] of p2Invalid) {
+    const value = structuredClone(p2Completed)
+    const sources = new Map<string, Assertion[]>()
+    mutate(value, sources)
+    requireCondition(
+      phaseAcceptanceFailures(value, sources, 'P2').some((message) => message.includes(expected)),
+      `P2 rejects ${name}`,
+    )
+  }
+  console.log(
+    `Frontend migration ledger fixtures passed (${invalid.length + 18 + p2Invalid.length} cases).`,
+  )
 }
 function main(): void {
   const markdown = fs.readFileSync(inventoryPath, 'utf8')
@@ -808,17 +969,18 @@ function main(): void {
     `Frontend migration ledger: ${ledger.constraints.length} frozen constraints; R=${retire}, frozen i18n=${frozen}; B=${ledger.behaviors.length}; ${ledger.sharedFileMappings.length} ordinary + ${ledger.generatedMapping.measuredFileCount} generated files mapped; ${ledger.supplementalConstraints?.length ?? 0} supplemental constraints; ${warnings.length} review warnings.`,
   )
   console.log(
-    'Ledger consistency is not phase acceptance. Use --phase=P1 to require completed P1a/P1b retirements, effective replacements and mandatory behaviors.',
+    'Ledger consistency is not phase acceptance. Use --phase=P1 or --phase=P2 to require completed retirements, effective replacements and mandatory behaviors through that phase.',
   )
   const phase = process.argv.find((argument) => argument.startsWith('--phase='))
   requireCondition(
-    phase === undefined || phase === '--phase=P1',
-    'supported acceptance phase is P1',
+    phase === undefined || phase === '--phase=P1' || phase === '--phase=P2',
+    'supported acceptance phases are P1 and P2',
   )
   if (phase) {
-    const failures = phaseAcceptanceFailures(ledger, sources)
+    const acceptedPhase = phase === '--phase=P2' ? 'P2' : 'P1'
+    const failures = phaseAcceptanceFailures(ledger, sources, acceptedPhase)
     for (const failure of failures) console.error(`[migration-ledger:acceptance] ${failure}`)
-    console.log(`P1 acceptance: ${failures.length} unmet requirements.`)
+    console.log(`${acceptedPhase} acceptance: ${failures.length} unmet requirements.`)
     if (failures.length > 0) process.exitCode = 1
   }
   if ((process.argv.includes('--strict') || phase !== undefined) && warnings.length > 0)

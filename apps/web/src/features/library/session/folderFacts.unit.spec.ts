@@ -10,7 +10,7 @@ import {
   libraryAffectedFolderKeysForAsset,
   uniqueLibraryFolderKeys,
 } from './folderFacts'
-import type { WorkspaceLibraryFolder } from '../domain/validators'
+import type { WorkspaceLibraryFolder } from '../core/validators'
 
 const fetchFolders = vi.fn<() => Promise<WorkspaceLibraryFolder[]>>()
 

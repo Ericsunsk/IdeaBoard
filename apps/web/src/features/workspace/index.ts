@@ -22,16 +22,17 @@ export {
   provisionWorkspace,
   workspaceApiUrls,
   workspaceQueryKeys,
-} from './infrastructure/workspaceResource'
+} from './selection/workspaceResource'
 export type {
   PrincipalSummary,
   WorkspaceAccessKind,
   WorkspaceListPage,
   WorkspaceSummary,
-} from './infrastructure/workspaceResource'
+} from './selection/workspaceResource'
 export {
   createWorkspaceSelectionStore,
   getWorkspaceSelectionStore,
+  installWorkspaceSelectionStore,
   localStorageWorkspacePersist,
   memoryWorkspacePersist,
   resetWorkspaceSelectionStore,
@@ -39,10 +40,20 @@ export {
   subscribeWorkspaceSelectionChange,
   toWorkspaceSelectionStatus,
   useWorkspaceSelection,
-} from './infrastructure/workspaceContext'
+} from './selection/workspaceContext'
 export type {
   ProvisionWorkspaceInput,
+  WorkspaceProvisionFn,
+  WorkspaceSelectionPersist,
   WorkspaceSelectionSource,
   WorkspaceSelectionStatus,
   WorkspaceSelectionStore,
-} from './infrastructure/workspaceContext'
+} from './selection/workspaceContext'
+export {
+  getWorkspaceSelectionPort,
+  installWorkspaceSelectionPort,
+  memoryWorkspaceSelectionPersist,
+  resetWorkspaceSelectionPort,
+  useWorkspaceSelectionPort,
+} from './selection/workspaceSelectionPort'
+export type { WorkspaceSelectionPort } from './selection/workspaceSelectionPort'

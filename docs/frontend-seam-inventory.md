@@ -4,13 +4,13 @@ P0 freeze, 2026-10-10. Checkpoint: `70e5758eddad32b588eaf641d1a470848283b0d4`.
 
 This document's schema-validated JSON block is the single source of truth for current/public and future entry contracts. Status changes and consumer rewrites must be reviewed atomically. Planned records are not accepted entries.
 
-- 404 records: 273 active (253 canonical, 20 cascading), 3 planned, 128 retired. P1 relocations preserve legacy exports and declare actual public subpaths; all 109 compatibility shims have one-phase TTL and p1-lane deletion ownership. P1 local acceptance passed: frozen retirement/behavior quotas, full dual Knip, strict P1 graph/surface/ledger and final verification are green; CI/checkpoint evidence remains unset.
+- 407 records: 275 active (254 canonical, 21 cascading), 3 planned, 129 retired. P1 relocations preserve legacy exports and declare actual public subpaths; all 109 P1 compatibility shims have one-phase TTL and p1-lane deletion ownership. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
 - Hypothetical API/theme root wrappers are replaced by direct public subpaths actually consumed today. CSS/token files move with the theme directory and remain governed by existing token contracts; no runtime barrel is introduced for CSS.
 - Explicit ownership scopes define external edges; nested scopes overlap intentionally and their totals must not be summed. For pure single-file entries ownership is exactly that file. The Board Canvas port owns Board, so private Board reexports do not count as outbound.
 - Frozen targets preserve source export/import behavior. Composite Admin/Canvas/account entries expose explicitly mapped exports and redirect the frozen external source consumers. Internal consumers remain within their owning scope; API/generated paths retain their P1a carve-out.
 - Surface differences remain advisory in the default P0-compatible command; `api:surface:check -- --strict` gates every active surface for P1. Existing surface contracts, missing active entries and cruiser direction errors always block. `lint:dependencies -- --strict --phase=P1` checks the current P1 batch while retaining the full report; omit `--phase` to check every active Seam.
 
-P1 corrections transpose the frozen HEAD consumer/outbound edges through reviewed relocations. The four generated barrels keep their declared index-only ownership: their targets use the original index-file edges (7/159/11/236), correcting the P0 planned directory projection. The reviewed deltas cover identity reset, split route policy, service labels and locale/theme specs, including the five exact runtime imports in serviceLocale.contract.spec.ts that verify all eight service labels in four locales. Legacy shim targets expose unchanged exports; `core/auth/routePolicy.ts` adds the reviewed pure security-policy seam. Future planned and retired records preserve their historical contracts.
+P1 corrections transpose the frozen HEAD consumer/outbound edges through reviewed relocations. The four generated barrels keep their declared index-only ownership: their targets use the original index-file edges (7/159/11/236), correcting the P0 planned directory projection. The reviewed deltas cover identity reset, split route policy, service labels and locale/theme specs, including the five exact runtime imports in serviceLocale.contract.spec.ts that verify all eight service labels in four locales. Legacy shim targets expose unchanged exports; `core/auth/routePolicy.ts` adds the reviewed pure security-policy seam. P2 adds the three exact runtime imports in `legal/routePreservation.contract.spec.ts` to the Legal contacts, links, and route-path contracts; external tests remain visible in fan-in. Future planned and retired records preserve their historical contracts.
 
 ## Schema
 
@@ -97,7 +97,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
         },
@@ -107,12 +107,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
         },
@@ -370,7 +370,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -385,12 +385,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -16687,7 +16687,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         }
@@ -18397,7 +18397,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/user/user.ts",
           "kind": "runtime"
         }
@@ -19239,12 +19239,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         }
@@ -20050,7 +20050,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/workspaces/workspaces.ts",
           "kind": "runtime"
         }
@@ -20393,7 +20393,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -20633,12 +20633,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -20860,7 +20860,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
         },
@@ -22365,7 +22365,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -22516,7 +22516,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
         }
@@ -22755,7 +22755,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         }
@@ -24100,7 +24100,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/core/components/IbFormField.vue",
           "kind": "runtime"
         },
@@ -24426,7 +24426,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
@@ -24651,17 +24651,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -25407,12 +25407,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/composables/useUserConfirmDialog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/confirmations.ts",
+          "from": "src/features/library/ui/confirmations.ts",
           "to": "src/core/composables/useUserConfirmDialog.ts",
           "kind": "type-only"
         },
@@ -25530,12 +25530,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -25666,12 +25666,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -25978,27 +25978,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/folderFacts.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/domain/transfer.ts",
+          "from": "src/features/library/core/transfer.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/folderFacts.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "type-only"
         },
@@ -26668,22 +26668,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -27445,27 +27445,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/folderFacts.ts",
+          "from": "src/features/library/session/folderFacts.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/confirmations.ts",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/ui/confirmations.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -28431,7 +28431,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderContextMenu.vue",
+          "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
           "to": "src/core/interaction/menuKeyboardNavigation.ts",
           "kind": "runtime"
         },
@@ -29762,7 +29762,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -30077,7 +30077,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -30092,12 +30092,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -30410,7 +30410,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -30952,7 +30952,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
@@ -31266,7 +31266,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -31495,7 +31495,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
@@ -31615,7 +31615,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -45553,14 +45553,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/contacts.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/shared/constants/contacts.shim.ts",
           "to": "src/features/legal/contacts.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": ["src/shared/constants/contacts.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -45637,14 +45642,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/legalLinks.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/shared/constants/legalLinks.shim.ts",
           "to": "src/features/legal/legalLinks.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 4,
       "measuredFanOut": 1,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 1,
       "shims": ["src/shared/constants/legalLinks.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -45688,6 +45698,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/routes/workspaceRoutes.ts",
           "to": "src/features/legal/routePaths.ts",
           "kind": "runtime"
@@ -45698,9 +45713,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
       "shims": ["src/shared/constants/routePaths.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -46107,7 +46122,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "owner": "p2-lane",
       "activationPhase": "pre-P0",
       "scope": "cross-feature",
-      "exportStyle": "explicit (star=0, named=5, decl=0)",
+      "exportStyle": "explicit (star=0, named=7, decl=0)",
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
@@ -46195,10 +46210,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "measuredFanOut": 50,
       "targetFanIn": 16,
       "targetFanOut": 48,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
+      "shims": [
+        "src/features/workspace/infrastructure/workspaceContext.shim.ts"
+      ],
+      "shimTtl": "1 phase — delete after P2",
+      "retirementPhase": "P2",
+      "deletionOwner": "workspace-p2",
       "notes": "workspace feature seam; 16 external importers (board catalog/sync, canvas).",
       "sourcePaths": ["src/features/workspace/index.ts"],
       "targetPath": "src/features/workspace/index.ts",
@@ -46211,6 +46228,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "WorkspaceListPage",
         "WorkspaceNavigation",
         "WorkspaceNavigationAdapter",
+        "WorkspaceProvisionFn",
+        "WorkspaceSelectionPersist",
+        "WorkspaceSelectionPort",
         "WorkspaceSelectionSource",
         "WorkspaceSelectionStatus",
         "WorkspaceSelectionStore",
@@ -46220,20 +46240,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "fetchAllWorkspaces",
         "fetchPrincipal",
         "fetchWorkspacePage",
+        "getWorkspaceSelectionPort",
         "getWorkspaceSelectionStore",
+        "installWorkspaceSelectionPort",
+        "installWorkspaceSelectionStore",
         "localStorageWorkspacePersist",
         "memoryWorkspacePersist",
+        "memoryWorkspaceSelectionPersist",
         "normalizeWorkspaceListParams",
         "parsePrincipal",
         "parseWorkspaceItem",
         "parseWorkspacePage",
         "provisionWorkspace",
+        "resetWorkspaceSelectionPort",
         "resetWorkspaceSelectionStore",
         "resolveWorkspaceSelection",
         "subscribeWorkspaceSelectionChange",
         "toWorkspaceSelectionStatus",
         "useWorkspaceAccountControls",
         "useWorkspaceSelection",
+        "useWorkspaceSelectionPort",
         "workspaceApiUrls",
         "workspaceQueryKeys"
       ],
@@ -46287,6 +46313,120 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/test/factories/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts"
+      ]
+    },
+    {
+      "path": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "workspace-p2",
+      "activationPhase": "P2",
+      "scope": "workspace",
+      "exportStyle": "compat re-export (export * from selection)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/application/accountWorkspace.ts",
+          "to": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase — delete after P2",
+      "retirementPhase": "P2",
+      "deletionOwner": "workspace-p2",
+      "notes": "P2 TTL-governed shim: implementation moved to selection/workspaceContext; retained solely for the cycle-free account consumer. Owned by the canonical workspace entry; do not add importers; delete after P2.",
+      "sourcePaths": [
+        "src/features/workspace/infrastructure/workspaceContext.shim.ts"
+      ],
+      "targetPath": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
+      "ownershipScope": [
+        "src/features/workspace/infrastructure/workspaceContext.shim.ts"
+      ],
+      "publicExports": [
+        "ProvisionWorkspaceInput",
+        "UseWorkspaceSelectionOptions",
+        "WORKSPACE_SELECTION_STORAGE_KEY",
+        "WORKSPACE_URL_PARAM",
+        "WorkspaceProvisionFn",
+        "WorkspaceSelectionPersist",
+        "WorkspaceSelectionSource",
+        "WorkspaceSelectionStatus",
+        "WorkspaceSelectionStore",
+        "asWorkspaceId",
+        "createWorkspaceSelectionStore",
+        "getWorkspaceSelectionStore",
+        "installWorkspaceSelectionStore",
+        "localStorageWorkspacePersist",
+        "memoryWorkspacePersist",
+        "resetWorkspaceSelectionStore",
+        "resolveWorkspaceSelection",
+        "subscribeWorkspaceSelectionChange",
+        "toWorkspaceSelectionStatus",
+        "useWorkspaceSelection"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/workspace/selection/workspaceContext.ts"
+      ]
+    },
+    {
+      "path": "src/features/workspace/infrastructure/workspaceResource.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "retired",
+      "owner": "workspace-p2",
+      "activationPhase": "P2",
+      "scope": "workspace",
+      "exportStyle": "compat re-export (export * from selection)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [],
+      "measuredFanIn": 0,
+      "measuredFanOut": 1,
+      "targetFanIn": 0,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase — delete after P2",
+      "retirementPhase": "P2",
+      "deletionOwner": "workspace-p2",
+      "notes": "P2 redundant wrapper removed: implementation and all consumers already use selection/workspaceResource. Historical source and measurements are retained; no compatibility path is needed.",
+      "sourcePaths": [
+        "src/features/workspace/infrastructure/workspaceResource.ts"
+      ],
+      "targetPath": "src/features/workspace/infrastructure/workspaceResource.ts",
+      "ownershipScope": [
+        "src/features/workspace/infrastructure/workspaceResource.ts"
+      ],
+      "publicExports": [
+        "PrincipalSummary",
+        "WORKSPACE_NAME_MAX_LENGTH",
+        "WORKSPACE_PAGE_SIZE_DEFAULT",
+        "WORKSPACE_PAGE_SIZE_MAX",
+        "WorkspaceAccessKind",
+        "WorkspaceListPage",
+        "WorkspaceRequestOptions",
+        "WorkspaceSummary",
+        "buildWorkspaceCreateHeaders",
+        "classifyWorkspaceAccessError",
+        "fetchAllWorkspaces",
+        "fetchPrincipal",
+        "fetchWorkspacePage",
+        "normalizeWorkspaceListParams",
+        "parsePrincipal",
+        "parseWorkspaceItem",
+        "parseWorkspacePage",
+        "provisionWorkspace",
+        "workspaceApiUrls",
+        "workspaceQueryKeys"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/workspace/selection/workspaceResource.ts"
       ]
     },
     {
@@ -46546,6 +46686,65 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": ["src/core/auth/routePolicy.ts"]
     },
     {
+      "path": "src/features/workspace/selection/workspaceSelectionPort.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "workspace-p2",
+      "activationPhase": "P2",
+      "scope": "cross-feature",
+      "exportStyle": "explicit named exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/workspace/index.ts",
+          "to": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/index.ts",
+          "to": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "to": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "P2 workspace selection port: installed singleton over persisted selection store; consumed via workspace entry; singleton identity verified by contract spec.",
+      "sourcePaths": [
+        "src/features/workspace/selection/workspaceSelectionPort.ts"
+      ],
+      "targetPath": "src/features/workspace/selection/workspaceSelectionPort.ts",
+      "ownershipScope": [
+        "src/features/workspace/selection/workspaceSelectionPort.ts"
+      ],
+      "publicExports": [
+        "WORKSPACE_SELECTION_STORAGE_KEY",
+        "WorkspaceSelectionPort",
+        "getWorkspaceSelectionPort",
+        "installWorkspaceSelectionPort",
+        "memoryWorkspaceSelectionPersist",
+        "resetWorkspaceSelectionPort",
+        "useWorkspaceSelectionPort"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/workspace/selection/workspaceContext.ts",
+        "src/features/workspace/selection/workspaceResource.ts"
+      ]
+    },
+    {
       "path": "src/shared/api/client.ts",
       "kind": "canonical",
       "confidence": "high",
@@ -46567,7 +46766,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/shared/api/client.ts",
           "kind": "type-only"
         },
@@ -46577,12 +46776,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/api/client.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/api/client.ts",
           "kind": "type-only"
         },
@@ -46797,7 +46996,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -46812,12 +47011,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -50406,7 +50605,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
@@ -50741,7 +50940,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/api/generated-query/public/user/user.ts",
           "kind": "runtime"
         },
@@ -50988,12 +51187,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/shared/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/shared/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         },
@@ -51249,7 +51448,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/api/generated-query/public/workspaces/workspaces.ts",
           "kind": "runtime"
         },
@@ -51377,7 +51576,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -51529,12 +51728,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/shared/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/workspace.contract.spec.ts",
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/shared/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -51633,7 +51832,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
         },
@@ -53066,7 +53265,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/shared/components/IbFormField.vue",
           "kind": "runtime"
         },
@@ -53360,7 +53559,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/shared/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
@@ -53599,17 +53798,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -54107,12 +54306,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/shared/composables/useUserConfirmDialog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/confirmations.ts",
+          "from": "src/features/library/ui/confirmations.ts",
           "to": "src/shared/composables/useUserConfirmDialog.ts",
           "kind": "type-only"
         },
@@ -54205,12 +54404,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
@@ -54293,12 +54492,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/shared/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceResource.ts",
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/shared/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -54858,27 +55057,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/folderFacts.ts",
-          "to": "src/shared/domain/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/application/libraryUseCases.ts",
-          "to": "src/shared/domain/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/library/domain/transfer.ts",
+          "from": "src/features/library/core/transfer.ts",
           "to": "src/shared/domain/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/shared/domain/externalImageProviders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/folderFacts.ts",
+          "to": "src/shared/domain/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/shared/domain/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
           "to": "src/shared/domain/externalImageProviders.ts",
           "kind": "type-only"
         },
@@ -55532,22 +55731,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/useLibraryIslandDnD.ts",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -56198,27 +56397,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/folderFacts.ts",
+          "from": "src/features/library/session/folderFacts.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/libraryUseCases.ts",
+          "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/confirmations.ts",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/ui/confirmations.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
@@ -56948,7 +57147,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderContextMenu.vue",
+          "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
           "to": "src/shared/interaction/menuKeyboardNavigation.ts",
           "kind": "runtime"
         }
@@ -57843,7 +58042,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -58069,7 +58268,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/application/useLibraryWorkspace.ts",
+          "from": "src/features/library/session/useLibraryWorkspace.ts",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -58084,12 +58283,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -58198,7 +58397,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/shared/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
@@ -58349,7 +58548,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/shared/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -58422,7 +58621,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/shared/theme/formControls.ts",
           "kind": "runtime"
         },
@@ -58470,7 +58669,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
           "to": "src/shared/theme/lightboxScrim.ts",
           "kind": "runtime"
         },
@@ -58577,7 +58776,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/utils/auth.ts",
           "kind": "runtime"
         },
@@ -58943,7 +59142,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/infrastructure/resource.ts",
+          "from": "src/features/library/session/resource.ts",
           "to": "src/shared/utils/ids.ts",
           "kind": "runtime"
         },
@@ -59163,7 +59362,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/shared/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -59336,7 +59535,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/workspace/infrastructure/workspaceContext.ts",
+          "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
@@ -59408,7 +59607,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/domain/validators.ts",
+          "from": "src/features/library/core/validators.ts",
           "to": "src/shared/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -59592,7 +59791,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFloatingIsland.vue",
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
@@ -59899,7 +60098,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -59980,7 +60179,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/components/LibraryFolderDialogs.vue",
+          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
@@ -60056,7 +60255,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/library/components/LibraryAssetLightbox.vue",
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
           "to": "src/theme/lightboxScrim.ts",
           "kind": "runtime"
         },
@@ -60384,14 +60583,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane       | 6       | 5 → 5                    | 15 → 15                   |
 | `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane       | 7       | 2 → 2                    | 6 → 6                     |
 | `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane       | 34      | 13 → 13                  | 27 → 27                   |
-| `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
 | `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane       | 7       | 0 → 0                    | 3 → 5                     |
-| `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
-| `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane       | 4       | 4 → 4                    | 0 → 0                     |
+| `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane       | 1       | 4 → 4                    | 1 → 1                     |
+| `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane       | 4       | 5 → 5                    | 0 → 0                     |
 | `src/features/library/index.ts`                                                     | canonical | active  | p2-lane       | 69      | 23 → 23                  | 37 → 37                   |
 | `src/features/search/index.ts`                                                      | canonical | active  | p3-lane       | 21      | 2 → 2                    | 40 → 40                   |
-| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 32      | 16 → 16                  | 50 → 48                   |
+| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 41      | 16 → 16                  | 50 → 48                   |
+| `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | active  | workspace-p2  | 20      | 1 → 1                    | 1 → 1                     |
+| `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2  | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane       | 9       | 34 → 34                  | 1 → 1                     |
+| `src/features/workspace/selection/workspaceSelectionPort.ts`                        | canonical | active  | workspace-p2  | 7       | 2 → 2                    | 3 → 3                     |
 | `src/shared/api/client.ts`                                                          | canonical | retired | p1-lane       | 6       | 12 → 12                  | 4 → 4                     |
 | `src/shared/api/contractKernel.ts`                                                  | canonical | retired | p1-lane       | 24      | 40 → 40                  | 2 → 2                     |
 | `src/shared/api/generated-query/control/control-billing/control-billing.ts`         | canonical | retired | p1-lane       | 56      | 3 → 3                    | 4 → 4                     |

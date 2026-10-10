@@ -19,7 +19,7 @@ import { type ExternalImageProvider } from '../../../core/contracts/externalImag
 // - Asset save is idempotent on `(workspace, provider, source_id)`.
 // - Materialization runs internal-only on the backend (no public job
 //   routes); Canvas resolves managed media through the shared workspace
-//   media delivery boundary (see `../application/libraryUseCases`).
+//   media delivery boundary (see `./libraryUseCases`).
 
 import {
   createWorkspaceLibraryFolder as createWorkspaceLibraryFolderTransport,
@@ -49,7 +49,7 @@ import {
   type WorkspaceLibraryFolder,
   type WorkspaceLibraryPage,
   type WorkspaceLibraryResolveResult,
-} from '../domain/validators'
+} from '../core/validators'
 
 export type WorkspaceLibraryRequestOptions = {
   requestId?: string | undefined

@@ -1,7 +1,7 @@
 import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
 import { i18n } from '../../../core/i18n'
-import { libraryAssetKey, type WorkspaceLibraryFolder } from '../domain/validators'
+import { libraryAssetKey, type WorkspaceLibraryFolder } from '../core/validators'
 
 export type LibraryFolderView = WorkspaceLibraryFolder
 

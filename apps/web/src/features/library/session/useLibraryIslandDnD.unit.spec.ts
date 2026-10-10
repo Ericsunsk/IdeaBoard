@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useLibraryIslandDnD } from './useLibraryIslandDnD'
-import { writeLibraryFolderMoveTransfer, writeSearchReferenceTransfer } from '../domain/transfer'
+import { writeLibraryFolderMoveTransfer, writeSearchReferenceTransfer } from '../core/transfer'
 
 const mocks = vi.hoisted(() => ({
   saveReference: vi.fn(),
@@ -17,8 +17,8 @@ vi.mock('vue-i18n', async (importOriginal) => {
   return { ...actual, useI18n: () => ({ t: (key: string) => key }) }
 })
 
-vi.mock('../application/libraryUseCases', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../application/libraryUseCases')>()
+vi.mock('./libraryUseCases', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./libraryUseCases')>()
   return { ...actual, saveWorkspaceSearchReference: mocks.saveReference }
 })
 

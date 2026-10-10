@@ -318,22 +318,22 @@ const fixtureCases: BoundaryFixtureCase[] = [
     ],
   },
   {
-    name: 'prohibits cross-feature deep imports into workspace infrastructure',
+    name: 'prohibits cross-feature deep imports into workspace selection',
     expectedRule: 'no-cross-feature-deep-imports',
     files: [
       {
         filePath: 'src/features/admin/boundary-workspace-deep.fixture.ts',
-        content: `import { getWorkspaceSelectionStore } from '{target:src/features/workspace/infrastructure/workspaceContext}'; console.log(getWorkspaceSelectionStore);`,
+        content: `import { getWorkspaceSelectionStore } from '{target:src/features/workspace/selection/workspaceContext}'; console.log(getWorkspaceSelectionStore);`,
       },
     ],
   },
   {
-    name: 'prohibits cross-feature deep imports into library components',
+    name: 'prohibits cross-feature deep imports into library ui',
     expectedRule: 'no-cross-feature-deep-imports',
     files: [
       {
         filePath: 'src/features/search/boundary-library-deep.fixture.ts',
-        content: `import LibraryFloatingIsland from '{target:src/features/library/components/LibraryFloatingIsland.vue}'; console.log(LibraryFloatingIsland);`,
+        content: `import LibraryFloatingIsland from '{target:src/features/library/ui/LibraryFloatingIsland.vue}'; console.log(LibraryFloatingIsland);`,
       },
     ],
   },
