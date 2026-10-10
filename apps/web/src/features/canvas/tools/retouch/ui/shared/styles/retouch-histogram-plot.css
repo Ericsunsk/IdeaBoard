@@ -1,0 +1,91 @@
+@import './retouch-plot-frame.css';
+
+/*
+ * Histogram marker + range-input rules only. Frame, histogram wash, and grid
+ * strokes live in the shared plot-frame contract above.
+ */
+
+.retouch-histogram-plot__guide-line {
+  stroke: var(--canvas-accent-strong);
+  stroke-width: var(--retouch-panel-border-width, 1px);
+  opacity: 0.66;
+  shape-rendering: crispEdges;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.retouch-histogram-plot__marker {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: calc(var(--retouch-histogram-marker-size, 12px) * -0.36);
+  box-sizing: border-box;
+  /*
+   * The painted dot (::after) stays 11px and centred, but the transparent
+   * button box is 24px wide so the grab target reaches the WCAG 2.2 AA floor.
+   * Both pseudos already paint the marker, so a hit-area overlay has nowhere
+   * to live; growing the transparent box is the only route that keeps the dot
+   * exactly where it was.
+   */
+  width: var(--spacing-touch-target-aa);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  transform: translateX(-50%);
+}
+
+.retouch-histogram-plot__range-input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.retouch-histogram-plot__marker::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: var(--retouch-histogram-marker-size, 12px);
+  width: var(--retouch-panel-border-width, 1px);
+  background: var(--canvas-accent-strong);
+  opacity: 0.66;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.retouch-histogram-plot__marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  box-sizing: border-box;
+  width: var(--retouch-histogram-marker-size, 12px);
+  height: var(--retouch-histogram-marker-size, 12px);
+  border: var(--retouch-panel-border-width, 1px) solid var(--canvas-accent-strong);
+  border-radius: var(--radius-pill);
+  /* Paper-white instrument dot shared with curve points (see control-points). */
+  background: var(--retouch-control-point-bg, #ffffff);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.retouch-histogram-plot__marker:focus-visible {
+  outline: none;
+}
+
+.retouch-histogram-plot__marker:focus-visible::after {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline-color, var(--canvas-accent));
+  outline-offset: 2px;
+}
+
+.retouch-histogram-plot__range-input:focus-visible + .retouch-histogram-plot__marker--range::after {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline-color, var(--canvas-accent));
+  outline-offset: 2px;
+}

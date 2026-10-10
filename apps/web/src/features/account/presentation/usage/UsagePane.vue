@@ -145,7 +145,7 @@ import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { useUsage } from '../../application/usage/useUsage'
 import { DEFAULT_USAGE_RANGE, type UsageRange } from '../../infrastructure'
 import { buildUsageTrendChart, createUsageChartPlugins, resolveUsageChartTheme } from '../../domain'
-import AccountPane from '../common/AccountPane.vue'
+import AccountPane from '../shared/AccountPane.vue'
 
 const props = defineProps<{ active: boolean }>()
 const { t, locale } = useI18n()

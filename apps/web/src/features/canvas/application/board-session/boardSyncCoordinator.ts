@@ -4,9 +4,13 @@ import {
   InvalidBoardStateError,
   type BoardSnapshot,
 } from '../../../board/ports/canvas'
-import type { BoardSession } from './useBoardSession'
+import {
+  BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
+  BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
+  type BoardSession,
+} from './useBoardSession'
 import { i18n } from '../../../../shared/i18n'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { userErrorCode, userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import {
   measureCanvasPerf,
   measureCanvasPerfAsync,
@@ -72,6 +76,23 @@ function isRecoverableSaveStatus(status: SaveStatus): boolean {
   return (
     status === 'retry' || status === 'conflict' || status === 'recover' || status === 'archived'
   )
+}
+
+/**
+ * Fallback workspace-missing detector for errors that bypassed the
+ * useBoardSession tagging (name-based: the typed error lives in board
+ * infrastructure, which canvas only reaches through the board port).
+ */
+function hasWorkspaceUnavailableInCauseChain(error: unknown): boolean {
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    const record = current as { name?: unknown; cause?: unknown }
+    if (record.name === 'BoardWorkspaceUnavailableError') return true
+    current = record.cause
+  }
+  return false
 }
 
 export function createBoardSyncCoordinator(
@@ -225,6 +246,25 @@ export function createBoardSyncCoordinator(
     // Classify the failure so the toast names the cause instead of blaming
     // the network for everything: only status-less errors (offline/timeout)
     // keep the network-recovery copy.
+    //
+    // Status-less local failures carry machine codes (see useBoardSession):
+    // auth-unavailable (session not ready) and workspace-unavailable (no
+    // workspace selected) both saved locally first and must never use the
+    // network-recovery copy.
+    const code = userErrorCode(error)
+    if (code === BOARD_SESSION_AUTH_UNAVAILABLE_CODE) {
+      console.info('[canvas] save skipped remote sync: auth unavailable')
+      options.onError(i18n.global.t('canvas.session.saveAuthUnavailable'))
+      return
+    }
+    if (
+      code === BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE ||
+      hasWorkspaceUnavailableInCauseChain(error)
+    ) {
+      console.info('[canvas] save skipped remote sync: workspace unavailable')
+      options.onError(i18n.global.t('workspace.feedback.noWorkspaceSelected'))
+      return
+    }
     const status =
       typeof (error as { status?: unknown } | null)?.status === 'number'
         ? ((error as { status?: number }).status as number)

@@ -2,12 +2,19 @@
  * Single owner for module-direction rules: no-circular,
  * shared-not-to-features, route-pages-no-direct-generated-query,
  * features-admin-no-public-client, non-admin-no-control-client,
- * no-cross-feature-deep-imports.
+ * no-cross-feature-deep-imports, canvas-tool-core-no-zone-imports,
+ * no-cross-tool-deep-imports.
  *
  * File-local Overlay adapter conventions live in eslint.config.js
  * (no-restricted-imports) and are smoke-tested by
  * scripts/checkEslintImportBoundaries.ts. Do not mirror direction
  * rules in both systems.
+ *
+ * Bare framework modules (`vue`, `vue-router`, `pinia`, `@tanstack/*`,
+ * network clients) inside tool `core/` zones are owned by the colocated
+ * purity spec (`features/canvas/domain/canvasDomainPurity.unit.spec.ts`),
+ * which can see specifiers dependency-cruiser only resolves to node_modules.
+ * Do not mirror them here either.
  *
  * @type {import('dependency-cruiser').IConfiguration}
  */
@@ -156,6 +163,59 @@ module.exports = {
       to: {
         path: '^src/features/search/',
         pathNot: '^src/features/search/index\\.ts$',
+      },
+    },
+    {
+      name: 'canvas-tool-core-no-zone-imports',
+      severity: 'error',
+      comment:
+        'ADR-0013: tool core/ zones are pure math and types. session/ and ui/ may import core/, never the reverse; core/ also stays clear of the legacy image-tools flat, canvas application/infrastructure/presentation layers, library/search features, and generated-query DTOs. (Cross-scope encapsulation is owned by no-cross-tool-deep-imports; bare framework modules are owned by canvasDomainPurity.)',
+      from: {
+        path: '^src/features/canvas/tools/[^/]+/core(?:/|$)',
+      },
+      to: {
+        path: '^src/features/canvas/tools/[^/]+/(?:session|ui)(?:/|$)|^src/features/canvas/tools/image-tools(?:/|$)|^src/features/canvas/(?:application|infrastructure|presentation)(?:/|$)|^src/features/(?:library|search)(?:/|$)|^src/shared/api/generated-query(?:/|$)',
+      },
+    },
+    {
+      name: 'canvas-tool-core-no-i18n-runtime',
+      severity: 'error',
+      comment:
+        'ADR-0013: core sources carry locale-free label keys; only the pure localeCore constants/types may be imported from shared/i18n. Colocated specs may verify display-copy parity.',
+      from: {
+        path: '^src/features/canvas/tools/[^/]+/core(?:/|$)',
+        pathNot: '\\.spec\\.ts$',
+      },
+      to: {
+        path: '^src/shared/i18n(?:$|/(?!localeCore\\.ts$))',
+      },
+    },
+    {
+      name: 'no-cross-tool-deep-imports',
+      severity: 'error',
+      comment:
+        'ADR-0013: every consumer outside retouch must go through its index.ts seam; session, core, and ui internals are private. The image-tools consumer exclusion is migration debt, not a pattern: image-tools is the unmigrated legacy flat scope with no index seam yet (no flag-day rewrite), so its pre-existing deep imports are grandfathered until its own migration. Do not extend this exclusion to any other scope. (Issue: frontend SaaS three-zone migration)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/canvas/tools/(?:retouch|image-tools)(?:/|$)',
+      },
+      to: {
+        path: '^src/features/canvas/tools/retouch/',
+        pathNot: '^src/features/canvas/tools/retouch/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-tool-deep-imports',
+      severity: 'error',
+      comment:
+        'ADR-0013: every consumer outside inpaint must go through its index.ts seam; session, core, and ui internals are private. The image-tools consumer exclusion is migration debt, not a pattern: image-tools is the unmigrated legacy flat scope with no index seam yet (no flag-day rewrite), so its pre-existing deep imports are grandfathered until its own migration. Do not extend this exclusion to any other scope. (Issue: frontend SaaS three-zone migration)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/canvas/tools/(?:inpaint|image-tools)(?:/|$)',
+      },
+      to: {
+        path: '^src/features/canvas/tools/inpaint/',
+        pathNot: '^src/features/canvas/tools/inpaint/index\\.ts$',
       },
     },
   ],

@@ -93,13 +93,6 @@ import { MONITOR_MESSAGES } from '../pages/messages'
 
 const props = defineProps<{
   searchKeyword: string
-  /**
-   * @deprecated reka `Select` owns its own open state. `AdminMonitorPage` still
-   * binds `v-model:time-range-popover-open` to this pair; dropping it means
-   * touching `useMonitorTimeline` and the page as well, which is out of scope
-   * here, so the contract is kept inert rather than deleted mid-refactor.
-   */
-  timeRangePopoverOpen: boolean
   selectedPreset: TimeRangePreset
   selectedTimeRangeKey: TimeRangePresetKey
   timeRangePresets: readonly TimeRangePreset[]
@@ -107,8 +100,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:searchKeyword': [value: string]
-  /** @deprecated See `timeRangePopoverOpen`; the dropdown no longer reports open state. */
-  'update:timeRangePopoverOpen': [value: boolean]
   search: []
   liveRefresh: []
   selectTimeRange: [key: TimeRangePresetKey]

@@ -21,7 +21,7 @@
     @redo-mask="chromeCommands.redoMask"
     @submit="chromeCommands.submitMaskPrompt"
   />
-  <Chrome
+  <RetouchChrome
     v-if="
       chromeModel.nodeId &&
       chromeModel.mode === 'adjust' &&
@@ -34,6 +34,7 @@
     :selected-effect-layer="chromeModel.editor.selectedEffectLayer"
     :histogram-source="chromeModel.editor.histogramSource"
     :applying-retouch="chromeModel.editor.applyingRetouch"
+    :can-apply="chromeModel.editor.canApply"
     @select-retouch="chromeCommands.selectEffectLayer"
     @select-layer="chromeCommands.selectEditorLayer"
     @set-layer-visible="chromeCommands.setEditorLayerVisible"
@@ -49,7 +50,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Chrome } from '../../retouch'
+import { RetouchChrome } from '../../retouch'
 import { ImageInpaintChrome } from '../../inpaint'
 import type { ImageToolPresentationBinding } from '../bindings'
 

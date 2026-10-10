@@ -1,2 +1,6 @@
-export { default as ImageInpaintChrome } from './components/ImageInpaintChrome.vue'
-export { default as ImageInpaintOverlay } from './components/ImageInpaintOverlay.vue'
+export { default as ImageInpaintChrome } from './ui/ImageInpaintChrome.vue'
+export { default as ImageInpaintOverlay } from './ui/ImageInpaintOverlay.vue'
+export type { ImageMaskDrawMode } from './core/model.ts'
+export { useImageInpaintOverlay } from './session/useImageInpaintOverlay.ts'
+export { useInpaintChromeActions } from './session/useInpaintChromeActions.ts'
+export { useInpaintChromeState } from './session/useInpaintChromeState.ts'

@@ -8,7 +8,7 @@ import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import { useUserStore } from '../../../auth'
 import { makeSessionUser } from '../../../../test/factories'
 import { HOME_PATH } from '../../../../shared/constants/routePaths'
-import { accountTabRegistry, type AccountTab } from '../common/tabRegistry'
+import { accountTabRegistry, type AccountTab } from '../shared/tabRegistry'
 import AccountDialogContent from './AccountDialogContent.vue'
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())

@@ -1,0 +1,101 @@
+@import './retouch-control-points.css';
+
+.retouch-threshold-control,
+.retouch-levels-control {
+  /* Frame radius lives in the shared plot-frame contract; markers stay 12px. */
+  --retouch-histogram-marker-size: 12px;
+  --retouch-levels-output-range-gradient: var(--editing-controls-tonal-range-gradient);
+}
+
+.retouch-threshold-control .retouch-histogram-plot,
+.retouch-levels-control .retouch-histogram-plot {
+  background: transparent;
+}
+
+.retouch-threshold-control .retouch-histogram-plot__grid,
+.retouch-levels-control .retouch-histogram-plot__grid {
+  display: none;
+}
+
+.retouch-threshold-control .retouch-histogram-plot__guide-line.is-threshold,
+.retouch-levels-control .retouch-histogram-plot__guide-line {
+  stroke: var(--canvas-accent-outline);
+  opacity: 1;
+}
+
+.retouch-threshold-fields {
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.retouch-levels-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.retouch-levels-fields .editing-controls-field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.retouch-levels-output {
+  display: grid;
+  gap: 5px;
+}
+
+.retouch-levels-output__header {
+  display: block;
+}
+
+.retouch-levels-output__fields {
+  grid-template-columns: repeat(2, minmax(0, 56px));
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.retouch-levels-output__field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.retouch-levels-output__slider {
+  --editing-two-handle-slider-track-background: var(--retouch-levels-output-range-gradient);
+  --editing-two-handle-slider-handle-color: var(--canvas-accent);
+}
+
+/*
+ * Threshold (single `is-threshold`) and Levels (three markers) share one marker
+ * treatment. The container pair folds into `:where()` so it adds zero
+ * specificity; the trailing marker selector keeps its class specificity so
+ * these rules still beat the base plot marker by source order. Broadening the
+ * threshold branch (dropping `.is-threshold`) is behavior-preserving: the
+ * threshold plot renders exactly one marker and it always carries that class.
+ */
+:where(.retouch-threshold-control, .retouch-levels-control) .retouch-histogram-plot__marker {
+  bottom: 0;
+  width: var(--retouch-control-point-size);
+}
+
+:where(.retouch-threshold-control, .retouch-levels-control)
+  .retouch-histogram-plot__marker::before {
+  display: none;
+}
+
+:where(.retouch-threshold-control, .retouch-levels-control) .retouch-histogram-plot__marker::after {
+  bottom: 0;
+  width: var(--retouch-control-point-size);
+  height: var(--retouch-control-point-size);
+  border: var(--retouch-control-point-border-width) solid var(--retouch-control-point-border-color);
+  background: var(--retouch-control-point-bg);
+  transform: translate(-50%, 50%);
+}
+
+:where(.retouch-threshold-control, .retouch-levels-control)
+  .retouch-histogram-plot__marker.active::after {
+  border: 0;
+  background: var(--retouch-control-point-active-bg);
+}
+
+/*
+ * Markers stay uniform on the shared control-point treatment above: the plot
+ * stem (::before) is hidden, so per-channel stem/dot colors would never
+ * render. Those dead per-channel `::before`/`::after` rules and the
+ * levels-only `::after` override were removed; dots keep the single
+ * `--retouch-control-point-border-color` from the shared rule.
+ */

@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
+	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
@@ -124,8 +125,11 @@ type V1UserDirectory interface {
 
 // V1AvatarProfileDirectory owns the persisted avatar projection, independent of session principals.
 type V1AvatarProfileDirectory interface {
-	GetUserAvatar(ctx context.Context, userID int64) (string, error)
 	UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error
+	// GetUserByID projects the stored user row for session reads
+	// (storage namespace, status, timestamps, avatar). It reuses the
+	// existing users.GetByID query; no new query or migration is needed.
+	GetUserByID(ctx context.Context, userID int64) (*identitydomain.User, error)
 }
 
 func NewV1AvatarProfileDirectory(repo identityports.UserRepository) V1AvatarProfileDirectory {
@@ -166,22 +170,18 @@ func (d usersRepositoryDirectory) GetUserPublicID(ctx context.Context, userID in
 	return user.PublicID, nil
 }
 
-func (d usersRepositoryDirectory) GetUserAvatar(ctx context.Context, userID int64) (string, error) {
-	if d.repo == nil || userID <= 0 {
-		return "", tenancy.ErrNotFound
-	}
-	user, err := d.repo.GetByID(ctx, userID)
-	if err != nil || user == nil {
-		return "", tenancy.ErrNotFound
-	}
-	return strings.TrimSpace(user.Avatar), nil
-}
-
 func (d usersRepositoryDirectory) UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error {
 	if d.repo == nil || userID <= 0 {
 		return tenancy.ErrNotFound
 	}
 	return d.repo.UpdateAvatarByID(ctx, userID, avatar)
+}
+
+func (d usersRepositoryDirectory) GetUserByID(ctx context.Context, userID int64) (*identitydomain.User, error) {
+	if d.repo == nil || userID <= 0 {
+		return nil, tenancy.ErrNotFound
+	}
+	return d.repo.GetByID(ctx, userID)
 }
 
 func (d *ContractV1Deps) normalize() {
@@ -362,6 +362,13 @@ type v1UserDTO struct {
 	Role                string  `json:"role"`
 	PersonalWorkspaceID *string `json:"personal_workspace_id,omitempty"`
 	Avatar              string  `json:"avatar,omitempty"`
+	// StorageNamespace is users.storage_uid (Media namespace display).
+	StorageNamespace string `json:"storage_namespace,omitempty"`
+	CreatedAt        string `json:"created_at,omitempty"`
+	UpdatedAt        string `json:"updated_at,omitempty"`
+	// Status is the numeric user status (0 = banned). It is never
+	// omitted: omitempty would drop the banned zero value.
+	Status int16 `json:"status"`
 }
 
 func (h *contractV1Handler) getUser(c *gin.Context) {
@@ -373,15 +380,23 @@ func (h *contractV1Handler) getUser(c *gin.Context) {
 		ID:          tenancy.FormatUserPublicID(identityPrincipal.PublicID()),
 		DisplayName: identityPrincipal.DisplayName(),
 		Role:        identityPrincipal.Role().String(),
+		// The principal only exists for active sessions, so the
+		// profile-less fallback (AvatarProfile nil in tests) reports
+		// active rather than the banned zero value.
+		Status: identitydomain.StatusActive,
 	}
 	if h.deps.AvatarProfile != nil {
-		avatar, err := h.deps.AvatarProfile.GetUserAvatar(c.Request.Context(), identityPrincipal.UserID())
-		if err != nil {
+		profile, err := h.deps.AvatarProfile.GetUserByID(c.Request.Context(), identityPrincipal.UserID())
+		if err != nil || profile == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
 			c.Abort()
 			return
 		}
-		dto.Avatar = strings.TrimSpace(avatar)
+		dto.Avatar = strings.TrimSpace(profile.Avatar)
+		dto.StorageNamespace = strings.TrimSpace(profile.StorageUID)
+		dto.CreatedAt = v1FormatTime(profile.CreatedAt)
+		dto.UpdatedAt = v1FormatTime(profile.UpdatedAt)
+		dto.Status = profile.Status
 	}
 	// Personal workspace auto-provision hook: idempotent and
 	// concurrent-safe; a provision failure never fails /user itself.

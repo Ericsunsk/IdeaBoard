@@ -50,7 +50,7 @@ import {
 } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { defaultAccountTab, type AccountTab, type PaymentReturnContext } from '../../domain'
 import AccountDialogContent from './AccountDialogContent.vue'
-import { accountDialogContentClass } from '../common/ui'
+import { accountDialogContentClass } from '../shared/ui'
 
 const props = withDefaults(
   defineProps<{

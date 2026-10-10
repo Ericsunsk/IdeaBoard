@@ -45,6 +45,7 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - Canvas saves are transactionally consistent snapshots; image refs must first persist to `mediaAssetId`.
 - Sync writes must carry `revision`; conflicts follow domain rollback/reconcile policy, never silent last-write-wins.
 - Schema evolution keeps load-migration functions for historic versions (e.g. `latestBoardState.ts`); never break old board data in place.
+- `retouchStack` has been fully removed with no migration: historical boards containing that field can no longer be opened (explicit user decision).
 - Protected contracts (persisted schema, API semantics, storage keys, route URLs, serialization semantics) live in `docs/architecture/frontend-contract-inventory.md`; no silent changes during restructuring.
 - Never store a Vue Flow runtime instance as the document; never send dirty objects with runtime UI state to the backend.
 - Never pass bare JSON across processes without a revision/version envelope.

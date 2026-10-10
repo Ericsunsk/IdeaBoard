@@ -1,6 +1,6 @@
 # Frontend bounded-context and DDD reorganization
 
-Status: Accepted  
+Status: Accepted (frontend layering partially superseded by ADR-0013 for tool scopes)
 Owner: Frontend Architecture  
 Decision date: 2026-09-10  
 Affected contexts: `board`, `canvas`, `workspace`, `account`, `admin`, `auth`, `search`, `library`, `legal`, `public-site`

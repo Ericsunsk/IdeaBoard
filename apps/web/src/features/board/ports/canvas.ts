@@ -78,7 +78,6 @@ export {
   type ImageNodeOutputItem,
   type ImageRetouchRecipe,
   type ImageRetouchRecipeStep,
-  type ImageRetouchStack,
   type LibraryImportFact,
   type PromptAspectRatio,
   type PromptNodeInputImage,

@@ -8,13 +8,15 @@ import type {
   CanvasVueFlowConnectionAdapter,
 } from '../../infrastructure/vue-flow-adapter'
 import type { CanvasNodeItem } from '../../../board/ports/canvas'
-import { useRetouchMode } from '../retouch/useRetouchMode'
-import { useRetouchSession } from '../retouch/useRetouchSession'
-import { useRetouchCoordinateAdapter } from '../retouch'
-import { cancelImageRetouchFinalRender } from '../retouch/rendering/renderer'
-import type { RetouchMode } from '../retouch/model.ts'
-import { useImageInpaintOverlay } from '../inpaint/useImageInpaintOverlay'
-import { useInpaintChromeState } from '../inpaint/useInpaintChromeState'
+import {
+  cancelImageRetouchFinalRender,
+  useRetouchCoordinateAdapter,
+  useRetouchMode,
+  useRetouchSession,
+} from '../retouch'
+import type { RetouchMode } from '../retouch'
+import { useImageInpaintOverlay } from '../inpaint'
+import { useInpaintChromeState } from '../inpaint'
 import type { ImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import type { CanvasFeedback } from '../../application/workspace/useCanvasFeedback.ts'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
@@ -64,33 +66,42 @@ export type UseCanvasImageToolsOptions = {
   feedback: CanvasImageToolsFeedback
 } & CanvasFlowViewportControls
 
+export type ImageToolSessionBoardCapabilities = Pick<
+  UseCanvasImageToolsOptions,
+  | 'currentBoardId'
+  | 'getImageNodeDisplayPayload'
+  | 'getImageNodeSnapshot'
+  | 'getImageStageElement'
+  | 'updateSnapshotNode'
+  | 'createPendingRetouchNode'
+  | 'applyImageFileToImageNode'
+  | 'removeNode'
+> & {
+  connectIntent: CanvasVueFlowConnectionAdapter['connectIntent']
+}
+
+export type ImageToolSessionExecutionCapabilities = Pick<
+  UseCanvasImageToolsOptions,
+  'isNodeExecutionActive' | 'runInpaintAction'
+>
+
+export type ImageToolSessionUiCapabilities = Pick<
+  UseCanvasImageToolsOptions,
+  | 'clearActiveNodePanel'
+  | 'hideStrengthControl'
+  | 'isImageActionPanelVisible'
+  | 'isImagePromptComposerVisible'
+  | 'strengthControl'
+>
+
 export type ImageToolSessionCapabilities = {
-  board: {
-    currentBoardId: ValueRef<string | null | undefined>
-    getImageNodeDisplayPayload: UseCanvasImageToolsOptions['getImageNodeDisplayPayload']
-    getImageNodeSnapshot: UseCanvasImageToolsOptions['getImageNodeSnapshot']
-    getImageStageElement: UseCanvasImageToolsOptions['getImageStageElement']
-    updateSnapshotNode?: UseCanvasImageToolsOptions['updateSnapshotNode']
-    createPendingRetouchNode: UseCanvasImageToolsOptions['createPendingRetouchNode']
-    applyImageFileToImageNode: UseCanvasImageToolsOptions['applyImageFileToImageNode']
-    removeNode: UseCanvasImageToolsOptions['removeNode']
-    connectIntent: CanvasVueFlowConnectionAdapter['connectIntent']
-  }
-  execution: {
-    isNodeExecutionActive: UseCanvasImageToolsOptions['isNodeExecutionActive']
-    runInpaintAction: UseCanvasImageToolsOptions['runInpaintAction']
-  }
-  ui: {
-    clearActiveNodePanel: UseCanvasImageToolsOptions['clearActiveNodePanel']
-    hideStrengthControl: UseCanvasImageToolsOptions['hideStrengthControl']
-    isImageActionPanelVisible: UseCanvasImageToolsOptions['isImageActionPanelVisible']
-    isImagePromptComposerVisible: UseCanvasImageToolsOptions['isImagePromptComposerVisible']
-    strengthControl: UseCanvasImageToolsOptions['strengthControl']
-  }
+  board: ImageToolSessionBoardCapabilities
+  execution: ImageToolSessionExecutionCapabilities
+  ui: ImageToolSessionUiCapabilities
   feedback: Pick<CanvasImageToolsFeedback, 'warning' | 'succeeded'>
 }
 
-export type ImageToolSession = Omit<ReturnType<typeof createImageToolSession>, 'options'>
+export type ImageToolSession = ReturnType<typeof createImageToolSession>
 
 export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   const retouch = useRetouchMode({
@@ -158,12 +169,8 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
       return false
     }
     if (mode === 'adjust') {
-      // Non-destructive editing (issue #671): re-entering Retouch on a node
-      // with a persisted stack reconstructs sliders/curves exactly.
-      const snapshot = options.getImageNodeSnapshot(nodeId)
-      if (!retouchSession.restoreRetouchStack(snapshot?.retouchStack)) {
-        retouchSession.resetRetouchSession()
-      }
+      // Retouch always starts from a clean neutral session (WYSIWYG).
+      retouchSession.resetRetouchSession()
     }
     return true
   }

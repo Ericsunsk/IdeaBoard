@@ -1,0 +1,48 @@
+/*
+ * Retouch panel CSS contract.
+ * Feature-local shell shared by the layers list and both action rows
+ * (`.retouch-action-row`, consumed by LayerActions and EffectActions).
+ * Panel metrics reuse the Canvas surface contract instead of hand-written
+ * geometry: inset tracks the tool button gap, control radius tracks the Canvas
+ * radius scale, and text tracks the Canvas caption size.
+ */
+.retouch-panel {
+  --retouch-panel-border-width: var(--node-tool-border-width);
+  /* The repo touch-target floor is 32px; 31px was one pixel under it. */
+  --retouch-panel-row-height: 32px;
+  --retouch-panel-control-radius: var(--canvas-radius-md);
+  --retouch-panel-control-focus-border-color: var(--focus-border-color);
+  --retouch-panel-inset: var(--canvas-tool-button-gap);
+  --retouch-panel-text-size: var(--canvas-font-size-caption);
+  border: var(--retouch-panel-border-width) solid var(--canvas-accent-outline);
+  border-radius: var(--canvas-radius-xl);
+  background: var(--canvas-surface-bg);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.retouch-panel
+  :where(
+    input:not([type]),
+    input[type='email'],
+    input[type='number'],
+    input[type='password'],
+    input[type='search'],
+    input[type='tel'],
+    input[type='text'],
+    input[type='url'],
+    select,
+    textarea
+  ):focus-visible {
+  border-color: var(--retouch-panel-control-focus-border-color);
+  box-shadow: none;
+  outline: none;
+}
+
+/* Shared five-button instrument row: effect picker and layer actions stay one grid. */
+.retouch-action-row {
+  display: grid;
+  grid-template-columns: repeat(5, var(--node-tool-button-size));
+  justify-content: space-between;
+  gap: var(--node-tool-button-gap);
+}

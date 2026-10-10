@@ -20,9 +20,9 @@ const imageToolStagePresentation = readSource('tools/image-tools/components/Stag
 const vueFlowAdapterSkin = readSource('presentation/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('presentation/chrome/CanvasMiniMap.vue')
 const nodeHandleRail = readSource('presentation/nodes/FlowCanvasNodeHandleRail.vue')
-const retouchLayerActions = readSource('tools/retouch/components/LayerActions.vue')
-const retouchHistogram = readSource('tools/retouch/components/styles/retouch-histogram-plot.css')
-const inpaintChrome = readSource('tools/inpaint/components/ImageInpaintChrome.vue')
+const retouchLayerActions = readSource('tools/retouch/ui/layers/LayerActions.vue')
+const retouchHistogram = readSource('tools/retouch/ui/shared/styles/retouch-histogram-plot.css')
+const inpaintChrome = readSource('tools/inpaint/ui/ImageInpaintChrome.vue')
 
 describe('Canvas surface skin contract', () => {
   it('mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen', () => {

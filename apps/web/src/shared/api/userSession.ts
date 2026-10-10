@@ -2,8 +2,9 @@ import { getUser } from './generated-query/public/user/user'
 import { i18n } from '../i18n'
 import type { User } from './sessionUserType'
 
-// /user projects principal fields and the persisted avatar URL.
-// Better Auth owns email; storage and operational fields stay outside this view.
+// /user projects principal fields, the persisted avatar URL, and profile
+// facts (storage namespace, status, timestamps).
+// Better Auth owns email; it stays outside this view.
 
 function asTrimmedString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
@@ -28,6 +29,13 @@ export function toSessionUser(raw: unknown): User | null {
   if (role !== undefined) user.role = role
   const personalWorkspaceId = asTrimmedString(record.personal_workspace_id)
   if (personalWorkspaceId !== undefined) user.personal_workspace_id = personalWorkspaceId
+  const storageNamespace = asTrimmedString(record.storage_namespace)
+  if (storageNamespace !== undefined) user.storage_namespace = storageNamespace
+  if (typeof record.status === 'number') user.status = record.status
+  const createdAt = asTrimmedString(record.created_at)
+  if (createdAt !== undefined) user.created_at = createdAt
+  const updatedAt = asTrimmedString(record.updated_at)
+  if (updatedAt !== undefined) user.updated_at = updatedAt
   return user
 }
 

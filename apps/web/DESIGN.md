@@ -313,7 +313,10 @@ error — including required-field errors — as persistent text below the contr
 
 ## Component Placement
 
-Default to feature-local components.
+Default to feature-local components. Inside a tool scope migrated to the
+SaaS layout (ADR-0013), controls default to control-colocated `ui/` directories
+(one directory per control with its SFC, local helpers, and specs), not to
+shared or kind-grouped folders.
 
 Promote to `src/shared` only when:
 
@@ -326,6 +329,9 @@ Admin local shared is different: `src/features/admin/shared/*` may serve all Adm
 
 DO NOT promote a component just because two places look similar. Similar visuals with different behavior stay local.
 
+- Component events use `update:` for v-model sync and `onXxx` for callbacks.
+- Boolean props start with `is`, `can`, or `has`.
+
 ## Directory Structure & File Naming Governance
 
 Follow the system architecture contract in [../../DESIGN.md](../../DESIGN.md) for full DDD details. In `apps/web`, all modules MUST adhere to:
@@ -336,6 +342,31 @@ Follow the system architecture contract in [../../DESIGN.md](../../DESIGN.md) fo
 - **Anti-Stuttering Rule**: MUST NOT repeat the parent directory name inside filenames (e.g., use `resource.ts` instead of `libraryResource.ts`, use `curves.ts` instead of `retouchCurves.ts`). Use named exports from the feature's root `index.ts` to disambiguate.
 - **Public API & Boundary Isolation**: Features that expose cross-feature APIs MUST use a root `index.ts`; route- or parent-owned internal features may keep explicit internal entrypoints. Outside modules MUST NOT deep-import private files or internal components across feature boundaries.
 - **Tiered DDD**: Complex core domains (`board`, `canvas`, `search`, `account`, `admin`) use layered structures (`domain/`, `application/`, `infrastructure/`, `presentation/` or `ui/`). Lightweight features stay flat.
+  - **Revision (ADR-0013, 2026-10-10):** the four-layer mandate above no longer
+    applies to frontend code; migrated tool/feature scopes use the SaaS
+    `core/` / `session/` / `ui/` layout below. Original rule retained for history.
+
+### Tool-Scoped SaaS Layout (core / session / ui)
+
+Per [ADR-0013](../../docs/adr/0013-frontend-feature-first-saas-layout.md),
+each migrated tool/feature scope (reference: `features/canvas/tools/retouch/`)
+is split into three zones:
+
+- **`core/` — pure math and types only.** Framework-free: no `vue`
+  reactivity, no router/Pinia/TanStack Query, no `generated-query` DTOs. The
+  only zone where domain purity is enforced.
+- **`session/` — stateful orchestration and adapters.** `useXSession`,
+  `useXMode`, coordinate/histogram/stage adapters, chrome sources, apply
+  pipelines, runtime render handoffs. May import `vue` and `core/`; owns
+  lifecycle, reactivity, and IO boundaries.
+- **`ui/` — one directory per control.** Controls colocate by control
+  (`curves/`, `levels/`, `histogram/`), each with its SFC, local helpers, and
+  specs (`.(unit|contract|component|browser).spec.ts`). Cross-control
+  contracts stay at the `ui/` root or in `core/`.
+- **`index.ts` seam.** The scope's only legal cross-scope exit: named
+  re-exports of model types, session entry, apply/chrome factories, and the
+  chrome component. Scope internals stay private behind it; no deep imports
+  across tool scopes.
 
 ## State, Responsive, Accessibility
 

@@ -2,16 +2,15 @@ import type { ComputedRef, Ref } from 'vue'
 import type {
   ImageRetouchKind,
   RetouchEffectLayer,
-  RetouchEffectWholeParams,
-  RetouchLayer,
+  RetouchNonHslWholeParams,
+  RetouchEditorLayers,
   RetouchMode,
-  RetouchParamKey,
-  RetouchParamValue,
-} from '../retouch/model.ts'
-import type { ImageMaskDrawMode } from '../inpaint/model.ts'
+} from '../retouch'
+import type { RetouchEffectParamKey, RetouchEffectParamMap } from '../retouch/core/model.ts'
+import type { ImageMaskDrawMode } from '../inpaint'
 import type { ImageStrengthAction } from '../../application/execution'
 import type { ImageToolSession } from './session'
-import type { ZeroCopyStageHandle } from '../retouch/useZeroCopyRetouchStage.ts'
+import type { ZeroCopyStageHandle } from '../retouch'
 
 export type ImageToolAnchorRect = {
   top: number
@@ -66,11 +65,12 @@ export type ImageToolChromeModel = {
     canRedo: boolean
   }
   editor: {
-    layers: RetouchLayer[]
+    layers: RetouchEditorLayers
     selectedLayerId: string
     selectedEffectLayer: RetouchEffectLayer | null
     histogramSource: ImageData | null
     applyingRetouch: boolean
+    canApply: boolean
   }
 }
 
@@ -89,8 +89,11 @@ export type ImageToolChromeCommands = {
   copyEditorLayer: () => void
   mergeEditorLayer: () => void
   removeEditorLayer: (layerId: string) => void
-  updateEditorParam: (key: RetouchParamKey, value: RetouchParamValue) => void
-  updateEditorRetouchParams: (params: RetouchEffectWholeParams) => void
+  updateEditorParam: <TKey extends RetouchEffectParamKey>(
+    key: TKey,
+    value: RetouchEffectParamMap[TKey],
+  ) => void
+  updateEditorRetouchParams: (params: RetouchNonHslWholeParams) => void
   applyRetouch: () => Promise<void>
 }
 

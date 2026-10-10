@@ -120,7 +120,7 @@ import {
   resolveAccountTab,
   resolveAccountTabKey,
   type AccountTab,
-} from '../common/tabRegistry'
+} from '../shared/tabRegistry'
 import { useProfileFeedback } from '../../application/profile/useProfileFeedback'
 import type { PaymentReturnContext } from '../../domain'
 import {
@@ -129,7 +129,7 @@ import {
   accountLogoutButtonClass,
   accountMainContentClass,
   accountNavTabClass,
-} from '../common/ui'
+} from '../shared/ui'
 
 const props = withDefaults(
   defineProps<{

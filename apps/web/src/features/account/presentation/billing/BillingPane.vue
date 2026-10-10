@@ -138,8 +138,8 @@ import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { formatAccountLocalDateTime } from '../../domain'
 import type { BillingRecordItem } from '../../infrastructure'
 import { useBillingRecords } from '../../application/billing/useBillingRecords'
-import AccountPane from '../common/AccountPane.vue'
-import { accountDataTableFrameClass } from '../common/ui'
+import AccountPane from '../shared/AccountPane.vue'
+import { accountDataTableFrameClass } from '../shared/ui'
 
 type BillingSkeletonRow = {
   record_id: string

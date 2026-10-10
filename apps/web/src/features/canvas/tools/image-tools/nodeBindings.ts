@@ -1,47 +1,40 @@
-import type {
-  ImageActionBinding,
-  ImageActionStrengthControl,
-  ImageToolStageBinding,
-} from './bindings'
+import type { ImageActionBinding, ImageToolStageBinding } from './bindings'
 import type { ImageToolSession } from './session'
-import type { ZeroCopyStageHandle } from '../retouch/useZeroCopyRetouchStage.ts'
+import type { ZeroCopyStageHandle } from '../retouch'
 import { i18n } from '../../../../shared/i18n'
 
-function areBindingObjectsEqual<T extends object>(
-  left: T,
-  right: T,
-  isCustomValueEqual?: (key: keyof T, leftValue: T[keyof T], rightValue: T[keyof T]) => boolean,
-) {
-  const leftKeys = Object.keys(left) as Array<keyof T>
-  const rightKeys = Object.keys(right) as Array<keyof T>
-  if (leftKeys.length !== rightKeys.length) return false
-  return leftKeys.every((key) => {
-    if (!Object.prototype.hasOwnProperty.call(right, key)) return false
-    const leftValue = left[key]
-    const rightValue = right[key]
-    return isCustomValueEqual?.(key, leftValue, rightValue) ?? Object.is(leftValue, rightValue)
-  })
+// Stage identity covers the 4 reactive fields; session is a stable closure
+// reference and intentionally excluded from the equality check.
+function areStageBindingsEqual(left: ImageToolStageBinding, right: ImageToolStageBinding): boolean {
+  return (
+    left.nodeId === right.nodeId &&
+    left.active === right.active &&
+    left.mode === right.mode &&
+    Object.is(left.retouchStage, right.retouchStage)
+  )
 }
 
-function areStrengthControlsEqual(
-  left: ImageActionStrengthControl,
-  right: ImageActionStrengthControl,
-) {
-  return areBindingObjectsEqual(left, right)
-}
-
-function areActionBindingValuesEqual(
-  key: keyof ImageActionBinding,
-  leftValue: ImageActionBinding[keyof ImageActionBinding],
-  rightValue: ImageActionBinding[keyof ImageActionBinding],
-) {
-  if (key === 'strengthControl') {
-    return areStrengthControlsEqual(
-      leftValue as ImageActionStrengthControl,
-      rightValue as ImageActionStrengthControl,
-    )
-  }
-  return Object.is(leftValue, rightValue)
+// Action identity covers the 5 top-level fields; strengthControl is a fresh
+// object per call, so its fields are compared inline instead of by reference.
+function areActionBindingsEqual(left: ImageActionBinding, right: ImageActionBinding): boolean {
+  const leftControl = left.strengthControl
+  const rightControl = right.strengthControl
+  return (
+    left.actionMenuVisible === right.actionMenuVisible &&
+    left.promptComposerVisible === right.promptComposerVisible &&
+    left.promptPlaceholder === right.promptPlaceholder &&
+    left.directGenerating === right.directGenerating &&
+    leftControl.visible === rightControl.visible &&
+    Object.is(leftControl.activeAction, rightControl.activeAction) &&
+    leftControl.getValue === rightControl.getValue &&
+    leftControl.setRangeRef === rightControl.setRangeRef &&
+    leftControl.setTriggerRef === rightControl.setTriggerRef &&
+    leftControl.onRangePointerDown === rightControl.onRangePointerDown &&
+    leftControl.onInput === rightControl.onInput &&
+    leftControl.onChange === rightControl.onChange &&
+    leftControl.onPointerUp === rightControl.onPointerUp &&
+    leftControl.onClick === rightControl.onClick
+  )
 }
 
 function reuseCachedBinding<T>(
@@ -78,9 +71,7 @@ export function createImageToolNodeBindings(
           : null,
       session,
     }
-    return reuseCachedBinding(stageBindingCache, nodeId, nextBinding, (left, right) =>
-      areBindingObjectsEqual(left, right),
-    )
+    return reuseCachedBinding(stageBindingCache, nodeId, nextBinding, areStageBindingsEqual)
   }
 
   function actionBindingFor(nodeId: string): ImageActionBinding {
@@ -109,9 +100,7 @@ export function createImageToolNodeBindings(
         onClick: ui.strengthControl.onClick,
       },
     }
-    return reuseCachedBinding(actionBindingCache, nodeId, nextBinding, (left, right) =>
-      areBindingObjectsEqual(left, right, areActionBindingValuesEqual),
-    )
+    return reuseCachedBinding(actionBindingCache, nodeId, nextBinding, areActionBindingsEqual)
   }
 
   return {

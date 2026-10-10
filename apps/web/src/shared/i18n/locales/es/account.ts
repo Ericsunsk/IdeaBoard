@@ -27,8 +27,13 @@ export default {
   profile: {
     overviewAria: 'Resumen del perfil de la cuenta',
     changeAvatar: 'Cambiar avatar',
+    banned: 'Bloqueado',
     roleAdmin: 'Administrador',
     roleCreator: 'Creador',
+    accountInfoAria: 'Información de la cuenta',
+    storageNamespace: 'Espacio de almacenamiento',
+    joinedAt: 'Fecha de registro',
+    lastUpdated: 'Última actualización',
   },
   security: {
     currentPassword: 'Contraseña actual',

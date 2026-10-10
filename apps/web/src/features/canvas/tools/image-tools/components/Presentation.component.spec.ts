@@ -28,13 +28,26 @@ const MaskChromeStub = defineComponent({
 })
 
 const EditorChromeStub = defineComponent({
-  name: 'Chrome',
-  props: { selectedLayerId: { type: String, required: true } },
-  emits: ['select-retouch'],
+  name: 'RetouchChrome',
+  props: {
+    selectedLayerId: { type: String, required: true },
+    canApply: { type: Boolean, required: true },
+    applyingRetouch: { type: Boolean, required: true },
+  },
+  emits: ['select-retouch', 'apply-retouch'],
   template: `
-    <button data-testid="editor-chrome" @click="$emit('select-retouch', 'hsl')">
-      Editor {{ selectedLayerId }}
-    </button>
+    <div>
+      <button data-testid="editor-chrome" @click="$emit('select-retouch', 'hsl')">
+        Editor {{ selectedLayerId }}
+      </button>
+      <button
+        data-testid="editor-apply"
+        :disabled="!canApply || applyingRetouch"
+        @click="$emit('apply-retouch')"
+      >
+        Apply {{ canApply ? 'ready' : 'empty' }}
+      </button>
+    </div>
   `,
 })
 
@@ -80,6 +93,7 @@ function createChromeModel(overrides: Partial<ImageToolChromeModel> = {}): Image
       selectedEffectLayer: null,
       histogramSource: null,
       applyingRetouch: false,
+      canApply: true,
     },
     ...overrides,
   }
@@ -98,7 +112,13 @@ function renderPresentation(model: ImageToolChromeModel, commands = createChrome
         } satisfies ImageToolPresentationBinding,
       },
       global: {
-        stubs: { ImageInpaintChrome: MaskChromeStub, Chrome: EditorChromeStub },
+        // VTU resolves the stub by the SFC filename (Chrome.vue → Chrome),
+        // not the barrel alias (RetouchChrome): keep both keys.
+        stubs: {
+          ImageInpaintChrome: MaskChromeStub,
+          RetouchChrome: EditorChromeStub,
+          Chrome: EditorChromeStub,
+        },
       },
     }),
     commands,
@@ -127,6 +147,59 @@ describe('Presentation', () => {
     expect(screen.getByTestId('editor-chrome')).toHaveTextContent('Editor base')
     await screen.getByTestId('editor-chrome').click()
     expect(view.commands.selectEffectLayer).toHaveBeenCalledWith('hsl')
+  })
+
+  it('injects parent-computed canApply into Editor chrome (same gate as readApplySource)', async () => {
+    const view = renderPresentation(
+      createChromeModel({
+        mode: 'adjust',
+        editor: {
+          layers: [],
+          selectedLayerId: 'base',
+          selectedEffectLayer: null,
+          histogramSource: null,
+          applyingRetouch: false,
+          canApply: false,
+        },
+      }),
+    )
+
+    expect(screen.getByTestId('editor-apply')).toBeDisabled()
+    expect(screen.getByTestId('editor-apply')).toHaveTextContent('Apply empty')
+
+    await view.setModel(
+      createChromeModel({
+        mode: 'adjust',
+        editor: {
+          layers: [],
+          selectedLayerId: 'base',
+          selectedEffectLayer: null,
+          histogramSource: null,
+          applyingRetouch: false,
+          canApply: true,
+        },
+      }),
+    )
+
+    expect(screen.getByTestId('editor-apply')).not.toBeDisabled()
+    await screen.getByTestId('editor-apply').click()
+    expect(view.commands.applyRetouch).toHaveBeenCalledTimes(1)
+
+    await view.setModel(
+      createChromeModel({
+        mode: 'adjust',
+        editor: {
+          layers: [],
+          selectedLayerId: 'base',
+          selectedEffectLayer: null,
+          histogramSource: null,
+          applyingRetouch: true,
+          canApply: true,
+        },
+      }),
+    )
+
+    expect(screen.getByTestId('editor-apply')).toBeDisabled()
   })
 
   it('renders no chrome when Image Tool is inactive or not ready', () => {

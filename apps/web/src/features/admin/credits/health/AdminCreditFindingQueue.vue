@@ -321,8 +321,7 @@ import AdminDrawer from '../../shared/components/AdminDrawer.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
-import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
-import { useCursorPagination } from '../../shared/composables/useCursorPagination'
+import { useAdminCursorCollection } from '../../shared/composables/useAdminCursorCollection'
 import { adminPolling } from '../../../../shared/query/queryDefaults'
 import {
   adminFramedIconButtonClass,
@@ -356,26 +355,22 @@ const statusOptions = [
 const status = ref<AdminCreditFindingStatus>('open')
 const selectedFinding = ref<AdminCreditFinding | null>(null)
 const drawerVisible = ref(false)
-let pagination: ReturnType<typeof useCursorPagination<number>>
 const resource = createAdminCreditFindingQueueResource()
 // TanStack Query owns the list lifecycle (same pattern as the orders pilot).
 // The previous recursive refresh timer folds into `refetchInterval`, which
 // follows the status cadence (5s open / 30s resolved) reactively.
-pagination = useCursorPagination<number>({ pending: () => loading.value })
 const FINDING_LIST_QUERY_ROOT = ['admin', 'credits', 'findings'] as const
 const FINDING_LIST_STATUS_INDEX = FINDING_LIST_QUERY_ROOT.length
 const FINDING_LIST_CURSOR_INDEX = FINDING_LIST_QUERY_ROOT.length + 1
-const findingListKey = computed(
-  () => [...FINDING_LIST_QUERY_ROOT, status.value, pagination.cursor.value] as const,
-)
 const {
   data: findingPage,
   loading,
   initialError,
   backgroundError,
   refresh: refreshFindingList,
-} = useAdminCollectionQuery({
-  queryKey: findingListKey,
+  pagination,
+} = useAdminCursorCollection({
+  buildKey: (cursor) => [...FINDING_LIST_QUERY_ROOT, status.value, cursor] as const,
   queryFn: ({ queryKey, signal }) =>
     resource.list({
       status: queryKey[FINDING_LIST_STATUS_INDEX] as AdminCreditFindingStatus,
@@ -383,7 +378,6 @@ const {
       signal,
     }),
   getNextCursor: (page) => page.next_before_id,
-  pagination,
   // Status cadence (5s open / 30s resolved); fail-fast stays in the shared
   // collection wrapper.
   refetchInterval: adminPolling(5_000, 30_000, () => status.value === 'open').refetchInterval,

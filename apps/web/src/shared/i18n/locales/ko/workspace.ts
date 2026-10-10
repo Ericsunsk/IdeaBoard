@@ -32,6 +32,7 @@ export default {
     deleted: '캔버스가 삭제되었습니다',
     syncFailedRetry: '캔버스 동기화에 실패했습니다. 나중에 다시 시도해 주세요.',
     reloaded: '캔버스 목록을 새로고침했습니다',
+    noWorkspaceSelected: '작업 공간이 선택되지 않았습니다. 로컬에 저장했습니다. 작업 공간을 선택한 뒤 다시 시도해 주세요.',
   },
   joinSharedBoard: {
     missingToken: '공유 토큰이 없습니다',

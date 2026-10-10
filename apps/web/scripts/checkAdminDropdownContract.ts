@@ -70,7 +70,7 @@ function recordViolation(rel: string, message: string): void {
 
 /** Files that may legitimately declare `role="listbox"` themselves, with the reason. */
 const LISTBOX_IMPLEMENTATIONS: Record<string, string> = {
-  'features/canvas/tools/retouch/components/LayersPanel.vue':
+  'features/canvas/tools/retouch/ui/layers/LayersPanel.vue':
     'retouch layer list: roving tabindex + Arrow/Home/End, pinned by LayersPanel.component.spec.ts',
 }
 

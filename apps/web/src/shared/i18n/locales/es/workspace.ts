@@ -34,6 +34,8 @@ export default {
     deleted: 'Lienzo eliminado',
     syncFailedRetry: 'Error al sincronizar el lienzo. Inténtelo de nuevo más tarde.',
     reloaded: 'Lista de lienzos recargada',
+    noWorkspaceSelected:
+      'No hay ningún espacio de trabajo seleccionado. Guardado localmente; seleccione un espacio de trabajo e inténtelo de nuevo.',
   },
   joinSharedBoard: {
     missingToken: 'Falta el token de recurso compartido',

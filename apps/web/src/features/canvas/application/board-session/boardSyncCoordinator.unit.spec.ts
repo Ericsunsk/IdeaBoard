@@ -6,6 +6,10 @@ import {
   type BoardSnapshot,
 } from '../../../board'
 import type { BoardSession, BoardSessionSaveResult } from './useBoardSession'
+import {
+  BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
+  BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
+} from './useBoardSession'
 import { createBoardSyncCoordinator, type SaveStatus } from './boardSyncCoordinator'
 
 function makeSnapshot(marker: string): BoardSnapshot {
@@ -205,6 +209,103 @@ describe('Board Sync Coordinator', () => {
     expect(harness.onError).toHaveBeenCalledWith(
       'Save failed: user session is missing. Please sign in and try again.',
     )
+  })
+
+  it('routes auth-unavailable codes to the session copy instead of the network copy', async () => {
+    const harness = createHarness()
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const failure = Object.assign(new Error('missing session'), {
+        code: BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
+      })
+      vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+        snapshot: makeSnapshot('saved-locally'),
+        remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+      })
+
+      await harness.coordinator.saveCurrentBoardSnapshot()
+
+      expect(harness.onError).toHaveBeenCalledWith(
+        'Save failed: user session is missing. Please sign in and try again.',
+      )
+      expect(harness.onWarning).not.toHaveBeenCalled()
+      expect(infoSpy).toHaveBeenCalledWith(
+        '[canvas] save skipped remote sync: auth unavailable',
+      )
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  it('routes workspace-unavailable codes to the workspace copy instead of the network copy', async () => {
+    const harness = createHarness()
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const failure = Object.assign(new Error('no workspace'), {
+        code: BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
+      })
+      vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+        snapshot: makeSnapshot('saved-locally'),
+        remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+      })
+
+      await harness.coordinator.saveCurrentBoardSnapshot()
+
+      expect(harness.onError).toHaveBeenCalledWith(
+        'No workspace selected. Saved locally; select a workspace and try again.',
+      )
+      expect(harness.onWarning).not.toHaveBeenCalled()
+      expect(infoSpy).toHaveBeenCalledWith(
+        '[canvas] save skipped remote sync: workspace unavailable',
+      )
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  it('routes untagged workspace-missing errors to the workspace copy via the cause chain', async () => {
+    const harness = createHarness()
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const workspaceCause = Object.assign(new Error('no workspace selected'), {
+        name: 'BoardWorkspaceUnavailableError',
+      })
+      const failure = new Error('BOARD_REMOTE_SYNC_FAILED', { cause: workspaceCause })
+      vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+        snapshot: makeSnapshot('saved-locally'),
+        remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+      })
+
+      await harness.coordinator.saveCurrentBoardSnapshot()
+
+      expect(harness.onError).toHaveBeenCalledWith(
+        'No workspace selected. Saved locally; select a workspace and try again.',
+      )
+      expect(harness.onWarning).not.toHaveBeenCalled()
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  it('keeps the network-recovery copy for status-less errors without a machine code', async () => {
+    const harness = createHarness()
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+        snapshot: makeSnapshot('saved-locally'),
+        remoteSync: { ok: false, reason: 'sync-failed', error: new Error('fetch timeout') },
+      })
+
+      await harness.coordinator.saveCurrentBoardSnapshot()
+
+      expect(harness.onWarning).toHaveBeenCalledWith(
+        'Saved locally. Remote sync failed; it will retry once the network recovers.',
+      )
+      expect(harness.onError).not.toHaveBeenCalled()
+      expect(infoSpy).not.toHaveBeenCalled()
+    } finally {
+      infoSpy.mockRestore()
+    }
   })
 
   it('does not return a stale reconciliation after a route switch', async () => {

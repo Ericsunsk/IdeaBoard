@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"path/filepath"
 	"testing"
+	"time"
 
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 type avatarProfileRepository struct {
@@ -85,5 +89,105 @@ func TestV1AvatarProfileWriterRequired(t *testing.T) {
 	}
 	if len(f.objects.objects) != 0 {
 		t.Fatal("missing profile writer must not write avatar bytes")
+	}
+}
+
+// TestV1UserProjectsProfileFields pins the restored /user profile
+// facts: storage namespace (users.storage_uid), RFC3339 timestamps,
+// numeric status, and the persisted avatar projection.
+func TestV1UserProjectsProfileFields(t *testing.T) {
+	f := newV1MediaGapsFixture(t, false, nil)
+	created := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
+	updated := time.Date(2026, time.February, 3, 4, 5, 6, 0, time.UTC)
+	repo := &avatarProfileRepository{users: map[int64]*identitydomain.User{
+		f.owner: {ID: f.owner, StorageUID: "USER01", Avatar: "https://cdn.example/a.png",
+			Role: "user", Status: identitydomain.StatusActive, CreatedAt: created, UpdatedAt: updated},
+		f.other: {ID: f.other, StorageUID: "USER02",
+			Role: "user", Status: identitydomain.StatusBanned, CreatedAt: created, UpdatedAt: updated},
+	}}
+	engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{
+		AvatarProfile: NewV1AvatarProfileDirectory(repo),
+	})
+	status, _, payload := doV1(t, engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})
+	if status != http.StatusOK {
+		t.Fatalf("GET /user = %d %v, want 200", status, payload)
+	}
+	data := v1Data(t, payload).(map[string]any)
+	if data["storage_namespace"] != "USER01" {
+		t.Fatalf("storage_namespace = %v, want USER01", data["storage_namespace"])
+	}
+	if data["created_at"] != "2026-01-02T03:04:05Z" {
+		t.Fatalf("created_at = %v, want RFC3339", data["created_at"])
+	}
+	if data["updated_at"] != "2026-02-03T04:05:06Z" {
+		t.Fatalf("updated_at = %v, want RFC3339", data["updated_at"])
+	}
+	if data["status"] != float64(identitydomain.StatusActive) {
+		t.Fatalf("status = %v, want %d", data["status"], identitydomain.StatusActive)
+	}
+	if data["avatar"] != "https://cdn.example/a.png" {
+		t.Fatalf("avatar = %v, want the persisted URL", data["avatar"])
+	}
+	// Banned rows keep their numeric status so the client can render
+	// the deactivated badge (0 is never dropped by omitempty).
+	status, _, payload = doV1(t, engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.other})
+	if status != http.StatusOK {
+		t.Fatalf("GET /user (banned row) = %d %v, want 200", status, payload)
+	}
+	banned := v1Data(t, payload).(map[string]any)
+	if banned["status"] != float64(identitydomain.StatusBanned) {
+		t.Fatalf("status = %v, want %d", banned["status"], identitydomain.StatusBanned)
+	}
+	if banned["storage_namespace"] != "USER02" {
+		t.Fatalf("storage_namespace = %v, want USER02", banned["storage_namespace"])
+	}
+}
+
+func TestV1UserResponseMatchesPublicOpenAPI(t *testing.T) {
+	doc, err := openapi3.NewLoader().LoadFromFile(filepath.Join("..", "..", "..", "..", "openapi.public.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := doc.Paths.Value("/user").Get.Responses.Status(http.StatusOK).Value.Content["application/json"].Schema.Value
+	f := newV1MediaGapsFixture(t, false, nil)
+	created := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
+	for _, tt := range []struct {
+		name    string
+		profile *identitydomain.User
+	}{
+		{"active profile", &identitydomain.User{ID: f.owner, StorageUID: "USER01", Avatar: "https://cdn.example/a.png",
+			Status: identitydomain.StatusActive, CreatedAt: created, UpdatedAt: created}},
+		{"banned profile", &identitydomain.User{ID: f.owner, StorageUID: "USER01",
+			Status: identitydomain.StatusBanned, CreatedAt: created, UpdatedAt: created}},
+		{"profile reader absent", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			deps := ContractV1Deps{}
+			if tt.profile != nil {
+				repo := &avatarProfileRepository{users: map[int64]*identitydomain.User{f.owner: tt.profile}}
+				deps.AvatarProfile = NewV1AvatarProfileDirectory(repo)
+			}
+			engine := newV1MediaTestEngine(f.store, f.dir, deps)
+			status, _, payload := doV1(t, engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})
+			if status != http.StatusOK {
+				t.Fatalf("GET /user = %d, want 200", status)
+			}
+			if err := schema.VisitJSON(payload); err != nil {
+				t.Fatalf("actual /user response rejected by Public OpenAPI: %v", err)
+			}
+			// Profile facts may be absent, while numeric status must always
+			// be present, including the banned zero value.
+			data := v1Data(t, payload).(map[string]any)
+			for _, field := range []string{"storage_namespace", "created_at", "updated_at"} {
+				delete(data, field)
+			}
+			if err := schema.VisitJSON(payload); err != nil {
+				t.Fatalf("optional profile facts required by Public OpenAPI: %v", err)
+			}
+			delete(data, "status")
+			if err := schema.VisitJSON(payload); err == nil {
+				t.Fatal("Public OpenAPI accepted a /user response without status")
+			}
+		})
 	}
 }

@@ -218,7 +218,7 @@ import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
 } from '../../../../shared/composables/useOverlayInteractionLifecycle'
-import { WorkspaceHeader } from '../../../workspace'
+import { WorkspaceHeader, useWorkspaceSelection } from '../../../workspace'
 import { NavArrowDown, Search, Xmark } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -247,6 +247,11 @@ import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalo
 
 const router = useRouter()
 const { t } = useI18n()
+// Ensure the workspace list loads on this surface: fresh profiles have no
+// persisted selection, so the store stays null until this query resolves and
+// auto-selects. The catalog watches scope and auto-hydrates when it becomes
+// ready; hydrate itself waits while the list is pending.
+useWorkspaceSelection()
 const controller = useCatalog({
   navigation: {
     openBoard(boardId) {

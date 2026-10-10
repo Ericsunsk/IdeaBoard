@@ -1,6 +1,7 @@
 import {
   assertLatestBoardSnapshot,
   assertLatestBoardState,
+  BOARD_STATE_SCHEMA_VERSION,
   createEmptyBoardSnapshot,
   type BoardSnapshot,
   type BoardState,
@@ -84,7 +85,7 @@ function mockCreateBoard(
     workspace_id: workspaceId,
     name: body?.data?.name ?? 'Untitled',
     revision: 1,
-    schema_version: 4,
+    schema_version: BOARD_STATE_SCHEMA_VERSION,
     archived_at: null,
     created_at: '2026-09-25T00:00:00.000Z',
     updated_at: '2026-09-25T00:00:00Z',
@@ -138,9 +139,9 @@ function mockReplaceDocument(
   const next = {
     board_id: boardId,
     revision: Number((previous?.revision as number | undefined) ?? 1) + 1,
-    schema_version: body?.data?.schema_version ?? 4,
+    schema_version: body?.data?.schema_version ?? BOARD_STATE_SCHEMA_VERSION,
     document: {
-      schema_version: body?.data?.schema_version ?? 4,
+      schema_version: body?.data?.schema_version ?? BOARD_STATE_SCHEMA_VERSION,
       payload: body?.data?.payload ?? {},
     },
     updated_at: '2026-09-25T00:00:01.000Z',

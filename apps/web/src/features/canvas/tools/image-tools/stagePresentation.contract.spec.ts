@@ -11,7 +11,7 @@ describe('Image Tool stage presentation contract', () => {
       'utf8',
     )
     const maskOverlay = readFileSync(
-      resolve(canvasRoot, './inpaint/components/ImageInpaintOverlay.vue'),
+      resolve(canvasRoot, './inpaint/ui/ImageInpaintOverlay.vue'),
       'utf8',
     )
 

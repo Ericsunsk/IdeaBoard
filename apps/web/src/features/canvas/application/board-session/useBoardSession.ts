@@ -22,8 +22,47 @@ type BoardSessionIdentity = {
   userUid: string
 }
 
+/**
+ * Machine codes for status-less local save failures (read via
+ * `userErrorCode`, the single error-code convention — no second scheme).
+ * Both skip remote sync after `saveLocal`, so the coordinator must not
+ * blame the network for them.
+ */
+export const BOARD_SESSION_AUTH_UNAVAILABLE_CODE = 'AUTH_UNAVAILABLE'
+export const BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE = 'WORKSPACE_UNAVAILABLE'
+
 function createAuthUnavailableError(): Error {
-  return new Error(i18n.global.t('canvas.session.saveAuthUnavailable'))
+  return Object.assign(new Error(i18n.global.t('canvas.session.saveAuthUnavailable')), {
+    code: BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
+  })
+}
+
+/** Cause-chain scan for the fail-closed workspace guard (name-based: the
+ * typed error lives in board infrastructure, which canvas must only reach
+ * through the board port — never a direct import). */
+function hasWorkspaceUnavailableInCauseChain(error: unknown): boolean {
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    const record = current as { name?: unknown; code?: unknown; cause?: unknown }
+    if (record.name === 'BoardWorkspaceUnavailableError') return true
+    if (record.code === BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE) return true
+    current = record.cause
+  }
+  return false
+}
+
+/** Tags a workspace-missing sync failure with its machine code so the
+ * coordinator can route it to workspace copy instead of network copy. */
+function withWorkspaceUnavailableCode<T>(error: T): T {
+  if (error && typeof error === 'object' && hasWorkspaceUnavailableInCauseChain(error)) {
+    const record = error as Record<string, unknown>
+    if (typeof record.code !== 'string' || !record.code) {
+      record.code = BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE
+    }
+  }
+  return error
 }
 
 function normalizeBoardSessionIdentity(
@@ -160,7 +199,7 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
         remoteSync: {
           ok: false,
           reason: classifyRemoteSyncFailure(cause),
-          error: cause,
+          error: withWorkspaceUnavailableCode(cause),
         },
       }
     }

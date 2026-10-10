@@ -20,7 +20,6 @@
     <template v-if="!isMonitorError">
       <TaskControlToolbar
         v-model:search-keyword="searchKeyword"
-        v-model:time-range-popover-open="timeRangePopoverOpen"
         :selected-preset="selectedPreset"
         :selected-time-range-key="selectedTimeRangeKey"
         :time-range-presets="timeRangePresets"
@@ -182,7 +181,6 @@ const chartRows = computed(() => chartListQuery.data.value?.list ?? [])
 
 const {
   selectedTimeRangeKey,
-  timeRangePopoverOpen,
   selectedPreset,
   selectTimeRange,
   timelineChartData,

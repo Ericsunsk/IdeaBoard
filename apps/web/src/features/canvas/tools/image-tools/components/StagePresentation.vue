@@ -26,7 +26,7 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import type { ImageToolStageBinding } from '../bindings'
 import { ImageInpaintOverlay } from '../../inpaint'
-import { isWebGLRetouchSupported } from '../../retouch/processing/webglEngine.ts'
+import { isWebGLRetouchSupported } from '../../retouch'
 
 const props = defineProps<{ binding: ImageToolStageBinding }>()
 // Zero-copy GPU stage (issue #672): the mounted canvas IS the render target

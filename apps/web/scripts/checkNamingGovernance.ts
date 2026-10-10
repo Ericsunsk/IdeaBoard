@@ -27,10 +27,18 @@ import { basename, join } from 'node:path'
  *    would collapse six distinct KeepAlive component names into one, changing
  *    caching behavior (plan section 11 forbids silent behavior changes).
  *    Excepted: `index.ts`, specs.
+ *    ADR-0013 tool zones (`features/<context>/tools/<tool>/session|ui/`):
+ *    `session/` files are exempt (tool-prefixed orchestration modules such as
+ *    `session/retouchViewModel.ts` are the documented session vocabulary, not
+ *    stutter); a Vue SFC directly under `ui/<control>/` may share its control
+ *    directory's stem (`ui/curves/CurvesControl.vue`). Other ancestors and
+ *    non-SFC modules under `ui/<control>/` stay governed.
  * 5. Same-name directory/file pairs are forbidden (`controller/controller.ts`);
  *    use a responsibility name, merge the single-file directory up, or use
  *    `index.ts` only for a documented public boundary. Specs mirroring their
- *    subject are exempt.
+ *    subject are exempt. ADR-0013 control-colocated SFCs are exempt: one
+ *    directory per control, so the control entry may carry the control name
+ *    (`ui/chrome/Chrome.vue`).
  * 6. Generic names (`common`, `misc`, `utils`, `manager`, `service`,
  *    `handler`, `helpers`) are forbidden by default for files and directories. Scope
  *    exemptions: locale `common.ts` files (externally canonical locale keys)
@@ -62,6 +70,11 @@ import { basename, join } from 'node:path'
  *     removing imports, re-exports (`export ... from`), `export type`, and
  *     one-line lazy `() => import()` wrappers, nothing executable may remain.
  *     Documented boundaries live in `keptBarrelBoundaries`.
+ * 15. Vague responsibility suffixes (`Manager`, `Helper`, `Util`, `Data`) are
+ *     forbidden as file stem suffixes for Vue SFCs and TypeScript modules.
+ *     Specs mirroring their subject are exempt; pre-existing documented keeps
+ *     live in `keptRoleSuffixOwnership`. Any new `*Manager/*Helper/*Util/*Data`
+ *     file fails the check.
  *
  * Migration machinery removed (issue #696): the phase-aware `migrationBaseline`
  * is gone with the final migration phase. Only permanent documented keeps
@@ -92,6 +105,7 @@ type ViolationKind =
   | 'symbol-alignment'
   | 'stale-prefix'
   | 'index-impl'
+  | 'role-suffix'
 
 type Violation = {
   kind: ViolationKind
@@ -128,18 +142,29 @@ const GENERIC_NAMES = new Set([
 ])
 const ACRONYM_RUNS = ['API', 'SSE', 'URL', 'DTO', 'HTTP', 'IO']
 const VAGUE_VUE_SUFFIXES = ['View', 'Manager', 'Service']
+const ROLE_SUFFIXES = ['Manager', 'Helper', 'Util', 'Data']
 
 const legacyAllowances: Record<string, string> = {}
 
 /** Permanent documented keeps: src-relative dir path -> ownership reason. */
 const keptGenericOwnership: Record<string, string> = {
-  // Cross-pane shared leaf inside account presentation (panes, tab registry).
-  'features/account/presentation/common': 'account-presentation: cross-pane shared leaf',
   // Cross-cutting client helpers (auth identity, errors, date, form, upload).
   'shared/utils': 'shared: cross-cutting client helpers (see shared/CONTEXT.md)',
   // Official shadcn-vue helper boundary (`components.json` standard utils location)
   'lib/utils.ts': 'shadcn: official standard helper entry (cn, cleanProps)',
   'lib/utils.unit.spec.ts': 'shadcn: test for official standard helper entry',
+}
+
+/** Permanent documented keeps: pre-existing `*Data` modules (rule 15). */
+const keptRoleSuffixOwnership: Record<string, string> = {
+  'features/admin/statistics/useUsageStatisticsData.ts':
+    'admin: usage statistics data composable (pre-existing; new *Data modules banned)',
+  'features/admin/monitor/application/demoData.ts':
+    'admin: monitor demo fixture (pre-existing; new *Data modules banned)',
+  'features/admin/models/domain/catalogData.ts':
+    'admin: model catalog reference data (pre-existing; new *Data modules banned)',
+  'features/admin/credits/pricing/demoData.ts':
+    'admin: pricing demo fixture (pre-existing; new *Data modules banned)',
 }
 
 /** Permanent documented keeps: composable-family files (same responsibility family). */
@@ -209,16 +234,42 @@ function ancestorChain(relativePath: string): string[] {
   return parts.slice(2, -1)
 }
 
+/**
+ * ADR-0013 tool zones: `features/<context>/tools/<tool>/session|ui/`.
+ *
+ * `session/` owns stateful orchestration, so tool-prefixed session modules
+ * (`session/retouchViewModel.ts`, `useRetouchSession.ts`) are the documented
+ * session vocabulary, not stutter. `ui/<control>/` colocates one control's
+ * SFC with its helpers, so a Vue SFC directly under it may share the control
+ * directory's stem (`ui/curves/CurvesControl.vue`).
+ */
+function isToolSession(relativePath: string): boolean {
+  return /^features\/[^/]+\/tools\/[^/]+\/session(?:\/|$)/.test(relativePath)
+}
+
+/** ADR-0013 control-colocated SFC: a `.vue` file directly under `ui/<control>/`. */
+function isControlColocatedSfc(relativePath: string, fileName: string): boolean {
+  if (!fileName.endsWith('.vue')) return false
+  return /^features\/[^/]+\/tools\/[^/]+\/ui\/[^/]+\/[^/]+$/.test(relativePath)
+}
+
 function checkAntiStutterStem(
   relativePath: string,
   stem: string,
   kind: ViolationKind,
+  options?: { controlColocatedSfc?: boolean },
 ): Violation | null {
+  // ADR-0013: session-layer files are not judged for anti-stutter.
+  if (isToolSession(relativePath)) return null
   const ancestors = ancestorChain(relativePath)
   if (ancestors.length === 0) return null
   if (SPEC_SUFFIX_PATTERN.test(stem) || stem === 'index') return null
+  const parent = relativePath.split('/').slice(-2, -1)[0] ?? ''
   const fileWords = splitWords(stem)
   for (const ancestor of ancestors) {
+    // ADR-0013: a control-colocated SFC may repeat its own control directory.
+    // Any other ancestor (tool scope, `ui`, sibling zones) stays governed.
+    if (options?.controlColocatedSfc === true && ancestor === parent) continue
     const ancestorWords = splitWords(ancestor)
     if (fileWords.length < ancestorWords.length) continue
     if (!ancestorWords.every((word, index) => fileWords[index] === word)) continue
@@ -263,6 +314,9 @@ function checkSameName(
     ? (fileName.split('.')[0] ?? '')
     : fileName.replace(/\.(ts|vue)$/, '')
   if (stem && normalizeName(stem) === normalizeName(parent)) {
+    // ADR-0013: a control-colocated SFC may carry its control directory's name
+    // (`ui/chrome/Chrome.vue`); deeper nesting and non-SFC modules stay governed.
+    if (isControlColocatedSfc(relativePath, fileName)) return null
     return {
       kind: 'same-name',
       path: relativePath,
@@ -323,6 +377,31 @@ function checkVueName(relativePath: string, fileName: string): Violation | null 
       kind: 'vue-name',
       path: relativePath,
       detail: `component '${stem}' uses a vague responsibility name`,
+    }
+  }
+  return null
+}
+
+/**
+ * Rule 15. Vague responsibility suffixes (`Manager`, `Helper`, `Util`,
+ * `Data`) hide ownership: use a specific responsibility name. Specs mirroring
+ * their subject are exempt; pre-existing modules live in
+ * `keptRoleSuffixOwnership`. The match is a case-sensitive stem suffix, so
+ * `mediaAssetMetadata.ts` (lowercase `data`) and `imageDataUtils.ts`
+ * (`Utils`, not `Util`) stay out of scope.
+ */
+function checkRoleSuffix(relativePath: string, fileName: string): Violation | null {
+  if (fileName.endsWith('.spec.ts') || fileName.endsWith('.d.ts')) return null
+  if (Object.hasOwn(keptRoleSuffixOwnership, relativePath)) return null
+  const stem = fileName.endsWith('.vue')
+    ? basename(fileName, '.vue')
+    : fileName.slice(0, -'.ts'.length)
+  const hit = ROLE_SUFFIXES.find((suffix) => stem.endsWith(suffix))
+  if (hit) {
+    return {
+      kind: 'role-suffix',
+      path: relativePath,
+      detail: `file '${fileName}' uses vague responsibility suffix '${hit}'; use a specific responsibility name`,
     }
   }
   return null
@@ -589,7 +668,9 @@ function collectViolations(): Violation[] {
         } else {
           const vague = checkVueName(relative, entry)
           if (vague) violations.push(vague)
-          const stutter = checkAntiStutterStem(relative, stem, 'anti-stutter')
+          const stutter = checkAntiStutterStem(relative, stem, 'anti-stutter', {
+            controlColocatedSfc: isControlColocatedSfc(relative, entry),
+          })
           if (stutter) violations.push(stutter)
           const same = checkSameName(relative, dir, entry)
           if (same) violations.push(same)
@@ -597,6 +678,8 @@ function collectViolations(): Violation[] {
           if (acronym) violations.push(acronym)
           const stale = checkStaleWorkspacePrefix(relative, entry)
           if (stale) violations.push(stale)
+          const roleSuffix = checkRoleSuffix(relative, entry)
+          if (roleSuffix) violations.push(roleSuffix)
         }
       } else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) {
         if (absolute.includes('/generated-query/')) continue
@@ -608,6 +691,8 @@ function collectViolations(): Violation[] {
           if (acronym) violations.push(acronym)
           const suffix = checkSpecSuffix(relative, entry)
           if (suffix) violations.push(suffix)
+          const roleSuffix = checkRoleSuffix(relative, entry)
+          if (roleSuffix) violations.push(roleSuffix)
           continue
         }
         const moduleViolation = checkTsModule(relative, dir, entry)
@@ -632,6 +717,8 @@ function collectViolations(): Violation[] {
         if (alignment) violations.push(alignment)
         const stale = checkStaleWorkspacePrefix(relative, entry)
         if (stale) violations.push(stale)
+        const roleSuffix = checkRoleSuffix(relative, entry)
+        if (roleSuffix) violations.push(roleSuffix)
         const barrel = checkIndexBarrel(relative, absolute, entry)
         if (barrel) violations.push(barrel)
       } else if (/\.(css|scss|svg|png|jpg|jpeg|webp)$/.test(entry)) {
@@ -668,6 +755,66 @@ function runSelfTest(): void {
         'anti-stutter',
       )?.kind,
       'anti-stutter',
+    ],
+    // --- ADR-0013 tool zones -----------------------------------------
+    // session/ files are not judged for anti-stutter; control-colocated
+    // SFCs may share their control directory's stem; everything else under
+    // tools/ stays governed.
+    [
+      'session-zone-exempt',
+      checkAntiStutterStem(
+        'features/canvas/tools/retouch/session/retouchViewModel.ts',
+        'retouchViewModel',
+        'anti-stutter',
+      ),
+      null,
+    ],
+    [
+      'control-colocated-sfc-exempt',
+      checkAntiStutterStem(
+        'features/canvas/tools/retouch/ui/curves/CurvesControl.vue',
+        'CurvesControl',
+        'anti-stutter',
+        { controlColocatedSfc: true },
+      ),
+      null,
+    ],
+    [
+      'control-colocated-other-ancestor-still-flagged',
+      checkAntiStutterStem(
+        'features/canvas/tools/retouch/ui/curves/RetouchCurves.vue',
+        'RetouchCurves',
+        'anti-stutter',
+        { controlColocatedSfc: true },
+      )?.kind,
+      'anti-stutter',
+    ],
+    [
+      'control-colocated-ts-still-flagged',
+      checkAntiStutterStem(
+        'features/canvas/tools/retouch/ui/curves/curvesHelpers.ts',
+        'curvesHelpers',
+        'anti-stutter',
+      )?.kind,
+      'anti-stutter',
+    ],
+    [
+      'control-colocated-same-name-exempt',
+      checkSameName(
+        'features/canvas/tools/retouch/ui/chrome/Chrome.vue',
+        'features/canvas/tools/retouch/ui/chrome',
+        'Chrome.vue',
+      ),
+      null,
+    ],
+    [
+      'session-zone-same-name-still-flagged',
+      checkSameName(
+        'features/canvas/tools/retouch/session/chrome/Chrome.vue',
+        'features/canvas/tools/retouch/session/chrome',
+        'Chrome.vue',
+      )?.kind,
+      'same-name',
     ],
     [
       'same-name-forbidden',
@@ -709,14 +856,70 @@ function runSelfTest(): void {
       'style-asset',
     ],
     [
-      'kept-generic-dir',
-      checkGenericName('features/account/presentation/common', 'common', true),
+      'shared-dir-needs-no-generic-keep',
+      checkGenericName('features/account/presentation/shared', 'shared', true),
       null,
     ],
     [
       'generic-flagged',
       checkGenericName('features/x/utils.ts', 'utils.ts', false)?.kind,
       'generic-name',
+    ],
+    // --- rule 15: role-suffix ----------------------------------------
+    // New `*Manager/*Helper/*Util/*Data` files fail; specs mirroring their
+    // subject and documented pre-existing keeps stay green.
+    [
+      'role-suffix-manager',
+      checkRoleSuffix('features/x/boardManager.ts', 'boardManager.ts')?.kind,
+      'role-suffix',
+    ],
+    [
+      'role-suffix-helper',
+      checkRoleSuffix('features/x/canvasHelper.ts', 'canvasHelper.ts')?.kind,
+      'role-suffix',
+    ],
+    [
+      'role-suffix-util',
+      checkRoleSuffix('features/x/imageUtil.ts', 'imageUtil.ts')?.kind,
+      'role-suffix',
+    ],
+    [
+      'role-suffix-data',
+      checkRoleSuffix('features/x/sessionData.ts', 'sessionData.ts')?.kind,
+      'role-suffix',
+    ],
+    [
+      'role-suffix-vue',
+      checkRoleSuffix('features/x/SessionManager.vue', 'SessionManager.vue')?.kind,
+      'role-suffix',
+    ],
+    [
+      'role-suffix-ok',
+      checkRoleSuffix('features/x/sessionCoordinator.ts', 'sessionCoordinator.ts'),
+      null,
+    ],
+    [
+      'role-suffix-metadata-out-of-scope',
+      checkRoleSuffix('shared/api/mediaAssetMetadata.ts', 'mediaAssetMetadata.ts'),
+      null,
+    ],
+    [
+      'role-suffix-utils-plural-out-of-scope',
+      checkRoleSuffix('features/canvas/tools/retouch/core/imageDataUtils.ts', 'imageDataUtils.ts'),
+      null,
+    ],
+    [
+      'role-suffix-spec-mirror-exempt',
+      checkRoleSuffix(
+        'features/admin/models/domain/catalogData.unit.spec.ts',
+        'catalogData.unit.spec.ts',
+      ),
+      null,
+    ],
+    [
+      'role-suffix-kept-data',
+      checkRoleSuffix('features/admin/models/domain/catalogData.ts', 'catalogData.ts'),
+      null,
     ],
     [
       'stale-user-prefix',

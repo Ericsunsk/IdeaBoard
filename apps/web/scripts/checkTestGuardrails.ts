@@ -75,7 +75,7 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
-  'src/features/account/presentation/common/ComingSoonPane.component.spec.ts': [
+  'src/features/account/presentation/shared/ComingSoonPane.component.spec.ts': [
     {
       reason:
         'Verifies the neutral StatusBadge carrier, card surface override, and lack of a status dot in the coming-soon capsule.',
@@ -270,31 +270,31 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
           'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
       },
     ],
-  'src/features/canvas/tools/retouch/components/HistogramPlot.component.spec.ts': [
+  'src/features/canvas/tools/retouch/ui/histogram/HistogramPlot.component.spec.ts': [
     {
       reason:
         'Verifies the active marker visual state for the reusable SVG histogram interaction surface.',
     },
   ],
-  'src/features/canvas/tools/retouch/components/LevelsControl.component.spec.ts': [
+  'src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts': [
     {
       reason:
         'Verifies SVG marker, guide-line, and numeric control visual classes for the levels editor.',
     },
   ],
-  'src/features/canvas/tools/retouch/components/SharpenControl.component.spec.ts': [
+  'src/features/canvas/tools/retouch/ui/sharpen/SharpenControl.component.spec.ts': [
     {
       reason:
         'Verifies the tonal track class contract that keeps the radius and threshold sliders visible.',
     },
   ],
-  'src/features/canvas/tools/retouch/components/ThresholdControl.component.spec.ts': [
+  'src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts': [
     {
       reason:
         'Verifies SVG threshold marker, guide-line, and control visual classes for the threshold editor.',
     },
   ],
-  'src/features/canvas/tools/inpaint/components/ImageInpaintOverlay.component.spec.ts': [
+  'src/features/canvas/tools/inpaint/ui/ImageInpaintOverlay.component.spec.ts': [
     {
       reason:
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',

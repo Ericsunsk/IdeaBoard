@@ -103,26 +103,6 @@ export interface ImageRetouchRecipe {
   plan: ImageRetouchRecipeStep[]
 }
 
-/**
- * Non-destructive Retouch adjustment stack (issue #671).
- * Persisted per image node so re-entering Retouch reconstructs sliders,
- * curves and layer visibility exactly. Effect layers only — paint raster
- * content stays session-local and is burned in on apply.
- */
-export type RetouchStackEffectLayer = {
-  id: string
-  kind: 'hsl' | 'threshold' | 'curves' | 'levels' | 'sharpen'
-  name: string
-  visible: boolean
-  params: unknown
-}
-
-export type ImageRetouchStack = {
-  version: 1
-  layers: RetouchStackEffectLayer[]
-  selectedLayerId?: string | undefined
-}
-
 export interface BoardStateMediaRef {
   mediaAssetId: number
   refType: 'board' | 'board_node'
@@ -153,7 +133,6 @@ export interface ImageNodeItem {
   sourceMediaRef?: MediaRef | undefined
   sourceMediaAssetId?: number | undefined
   retouchRecipe?: ImageRetouchRecipe | undefined
-  retouchStack?: ImageRetouchStack | undefined
   sourceImageRatio: number
   outputCount?: number | undefined
   outputResolution?: OutputResolution | undefined

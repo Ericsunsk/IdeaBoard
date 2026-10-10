@@ -107,7 +107,7 @@ import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatAccountExpiryDateTime } from '../../domain'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
-import { accountPrimaryActionButtonClass } from '../common/ui'
+import { accountPrimaryActionButtonClass } from '../shared/ui'
 import type { PendingPaymentOrder } from '../../infrastructure'
 
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }

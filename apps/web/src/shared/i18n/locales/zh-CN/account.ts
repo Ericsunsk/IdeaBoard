@@ -27,8 +27,13 @@ export default {
   profile: {
     overviewAria: '账户个人资料概览',
     changeAvatar: '更改头像',
+    banned: '已封禁',
     roleAdmin: '管理员',
     roleCreator: '创作者',
+    accountInfoAria: '账户信息',
+    storageNamespace: '存储命名空间',
+    joinedAt: '注册时间',
+    lastUpdated: '最近更新',
   },
   security: {
     currentPassword: '当前密码',

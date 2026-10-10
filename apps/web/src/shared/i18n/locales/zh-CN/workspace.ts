@@ -30,6 +30,7 @@ export default {
     deleted: '画布已删除',
     syncFailedRetry: '画布同步失败，请稍后重试。',
     reloaded: '画布列表已重新加载',
+    noWorkspaceSelected: '未选择工作区，已保存至本地。请选择工作区后重试。',
   },
   joinSharedBoard: {
     missingToken: '缺少分享凭证',

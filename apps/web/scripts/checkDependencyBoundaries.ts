@@ -256,6 +256,56 @@ const fixtureCases: BoundaryFixtureCase[] = [
       },
     ],
   },
+  {
+    name: 'prohibits tool core modules from importing session zone modules',
+    expectedRule: 'canvas-tool-core-no-zone-imports',
+    files: [
+      {
+        filePath: 'src/features/canvas/tools/retouch/core/boundary-core-session.fixture.ts',
+        content: `import { useRetouchSession } from '{target:src/features/canvas/tools/retouch/session/sessionTarget}'; console.log(useRetouchSession);`,
+      },
+    ],
+  },
+  {
+    name: 'prohibits tool core modules from importing ui zone modules',
+    expectedRule: 'canvas-tool-core-no-zone-imports',
+    files: [
+      {
+        filePath: 'src/features/canvas/tools/inpaint/core/boundary-core-ui.fixture.ts',
+        content: `import { chromeTarget } from '{target:src/features/canvas/tools/inpaint/ui/chromeTarget.vue}'; console.log(chromeTarget);`,
+      },
+    ],
+  },
+  ...['index', 'i18nRuntime'].map<BoundaryFixtureCase>((module) => ({
+    name: `prohibits tool core modules from importing the i18n ${module} module`,
+    expectedRule: 'canvas-tool-core-no-i18n-runtime',
+    files: [
+      {
+        filePath: `src/features/canvas/tools/retouch/core/boundary-i18n-${module}.fixture.ts`,
+        content: `import { i18n } from '{target:src/shared/i18n/${module}}'; console.log(i18n);`,
+      },
+    ],
+  })),
+  {
+    name: 'prohibits cross-tool deep imports bypassing the tool index seam',
+    expectedRule: 'no-cross-tool-deep-imports',
+    files: [
+      {
+        filePath: 'src/features/canvas/tools/inpaint/session/boundary-cross-tool-deep.fixture.ts',
+        content: `import { useRetouchSession } from '{target:src/features/canvas/tools/retouch/session/sessionTarget}'; console.log(useRetouchSession);`,
+      },
+    ],
+  },
+  {
+    name: 'prohibits canvas-layer deep imports into inpaint internals',
+    expectedRule: 'no-cross-tool-deep-imports',
+    files: [
+      {
+        filePath: 'src/features/canvas/application/boundary-tool-deep.fixture.ts',
+        content: `import { useInpaintChromeState } from '{target:src/features/canvas/tools/inpaint/session/inpaintSessionTarget}'; console.log(useInpaintChromeState);`,
+      },
+    ],
+  },
 ]
 
 function runDepcruise(cwd: string, args: string[]) {
@@ -520,6 +570,24 @@ try {
     hasError = true
   } else {
     console.log('✓ Positive fixture: Vue SFC and dynamic import resolved successfully.')
+  }
+
+  const pureLocaleModule = materializeFixture(workspace, {
+    filePath: 'src/features/canvas/tools/retouch/core/boundary-locale-core.fixture.ts',
+    content: `import { SUPPORTED_LOCALES } from '{target:src/shared/i18n/localeCore}'; console.log(SUPPORTED_LOCALES);`,
+  })
+  const pureLocaleResult = runDepcruise(workspace, [
+    '--config',
+    '.dependency-cruiser.cjs',
+    '--output-type',
+    'json',
+    pureLocaleModule,
+  ])
+  if (pureLocaleResult.status !== 0) {
+    console.error('✗ Positive fixture failed: core cannot import pure localeCore constants/types.')
+    hasError = true
+  } else {
+    console.log('✓ Positive fixture: core may import pure localeCore constants/types.')
   }
 
   // 2.2 Negative Fixtures: Rule violation detection

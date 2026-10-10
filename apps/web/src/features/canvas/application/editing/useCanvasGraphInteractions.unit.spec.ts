@@ -163,6 +163,24 @@ describe('useCanvasGraphInteractions', () => {
     })
   })
 
+  it('keeps the recipe when appending a baked node', () => {
+    const baked: ImageNodeItem = {
+      ...createImageSnapshot(),
+      sourceImageUrl: 'https://example.test/baked.png',
+      retouchRecipe: {
+        version: 1,
+        sourceAssetId: 'asset_src',
+        plan: [{ kind: 'threshold', threshold: 128, invert: false }],
+      },
+    }
+    const harness = createHarness([baked])
+
+    harness.interactions.commands.appendImageToCanvas('image-1')
+
+    const appended = harness.graphSession.store.exportSnapshot().imageNodes.at(-1)
+    expect(appended?.retouchRecipe).toEqual(baked.retouchRecipe)
+  })
+
   it('duplicates selected image business data from Graph facts after Alt-drag', () => {
     const harness = createHarness()
 

@@ -66,10 +66,69 @@ function setupCatalogWatchers(
   }
 }
 
+function setupCatalogRefresh(refresh: {
+  scope: Ref<string | null>
+  isBoardsLoading: Ref<boolean>
+  catalogHydrationFailed: Ref<boolean>
+  catalogRecoveryBoardId: Ref<string | null>
+  initialize: (options?: { force?: boolean }) => Promise<void>
+  reloadCatalog: () => Promise<void>
+}): () => void {
+  const FOCUS_RELOAD_THROTTLE_MS = 5_000
+  let lastVisibleReloadAt = 0
+
+  async function refreshOnVisible(): Promise<void> {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    if (refresh.scope.value == null) return
+    if (refresh.isBoardsLoading.value) return
+    const now = Date.now()
+    if (now - lastVisibleReloadAt < FOCUS_RELOAD_THROTTLE_MS) return
+    lastVisibleReloadAt = now
+    if (refresh.catalogHydrationFailed.value || refresh.catalogRecoveryBoardId.value) {
+      await refresh.reloadCatalog()
+      return
+    }
+    await refresh.initialize({ force: true })
+  }
+
+  function handleVisibilityChange(): void {
+    if (typeof document === 'undefined') return
+    if (document.visibilityState !== 'visible') return
+    void refreshOnVisible()
+  }
+
+  function handleWindowFocus(): void {
+    void refreshOnVisible()
+  }
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('focus', handleWindowFocus)
+  }
+
+  const stopScopeWatch = watch(refresh.scope, (next, prev) => {
+    if (next == null || next === prev) return
+    if (prev == null) {
+      if (!refresh.isBoardsLoading.value && !refresh.catalogHydrationFailed.value) return
+    }
+    void refresh.initialize({ force: true })
+  })
+
+  return () => {
+    stopScopeWatch()
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('focus', handleWindowFocus)
+    }
+  }
+}
+
 export function createGalleryController(dependencies: GalleryControllerDependencies): Catalog {
   const activeMenuBoardId = ref<string | null>(null)
-  const isBoardsLoading = ref(true)
-  const catalogHydrationFailed = ref(false)
   const searchKeyword = ref('')
   const sortMode = ref<CatalogSortMode>('recent')
   const renamingBoardId = ref<string | null>(null)
@@ -80,7 +139,6 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const pendingDeleteBoard = ref<CatalogEntry | null>(null)
   const isDeletePending = ref(false)
   let suppressNextBoardOpen = false
-  let initializePromise: Promise<void> | null = null
 
   const boards = computed<readonly CatalogEntry[]>(
     () => dependencies.catalog.viewModel.boards.value,
@@ -117,43 +175,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     resetDeleteState,
   })
 
-  function initialize(options: { force?: boolean } = {}): Promise<void> {
-    if (options.force) initializePromise = null
-    if (initializePromise) return initializePromise
-    initializePromise = (async () => {
-      try {
-        const result = await dependencies.catalog.commands.hydrate()
-        if (!result.ok) {
-          catalogHydrationFailed.value = true
-          dependencies.feedback.catalogSyncFailed()
-          return
-        }
-        catalogHydrationFailed.value = false
-      } catch (error) {
-        catalogHydrationFailed.value = true
-        dependencies.warn('[boards] failed to hydrate catalog', error)
-        dependencies.feedback.catalogSyncFailed()
-      } finally {
-        isBoardsLoading.value = false
-      }
-    })()
-    return initializePromise
-  }
-
-  async function reloadCatalog() {
-    if (catalogHydrationFailed.value && !catalogRecoveryBoardId.value) {
-      if (isCatalogReloadPending.value) return
-      isCatalogReloadPending.value = true
-      try {
-        await initialize({ force: true })
-        if (!catalogHydrationFailed.value) dependencies.feedback.catalogReloaded()
-      } finally {
-        isCatalogReloadPending.value = false
-      }
-      return
-    }
-    await commandHandlers.reloadCatalog()
-  }
+  const { hydration, reloadCatalog } = commandHandlers
 
   function setSearchKeyword(value: string | undefined) {
     searchKeyword.value = (value ?? '').trim()
@@ -226,25 +248,32 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     pendingDeleteBoard.value = null
   }
 
+  const disposeRefresh = setupCatalogRefresh({
+    scope: dependencies.catalog.viewModel.scope,
+    ...hydration.viewModel,
+    initialize: hydration.initialize,
+    reloadCatalog,
+  })
+
   return {
     viewModel: {
       visibleBoards,
       previewMap: readonly(dependencies.preview.previewMap),
-      isBoardsLoading: readonly(isBoardsLoading),
-      catalogHydrationFailed: readonly(catalogHydrationFailed),
+      isBoardsLoading: hydration.viewModel.isBoardsLoading,
+      catalogHydrationFailed: hydration.viewModel.catalogHydrationFailed,
       searchKeyword: readonly(searchKeyword),
       sortMode: readonly(sortMode),
       activeMenuBoardId: readonly(activeMenuBoardId),
       renamingBoardId: readonly(renamingBoardId),
       renameDraft: readonly(renameDraft),
-      catalogRecoveryBoardId: readonly(catalogRecoveryBoardId),
-      isCatalogReloadPending: readonly(isCatalogReloadPending),
+      catalogRecoveryBoardId: hydration.viewModel.catalogRecoveryBoardId,
+      isCatalogReloadPending: hydration.viewModel.isCatalogReloadPending,
       deleteDialogVisible: readonly(deleteDialogVisible),
       pendingDeleteBoard: readonly(pendingDeleteBoard),
       isDeletePending: readonly(isDeletePending),
     },
     commands: {
-      initialize,
+      initialize: hydration.initialize,
       setSearchKeyword,
       setSortMode,
       toggleBoardMenu,
@@ -263,7 +292,9 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       confirmDelete: commandHandlers.confirmDelete,
     },
     dispose() {
+      hydration.dispose()
       disposeWatchers()
+      disposeRefresh()
     },
   }
 }

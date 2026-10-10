@@ -93,7 +93,6 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
   const { isDemoMode, demoRows, chartRows, filterStatus } = options
 
   const selectedTimeRangeKey = ref<TimeRangePresetKey>('1h')
-  const timeRangePopoverOpen = ref(false)
 
   const selectedPreset = computed(() => {
     return (
@@ -105,7 +104,6 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
 
   function selectTimeRange(key: TimeRangePresetKey) {
     selectedTimeRangeKey.value = key
-    timeRangePopoverOpen.value = false
   }
 
   const timelineBuckets = computed(() => {
@@ -323,7 +321,6 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
 
   return {
     selectedTimeRangeKey,
-    timeRangePopoverOpen,
     selectedPreset,
     selectTimeRange,
     timelineChartData,

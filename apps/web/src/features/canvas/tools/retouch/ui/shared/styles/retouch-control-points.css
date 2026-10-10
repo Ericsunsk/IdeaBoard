@@ -1,0 +1,15 @@
+/*
+ * Retouch control-point CSS contract.
+ * Shared instrument-handle sizing consumed by curve points and
+ * threshold/levels histogram markers. The paper-white dot is a canvas drawing
+ * constant (pinned by the hex-color allowance): handles must stay light in
+ * both modes for contrast against histogram washes, so it intentionally does
+ * not track `--color-canvas-text-inverse`, which flips dark.
+ */
+:where(.retouch-curves, .retouch-threshold-control, .retouch-levels-control) {
+  --retouch-control-point-size: var(--canvas-range-thumb-size);
+  --retouch-control-point-border-width: var(--editing-controls-border-width, 1px);
+  --retouch-control-point-border-color: var(--canvas-accent);
+  --retouch-control-point-bg: #ffffff;
+  --retouch-control-point-active-bg: var(--canvas-accent);
+}

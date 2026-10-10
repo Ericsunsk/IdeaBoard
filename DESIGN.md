@@ -232,6 +232,14 @@ Dependency direction:
 
 ### 2. Complex Feature Layering Contract (Architecture Contract)
 
+> **Revision (ADR-0013, 2026-10-10):** the Tiered DDD four-layer mandate below
+> no longer applies to frontend code. Frontend uses the feature-first SaaS
+> layout (`core/` pure math+types / `session/` stateful orchestration+adapters
+> / `ui/` control-colocated views, one `index.ts` seam per scope); domain
+> purity is enforced only in `core/`. See
+> [ADR-0013](./docs/adr/0013-frontend-feature-first-saas-layout.md). Original
+> text retained for history.
+
 复杂业务特性在进行 DDD 物理重构或代码演进时，可采用如下分层契约。简单展示型特性保持轻量结构，不得为了满足模板创建空目录或空抽象：
 
 - **`domain/`（纯领域层）**：
@@ -282,7 +290,7 @@ Vue UI -> application use case -> resource/adapter -> generated API
 
 当对一个高复杂度模块执行绞杀者迁移（Strangler Migration）时，只有满足以下条件才视作完成：
 
-1. 对采用分层的复杂特性，`domain` 零 Vue 响应式与网络传输依赖，且核心规则通过独立 Unit Tests 验证。
+1. 对采用分层的复杂特性，`domain` 零 Vue 响应式与网络传输依赖，且核心规则通过独立 Unit Tests 验证。（**Revision, ADR-0013:** 新迁移范围按 `core/` 纯数学与类型执行此条，`session/` 允许 Vue 响应式。）
 2. `application` 独立拥有用例编排与错误/加载态处理。
 3. `infrastructure` 收敛所有外部 API 调用与 DTO 转换。
 4. `ui` 纯化为展示与交互。
@@ -296,6 +304,7 @@ Vue UI -> application use case -> resource/adapter -> generated API
 1. **分级架构范式 (Tiered DDD Architecture)**：
    - **重度核心子域**（如 `board`, `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
    - **轻量特性模块**（如 `legal`, `auth`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
+   - **Revision (ADR-0013, 2026-10-10):** 前端新迁移范围改用 feature-first SaaS 三区（`core/` / `session/` / `ui/` + 按 control colocate + `index.ts` 缝），替代本条对前端的 4 层硬性要求；原文保留，细节见 [ADR-0013](./docs/adr/0013-frontend-feature-first-saas-layout.md)。
 
 2. **文件与目录命名规范 (Naming Conventions)**：
    - **目录命名**：全小写短横线 `kebab-case`（如 `board/`, `image-tools/`, `workspace-runtime/`）。
@@ -306,7 +315,7 @@ Vue UI -> application use case -> resource/adapter -> generated API
 3. **消除前缀冗余守则 (Anti-Stuttering Rule)**：
    - **严禁在子文件/子目录内重复父级目录名前缀**。
    - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`features/board/catalog/boardCatalog.ts`。
-    - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/processing/curves.ts`、`features/board/presentation/catalog/contract.ts`。
+    - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/core/kinds/curves.ts`、`features/board/presentation/catalog/contract.ts`。
    - **防命名冲突机制**：跨模块向外暴露能力时，必须通过特性的根 `index.ts` 进行语义清晰的 Named Export（例如 `export { createLibraryResource } from './resource'`），在消费方上下文保证语义清晰，无需在内部文件名冗余堆叠前缀。
 
 4. **公共 API 出口与边界隔离 (Public API Seams & Boundary Enforcement)**：

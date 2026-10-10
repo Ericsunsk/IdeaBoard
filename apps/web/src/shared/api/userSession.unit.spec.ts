@@ -43,9 +43,10 @@ describe('user session API boundary', () => {
     })
   })
 
-  it('projects the durable avatar while dropping unrelated wire fields', () => {
-    // avatar is now the authoritative profile projection; unrelated
-    // identity/storage fields remain outside this boundary.
+  it('projects the durable avatar and profile facts while dropping unrelated wire fields', () => {
+    // avatar is the authoritative profile projection; storage namespace,
+    // status, and timestamps ride the same /user boundary. Email stays
+    // owned by Better Auth and never lands on this view.
     expect(
       toSessionUser({
         id: 'usr_1',
@@ -63,7 +64,15 @@ describe('user session API boundary', () => {
       display_name: 'Alice',
       role: 'user',
       avatar: 'https://cdn.example/a.png',
+      storage_namespace: 'USER0001',
+      status: 1,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-02T00:00:00.000Z',
     })
+  })
+
+  it('ignores a non-numeric status instead of projecting it', () => {
+    expect(toSessionUser({ id: 'usr_1', status: 'banned' })).toEqual({ public_id: 'usr_1' })
   })
 
   it('rejects when the principal request fails', async () => {

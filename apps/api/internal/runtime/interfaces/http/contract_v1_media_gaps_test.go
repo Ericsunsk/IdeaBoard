@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
@@ -44,13 +45,6 @@ func (f *fakeAvatarUID) GetStorageUIDByUserID(ctx context.Context, userID int64)
 	return f.uid, nil
 }
 
-func (f *fakeAvatarUID) GetUserAvatar(ctx context.Context, userID int64) (string, error) {
-	if f.avatarUserID != userID {
-		return "", nil
-	}
-	return f.avatar, nil
-}
-
 func (f *fakeAvatarUID) UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error {
 	if f.writeErr != nil {
 		return f.writeErr
@@ -58,6 +52,21 @@ func (f *fakeAvatarUID) UpdateUserAvatar(ctx context.Context, userID int64, avat
 	f.avatar, f.avatarUserID = avatar, userID
 	f.writes++
 	return nil
+}
+
+// GetUserByID keeps fakeAvatarUID satisfying the extended
+// V1AvatarProfileDirectory (storage/status/timestamps projection).
+// Unknown users project an empty row; only the avatar-owning user
+// carries the persisted URL.
+func (f *fakeAvatarUID) GetUserByID(ctx context.Context, userID int64) (*domain.User, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	user := &domain.User{ID: userID, StorageUID: f.uid, Status: domain.StatusActive}
+	if f.avatarUserID == userID {
+		user.Avatar = f.avatar
+	}
+	return user, nil
 }
 
 type v1MediaGapsFixture struct {

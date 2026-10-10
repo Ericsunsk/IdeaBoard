@@ -1,0 +1,71 @@
+/*
+ * Retouch plot-frame CSS contract.
+ * Shared square instrument frame consumed by HistogramPlot
+ * (`.retouch-histogram-plot`) and CurveGraph (`.retouch-curves__graph`).
+ * Both frames render the same surface: accent-outline border, histogram wash,
+ * and fine/strong grid strokes. Keep them in one place so readability tweaks
+ * (veil, histogram fill, grid) cannot drift between curves and levels/threshold.
+ *
+ * Visual values resolve through the Canvas surface contract, never raw colors:
+ * the top-light veil reuses `--canvas-glass-bg` (white Tier in light mode,
+ * dark Tier in `dark.css`, so the frame stays readable in both modes) and the
+ * histogram wash is a `color-mix` of `--canvas-text-subtle`, which tracks the
+ * Canvas text ramp instead of a hard-coded slate.
+ */
+
+.retouch-histogram-plot,
+.retouch-curves__graph {
+  /* Single frame radius for every retouch plot; one-off instrument geometry. */
+  --retouch-plot-frame-radius: 9px;
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border: var(--editing-controls-border-width, var(--retouch-panel-border-width, 1px)) solid
+    var(--canvas-accent-outline);
+  border-radius: var(--retouch-plot-frame-radius);
+  background: linear-gradient(180deg, var(--canvas-glass-bg), var(--canvas-surface-muted));
+  cursor: crosshair;
+  overflow: visible;
+  touch-action: none;
+}
+
+.retouch-histogram-plot__canvas,
+.retouch-curves__plot {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.retouch-histogram-plot__canvas svg,
+.retouch-curves__plot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+}
+
+.retouch-histogram-plot__histogram,
+.retouch-curves__histogram {
+  fill: color-mix(in srgb, var(--canvas-text-subtle) 18%, transparent);
+  pointer-events: none;
+}
+
+.retouch-histogram-plot__grid,
+.retouch-curves__grid {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.retouch-histogram-plot__grid--fine,
+.retouch-curves__grid--fine {
+  stroke: var(--canvas-surface-border-soft);
+  stroke-width: 0.5;
+}
+
+.retouch-histogram-plot__grid--strong,
+.retouch-curves__grid--strong {
+  stroke: var(--canvas-accent-outline);
+  stroke-width: 0.7;
+}

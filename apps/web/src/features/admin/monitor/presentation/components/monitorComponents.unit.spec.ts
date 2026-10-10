@@ -13,7 +13,6 @@ describe('Monitor Components', () => {
     const { user } = renderWithUser(TaskControlToolbar, {
       props: {
         searchKeyword: 'prompt text',
-        timeRangePopoverOpen: false,
         selectedPreset: timeRangePresets[0]!,
         selectedTimeRangeKey: '1h',
         timeRangePresets,

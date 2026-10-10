@@ -19,7 +19,6 @@ describe('TaskControlToolbar time range picker', () => {
 
   const baseProps = {
     searchKeyword: '',
-    timeRangePopoverOpen: false,
     selectedPreset,
     selectedTimeRangeKey: '1h' as const,
     timeRangePresets,
@@ -49,17 +48,5 @@ describe('TaskControlToolbar time range picker', () => {
     })
 
     expect(screen.getByRole('combobox', { name: '选择时间范围' })).toHaveTextContent('过去 1 小时')
-  })
-
-  it('keeps the page-owned open flag off the trigger element', () => {
-    // `timeRangePopoverOpen` is retained only because AdminMonitorPage still binds
-    // it. reka `Select` owns the open state, so the flag must not leak onto the
-    // rendered <button> as a stray `open` attribute — that is the same class of
-    // bug as forwarding a local variant prop through `v-bind`.
-    render(TaskControlToolbar, { props: { ...baseProps, timeRangePopoverOpen: true } })
-
-    const trigger = screen.getByRole('combobox', { name: '选择时间范围' })
-    expect(trigger).not.toHaveAttribute('open')
-    expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })
 })

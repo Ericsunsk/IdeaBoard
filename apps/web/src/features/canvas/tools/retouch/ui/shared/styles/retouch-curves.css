@@ -1,0 +1,67 @@
+@import './retouch-control-points.css';
+@import './retouch-plot-frame.css';
+
+/*
+ * Curves-specific rules only. Frame, histogram wash, and grid strokes live in
+ * the shared plot-frame contract; control-point sizing lives in control-points.
+ */
+
+.retouch-curves__toolbar {
+  grid-template-columns: minmax(0, 1fr) minmax(78px, 0.54fr);
+}
+
+.retouch-curves__baseline {
+  fill: none;
+  stroke: var(--canvas-text-subtle);
+  stroke-dasharray: 3 3;
+  stroke-width: 0.9;
+  vector-effect: non-scaling-stroke;
+}
+
+.retouch-curves__ghost-curve {
+  fill: none;
+  opacity: 0.38;
+  shape-rendering: geometricPrecision;
+  stroke: var(--canvas-text-subtle);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.retouch-curves__curve {
+  fill: none;
+  shape-rendering: geometricPrecision;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+  vector-effect: non-scaling-stroke;
+}
+
+.retouch-curves__point {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  width: var(--retouch-control-point-size);
+  height: var(--retouch-control-point-size);
+  padding: 0;
+  border: var(--retouch-control-point-border-width) solid var(--retouch-control-point-border-color);
+  border-radius: var(--radius-pill);
+  background: var(--retouch-control-point-bg);
+  cursor: grab;
+  transform: translate(-50%, -50%);
+}
+
+.retouch-curves__point:focus-visible {
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: 2px;
+}
+
+.retouch-curves__point.active {
+  border: 0;
+  background: var(--retouch-control-point-active-bg);
+}
+
+.retouch-curves__fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

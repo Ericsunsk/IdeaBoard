@@ -153,7 +153,7 @@ import { ibFormInputClass } from '../../../../shared/theme/formControls'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { formatUsdForIdeas, MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../../domain'
 import type { PaymentPurchaseOptions } from '../../infrastructure'
-import { accountCardPanelClass, accountPrimaryActionButtonClass } from '../common/ui'
+import { accountCardPanelClass, accountPrimaryActionButtonClass } from '../shared/ui'
 
 const props = defineProps<{
   options?: PaymentPurchaseOptions | undefined

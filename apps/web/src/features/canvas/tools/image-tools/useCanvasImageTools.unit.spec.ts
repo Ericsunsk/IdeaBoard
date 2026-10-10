@@ -2,29 +2,29 @@ import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../board'
-import { renderRetouchLayerStackFile } from '../retouch/rendering/renderer'
+import { renderRetouchLayerStackFile } from '../retouch/session/stage/runtime/finalRender'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../application/execution'
 import type { UseCanvasImageToolsOptions } from './session'
-import { useCanvasImageTools, type CanvasImageTools } from '.'
+import { useCanvasImageTools, type CanvasImageTools } from './'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
-import { deserializeRetouchStack } from '../retouch/processing/stackPersistence.ts'
+import { deserializeImageRetouchPlan } from '../retouch/core/recipe.ts'
 import * as mediaAssetDelivery from '../../../../shared/api/mediaAssetDelivery'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
 } from '../../../../shared/api/mediaAssetDelivery'
 
-vi.mock('../retouch/rendering/renderer', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../retouch/rendering/renderer')>()
+vi.mock('../retouch/session/stage/runtime/finalRender', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../retouch/session/stage/runtime/finalRender')>()
   return {
     ...actual,
     renderRetouchLayerStackFile: vi.fn(),
   }
 })
 
-vi.mock('../inpaint/lib/maskPaintingCanvas', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../inpaint/lib/maskPaintingCanvas')>()
+vi.mock('../inpaint/session/maskPaintingCanvas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../inpaint/session/maskPaintingCanvas')>()
   return {
     ...actual,
     buildMaskCommitResult: vi.fn(() => ({
@@ -34,7 +34,7 @@ vi.mock('../inpaint/lib/maskPaintingCanvas', async (importOriginal) => {
   }
 })
 
-vi.mock('../inpaint/fabric/loader', () => ({
+vi.mock('../inpaint/session/fabric/loader', () => ({
   loadFabricMaskPainter: () => ({
     paintStroke: vi.fn(),
     eraseStroke: vi.fn(),
@@ -273,6 +273,7 @@ function mountCanvasImageTools() {
     activeTool,
     activeStrengthAction,
     app,
+    nodes,
     connectionAdapter,
     createPendingRetouchNode,
     applyImageFileToImageNode,
@@ -491,7 +492,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
     }
   })
 
-  it('persists the adjustment stack on the newly spawned node for re-editing', async () => {
+  it('persists only the recipe on the newly spawned node so re-entry starts from baked pixels', async () => {
     mediaAssetRequestMock.mockResolvedValue({
       code: 0,
       msg: '',
@@ -534,13 +535,80 @@ describe('useCanvasImageTools image retouch final apply', () => {
       ]
       expect(nodeId).toBe('image-3')
       const next = patcher({ ...imageNodeFixtures['image-5']!.snapshot })
-      expect(next.retouchStack?.layers.map((layer) => layer.kind)).toEqual(['threshold'])
-      // The persisted stack round-trips back into an editable session.
-      expect(deserializeRetouchStack(next.retouchStack)?.layers[0]).toMatchObject({
-        kind: 'threshold',
-        params: { threshold: 128, invert: true },
-      })
+      // The durable recipe stays re-renderable from the original asset (#671).
+      expect(next.retouchRecipe?.sourceAssetId).toBe('asset-3')
+      expect(deserializeImageRetouchPlan(next.retouchRecipe!)).toMatchObject([
+        { kind: 'threshold', threshold: 128, invert: true },
+      ])
     } finally {
+      harness.unmount()
+    }
+  })
+
+  it('re-entering any node starts from a clean neutral session with a single source layer', async () => {
+    mediaAssetRequestMock.mockResolvedValue({
+      code: 0,
+      msg: '',
+      data: {
+        id: 'asset-3',
+        asset_id: 'asset-3',
+        status: 'ready',
+        mime_type: 'image/jpeg',
+        width: 2048,
+        height: 1024,
+        size_bytes: 100,
+        content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
+        original: { status: 'ready', url: '/api/original.jpg' },
+        derivatives: {
+          'processing-input': {
+            status: 'ready',
+            format: 'webp',
+            url: '/api/processing-input.webp',
+          },
+        },
+      },
+    })
+    renderLayerStackFileMock.mockResolvedValue(
+      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    )
+    const harness = mountCanvasImageTools()
+    harness.updateSnapshotNode.mockClear()
+
+    try {
+      expect(harness.runtime.commands.lifecycle.enter('image-5', 'adjust')).toBe(true)
+      harness.runtime.commands.chrome.selectEffectLayer('threshold')
+      harness.runtime.commands.chrome.updateEditorRetouchParams({ threshold: 128, invert: true })
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.updateSnapshotNode).toHaveBeenCalledTimes(1)
+      const [, patcher] = harness.updateSnapshotNode.mock.calls[0] as [
+        string,
+        (previous: ImageNodeItem) => ImageNodeItem,
+      ]
+      // The baked child displays the rendered upload with a recipe.
+      const resultSnapshot = patcher({ ...imageNodeFixtures['image-5']!.snapshot, id: 3 })
+      expect(resultSnapshot.retouchRecipe?.sourceAssetId).toBe('asset-3')
+      imageNodeFixtures['image-3'] = {
+        display: { url: 'https://example.com/baked-child.png', ratio: 1 },
+        snapshot: resultSnapshot,
+      }
+      harness.nodes.value = [
+        ...harness.nodes.value,
+        { id: 'image-3', data: { kind: 'image' } } as Node,
+      ]
+
+      // Re-entering any node starts from a clean neutral session: the
+      // zero-copy stage base is the baked DOM image itself, so sliders stay
+      // at defaults (WYSIWYG).
+      expect(harness.runtime.commands.lifecycle.enter('image-3', 'adjust')).toBe(true)
+      const editor = harness.runtime.viewModel.chrome.value.editor
+      expect(editor.layers).toHaveLength(1)
+      expect(editor.layers[0]).toMatchObject({ id: 'source', type: 'source' })
+      expect(editor.layers.some((layer) => layer.type === 'effect')).toBe(false)
+      expect(editor.selectedLayerId).toBe('source')
+    } finally {
+      delete imageNodeFixtures['image-3']
       harness.unmount()
     }
   })

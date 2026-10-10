@@ -199,6 +199,72 @@ describe('boardSync', () => {
     expect(getPromptText('remote-only')).toBe('remote-only-state')
   })
 
+  it('drops a local-only board with revision deleted elsewhere (meta and draft cleared)', async () => {
+    replaceBoards([
+      { id: 'deleted-elsewhere', name: 'Deleted Elsewhere', createdAt: 100, updatedAt: 3_000, revision: 5 },
+    ])
+    replaceBoardStateMap({ 'deleted-elsewhere': makeState(3_000, 'stale-local-edit') })
+    addRemoteBoard({
+      id: 'remote-only',
+      name: 'Remote Board',
+      createdAt: 100,
+      updatedAt: 1_500,
+      state: makeState(1_500, 'remote-only-state'),
+    })
+
+    await hydrateBoardsFromServer()
+
+    expect(listBoards().map((board) => board.id)).toEqual(['remote-only'])
+    // The draft rides only on the merged set, so dropping the meta clears it too.
+    expect(getBoardState('deleted-elsewhere')).toBeNull()
+    // Hydrate never pushes the dropped board back to the server.
+    expect(
+      mocks.request.mock.calls.filter(
+        ([url, config]) =>
+          typeof url === 'string' &&
+          url.includes('deleted-elsewhere') &&
+          typeof config === 'object' &&
+          config !== null &&
+          'method' in config &&
+          config.method === 'PUT',
+      ),
+    ).toEqual([])
+  })
+
+  it('keeps a never-synced local-only board without revision during hydrate', async () => {
+    replaceBoards([{ id: 'offline-new', name: 'Offline New', createdAt: 100, updatedAt: 2_000 }])
+    replaceBoardStateMap({ 'offline-new': makeState(2_000, 'offline-draft') })
+    addRemoteBoard({
+      id: 'remote-only',
+      name: 'Remote Board',
+      createdAt: 100,
+      updatedAt: 1_500,
+      state: makeState(1_500, 'remote-only-state'),
+    })
+
+    await hydrateBoardsFromServer()
+
+    expect(listBoards().map((board) => board.id)).toEqual(['offline-new', 'remote-only'])
+    expect(getPromptText('offline-new')).toBe('offline-draft')
+  })
+
+  it('still drops a never-synced local-only board marked for rollback', async () => {
+    replaceBoards([{ id: 'local-only', name: 'Local Only', createdAt: 100, updatedAt: 2_000 }])
+    replaceBoardStateMap({ 'local-only': makeState(2_000, 'local-draft') })
+    addRemoteBoard({
+      id: 'remote-only',
+      name: 'Remote Board',
+      createdAt: 100,
+      updatedAt: 1_500,
+      state: makeState(1_500, 'remote-only-state'),
+    })
+
+    await hydrateBoardsFromServer({ preserveLocalNewer: false, rollbackBoardIds: ['local-only'] })
+
+    expect(listBoards().map((board) => board.id)).toEqual(['remote-only'])
+    expect(getBoardState('local-only')).toBeNull()
+  })
+
   it('rolls back only the conflict target while preserving other local newer and local-only boards', async () => {
     replaceBoards([
       { id: 'board-a', name: 'Conflicting Local', createdAt: 100, updatedAt: 4_000 },
@@ -282,6 +348,38 @@ describe('boardSync', () => {
     getWorkspaceSelectionStore().clear()
 
     const result = await hydrateBoardsFromServer()
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected hydrate failure')
+    expect(result.error).toBeInstanceOf(BoardWorkspaceUnavailableError)
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
+  it('waits for a late workspace selection when explicitly requested', async () => {
+    resetWorkspaceSelectionStore()
+    getWorkspaceSelectionStore().clear()
+    addRemoteBoard({
+      id: 'late-board',
+      name: 'Late Board',
+      createdAt: 100,
+      updatedAt: 2_000,
+      state: makeState(2_000, 'late-ready'),
+    })
+
+    const hydrateTask = hydrateBoardsFromServer({ waitForWorkspaceTimeoutMs: 500 })
+    setTimeout(() => getWorkspaceSelectionStore().select(WORKSPACE_ID), 10)
+    const result = await hydrateTask
+
+    expect(result.ok).toBe(true)
+    expect(listBoards().map((board) => board.id)).toEqual(['late-board'])
+    expect(getPromptText('late-board')).toBe('late-ready')
+  })
+
+  it('times out to fail-closed when the workspace selection never arrives', async () => {
+    resetWorkspaceSelectionStore()
+    getWorkspaceSelectionStore().clear()
+
+    const result = await hydrateBoardsFromServer({ waitForWorkspaceTimeoutMs: 20 })
 
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('expected hydrate failure')

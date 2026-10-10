@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import type { RetouchModeState } from '../retouch/useRetouchMode'
+import type { RetouchModeState } from '../retouch'
 
 type ValueRef<T> = {
   readonly value: T

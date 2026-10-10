@@ -207,7 +207,7 @@ const RULES: Rule[] = [
   {
     kind: 'opt-in',
     label: 'retouch curve drag point',
-    rel: 'features/canvas/tools/retouch/components/CurveGraph.vue',
+    rel: 'features/canvas/tools/retouch/ui/curves/CurveGraph.vue',
     pattern: /retouch-curves__point/,
     fix: 'carry `hit-target-drag` (11px dot, keyboard-operable; a full 32px overlay would steal neighbouring grabs)',
   },
@@ -223,7 +223,7 @@ const RULES: Rule[] = [
     // the AA floor instead, because both pseudos already paint the marker.
     kind: 'required',
     label: 'retouch histogram marker',
-    rel: 'features/canvas/tools/retouch/components/styles/retouch-histogram-plot.css',
+    rel: 'features/canvas/tools/retouch/ui/shared/styles/retouch-histogram-plot.css',
     // Only the transparent button box counts: the 11px painted dot further down
     // the file is the visual, not the target.
     pattern:

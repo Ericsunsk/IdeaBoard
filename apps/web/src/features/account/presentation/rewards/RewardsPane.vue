@@ -188,12 +188,12 @@ import { formatAccountShanghaiDateTime } from '../../domain'
 import { useRewardRedemption } from '../../application/rewards/useRewardRedemption'
 import { useRewardHistory } from '../../application/rewards/useRewardHistory'
 import type { RewardRedemptionItem } from '../../infrastructure'
-import AccountPane from '../common/AccountPane.vue'
+import AccountPane from '../shared/AccountPane.vue'
 import {
   accountCardPanelClass,
   accountDataTableFrameClass,
   accountPrimaryActionButtonClass,
-} from '../common/ui'
+} from '../shared/ui'
 
 const { t } = useI18n()
 const code = ref('')

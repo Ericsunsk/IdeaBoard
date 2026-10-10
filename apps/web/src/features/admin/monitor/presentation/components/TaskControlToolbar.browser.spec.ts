@@ -26,7 +26,6 @@ describe('TaskControlToolbar browser contract', () => {
     const view = render(TaskControlToolbar, {
       props: {
         searchKeyword: '',
-        timeRangePopoverOpen: false,
         selectedTimeRangeKey: key.value,
         selectedPreset: timeRangePresets.find((preset) => preset.key === key.value)!,
         timeRangePresets,

@@ -27,8 +27,13 @@ export default {
   profile: {
     overviewAria: '계정 프로필 개요',
     changeAvatar: '아바타 변경',
+    banned: '차단됨',
     roleAdmin: '관리자',
     roleCreator: '크리에이터',
+    accountInfoAria: '계정 정보',
+    storageNamespace: '저장소 네임스페이스',
+    joinedAt: '가입일',
+    lastUpdated: '마지막 업데이트',
   },
   security: {
     currentPassword: '현재 비밀번호',

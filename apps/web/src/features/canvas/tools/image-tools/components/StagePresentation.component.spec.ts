@@ -15,8 +15,8 @@ import { render } from '../../../../../test/render'
 import type { ImageToolStageBinding } from '../bindings'
 import StagePresentation from './StagePresentation.vue'
 
-vi.mock('../../retouch/processing/webglEngine.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../retouch/processing/webglEngine.ts')>()
+vi.mock('../../retouch/session/stage/runtime/webglEngine.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../retouch/session/stage/runtime/webglEngine.ts')>()
   return {
     ...actual,
     isWebGLRetouchSupported: () => true,

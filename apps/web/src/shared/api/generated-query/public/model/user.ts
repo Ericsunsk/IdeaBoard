@@ -24,4 +24,12 @@ export interface User {
   personal_workspace_id?: WorkspaceId
   /** Persisted profile avatar URL; omitted when no avatar is set. */
   avatar?: string
+  /** Media storage namespace; omitted when no storage namespace is set. */
+  storage_namespace?: string
+  /** RFC3339 UTC profile creation timestamp; omitted when unavailable. */
+  created_at?: string
+  /** RFC3339 UTC profile update timestamp; omitted when unavailable. */
+  updated_at?: string
+  /** Numeric user status; 0 means banned and 1 means active. Always present. */
+  status: number
 }

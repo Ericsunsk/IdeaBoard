@@ -3522,7 +3522,7 @@ components:
       description: Workspace/organization membership role.
     User:
       type: object
-      required: [id]
+      required: [id, status]
       additionalProperties: false
       properties:
         id:
@@ -3537,6 +3537,20 @@ components:
         avatar:
           type: string
           description: Persisted profile avatar URL; omitted when no avatar is set.
+        storage_namespace:
+          type: string
+          description: Media storage namespace; omitted when no storage namespace is set.
+        created_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC profile creation timestamp; omitted when unavailable.
+        updated_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC profile update timestamp; omitted when unavailable.
+        status:
+          type: integer
+          description: Numeric user status; 0 means banned and 1 means active. Always present.
     Workspace:
       type: object
       required: [id, name, created_at]

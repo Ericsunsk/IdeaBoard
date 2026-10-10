@@ -145,8 +145,8 @@ import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { usePasswordChange } from '../../application/security/usePasswordChange'
-import AccountPane from '../common/AccountPane.vue'
-import { accountPrimaryActionButtonClass } from '../common/ui'
+import AccountPane from '../shared/AccountPane.vue'
+import { accountPrimaryActionButtonClass } from '../shared/ui'
 
 const { t } = useI18n()
 const {

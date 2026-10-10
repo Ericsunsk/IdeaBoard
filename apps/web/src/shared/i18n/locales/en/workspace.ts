@@ -32,6 +32,7 @@ export default {
     deleted: 'Canvas deleted',
     syncFailedRetry: 'Canvas sync failed. Please try again later.',
     reloaded: 'Canvas list reloaded',
+    noWorkspaceSelected: 'No workspace selected. Saved locally; select a workspace and try again.',
   },
   joinSharedBoard: {
     missingToken: 'Share token is missing',

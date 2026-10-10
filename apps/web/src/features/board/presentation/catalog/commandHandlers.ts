@@ -1,5 +1,6 @@
-import type { Ref } from 'vue'
+import { readonly, ref, watch, type Ref } from 'vue'
 import type { BoardRepository } from '../../../board/application/catalog/repository'
+import type { HydrateBoardsFromServerOptions } from '../../application/sync/boardSync'
 import type { CatalogEntry, CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 
@@ -35,6 +36,119 @@ async function runCatalogCommand<T>(
   }
 }
 
+function createCatalogHydration({
+  catalog,
+  feedback,
+  warn,
+  state,
+}: Pick<CatalogCommandDependencies, 'catalog' | 'feedback' | 'warn' | 'state'>) {
+  const isBoardsLoading = ref(true)
+  const catalogHydrationFailed = ref(false)
+  let initializePromise: Promise<void> | null = null
+  let generation = 0
+  let disposed = false
+
+  const stopScopeWatch = watch(
+    catalog.viewModel.scope,
+    () => {
+      generation += 1
+      initializePromise = null
+      state.isCatalogReloadPending.value = false
+    },
+    { flush: 'sync' },
+  )
+
+  function capture() {
+    return { scope: catalog.viewModel.scope.value, generation }
+  }
+
+  function isCurrent(token: ReturnType<typeof capture>): boolean {
+    return (
+      !disposed && token.scope === catalog.viewModel.scope.value && token.generation === generation
+    )
+  }
+
+  function initialize(
+    options: { force?: boolean; hydrateOptions?: HydrateBoardsFromServerOptions | undefined } = {},
+  ): Promise<void> {
+    if (disposed) return Promise.resolve()
+    if (options.force) initializePromise = null
+    if (initializePromise) return initializePromise
+    generation += 1
+    state.isCatalogReloadPending.value = false
+    const token = capture()
+    initializePromise = (async () => {
+      try {
+        const result = await (options.hydrateOptions
+          ? catalog.commands.hydrate(options.hydrateOptions)
+          : catalog.commands.hydrate())
+        if (!isCurrent(token)) return
+        if (!result.ok) {
+          if (!options.hydrateOptions) catalogHydrationFailed.value = true
+          feedback.catalogSyncFailed()
+          return
+        }
+        catalogHydrationFailed.value = false
+        if (options.hydrateOptions) state.catalogRecoveryBoardId.value = null
+      } catch (error) {
+        if (!isCurrent(token)) return
+        if (!options.hydrateOptions) catalogHydrationFailed.value = true
+        warn(
+          options.hydrateOptions
+            ? '[boards] failed to reload catalog'
+            : '[boards] failed to hydrate catalog',
+          error,
+        )
+        feedback.catalogSyncFailed()
+      } finally {
+        if (isCurrent(token)) isBoardsLoading.value = false
+      }
+    })()
+    return initializePromise
+  }
+
+  async function reloadCatalog() {
+    const boardId = state.catalogRecoveryBoardId.value
+    if (disposed || state.isCatalogReloadPending.value) return
+    if (!catalogHydrationFailed.value && !boardId) return
+    const pending = initialize({
+      force: true,
+      hydrateOptions: boardId
+        ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] }
+        : undefined,
+    })
+    const token = capture()
+    state.isCatalogReloadPending.value = true
+    try {
+      await pending
+      if (
+        isCurrent(token) &&
+        !catalogHydrationFailed.value &&
+        !state.catalogRecoveryBoardId.value
+      ) {
+        feedback.catalogReloaded()
+      }
+    } finally {
+      if (isCurrent(token)) state.isCatalogReloadPending.value = false
+    }
+  }
+
+  return {
+    viewModel: {
+      isBoardsLoading: readonly(isBoardsLoading),
+      catalogHydrationFailed: readonly(catalogHydrationFailed),
+      catalogRecoveryBoardId: readonly(state.catalogRecoveryBoardId),
+      isCatalogReloadPending: readonly(state.isCatalogReloadPending),
+    },
+    initialize,
+    reloadCatalog,
+    dispose() {
+      disposed = true
+      stopScopeWatch()
+    },
+  }
+}
+
 export function createCommandHandlers({
   catalog,
   navigation,
@@ -44,6 +158,7 @@ export function createCommandHandlers({
   clearRename,
   resetDeleteState,
 }: CatalogCommandDependencies) {
+  const hydration = createCatalogHydration({ catalog, feedback, warn, state })
   async function createAndOpenBoard() {
     state.activeMenuBoardId.value = null
     const result = await runCatalogCommand(
@@ -123,34 +238,6 @@ export function createCommandHandlers({
     feedback.renamed()
   }
 
-  async function reloadCatalog() {
-    const boardId = state.catalogRecoveryBoardId.value
-    if (!boardId || state.isCatalogReloadPending.value) return
-    state.isCatalogReloadPending.value = true
-    const result = await runCatalogCommand(
-      () =>
-        catalog.commands.hydrate({
-          preserveLocalNewer: false,
-          rollbackBoardIds: [boardId],
-        }),
-      (error) => {
-        warn('[boards] failed to reload catalog', error)
-        feedback.catalogSyncFailed()
-      },
-    )
-    try {
-      if (!result) return
-      if (!result.ok) {
-        feedback.catalogSyncFailed()
-        return
-      }
-      state.catalogRecoveryBoardId.value = null
-      feedback.catalogReloaded()
-    } finally {
-      state.isCatalogReloadPending.value = false
-    }
-  }
-
   async function confirmDelete() {
     const board = state.pendingDeleteBoard.value
     if (!board || state.isDeletePending.value) return
@@ -188,5 +275,12 @@ export function createCommandHandlers({
     }
   }
 
-  return { createAndOpenBoard, duplicateBoard, commitRename, reloadCatalog, confirmDelete }
+  return {
+    createAndOpenBoard,
+    duplicateBoard,
+    commitRename,
+    reloadCatalog: hydration.reloadCatalog,
+    confirmDelete,
+    hydration,
+  }
 }

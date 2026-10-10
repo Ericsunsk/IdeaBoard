@@ -1,5 +1,39 @@
 # ExecPlans
 
+## 未提交 Diff 冗余审计与提交（2026-10-10）
+
+- Goal: 审计当前未提交 diff，删除有证据支持的冗余，并在当前 branch 提交验证后的完整改动。
+- Scope: 以当前 HEAD 为基线，subagents 并行审计 Retouch、Board/Inpaint/Image Tools 及其余 API/Account/Admin/governance/docs；按互不重叠的文件范围清理。保留已接受的 feature-first layout、retouchStack hard cut 和前轮四项修复。
+- Success criteria: 每项删除有调用链或 contract 证据；相关 tests、lint、type/build、generated consistency 通过，独立复核无遗留问题；commit 后工作区干净。
+- Risks: 不删除 public seam、必要 boundary adapter、兼容约束或真实 regression coverage；generated files 仅通过 generator 更新；不改变 runtime behavior 或外部数据。
+- Rollback: commit 前仅撤回本轮清理 patches；commit 后可 revert 本轮 commit。不切换 branch、创建 worktree 或 push。
+- Results: 12 个代码/文档文件净减少 84 行；删除无消费者的私有 types/test-only helpers、重复 patch 委托与条件、无效类型包装和过时说明。保留公开 seam、默认工厂、错误分类差异及真实 regression coverage。
+- Verification: Web 全量 524 files / 3441 tests、build（含 bundle budget）、test typecheck、完整 lint、style、generated API consistency、browser 3 files / 7 tests 和 Go build 全部通过。独立复核 PASS，并自行通过 6 specs / 117 tests、55 naming self-tests 与 diff check。
+- Status: COMPLETE；冗余审计、清理与验证全部完成。本批通过当前 branch 的一个 commit 交付，commit identity 以 Git history 为准。
+
+## 未提交 Diff 审计修复（2026-10-10）
+
+- Goal: 修复本轮确认的 4 项 P2，并保留现有 staged、unstaged 和 untracked 工作。
+- Scope: 当前 checkout 与 branch，由 subagents 依次修复：
+  1. [x] 同步 `/user` profile fields 的 canonical OpenAPI，并重新生成 client；response/schema regression、HTTP package tests 与 generated drift check 通过。
+  2. [x] 移除 Retouch `core/` 对 runtime i18n 的依赖，在 session/UI 翻译 label keys，并收紧 purity guard；166 targeted tests、dependency fixtures、lint、test typecheck 通过。
+  3. [x] 保留 Sharpen visually neutral draft 参数，同时保持延迟 commit；4 个 regression 先失败后通过，100 targeted tests、lint、guardrails 通过。
+  4. [x] 隔离 Gallery refresh 的旧 scope completion，防止 Workspace 切换产生虚假失败提示；11 个 regression 先失败后通过，72 targeted tests 及 boundary/contract checks 通过。
+- Success criteria: 新增回归测试在修复前失败、修复后通过；相关 contract、test、lint、type/build checks 通过，独立复核无遗漏。
+- Risks: 保持已有 API wire fields、layer labels、pending state machine 和真实同步错误反馈；generated client 仅通过 Orval 更新，不改 schema、auth policy 或外部数据。
+- Rollback: 仅撤回本轮 targeted patches；不重置现有 diff，不切换 branch，不提交或 push。
+- Verification: Web 全量 524 files / 3441 tests、build（含 bundle budget）、test typecheck、完整 lint、style、generated API consistency 及 browser 3 files / 7 tests 全部通过；Go HTTP package tests 通过。独立 subagent 复核 PASS，并自行通过 9 files / 150 targeted tests、build、test typecheck、修改文件 ESLint、dependency fixtures、generated drift 与 Go HTTP package tests。
+- Status: COMPLETE；4 项已依次修复并通过整体验证与独立复核。保留现有工作区改动，当前 branch 与 HEAD 不变，未提交或 push。
+
+## Canvas Session Save Recovery (2026-10-10)
+
+- Goal: fix the false missing-session failure when autosaving an authenticated Canvas.
+- Scope: CanvasPage identity wiring and its regression tests; preserve existing workspace diffs.
+- Success criteria: the page passes the authoritative session storage namespace to the real save path; missing identity retains a local draft; refreshed identity permits saving without remounting; relevant tests, lint, formatting and type/build checks pass.
+- Risk: do not invent a namespace from public_id or bypass the missing-session guard.
+- Rollback: reverse only this task's patches; no schema changes or external writes.
+- Status: COMPLETE; two regression tests reproduced AUTH_UNAVAILABLE before the fix and pass afterward. All 42 targeted tests, ESLint, Prettier, test typecheck and Web build passed. Browser verification confirmed import and drag autosave, durable MediaRef and matching remote positions (revision 4 to 6) without a failure toast.
+
 ## Archived Settings Diff Audit and Cleanup (2026-10-09)
 
 - Status: implementation, redundancy cleanup and independent review complete.

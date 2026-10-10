@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BoardSnapshot, BoardState } from '../../../board'
+import { userErrorCode } from '../../../../shared/errors/errorCatalog'
 import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import type { BoardSessionPreviewRenderer } from './preview'
 import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
-import { useBoardSession } from './useBoardSession'
+import {
+  BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
+  BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
+  useBoardSession,
+} from './useBoardSession'
 
 function makeSnapshot(marker: string | number): BoardSnapshot {
   return makeBoardSnapshot({
@@ -183,10 +188,56 @@ describe('useBoardSession', () => {
       expect(result.remoteSync.reason).toBe('sync-failed')
       expect(result.remoteSync.error).toBeInstanceOf(Error)
       expect((result.remoteSync.error as Error).message).toContain('user session is missing')
+      expect(userErrorCode(result.remoteSync.error)).toBe(BOARD_SESSION_AUTH_UNAVAILABLE_CODE)
     }
     expect(createUploadLifecycle).not.toHaveBeenCalled()
     expect(repository.saveLocal).toHaveBeenCalledWith('board-a', snapshot)
     expect(repository.save).not.toHaveBeenCalled()
+  })
+
+  it('tags workspace-missing sync failures so the toast names the workspace, not the network', async () => {
+    const snapshot = makeSnapshot(100)
+    const stabilizedSnapshot = makeSnapshot(250)
+    const savedState = makeState(stabilizedSnapshot)
+    const workspaceError = Object.assign(
+      new Error('Board workspace is unavailable. Select a workspace before syncing boards.'),
+      { name: 'BoardWorkspaceUnavailableError' },
+    )
+    const lifecycle = {
+      stabilizeSnapshotForSave: vi.fn(async () => stabilizedSnapshot),
+    }
+    const repository = createRepository({
+      save: vi.fn(async () => {
+        throw new BoardSessionRemoteSyncError('board-a', savedState, workspaceError)
+      }),
+      sync: vi.fn(async () => undefined),
+    })
+    const session = useBoardSession({
+      getBoardIdQuery: () => 'board-a',
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
+      repository,
+      previewRenderer: {
+        rendererVersion: 1,
+        render: vi.fn(async () => 'data:image/webp;base64,preview'),
+      },
+      message: { warning: vi.fn() },
+      createUploadLifecycle: vi.fn(() => lifecycle),
+    })
+
+    const result = await session.save(snapshot)
+
+    expect(result.snapshot).toBe(stabilizedSnapshot)
+    expect(result.remoteSync.ok).toBe(false)
+    if (!result.remoteSync.ok) {
+      expect(result.remoteSync.reason).toBe('sync-failed')
+      expect(userErrorCode(result.remoteSync.error)).toBe(
+        BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
+      )
+    }
+    expect((workspaceError as { code?: unknown }).code).toBe(
+      BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
+    )
+    expect(repository.sync).not.toHaveBeenCalled()
   })
 
   it('keeps a local draft before surfacing upload stabilization failures', async () => {

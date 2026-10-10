@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsResource'
+import { BOARD_STATE_SCHEMA_VERSION } from '../../domain'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { joinSharedBoardByToken } from './joinSharedBoardWorkflow'
 
@@ -30,7 +31,7 @@ function joinEnvelope(boardId: string) {
       workspace_id: WORKSPACE_ID,
       name: 'Shared Board',
       revision: 3,
-      schema_version: 4,
+      schema_version: BOARD_STATE_SCHEMA_VERSION,
       archived_at: null,
       created_at: '2026-09-25T00:00:00.000Z',
       updated_at: '2026-09-25T00:00:00.000Z',

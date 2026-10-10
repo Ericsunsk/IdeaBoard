@@ -22,10 +22,7 @@ import { createCanvasNodeAt } from '../../domain/nodes/canvasNodeFactory.ts'
 import { resolveImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
 import { resolveWritableCanvasGraphStore } from '../canvasGraphStoreWriter'
-import {
-  renderImageRetouchRecipeFile,
-  type ImageRetouchRenderSource,
-} from '../../tools/retouch/rendering/renderer.ts'
+import { renderImageRetouchRecipeFile, type ImageRetouchRenderSource } from '../../tools/retouch'
 import { resolveMediaAssetOriginalURL } from '../../../../shared/api/mediaAssetDelivery'
 
 type MessageLoadingHandle = {
@@ -273,7 +270,6 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     const latestOutput = resolveImageNodeLatestOutput(source)
     if (latestOutput?.url?.trim()) image.sourceImageUrl = latestOutput.url.trim()
     image.retouchRecipe = source.retouchRecipe ? structuredClone(source.retouchRecipe) : undefined
-    image.retouchStack = source.retouchStack ? structuredClone(source.retouchStack) : undefined
     image.sourceImageRatio = payload.ratio
     image.outputCount = source.outputCount ?? image.outputCount
     image.width = resolveImageNodeFrameSize(payload.ratio, true).width

@@ -46,6 +46,8 @@ import {
   type BoardStateValidationErrorContext,
   type BoardState,
 } from '../../domain'
+import { queryClient } from '../../../../shared/query/queryClient'
+import { workspaceQueryKeys } from '../../../workspace'
 
 export type HydrateBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }
 
@@ -59,6 +61,7 @@ subscribeBoardScopeChange(() => pendingRollbackBoardIds.clear())
 export type HydrateBoardsFromServerOptions = {
   preserveLocalNewer?: boolean
   rollbackBoardIds?: string[]
+  waitForWorkspaceTimeoutMs?: number
 }
 
 type ResolvedHydrateBoardsFromServerOptions = {
@@ -193,8 +196,17 @@ function applyRemoteBoardsToLocal(
     mergedMetas.set(remoteMeta.id, preserveLocal ? { ...localMeta } : remoteMeta)
   })
 
+  // Local-only boards (absent from the full remote list, which is a
+  // complete cursor walk so absence means deleted/archived elsewhere):
+  // absent + revision means the board synced before and is now deleted
+  // elsewhere — deleted-elsewhere wins, so drop the local meta without
+  // pushing it back to the server, discarding any unsynced local edits
+  // with it (delete semantics, not a conflict). Absent + no revision
+  // means a never-synced offline creation — keep it locally.
+  // Rollback markers still drop first via shouldPreserveLocal above.
   localMetas.forEach((localMeta) => {
     if (mergedMetas.has(localMeta.id) || !shouldPreserveLocal(localMeta.id)) return
+    if (localMeta.revision !== undefined) return
     mergedMetas.set(localMeta.id, localMeta)
   })
 
@@ -264,21 +276,66 @@ async function listRemoteBoards(
   )
 }
 
+const WORKSPACE_SELECTION_READY_TIMEOUT_MS = 5_000
+
+function readWorkspaceListQueryStatus(): 'pending' | 'error' | 'success' | null {
+  try {
+    return queryClient.getQueryState(workspaceQueryKeys.list)?.status ?? null
+  } catch {
+    return null
+  }
+}
+
+function waitForBoardScopeSettled(timeoutMs: number): Promise<void> {
+  const current = getBoardScope()
+  if (current.workspaceId || !current.userScope) return Promise.resolve()
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      unsubscribe()
+      resolve()
+    }
+    const unsubscribe = subscribeBoardScopeChange((scope) => {
+      if (scope.workspaceId || !scope.userScope) finish()
+    })
+    const timer = setTimeout(finish, Math.max(0, timeoutMs))
+  })
+}
+
+async function resolveHydrateScope(options: HydrateBoardsFromServerOptions): Promise<BoardScope> {
+  const initial = getBoardScope()
+  if (!initial.userScope || initial.workspaceId) return initial
+  // Authed without a selection: wait only when explicitly requested or
+  // while the workspace list is still loading. Query errors, empty lists,
+  // and idle caches fail closed immediately (existing behavior); only a
+  // pending list (fresh profile) waits for the ready/failed/timeout tri-state.
+  const explicitTimeout = options.waitForWorkspaceTimeoutMs
+  const shouldWait =
+    explicitTimeout != null ? explicitTimeout > 0 : readWorkspaceListQueryStatus() === 'pending'
+  if (!shouldWait) return initial
+  const timeoutMs = explicitTimeout != null ? explicitTimeout : WORKSPACE_SELECTION_READY_TIMEOUT_MS
+  await waitForBoardScopeSettled(timeoutMs)
+  return getBoardScope()
+}
+
 export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOptions = {}) {
-  const captured = getBoardScope()
+  const waited = await resolveHydrateScope(options)
   // Signed-out surfaces (public landing) have no scope and nothing to sync.
-  if (!captured.userScope) return { ok: true } satisfies HydrateBoardsFromServerResult
+  if (!waited.userScope) return { ok: true } satisfies HydrateBoardsFromServerResult
   // Authed without a workspace selection fails closed: the request target
   // must never be inferred from a board id.
-  if (!captured.workspaceId) {
+  if (!waited.workspaceId) {
     return {
       ok: false,
       error: new BoardWorkspaceUnavailableError(),
     } satisfies HydrateBoardsFromServerResult
   }
   const scope: CompleteBoardScope = {
-    userScope: captured.userScope,
-    workspaceId: captured.workspaceId,
+    userScope: waited.userScope,
+    workspaceId: waited.workspaceId,
   }
   const workspaceId = scope.workspaceId
   const resolvedOptions = resolveHydrateOptions(options)
@@ -380,6 +437,24 @@ function markSyncFailure(boardId: string, captured: BoardScope, error: unknown) 
   if (isBoardScopeCurrent(captured) && isBoardSyncConflictError(error)) {
     pendingRollbackBoardIds.add(boardId.trim())
   }
+  // Observability for the status-less failure class (offline/timeout,
+  // workspace-missing): summary only — status/code/message, never payloads
+  // or secrets — so the next "saved locally" report is attributable.
+  console.info('[boards] remote sync failed', boardId, summarizeSyncFailure(error))
+}
+
+function summarizeSyncFailure(error: unknown): string {
+  if (!error || typeof error !== 'object') return String(error)
+  const record = error as { status?: unknown; message?: unknown }
+  const status = typeof record.status === 'number' ? `status=${record.status}` : null
+  const code = userErrorCode(error)
+  const message =
+    typeof record.message === 'string' && record.message.trim()
+      ? record.message.trim().slice(0, 120)
+      : null
+  return (
+    [status, code ? `code=${code}` : null, message].filter(Boolean).join(' ') || 'unknown error'
+  )
 }
 
 export function clearPendingBoardSyncRollback(boardId: string) {

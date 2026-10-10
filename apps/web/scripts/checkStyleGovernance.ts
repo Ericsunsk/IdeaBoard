@@ -263,19 +263,19 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Retouch editing controls use the documented iOS system palette fallback.',
   },
-  'src/features/canvas/tools/inpaint/fabric/adapter.ts': {
+  'src/features/canvas/tools/inpaint/session/fabric/adapter.ts': {
     counts: {
       'hex-color': 1,
     },
     reason: 'Fabric canvas object default is a canvas drawing constant.',
   },
-  'src/features/canvas/tools/retouch/components/styles/retouch-control-points.css': {
+  'src/features/canvas/tools/retouch/ui/shared/styles/retouch-control-points.css': {
     counts: {
       'hex-color': 1,
     },
     reason: 'Retouch control-point overlay uses canvas drawing constants.',
   },
-  'src/features/canvas/tools/retouch/components/styles/retouch-histogram-plot.css': {
+  'src/features/canvas/tools/retouch/ui/shared/styles/retouch-histogram-plot.css': {
     counts: {
       'hex-color': 1,
     },
