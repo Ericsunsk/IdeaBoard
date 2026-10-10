@@ -23,9 +23,9 @@
 import { IconoirProvider } from '@iconoir/vue'
 import { watch } from 'vue'
 import { Toaster } from 'vue-sonner'
-import { useSiteBranding } from '../shared/composables/useSiteBranding'
-import { i18n } from '../shared/i18n'
-import { useTheme } from '../shared/theme/composables/useTheme'
+import { useSiteBranding } from '../core/composables/useSiteBranding'
+import { i18n } from '../core/i18n'
+import { useTheme } from '../theme/composables/useTheme'
 
 const { isDark } = useTheme()
 

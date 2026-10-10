@@ -1,11 +1,11 @@
-import { isExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { isExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 import type { LibrarySearchReference, SearchAuthAction } from '../domain/authAction'
 import { normalizeSearchQuery } from '../domain/queryPolicy'
 import {
   readSessionStorageItem,
   removeSessionStorageItem,
   writeSessionStorageItem,
-} from '../../../shared/utils/storage'
+} from '../../../core/utils/storage'
 
 const ANONYMOUS_QUERY_GATE_KEY = 'ideaboard:search:anonymous-query-gate'
 const PENDING_ACTION_KEY = 'ideaboard:search:pending-auth-action'

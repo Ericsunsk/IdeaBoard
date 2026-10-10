@@ -8,7 +8,7 @@ import {
   watch,
   type Ref,
 } from 'vue'
-import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useAppToast } from '../../../core/composables/useAppToast'
 import { useAuthOverlay } from '../../auth'
 import { useRoute, useRouter } from 'vue-router'
 import {

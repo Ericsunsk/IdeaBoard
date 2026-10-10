@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { SERVICE, type Service } from '../../../../../shared/domain/imageServices'
+import { SERVICE, type Service } from '../../../../../core/contracts/imageServices'
 import type {
   SubmitTaskReadinessData,
   CanvasTaskRequestData,

@@ -29,10 +29,4 @@ describe('Icon button accessible name contract', () => {
     expect(source).toContain(':aria-label="resolvedAriaLabel"')
     expect(source).toContain('props.ariaLabel ?? resolvedTooltip.value')
   })
-
-  it('forwards ActionButton ariaLabel and title to the underlying Button', () => {
-    const source = src('shared/components', 'ActionButton.vue')
-    expect(source).toContain(':aria-label="props.ariaLabel"')
-    expect(source).toContain(':title="props.title"')
-  })
 })

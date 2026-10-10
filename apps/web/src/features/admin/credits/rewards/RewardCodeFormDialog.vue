@@ -195,7 +195,7 @@ import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
-import { createUniqueId } from '../../../../shared/utils/ids'
+import { createUniqueId } from '../../../../core/utils/ids'
 import type { RewardCode, UpdateRewardCodeInput } from './resource'
 import { generateRewardCode } from './rewardCodeGenerator'
 import {
@@ -204,7 +204,7 @@ import {
   shanghaiEndOfDayPlusDays,
 } from './rewardCodeTime'
 
-export type RewardCodeFormValue = Omit<UpdateRewardCodeInput, 'creditAmount' | 'maxRedemptions'> & {
+type RewardCodeFormValue = Omit<UpdateRewardCodeInput, 'creditAmount' | 'maxRedemptions'> & {
   code: string
   idempotencyKey: string
   creditAmount: number | null

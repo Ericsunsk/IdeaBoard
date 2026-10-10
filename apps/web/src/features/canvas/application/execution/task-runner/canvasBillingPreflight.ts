@@ -1,5 +1,5 @@
-import type { ApiClientError } from '../../../../../shared/api/client'
-import { i18n } from '../../../../../shared/i18n'
+import type { ApiClientError } from '../../../../../api/client'
+import { i18n } from '../../../../../core/i18n'
 
 export type CanvasBillingPreflightFailureKind =
   'insufficient-credits' | 'network' | 'pricing-unavailable' | 'resolution-unavailable'

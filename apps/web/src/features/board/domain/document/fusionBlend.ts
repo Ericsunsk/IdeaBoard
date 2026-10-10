@@ -1,4 +1,4 @@
-import { clamp } from '../../../../shared/utils/number'
+import { clamp } from '../../../../core/utils/number'
 
 export interface FusionBlendPoint {
   x: number

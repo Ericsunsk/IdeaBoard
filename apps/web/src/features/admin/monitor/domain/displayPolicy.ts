@@ -1,4 +1,4 @@
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
 
 export const ADMIN_MONITOR_PAGE_SIZE = PAGE_SIZES.adminMonitor
 export const ADMIN_MONITOR_CHART_PAGE_SIZE = PAGE_SIZES.dense

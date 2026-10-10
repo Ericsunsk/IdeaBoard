@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../../auth'
-import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
+import { useLogoutRedirect } from '../../../../core/composables/useLogoutRedirect'
 import { CanvasScreen } from '../screens'
 
 const route = useRoute()

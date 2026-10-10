@@ -2,13 +2,13 @@ import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import SearchSavePopover from './SearchSavePopover.vue'
 import type { SearchSavePopoverController } from '../browser/savePopoverContract'
 import type { SearchResult } from '../../domain/models'
 
 const mocks = vi.hoisted(() => ({ saveReference: vi.fn() }))
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 vi.mock('../../infrastructure/libraryCoordinator', () => ({
   useSearchLibraryCoordinator: () => ({
     folderFacts: {

@@ -11,7 +11,7 @@ import { booleanPrefixRule, noBarrelImportRule } from './scripts/eslint-p0-gover
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'output/**', 'src/shared/api/generated-query/**'],
+    ignores: ['dist/**', 'node_modules/**', 'output/**', 'src/api/generated-query/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -236,7 +236,7 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/shared/api/generated-query/**'],
+    ignores: ['src/api/generated-query/**'],
     rules: {
       'no-restricted-globals': [
         'error',

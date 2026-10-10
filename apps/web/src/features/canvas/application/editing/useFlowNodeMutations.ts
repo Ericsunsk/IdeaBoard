@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { createCanvasNodeAt } from '../../domain/nodes/canvasNodeFactory.ts'
 import { getDefaultCanvasNodeTitle } from '../../domain/nodes/canvasNodeRegistry.ts'
 import {

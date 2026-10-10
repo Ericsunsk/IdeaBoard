@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../../../shared/api/sessionUserType'
+import type { User } from '../../../api/sessionUserType'
 
 const mocks = vi.hoisted(() => ({
   clearAuthScopedQueryCache: vi.fn(),
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   readStoredSessionUser: vi.fn(),
 }))
 
-vi.mock('../../../shared/query/queryClient', () => ({
+vi.mock('../../../core/query/queryClient', () => ({
   clearAuthScopedQueryCache: mocks.clearAuthScopedQueryCache,
 }))
 vi.mock('./sessionPersistence', () => ({
@@ -89,6 +89,50 @@ describe('browser session transition', () => {
     expect(harness.state.commit).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-2' }))
     expect(mocks.persistSessionUser).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-2' }))
     expect(mocks.clearAuthScopedQueryCache).toHaveBeenCalledOnce()
+  })
+
+  it('discards a stale in-flight fetch that resolves after an identity switch', async () => {
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-2' }),
+      loaded: true,
+    })
+    let resolveStale!: (value: { user: User }) => void
+    harness.loadUser.mockReturnValueOnce(
+      new Promise<{ user: User }>((resolve) => {
+        resolveStale = resolve
+      }),
+    )
+
+    const pending = harness.transition.fetchUserInfo(true)
+    harness.transition.setAuth(makeSessionUser({ public_id: 'user-3' }))
+    resolveStale({ user: makeSessionUser({ public_id: 'user-2' }) })
+
+    await expect(pending).resolves.toEqual(makeSessionUser({ public_id: 'user-3' }))
+    expect(harness.getUser()?.public_id).toBe('user-3')
+    expect(mocks.persistSessionUser).toHaveBeenCalledTimes(1)
+    expect(mocks.persistSessionUser).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-3' }))
+  })
+
+  it('ignores a stale 401 from a previous identity epoch instead of clearing the new identity', async () => {
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-2' }),
+      loaded: true,
+    })
+    let rejectStale!: (reason: unknown) => void
+    harness.loadUser.mockReturnValueOnce(
+      new Promise<{ user: User }>((_resolve, reject) => {
+        rejectStale = reject
+      }),
+    )
+
+    const pending = harness.transition.fetchUserInfo(true)
+    harness.transition.setAuth(makeSessionUser({ public_id: 'user-3' }))
+    rejectStale({ status: 401 })
+
+    await expect(pending).resolves.toEqual(makeSessionUser({ public_id: 'user-3' }))
+    expect(harness.getUser()?.public_id).toBe('user-3')
+    expect(harness.state.clear).not.toHaveBeenCalled()
+    expect(mocks.clearPersistedSession).not.toHaveBeenCalled()
   })
 
   it('clears local state when a fresh user projection is rejected as unauthorized', async () => {

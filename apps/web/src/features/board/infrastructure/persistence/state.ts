@@ -4,7 +4,7 @@ import {
   type BoardSnapshot,
   type BoardState,
 } from '../../domain'
-import { readLocalStorageItem, writeLocalStorageItem } from '../../../../shared/utils/storage'
+import { readLocalStorageItem, writeLocalStorageItem } from '../../../../core/utils/storage'
 import { normalizeBoardState, serializeBoardState } from './boardStateSerialization'
 import { scopedBoardStorageKey } from '../../application/catalog/scope'
 

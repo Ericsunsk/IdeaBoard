@@ -213,11 +213,11 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
 import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogStyle } from './skin'
-import { USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
+import { USER_CANVAS_PATH } from '../../../workspace/routePaths'
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
-} from '../../../../shared/composables/useOverlayInteractionLifecycle'
+} from '../../../../core/composables/useOverlayInteractionLifecycle'
 import { WorkspaceHeader, useWorkspaceSelection } from '../../../workspace'
 import { NavArrowDown, Search, Xmark } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
@@ -230,7 +230,7 @@ import {
 } from '@/components/ui/dialog'
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
-import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
+import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import {
   Select,
   SelectContent,
@@ -241,7 +241,7 @@ import {
   SelectValue,
   SelectViewport,
 } from '@/components/ui/select'
-import { appOverlayMenuSideOffset } from '../../../../shared/theme/appOverlayMenu'
+import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
 

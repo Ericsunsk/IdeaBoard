@@ -1,14 +1,20 @@
-import { hasRenderableRetouchLayerStack, renderRetouchLayerStackFile } from './stage/runtime/finalRender'
-import { isProcessingCancelled, processingCancelledError } from './stage/runtime/processingCancelled'
+import {
+  hasRenderableRetouchLayerStack,
+  renderRetouchLayerStackFile,
+} from './stage/runtime/finalRender'
+import {
+  isProcessingCancelled,
+  processingCancelledError,
+} from './stage/runtime/processingCancelled'
 import {
   MediaAssetDerivativeNotReadyError,
   resolveMediaAssetProcessingURL,
-} from '../../../../../shared/api/mediaAssetDelivery'
+} from '../../../../../api/mediaAssetDelivery'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../../../domain/graph'
 import type { ImageNodeDisplayPayload } from '../../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import type { CanvasVueFlowConnectionAdapter } from '../../../infrastructure/vue-flow-adapter'
 import type { CanvasNodeItem, ImageNodeItem } from '../../../../board/ports/canvas'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 import { buildImageRetouchPlan } from '../core/planPipeline.ts'
 import { deserializeImageRetouchPlan, serializeImageRetouchPlan } from '../core/recipe.ts'
 import { hasRetouchRasterEdits } from '../core/rasterTools.ts'

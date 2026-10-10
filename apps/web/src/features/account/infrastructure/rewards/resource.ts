@@ -1,15 +1,15 @@
 import {
   listWorkspaceRewardRedemptions,
   redeemWorkspaceReward,
-} from '../../../../shared/api/generated-query/public/workspace-rewards/workspace-rewards'
+} from '../../../../api/generated-query/public/workspace-rewards/workspace-rewards'
 import type {
   RedeemWorkspaceRewardResult,
   WorkspaceRewardRedemption,
   WorkspaceRewardRedemptionHistoryItem,
-} from '../../../../shared/api/generated-query/public/model'
-import { buildContractRequestHeaders, newRequestId } from '../../../../shared/api/contractKernel'
-import { workspaceRewardsRedeemIdempotencyKey } from '../../../../shared/api/idempotencyKey'
-import { i18n } from '../../../../shared/i18n'
+} from '../../../../api/generated-query/public/model'
+import { buildContractRequestHeaders, newRequestId } from '../../../../api/contractKernel'
+import { workspaceRewardsRedeemIdempotencyKey } from '../../../../api/idempotencyKey'
+import { i18n } from '../../../../core/i18n'
 import {
   asWorkspaceBillingError,
   readContractListBody,

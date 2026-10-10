@@ -47,10 +47,8 @@
 
 <script setup lang="ts">
 import { Spinner } from '@/components/ui/spinner'
-import IbFormField, {
-  type IbFormFieldSlotProps,
-} from '../../../../shared/components/IbFormField.vue'
-import { ibFormInputIconClass } from '../../../../shared/theme/formControls'
+import IbFormField, { type IbFormFieldSlotProps } from '../../../../core/components/IbFormField.vue'
+import { ibFormInputIconClass } from '../../../../theme/formControls'
 
 withDefaults(
   defineProps<{

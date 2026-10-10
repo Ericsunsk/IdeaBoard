@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RetouchCurvesParams } from '../../core/model.ts'
 import RetouchCurvesControl from './CurvesControl.vue'
 import { renderWithUser, screen, waitFor, within } from '../../../../../../test/render'
-import { setUserLocale } from '../../../../../../shared/i18n'
+import { setUserLocale } from '../../../../../../core/i18n'
 
 function renderCurvesControl(initialParams: RetouchCurvesParams) {
   const params = ref(initialParams)

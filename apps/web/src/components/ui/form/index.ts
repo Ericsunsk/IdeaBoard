@@ -14,5 +14,5 @@ export {
 } from './context'
 
 // User-shell and Admin adapters consume the neutral contract from
-// `@/shared/components/formFieldContract`; this package owns only the
+// `@/core/components/formFieldContract`; this package owns only the
 // reka-ui form primitives and must not import feature-specific tokens.

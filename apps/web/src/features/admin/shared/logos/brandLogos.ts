@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
+import { resolveApiUrl } from '../../../../core/config/runtimeUrls'
 import { CONTROL_API_PREFIX } from '../lib/controlTransport'
-import { getGetControlAIGatewayBrandLogoUrl } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
+import { getGetControlAIGatewayBrandLogoUrl } from '../../../../api/generated-query/control/control-platform/control-platform'
 
 // Brand logo override vocabulary (issue #809). The legacy generated models
 // are gone; this module owns the scope/key sets its pickers and resources
@@ -70,19 +70,19 @@ type AdminBrandLogoOverrideUpdateLogoKey =
 // Provider 品牌图走 Control 品牌图透传（GET /api/control/v1/platform/ai-gateway/brand-logo），
 // 前端不再 bundle 任何 provider SVG：上游缺失时后端回默认图，卡片不断图。
 // 存储与身份类目仍用站内现成资产（storage-vendors / oauth），不在本次迁移范围。
-import logoAmazonS3 from '../../../../shared/assets/storage-vendors/amazons3.svg'
-import logoAlibabaCloud from '../../../../shared/assets/storage-vendors/alibabacloud.svg'
-import logoCloudflareVendor from '../../../../shared/assets/storage-vendors/cloudflare.svg'
-import logoMinio from '../../../../shared/assets/storage-vendors/minio.svg'
-import logoTencentCloud from '../../../../shared/assets/storage-vendors/tencentcloud.ico'
+import logoAmazonS3 from '../ui/assets/storage-vendors/amazons3.svg'
+import logoAlibabaCloud from '../ui/assets/storage-vendors/alibabacloud.svg'
+import logoCloudflareVendor from '../ui/assets/storage-vendors/cloudflare.svg'
+import logoMinio from '../ui/assets/storage-vendors/minio.svg'
+import logoTencentCloud from '../ui/assets/storage-vendors/tencentcloud.ico'
 
 // 身份与认证
-import logoGithub from '../../../../shared/assets/oauth/github.svg'
-import logoGoogleOAuth from '../../../../shared/assets/oauth/google.svg'
-import logoDiscord from '../../../../shared/assets/oauth/discord.svg'
+import logoGithub from '../ui/assets/oauth/github.svg'
+import logoGoogleOAuth from '../../../../core/assets/oauth/google.svg'
+import logoDiscord from '../../../../core/assets/oauth/discord.svg'
 // 图片搜索供应商（站内现成资产，不走 models.dev：上游仅有通用占位图）
-import logoUnsplash from '../../../../shared/assets/search-providers/unsplash.svg'
-import logoPexels from '../../../../shared/assets/search-providers/pexels.svg'
+import logoUnsplash from '../ui/assets/search-providers/unsplash.svg'
+import logoPexels from '../ui/assets/search-providers/pexels.svg'
 
 export type AdminBrandCategoryKey =
   'all' | 'image-gen' | 'china-ai' | 'global-ai' | 'storage' | 'search' | 'auth'

@@ -6,12 +6,12 @@ import type {
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
-} from '../../../../shared/utils/imageUploadSupport'
-import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
-import { preloadImage } from '../../../../shared/media/preloadImage'
-import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/mediaRef'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { i18n } from '../../../../shared/i18n'
+} from '../../../../core/utils/imageUploadSupport'
+import { prepareImageAssetForUpload } from '../../../../core/media/imageAssetPipeline'
+import { preloadImage } from '../../session/media/preloadImage'
+import { buildMediaBrowserURL, type MediaRef } from '../../../../core/media/mediaRef'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
+import { i18n } from '../../../../core/i18n'
 import { resolveImageNodeFrameSize } from '../../../board/ports/canvas'
 import { readCurrentBoardIdRef } from '../board-session/currentBoardId.ts'
 import type { CanvasGraphNodeIdForKind } from '../../domain/graph'

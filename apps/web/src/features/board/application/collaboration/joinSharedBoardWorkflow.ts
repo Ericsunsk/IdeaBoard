@@ -3,7 +3,7 @@ import {
   BoardWorkspaceUnavailableError,
   joinWorkspaceBoardByShareToken,
 } from '../../infrastructure/api/boardsResource'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { useBoardRepository } from '../catalog/repository'
 
 export interface JoinSharedBoardResult {

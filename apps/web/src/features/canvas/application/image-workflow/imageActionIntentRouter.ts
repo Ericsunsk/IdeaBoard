@@ -13,7 +13,7 @@ import {
 } from '../execution'
 import type { PromptAspectRatio } from '../../../board/ports/canvas'
 import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   ACTIVE_NODE_PANEL_KIND,
   type ActiveNodePanel,

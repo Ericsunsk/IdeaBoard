@@ -1,4 +1,4 @@
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useImageWorkflowExecution } from './useImageWorkflowExecution'

@@ -7,7 +7,7 @@ import {
   type BoardRepository,
 } from '../../../board/ports/canvas'
 import { createBoardRepository, replaceBoards } from '../../../board'
-import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
+import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 

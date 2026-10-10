@@ -1,17 +1,17 @@
 import type {
   UserAccountMenuItem,
   UserIdeaBalanceControl,
-} from '../../../../../shared/components/userAccountMenu.types'
+} from '../../../../account/ui/chrome/userAccountMenu.types'
 
-export type CanvasChromeBoardOption = {
+type CanvasChromeBoardOption = {
   id: string
   name: string
 }
 
-export type CanvasChromeCatalogRecoveryState =
+type CanvasChromeCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
 
-export type CanvasChromeArchivedState = {
+type CanvasChromeArchivedState = {
   isArchived: boolean
   isRestoring: boolean
 }

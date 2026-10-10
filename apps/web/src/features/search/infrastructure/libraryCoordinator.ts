@@ -1,4 +1,4 @@
-import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 import type { SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
 import { inject, provide, toValue, type InjectionKey, type MaybeRefOrGetter } from 'vue'
 import {

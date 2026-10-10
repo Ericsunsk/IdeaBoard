@@ -1,15 +1,16 @@
 import { computed, onMounted } from 'vue'
 import { authTransport, useAuthOverlay, useUserStore } from '../../auth'
-import { canAccessAdmin } from '../../../shared/auth/adminAccess'
+import { canAccessAdmin } from '../../../core/auth/adminAccess'
 import type {
   UserAccountMenuItem,
   UserIdeaBalanceControl,
-} from '../../../shared/components/userAccountMenu.types'
-import { ADMIN_ROOT_PATH, HOME_PATH } from '../../../shared/constants/routePaths'
-import { i18n } from '../../../shared/i18n'
-import { formatLocaleNumber } from '../../../shared/i18n/formatters'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
-import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
+} from '../../account/ui/chrome/userAccountMenu.types'
+import { ADMIN_ROOT_PATH } from '../../admin/routePaths'
+import { HOME_PATH } from '../routePaths'
+import { i18n } from '../../../core/i18n'
+import { formatLocaleNumber } from '../../../core/i18n/formatters'
+import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
+import { formatIdeaAmount } from '../../../core/i18n/userIdeaCurrency'
 import {
   defaultAccountTab,
   useAccountOverlay,

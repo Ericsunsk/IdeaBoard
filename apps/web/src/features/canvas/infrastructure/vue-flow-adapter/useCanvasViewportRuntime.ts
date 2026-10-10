@@ -26,7 +26,7 @@ export type CanvasFlowMovePayload = {
   }
 }
 
-export type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'viewport-pan' | 'node-drag'
+type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'viewport-pan' | 'node-drag'
 
 export type CanvasMiniMapCenterRequestPayload = {
   position: {

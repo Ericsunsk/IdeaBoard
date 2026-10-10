@@ -1,4 +1,4 @@
-export type ImageProcessingSchedulerTaskContext = {
+type ImageProcessingSchedulerTaskContext = {
   taskId: string
   revision: number
   signal: AbortSignal

@@ -1,9 +1,9 @@
 import { computed, onScopeDispose, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type { ControlLedgerTransaction } from '../../../../shared/api/generated-query/control/model'
-import { subscribeUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
-import { keepPrevious } from '../../../../shared/query/queryDefaults'
+import type { ControlLedgerTransaction } from '../../../../api/generated-query/control/model'
+import { subscribeUserCreditsInvalidation } from '../../../../core/query/userCreditsInvalidation'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
+import { keepPrevious } from '../../../../core/query/queryDefaults'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import {
   buildAdminCreditCommandRequest,

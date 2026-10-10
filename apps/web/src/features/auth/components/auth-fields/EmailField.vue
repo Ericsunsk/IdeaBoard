@@ -52,8 +52,8 @@
 import type { HTMLAttributes } from 'vue'
 import { Input } from '@/components/ui/input'
 import AuthFieldShell from './AuthFieldShell.vue'
-import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'
-import { ibFormInputIconClass } from '../../../../shared/theme/formControls'
+import { resolveInteractiveControlState } from '../../../../core/interaction/interactiveControlState'
+import { ibFormInputIconClass } from '../../../../theme/formControls'
 
 const props = withDefaults(
   defineProps<{

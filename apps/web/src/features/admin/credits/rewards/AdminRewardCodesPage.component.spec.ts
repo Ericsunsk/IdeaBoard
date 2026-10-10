@@ -1,8 +1,8 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
-import { i18n } from '../../../../shared/i18n'
-import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
+import { i18n } from '../../../../core/i18n'
+import { loadLocaleMessages } from '../../../../core/i18n/userLocale'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
@@ -35,10 +35,10 @@ vi.mock('./rewardCodeRedemptionResource', async (importOriginal) => ({
   createRewardCodeRedemptionResource: () => redemptionsResource,
 }))
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 // Route clipboard access to the spec-controlled API so success and failure stay deterministic.
-vi.mock('../../../../shared/composables/useAppClipboard', () => ({
+vi.mock('../../../../core/composables/useAppClipboard', () => ({
   useAppClipboard: () => ({
     copyText: (text: string) => {
       const clipboard = (

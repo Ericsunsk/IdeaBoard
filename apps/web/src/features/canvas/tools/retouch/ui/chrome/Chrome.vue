@@ -82,7 +82,7 @@ const emit = defineEmits<{
   (
     e: 'update-param',
     key: RetouchEffectParamKey,
-    value: RetouchEffectParamMap[RetouchEffectParamKey]
+    value: RetouchEffectParamMap[RetouchEffectParamKey],
   ): void
   (e: 'update:params', params: RetouchNonHslWholeParams): void
   (e: 'apply-retouch'): void

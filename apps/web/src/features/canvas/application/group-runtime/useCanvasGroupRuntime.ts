@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { BoardSnapshot, CanvasGroup } from '../../../board/ports/canvas'
 import type { PendingImageExecutionLease } from '../execution/pending-execution'
@@ -72,7 +72,7 @@ export type CanvasGroupRuntimeCommands = {
   groupResize: GroupResizeRuntime
 }
 
-export type CanvasGroupRuntimeInternalHooks = {
+type CanvasGroupRuntimeInternalHooks = {
   selectedGroupId: Ref<CanvasGraphGroupId | null>
   selectedGroupCoveredExternalNodeIds: ComputedRef<CanvasGraphNodeId[]>
   projectCurrentGroupNodeLayers: (nodes: readonly Node[]) => Node[]

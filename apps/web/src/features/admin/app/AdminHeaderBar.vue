@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { useSupportChannels } from '../../../shared/composables/useSupportChannels'
+import { useSupportChannels } from '../../../core/composables/useSupportChannels'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminPopover from '../shared/components/AdminPopover.vue'
@@ -142,14 +142,15 @@ import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
 import { BellNotificationSolid as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'
 import { useUserStore } from '../../auth'
-import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useLogoutRedirect } from '../../../core/composables/useLogoutRedirect'
 import { useAnomalyRadar } from '../shared/composables/useAnomalyRadar'
 import { useAdminToast } from '../shared/lib/toast'
 import type { AdminAnomalyItem } from '../shared/lib/anomalyRules'
 import { adminAnomalyPopoverClass } from '../shared/lib/uiClasses'
-import { ADMIN_LOGIN_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
-import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
-import type { UserAccountMenuItem } from '../../../shared/components/userAccountMenu.types'
+import { ADMIN_LOGIN_PATH } from '../routePaths'
+import { USER_BOARDS_PATH } from '../../workspace/routePaths'
+import UserAccountMenu from '../../account/ui/chrome/UserAccountMenu.vue'
+import type { UserAccountMenuItem } from '../../account/ui/chrome/userAccountMenu.types'
 
 defineProps<{
   activeItem: AdminNavigationItem

@@ -159,7 +159,7 @@ function checkMakeFactoryFixtures(): void {
     ['spec-exclusion', 'src/test/factories/new.unit.spec.ts', 'export function makeSpec() {}', []],
     [
       'generated-exclusion',
-      'src/shared/api/generated-query/model.ts',
+      'src/api/generated-query/model.ts',
       'export const makeGenerated = () => ({})',
       [],
     ],
@@ -277,7 +277,7 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies storage status color transitions and stable row opacity during toggle updates.',
     },
   ],
-  'src/shared/components/StatusBadge.component.spec.ts': [
+  'src/core/components/StatusBadge.component.spec.ts': [
     {
       reason:
         'Verifies the shared Badge carrier, semantic tone and dot colors, fixed sizes, and caller class merging.',
@@ -421,13 +421,13 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',
     },
   ],
-  'src/shared/components/DataTableFrame.component.spec.ts': [
+  'src/core/components/DataTableFrame.component.spec.ts': [
     {
       reason:
         'Verifies the single table-container scroll surface and its mechanical accessibility class.',
     },
   ],
-  'src/shared/components/ActionButton.component.spec.ts': [
+  'src/core/components/ActionButton.component.spec.ts': [
     {
       reason:
         'Verifies the shared action chrome (built-in action class, small-size token, caller-class merge) that the migrated call sites rely on; the DOM harness cannot compute Tailwind styles.',

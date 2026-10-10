@@ -73,10 +73,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
-import {
-  lightboxScrimIconButtonClass,
-  lightboxScrimLinkClass,
-} from '../../../shared/theme/lightboxScrim'
+import { lightboxScrimIconButtonClass, lightboxScrimLinkClass } from '../../../theme/lightboxScrim'
 import type { LibraryAssetView } from '../domain/transfer'
 
 const props = defineProps<{

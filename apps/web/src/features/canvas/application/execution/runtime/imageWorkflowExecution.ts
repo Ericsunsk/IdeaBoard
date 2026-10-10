@@ -21,11 +21,11 @@ import {
   type GenerationExecutionPlan,
 } from '../planning/imageExecutionPlan'
 import type { BoardAttachment } from '../board-attachment'
-import type { TaskImageResult } from '../../../../../shared/query/taskResult'
+import type { TaskImageResult } from '../../../../../core/query/taskResult'
 import { type CanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 import { assemblePendingImageWorkflow } from './pendingWorkflowAssembly'
-import { resolveMediaAssetProcessingURL } from '../../../../../shared/api/mediaAssetDelivery'
+import { resolveMediaAssetProcessingURL } from '../../../../../api/mediaAssetDelivery'
 
 export type ImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 

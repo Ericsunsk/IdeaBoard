@@ -1,15 +1,17 @@
-import { fetchCurrentUserInfo } from '../../../shared/api/userSession'
-import type { User } from '../../../shared/api/sessionUserType'
-import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
-import { USER_BOARDS_PATH, USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
-import { normalizeSafeInternalRedirectPath } from '../../../shared/auth/sessionPolicy'
+import { fetchCurrentUserInfo } from '../../../api/userSession'
+import type { User } from '../../../api/sessionUserType'
+import { resetWorkspaceMediaDeliveryOnIdentitySwitch } from '../../../api/mediaAssetMetadata'
+import { resetWorkspaceEventStreams } from '../../../api/workspaceEventStream'
+import { clearAuthScopedQueryCache } from '../../../core/query/queryClient'
+import { USER_BOARDS_PATH, USER_AUTH_CALLBACK_PATH } from '../../workspace/routePaths'
+import { normalizeSafeInternalRedirectPath } from '../../../core/auth/sessionPolicy'
 import { authTransport } from './transport'
 import {
   clearPersistedSession,
   persistSessionUser,
   readStoredSessionUser,
 } from './sessionPersistence'
-import { forgetStoredAuthScope } from '../../../shared/utils/auth'
+import { forgetStoredAuthScope } from '../../../core/utils/auth'
 import { isSessionFresh } from './freshness'
 
 // Session trust window and freshness predicate live in
@@ -75,11 +77,30 @@ export function createBrowserSessionTransition(
   const loadUser = dependencies.loadUser ?? fetchCurrentUserInfo
   const now = dependencies.now ?? Date.now
 
+  // Identity epoch: every explicit identity change (commit/clear) and every
+  // fetch start claims a new generation. A fetch captures its generation and
+  // commits only while it is still current, so a late resolve from a previous
+  // epoch (e.g. setAuth(user-3) while a user-2 projection is in flight) can
+  // neither overwrite the new identity nor clear it via a stale 401.
+  let identityEpoch = 0
+
+  // Workspace delivery/stream state is identity-scoped exactly like the Query
+  // cache: a new identity must not read the previous identity's metadata, and
+  // shared SSE transports must not survive the switch.
+  function resetWorkspaceStateOnIdentitySwitch(): void {
+    resetWorkspaceMediaDeliveryOnIdentitySwitch()
+    resetWorkspaceEventStreams()
+  }
+
   function commitUser(user: User): User {
     const previousUser = state.getUser()
+    identityEpoch += 1
     state.commit(user)
     persistSessionUser(user)
-    if (previousUser?.public_id !== user.public_id) clearAuthScopedQueryCache()
+    if (previousUser?.public_id !== user.public_id) {
+      clearAuthScopedQueryCache()
+      resetWorkspaceStateOnIdentitySwitch()
+    }
     return user
   }
 
@@ -90,9 +111,32 @@ export function createBrowserSessionTransition(
   }
 
   function clearSession() {
+    identityEpoch += 1
     state.clear()
     clearPersistedSession()
     clearAuthScopedQueryCache()
+    resetWorkspaceStateOnIdentitySwitch()
+  }
+
+  function isStaleRequest(requestEpoch: number): boolean {
+    return requestEpoch !== identityEpoch
+  }
+
+  function commitUnlessStale(user: User, requestEpoch: number): User | null {
+    if (isStaleRequest(requestEpoch)) return state.getUser()
+    return commitUser(user)
+  }
+
+  function clearUnlessStale(requestEpoch: number): User | null {
+    if (isStaleRequest(requestEpoch)) return state.getUser()
+    clearSession()
+    return null
+  }
+
+  function failOpenUnlessStale(requestEpoch: number): User | null {
+    if (isStaleRequest(requestEpoch)) return state.getUser()
+    state.markUnloaded()
+    return state.getUser()
   }
 
   async function fetchUserInfo(
@@ -100,13 +144,13 @@ export function createBrowserSessionTransition(
     options: { retryTransient?: boolean | undefined } = {},
   ): Promise<User | null> {
     if (state.isLoaded() && !force) return state.getUser()
+    const requestEpoch = ++identityEpoch
     try {
       const session = await loadUser()
-      return commitUser(session.user)
+      return commitUnlessStale(session.user, requestEpoch)
     } catch (error) {
       if (isSessionExpiredStatus(getErrorStatusCode(error))) {
-        clearSession()
-        return null
+        return clearUnlessStale(requestEpoch)
       }
       // Post-auth flows (login / OTP verify / email change) just proved the
       // credential, so a transient projection failure retries once before the
@@ -114,18 +158,15 @@ export function createBrowserSessionTransition(
       if (options.retryTransient) {
         try {
           const session = await loadUser()
-          return commitUser(session.user)
+          return commitUnlessStale(session.user, requestEpoch)
         } catch (retryError) {
           if (isSessionExpiredStatus(getErrorStatusCode(retryError))) {
-            clearSession()
-            return null
+            return clearUnlessStale(requestEpoch)
           }
         }
-        clearSession()
-        return null
+        return clearUnlessStale(requestEpoch)
       }
-      state.markUnloaded()
-      return state.getUser()
+      return failOpenUnlessStale(requestEpoch)
     }
   }
 
@@ -133,7 +174,9 @@ export function createBrowserSessionTransition(
     const cacheValid =
       state.isLoaded() && !options.fresh && isSessionFresh(state.getValidatedAt(), now())
     if (cacheValid) return state.getUser()
+    const requestEpoch = identityEpoch
     if (!(await transport.hasSession())) {
+      if (requestEpoch !== identityEpoch) return state.getUser()
       clearSession()
       return null
     }

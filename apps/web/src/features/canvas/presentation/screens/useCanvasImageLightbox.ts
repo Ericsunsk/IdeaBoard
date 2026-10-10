@@ -3,12 +3,12 @@ import type { ImageNodeItem, ImageNodeOutputItem } from '../../../board/ports/ca
 import {
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,
-} from '../../../../shared/config/runtimeUrls.ts'
+} from '../../../../core/config/runtimeUrls.ts'
 import {
   getMediaAssetMetadata,
   resolveMediaAssetOriginalURL,
-} from '../../../../shared/api/mediaAssetDelivery.ts'
-import { readImageNaturalSize } from '../../../../shared/media/imageDimensions.ts'
+} from '../../../../api/mediaAssetDelivery.ts'
+import { readImageNaturalSize } from '../../../../core/media/imageDimensions.ts'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import 'photoswipe/style.css'
 

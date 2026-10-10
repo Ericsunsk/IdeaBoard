@@ -25,7 +25,7 @@ import { computed, useId } from 'vue'
 import type {
   FormFieldContractProps,
   FormFieldContractSlotProps,
-} from '@/shared/components/formFieldContract'
+} from '@/core/components/formFieldContract'
 
 /** Admin adapter for the neutral field contract. Admin owns markup and tokens. */
 export type AdminFormFieldSlotProps = Pick<FormFieldContractSlotProps, 'describedbyId' | 'invalid'>

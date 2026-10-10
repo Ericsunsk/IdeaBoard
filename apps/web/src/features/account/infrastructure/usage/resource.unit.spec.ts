@@ -5,7 +5,7 @@ const transport = vi.hoisted(() => ({
   request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/client', () => ({
+vi.mock('../../../../api/client', () => ({
   api: { request: transport.request },
 }))
 

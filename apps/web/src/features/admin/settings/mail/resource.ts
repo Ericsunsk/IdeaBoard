@@ -3,15 +3,15 @@ import {
   buildRoutineControlMutationHeaders,
   type ControlMutationOptions,
 } from '../../shared/lib/controlMutation'
-import type { ControlMailConfigRequest } from '../../../../shared/api/generated-query/control/model/controlMailConfigRequest'
+import type { ControlMailConfigRequest } from '../../../../api/generated-query/control/model/controlMailConfigRequest'
 import { loadControlSetting } from '../../shared/lib/controlResource'
 import {
   deleteControlMailSetting,
   getControlMailSetting,
   testControlMailSetting,
   updateControlMailSetting,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
 import type { MailConfigSummary, MailConfigUpdate } from './types'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
@@ -27,7 +27,7 @@ const MAIL_CONTROL_MESSAGES = {
 
 // Mail configuration uses Control Plane envelopes and audited mutations.
 // Idempotency-Key is header-only; operator reason also accompanies body writes.
-export type MailConfigMutationOptions = ControlMutationOptions
+type MailConfigMutationOptions = ControlMutationOptions
 
 export interface AdminMailConfigResource {
   get: () => Promise<MailConfigSummary>

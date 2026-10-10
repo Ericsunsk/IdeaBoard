@@ -15,7 +15,7 @@ function releaseCanvas(canvas: HTMLCanvasElement | null) {
 const DEFAULT_IMAGE_SOURCE_CACHE_LIMIT = 12
 const DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS = 24_000_000
 
-export type ImageSourceCacheErrorCode =
+type ImageSourceCacheErrorCode =
   | 'invalid-url'
   | 'fetch-failed'
   | 'not-image'
@@ -25,7 +25,7 @@ export type ImageSourceCacheErrorCode =
   | 'unsupported-canvas'
   | 'disposed'
 
-export type ImageSourceResolveOptions = Parameters<typeof resolveFetchUrl>[1]
+type ImageSourceResolveOptions = Parameters<typeof resolveFetchUrl>[1]
 
 export type ImageSourceCacheEntry = {
   readonly key: string

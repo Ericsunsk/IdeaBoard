@@ -7,14 +7,14 @@
 // No SSE, no readiness, no Vue: the retry policy stays with the
 // `task-lifecycle` cancel owner, which injects this seam.
 
-import { sanitizeApiErrorMessage } from '../../../../../shared/utils/errorMessages'
-import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../../shared/utils/workspaceId'
+import { sanitizeApiErrorMessage } from '../../../../../core/utils/errorMessages'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../../core/utils/workspaceId'
 import {
   cancelWorkspaceTask,
   isWorkspaceTaskGoneError,
-} from '../../../../../shared/api/workspaceTaskTransport'
-import { taskCancellationIdempotencyKey } from '../../../../../shared/api/idempotencyKey'
-import { i18n } from '../../../../../shared/i18n'
+} from '../../../../../api/workspaceTaskTransport'
+import { taskCancellationIdempotencyKey } from '../../../../../api/idempotencyKey'
+import { i18n } from '../../../../../core/i18n'
 import { getWorkspaceSelectionStore } from '../../../../workspace'
 import { errorCode, errorStatus } from './canvasTaskContractMapping'
 

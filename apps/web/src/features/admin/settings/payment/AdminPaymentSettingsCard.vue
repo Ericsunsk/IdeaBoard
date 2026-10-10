@@ -42,7 +42,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import StripeSettingsDialog from '../../payments/stripe-settings/StripeSettingsDialog.vue'

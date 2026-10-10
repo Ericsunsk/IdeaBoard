@@ -156,12 +156,12 @@ import {
   SpockHandGesture,
 } from '@iconoir/vue'
 import CanvasChromeBoardHeader from './CanvasChromeBoardHeader.vue'
-import UserAccountMenu from '../../../../../shared/components/UserAccountMenu.vue'
-import { useSupportChannels } from '../../../../../shared/composables/useSupportChannels'
+import UserAccountMenu from '../../../../account/ui/chrome/UserAccountMenu.vue'
+import { useSupportChannels } from '../../../../../core/composables/useSupportChannels'
 import {
   createPageChromeAccountRoundControlClass,
   createPageChromeRoundControlClass,
-} from '../../../../../shared/lib/pageChrome'
+} from '../../../../../core/lib/pageChrome'
 import type {
   CanvasChromeAccountState,
   CanvasChromeBoardState,

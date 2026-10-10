@@ -1,4 +1,4 @@
-import { SERVICE, type Service } from '../../../../../shared/domain/imageServices'
+import { SERVICE, type Service } from '../../../../../core/contracts/imageServices'
 import type {
   CanvasTaskRequestData,
   SubmitTaskReadinessData,
@@ -9,7 +9,7 @@ import {
   buildInpaintReadinessRequest,
   buildGenerationTaskRequest,
 } from '../commands/imageTaskRequests'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,

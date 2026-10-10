@@ -2,7 +2,7 @@ import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountDialog from './AccountDialog.vue'
 import { renderWithUser, screen } from '../../../../test/render'
-import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
+import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import { defaultAccountTab, type AccountTab } from '../../domain'
 
 const DialogRootStub = defineComponent({

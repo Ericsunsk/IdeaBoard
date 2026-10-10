@@ -245,7 +245,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [executionContract.ts](./apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts)                   | 前端 workflow feature contract      |
 | [generationIntent.ts](./apps/web/src/features/canvas/application/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
 | [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/application/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
-| [workspaceEventStream.ts](./apps/web/src/shared/api/workspaceEventStream.ts)                                                          | Task SSE events                     |
+| [workspaceEventStream.ts](./apps/web/src/api/workspaceEventStream.ts)                                                          | Task SSE events                     |
 | [features.go](./apps/api/internal/workflow/features.go)                                                           | 后端 canonical feature contract     |
 
 ### Task runtime
@@ -274,7 +274,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [middleware.go](./apps/api/internal/identity/auth/middleware.go)         | API auth middleware        |
 | [service_client.go](./apps/api/internal/identity/auth/service_client.go) | Go -> Auth internal client |
 | [index.ts](./apps/auth/src/index.ts)                                     | Auth service routes        |
-| [client.ts](./apps/web/src/shared/auth/client.ts)                        | Web auth client            |
+| [client.ts](./apps/web/src/core/auth/client.ts)                        | Web auth client            |
 | [userSession.ts](./apps/web/src/features/auth/session/userSession.ts)    | User session store         |
 | [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)   | Auth operation rules       |
 
@@ -328,9 +328,9 @@ Rules:
 
 Generated API:
 
-- `apps/web/src/shared/api/generated-query` 由 Orval 生成，不手动编辑。
+- `apps/web/src/api/generated-query` 由 Orval 生成，不手动编辑。
 - Route pages 和 components 不直接依赖 generated API。
-- 业务访问收口到 feature resource、feature adapter 或 shared composable。
+- 业务访问收口到 feature resource、feature adapter 或 horizontal API adapter。
 
 sqlc:
 
@@ -411,6 +411,11 @@ scripts/                     # packaging, deployment and release scripts
 
 apps/web/src/
 ├── app/                      # app startup, router, theme wiring
+├── api/                      # HTTP exit, transport contracts, generated clients
+├── core/                     # horizontal primitives and infrastructure runtime
+├── theme/                    # tokens, atoms and UI presets
+├── lib/                      # horizontal utilities
+├── components/               # standard UI primitives
 ├── features/                 # business modules
 │   ├── account/              # user account and billing settings
 │   ├── admin/                # Admin vertical contexts
@@ -421,7 +426,7 @@ apps/web/src/
 │   ├── library/              # asset library
 │   ├── search/               # search features
 │   ├── workspace/            # workspace routes, layout, shell (/user/* URLs)
-└── shared/                   # cross-feature API/auth/types/utils/assets
+└── shared/                   # one-phase compatibility shims; canonical docs in core/api
 
 apps/api/
 ├── cmd/                      # service entrypoints

@@ -1,7 +1,7 @@
-import type { AsyncActionFeedback } from '../../shared/composables/useAsyncAction'
-import { useAppToast } from '../../shared/composables/useAppToast'
-import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
-import { i18n } from '../../shared/i18n'
+import type { AsyncActionFeedback } from '../../core/composables/useAsyncAction'
+import { useAppToast } from '../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../core/errors/errorCatalog'
+import { i18n } from '../../core/i18n'
 
 type AuthToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'error'>
 

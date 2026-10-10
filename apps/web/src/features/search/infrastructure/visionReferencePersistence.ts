@@ -5,7 +5,7 @@ import {
   readSessionStorageItem,
   removeSessionStorageItem,
   writeSessionStorageItem,
-} from '../../../shared/utils/storage'
+} from '../../../core/utils/storage'
 
 const VISION_REF_CACHE_KEY = 'ideaboard:search:vision_refs'
 

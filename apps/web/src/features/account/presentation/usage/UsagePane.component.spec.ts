@@ -2,7 +2,7 @@ import { cleanup } from '@testing-library/vue'
 import { defineComponent, nextTick, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../../test/render'
-import { setUserLocale } from '../../../../shared/i18n'
+import { setUserLocale } from '../../../../core/i18n'
 import UsagePane from './UsagePane.vue'
 
 const usageState = vi.hoisted(() => ({

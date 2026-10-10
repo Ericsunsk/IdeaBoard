@@ -9,12 +9,12 @@ import {
   type PromptAspectRatio,
   type PromptNodeItem,
 } from '../../../../board/ports/canvas'
-import { parseRequestedOutputCount } from '../../../../../shared/domain/generationContract'
+import { parseRequestedOutputCount } from '../../../../../core/contracts/generationContract'
 import {
   normalizeOutputResolution,
   type OutputResolution,
-} from '../../../../../shared/domain/generationContract'
-import { i18n } from '../../../../../shared/i18n'
+} from '../../../../../core/contracts/generationContract'
+import { i18n } from '../../../../../core/i18n'
 import { EXECUTION_FUSION_META } from '../../../domain/execution-contracts/executionContract'
 import type { ImageTaskAction } from '../../../domain/execution-contracts/imageActionExecution'
 import { resolveOutpaintIntent, type OutpaintRect } from '../../../domain/graph/outpaintGeometry'
@@ -86,7 +86,7 @@ export type GenerationExecutionPlan = {
   resultOptions: ImageExecutionResultOptions
 }
 
-export type FusionExecutionInputImage = ResolvedFlowInputImage
+type FusionExecutionInputImage = ResolvedFlowInputImage
 
 export type FusionExecutionPlan = {
   kind: 'fusion'

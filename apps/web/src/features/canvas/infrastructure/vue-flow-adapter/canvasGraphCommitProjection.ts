@@ -7,7 +7,6 @@ import type {
 import {
   canvasConnectionToFlowEdge,
   canvasNodeToFlowNode,
-  type FlowAdapterEdge,
   type FlowAdapterNode,
 } from './flowSnapshotAdapter.ts'
 import { recordCanvasInteractionCount } from '../../infrastructure/browser/canvasInteractionMetrics.ts'
@@ -18,7 +17,7 @@ export type CanvasFlowGraphProjection = Readonly<{
   edges: Edge[]
 }>
 
-export type CanvasGraphCommitProjectionKind = 'incremental' | 'full'
+type CanvasGraphCommitProjectionKind = 'incremental' | 'full'
 export type CanvasGraphCommitProjection = Readonly<{
   kind: CanvasGraphCommitProjectionKind
   graph: CanvasFlowGraphProjection
@@ -415,5 +414,3 @@ export function createCanvasGraphCommitProjectionController(options: {
     needsRecovery: () => recoveryRequired,
   }
 }
-
-export type { FlowAdapterEdge, FlowAdapterNode }

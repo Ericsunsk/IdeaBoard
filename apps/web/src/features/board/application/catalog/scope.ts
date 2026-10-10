@@ -2,7 +2,7 @@ import {
   getAuthStorageUserScope,
   getRecoverableAuthStorageUserScope,
   subscribeAuthStorageScopeChange,
-} from '../../../../shared/utils/auth'
+} from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, subscribeWorkspaceSelectionChange } from '../../../workspace'
 
 // Active User + Workspace scope gates repository views and async mutations.

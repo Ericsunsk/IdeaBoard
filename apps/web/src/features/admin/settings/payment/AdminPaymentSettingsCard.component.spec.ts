@@ -5,7 +5,7 @@ import { renderWithUser, screen, within } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import AdminPaymentSettingsCard from './AdminPaymentSettingsCard.vue'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 vi.mock('../../payments/../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))

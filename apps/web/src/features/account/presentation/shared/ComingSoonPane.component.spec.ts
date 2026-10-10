@@ -1,7 +1,7 @@
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { renderWithUser, screen } from '../../../../test/render'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import ComingSoonPane from './ComingSoonPane.vue'
 
 const IconStub = defineComponent({

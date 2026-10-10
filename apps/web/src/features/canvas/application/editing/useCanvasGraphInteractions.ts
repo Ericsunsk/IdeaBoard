@@ -1,6 +1,6 @@
 import type { Edge, Elements, Node } from '@vue-flow/core'
 import { computed, ref, type Ref } from 'vue'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   resolveImageNodeFrameSize,
   resolveImageNodeLatestOutput,
@@ -23,7 +23,7 @@ import { resolveImageNodeDisplayPayload } from '../../infrastructure/vue-flow-ad
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
 import { resolveWritableCanvasGraphStore } from '../canvasGraphStoreWriter'
 import { renderImageRetouchRecipeFile, type ImageRetouchRenderSource } from '../../tools/retouch'
-import { resolveMediaAssetOriginalURL } from '../../../../shared/api/mediaAssetDelivery'
+import { resolveMediaAssetOriginalURL } from '../../../../api/mediaAssetDelivery'
 
 type MessageLoadingHandle = {
   destroy: () => void

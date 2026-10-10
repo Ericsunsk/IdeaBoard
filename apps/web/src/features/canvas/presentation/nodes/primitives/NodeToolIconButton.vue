@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { resolveInteractiveControlState } from '../../../../../shared/interaction/interactiveControlState'
+import { resolveInteractiveControlState } from '../../../../../core/interaction/interactiveControlState'
 
 const props = withDefaults(
   defineProps<{

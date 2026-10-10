@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
-} from '../../../../shared/domain/generationContract'
-import { SERVICE, SERVICE_SLUGS } from '../../../../shared/domain/imageServices'
+} from '../../../../core/contracts/generationContract'
+import { SERVICE, SERVICE_SLUGS } from '../../../../core/contracts/imageServices'
 
 // #856 service + resolution catalog contract: Canvas, Admin Prompt,
 // Pricing, and Model Pool read these two shared sources instead of local
 // copies. Downstream tickets (#859/#860/#863) must consume exactly:
-//   services   -> apps/web/src/shared/domain/imageServices.ts (SERVICE)
-//   resolutions -> apps/web/src/shared/domain/generationContract.ts
+//   services   -> apps/web/src/core/contracts/imageServices.ts (SERVICE)
+//   resolutions -> apps/web/src/core/contracts/generationContract.ts
 //                 (OUTPUT_RESOLUTION_OPTIONS, parseOutputResolution)
 describe('service resolution catalog contract', () => {
   it('keeps the service catalog on the eight workflow slugs', () => {

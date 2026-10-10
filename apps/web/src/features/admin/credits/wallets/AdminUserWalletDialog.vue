@@ -110,11 +110,11 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@iconoir/vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { useAdminCreditsBillingOperationsFeedback } from '../shared/feedback'
-import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { useAdminCreditWalletResource, type AdminCreditLedgerTransaction } from './resource'
 import {
   type AdminCreditCommandKind,

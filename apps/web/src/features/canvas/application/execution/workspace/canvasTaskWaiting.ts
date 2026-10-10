@@ -12,14 +12,14 @@
 import {
   getWorkspaceTask,
   isWorkspaceTaskGoneError,
-} from '../../../../../shared/api/workspaceTaskTransport'
-import { waitWorkspaceTaskTerminal } from '../../../../../shared/api/workspaceTaskWaiter'
-import type { WorkspaceTaskItem } from '../../../../../shared/api/workspaceTaskContract'
-import type { WorkspaceTaskOutputRef } from '../../../../../shared/api/workspaceTaskContract'
-import { i18n } from '../../../../../shared/i18n'
-import { resolveWorkspaceMediaAssetDerivativeURL } from '../../../../../shared/api/mediaAssetDelivery'
-import { notifyUserCreditsInvalidation } from '../../../../../shared/query/userCreditsInvalidation'
-import type { TaskImageResult } from '../../../../../shared/query/taskResult'
+} from '../../../../../api/workspaceTaskTransport'
+import { waitWorkspaceTaskTerminal } from '../../../../../api/workspaceTaskWaiter'
+import type { WorkspaceTaskItem } from '../../../../../api/workspaceTaskContract'
+import type { WorkspaceTaskOutputRef } from '../../../../../api/workspaceTaskContract'
+import { i18n } from '../../../../../core/i18n'
+import { resolveWorkspaceMediaAssetDerivativeURL } from '../../../../../api/mediaAssetDelivery'
+import { notifyUserCreditsInvalidation } from '../../../../../core/query/userCreditsInvalidation'
+import type { TaskImageResult } from '../../../../../core/query/taskResult'
 import {
   createTaskCancelledError,
   createTaskResultFailureError,

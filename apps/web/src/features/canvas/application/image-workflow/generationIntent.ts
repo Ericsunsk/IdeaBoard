@@ -1,6 +1,6 @@
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../board/ports/canvas'
 import type { MediaInputImage } from '../editing/useFlowMediaInputImages.ts'
-import type { MediaRef } from '../../../../shared/media/mediaRef'
+import type { MediaRef } from '../../../../core/media/mediaRef'
 
 export type GenerationIntentOptions = {
   cancelFlowOutpaintMode: () => void

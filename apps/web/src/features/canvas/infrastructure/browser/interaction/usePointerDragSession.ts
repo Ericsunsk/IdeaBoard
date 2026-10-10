@@ -19,11 +19,11 @@ export type UsePointerDragSessionOptions<TPayload> = {
   onCancel?: (context: PointerDragSessionContext<TPayload>) => void
 }
 
-export type BeginPointerDragSessionOptions = {
+type BeginPointerDragSessionOptions = {
   target?: PointerDragTarget | null
 }
 
-export type PointerDragSession<TPayload> = {
+type PointerDragSession<TPayload> = {
   pointerId: number
   payload: TPayload
   target: PointerDragTarget | null

@@ -147,14 +147,14 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 
 // ── Token budgets (repo-wide) ─────────────────────────────────────────────
 // Hex colors and font stacks live in the token source of truth
-// (`src/app/style.css`, `src/shared/theme/**`, `src/features/admin/shared/lib/taskMetricTokens.ts`);
+// (`src/app/style.css`, `src/theme/**`, `src/features/admin/shared/lib/taskMetricTokens.ts`);
 // call sites reference tokens. Type sizes use the type scale (`text-admin-*`);
 // display/optical one-offs outside the scale carry explicit
 // waivers with reasons instead of forced mappings. Breakpoints use the named
 // mobile-first system (`sm/md/lg`, plus `xl` where already established);
 // arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode ships via
 // token resolution: `html.dark` overrides live in
-// `src/shared/theme/tokens/dark.css`, so `dark:` variants are banned outright —
+// `src/theme/tokens/dark.css`, so `dark:` variants are banned outright —
 // components use semantic tokens that resolve in both modes instead.
 
 function isTokenOwnerFile(file: SourceFile): boolean {
@@ -162,7 +162,7 @@ function isTokenOwnerFile(file: SourceFile): boolean {
     file.sourcePath === 'src/app/style.css' ||
     file.sourcePath === 'src/features/admin/shared/lib/taskMetricTokens.ts' ||
     file.sourcePath === 'src/features/admin/shared/lib/adminThemeTokens.ts' ||
-    file.sourcePath.startsWith('src/shared/theme/')
+    file.sourcePath.startsWith('src/theme/')
   )
 }
 
@@ -195,7 +195,7 @@ const tokenCountRules = [
     id: 'dark-variant',
     pattern: /dark:/g,
     message:
-      'Dark mode ships through semantic tokens (html.dark overrides in shared/theme/tokens/dark.css); do not add dark: overrides, use tokens that resolve in both modes.',
+      'Dark mode ships through semantic tokens (html.dark overrides in theme/tokens/dark.css); do not add dark: overrides, use tokens that resolve in both modes.',
   },
   {
     id: 'legacy-token',
@@ -517,7 +517,7 @@ function isAdminProductionStyleFile(file: SourceFile): boolean {
 function isCanvasTokenAllowedFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
-    file.sourcePath.startsWith('src/shared/theme/') ||
+    file.sourcePath.startsWith('src/theme/') ||
     file.sourcePath.startsWith('src/features/canvas/')
   )
 }

@@ -54,7 +54,7 @@ export type RetouchLayerStack = {
   selectedLayerId: string
 }
 
-export type RetouchUpdateSelectedParamCommand = {
+type RetouchUpdateSelectedParamCommand = {
   [K in RetouchEffectParamKey]: {
     type: 'update-selected-param'
     key: K
@@ -467,7 +467,7 @@ export function isSharpenParam(key: RetouchEffectParamKey, value: unknown): bool
  * does not belong to the target layer stays a runtime no-op (same
  * reference), exactly like the mismatched whole-params packets.
  */
-export type RetouchSingleParamPatch = {
+type RetouchSingleParamPatch = {
   [K in RetouchEffectParamKey]: { kind: 'single-param'; key: K; value: RetouchEffectParamMap[K] }
 }[RetouchEffectParamKey]
 

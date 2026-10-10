@@ -8,12 +8,12 @@ import {
   replaceBoardDocument,
   restoreBoard,
   updateBoard,
-} from '../../../../shared/api/generated-query/public/boards/boards'
-import type { Board } from '../../../../shared/api/generated-query/public/model/board'
-import type { BoardDocument } from '../../../../shared/api/generated-query/public/model/boardDocument'
-import { boardOperationIdempotencyKey } from '../../../../shared/api/idempotencyKey'
-import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../shared/utils/workspaceId'
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
+} from '../../../../api/generated-query/public/boards/boards'
+import type { Board } from '../../../../api/generated-query/public/model/board'
+import type { BoardDocument } from '../../../../api/generated-query/public/model/boardDocument'
+import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../core/utils/workspaceId'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
 import { getWorkspaceSelectionStore } from '../../../workspace'
 import type { BoardState } from '../../domain'
 
@@ -82,11 +82,6 @@ export type WorkspaceBoardDocument = {
   schemaVersion: number
   document: unknown
   updatedAt: number
-}
-
-export type WorkspaceBoardRecord = {
-  meta: WorkspaceBoardMeta
-  state: BoardState
 }
 
 export type SaveWorkspaceBoardResult = {

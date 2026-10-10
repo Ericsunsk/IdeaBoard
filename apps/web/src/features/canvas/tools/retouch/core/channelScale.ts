@@ -1,4 +1,4 @@
-import { clamp } from '../../../../../shared/utils/number.ts'
+import { clamp } from '../../../../../core/utils/number.ts'
 
 export const RETOUCH_CHANNEL_MIN = 0
 export const RETOUCH_CHANNEL_MAX = 255

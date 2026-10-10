@@ -27,7 +27,7 @@ import {
   ADMIN_PAYMENT_ORDERS_PATH,
   ADMIN_REWARD_CODES_PATH,
   isPathUnderRoute,
-} from '../../../../shared/constants/routePaths'
+} from '../../routePaths'
 import { useAdminCreditHealthResource } from '../health/resource'
 import { getCreditHealthPresentation } from '../health/creditHealthPresentation'
 import { CREDITS_BILLING_LAYOUT_MESSAGES } from './messages'

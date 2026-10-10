@@ -6,8 +6,8 @@ import {
   listControlSearchProviders,
   testControlSearchProvider,
   updateControlSearchProvider,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 import type {
   SearchProviderId,
@@ -26,7 +26,7 @@ import type {
 // POST read-guard, so both skip the operator-reason ceremony and audit an
 // empty reason while keeping the header-only Idempotency-Key.
 
-export type SearchProviderMutationOptions = ControlMutationOptions
+type SearchProviderMutationOptions = ControlMutationOptions
 
 export interface AdminSearchProviderResource {
   list: () => Promise<SearchProviderList>

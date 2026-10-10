@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import type { useAsyncAction } from '../../../core/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { useOptimisticToggle } from '../shared/composables/useOptimisticToggle'
 import { requireDestructiveReason } from '../shared/lib/confirmSettingsSave'

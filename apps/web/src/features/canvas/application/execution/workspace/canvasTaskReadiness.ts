@@ -7,11 +7,11 @@
 // inferred from the absence of 402. There is no v1 matrix endpoint;
 // matrix fans out to one quote per request. No SSE, no cancel, no Vue.
 
-import type { ApiClientError } from '../../../../../shared/api/client'
-import { quoteWorkspaceTask } from '../../../../../shared/api/workspaceTaskTransport'
-import type { Service } from '../../../../../shared/domain/imageServices'
-import { i18n } from '../../../../../shared/i18n'
-import { readinessErrorCopy } from '../../../../../shared/errors/errorCatalog'
+import type { ApiClientError } from '../../../../../api/client'
+import { quoteWorkspaceTask } from '../../../../../api/workspaceTaskTransport'
+import type { Service } from '../../../../../core/contracts/imageServices'
+import { i18n } from '../../../../../core/i18n'
+import { readinessErrorCopy } from '../../../../../core/errors/errorCatalog'
 import type {
   CanvasTaskRequestData,
   SubmitTaskReadinessData,

@@ -133,8 +133,8 @@ import { ArrowLeft, SquareCursor } from '@iconoir/vue'
 import {
   appOverlayMenuItemClass,
   appOverlayMenuThemeClass,
-} from '../../../../../shared/theme/appOverlayMenu'
-import { createPopoverMotionTransition } from '../../../../../shared/motion/popoverMotion'
+} from '../../../../../theme/appOverlayMenu'
+import { createPopoverMotionTransition } from '../../../../../core/motion/popoverMotion'
 import type { CanvasChromeBoardState } from './types'
 
 const props = defineProps<{

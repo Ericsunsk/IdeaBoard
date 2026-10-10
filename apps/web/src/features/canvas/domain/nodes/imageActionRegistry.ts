@@ -1,6 +1,6 @@
-import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import { serviceLabelKey } from '../../../../shared/domain/serviceRegistry'
-import type { Service } from '../../../../shared/domain/imageServices'
+import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../core/nodes/imageActions'
+import { serviceLabelKey } from '../../core/nodes/serviceLabelKey'
+import type { Service } from '../../../../core/contracts/imageServices'
 import {
   IMAGE_EXECUTION_MODE,
   isImageStrengthAction,
@@ -37,7 +37,7 @@ type WorkflowImageNodeAction = Extract<ImageNodeAction, Service>
  * Registry facts only: mode + icon + label key. Copy resolves read-time so it
  * never freezes at module import.
  */
-export type ImageActionRegistryItem = {
+type ImageActionRegistryItem = {
   action: ImageNodeAction
   mode: ImageActionMode
   labelKey: string

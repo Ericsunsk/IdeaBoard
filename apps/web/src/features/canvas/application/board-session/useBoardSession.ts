@@ -4,7 +4,7 @@ import {
   isBoardSyncConflictError,
   type BoardSnapshot,
 } from '../../../board/ports/canvas'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -74,17 +74,17 @@ function normalizeBoardSessionIdentity(
   return { userId, userUid }
 }
 
-export type BoardSessionMessage = {
+type BoardSessionMessage = {
   warning: (message: string) => void
 }
 
-export type BoardSessionSaveOptions = {
+type BoardSessionSaveOptions = {
   waitForPreview?: boolean | undefined
 }
 
-export type BoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict' | 'archived'
+type BoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict' | 'archived'
 
-export type BoardSessionRemoteSyncResult =
+type BoardSessionRemoteSyncResult =
   { ok: true } | { ok: false; reason: BoardSessionRemoteSyncFailureReason; error: unknown }
 
 export type BoardSessionSaveResult = {
@@ -103,7 +103,7 @@ export type BoardSession = {
   refreshPreview: (boardId: string, snapshot: BoardSnapshot) => Promise<void>
 }
 
-export type UseBoardSessionOptions = {
+type UseBoardSessionOptions = {
   getBoardIdQuery: () => unknown
   getUserIdentity: () => BoardSessionIdentity
   getWorkspaceId?: (() => string) | undefined

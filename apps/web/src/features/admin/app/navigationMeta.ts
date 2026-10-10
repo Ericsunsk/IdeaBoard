@@ -6,7 +6,7 @@ import {
   ADMIN_STATISTICS_PATH,
   ADMIN_MONITOR_PATH,
   ADMIN_USERS_PATH,
-} from '../../../shared/constants/routePaths'
+} from '../routePaths'
 
 export const ADMIN_DEFAULT_PATH = ADMIN_STATISTICS_PATH
 

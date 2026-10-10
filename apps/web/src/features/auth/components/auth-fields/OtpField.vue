@@ -38,7 +38,7 @@
 import type { HTMLAttributes } from 'vue'
 import { Input } from '@/components/ui/input'
 import AuthFieldShell from './AuthFieldShell.vue'
-import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'
+import { resolveInteractiveControlState } from '../../../../core/interaction/interactiveControlState'
 
 const props = withDefaults(
   defineProps<{

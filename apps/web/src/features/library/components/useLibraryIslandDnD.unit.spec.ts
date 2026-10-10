@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }))
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
+vi.mock('../../../core/composables/useAppToast', () => ({
   useAppToast: () => ({ success: vi.fn(), error: mocks.toastError }),
 }))
 

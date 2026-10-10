@@ -1,5 +1,5 @@
-import { createPrefixedId } from '../../../../shared/utils/ids'
-import { readLocalStorageItem, writeLocalStorageJson } from '../../../../shared/utils/storage'
+import { createPrefixedId } from '../../../../core/utils/ids'
+import { readLocalStorageItem, writeLocalStorageJson } from '../../../../core/utils/storage'
 import { getRecoverableBoardScope, scopedBoardStorageKey } from './scope'
 
 export interface BoardMeta {

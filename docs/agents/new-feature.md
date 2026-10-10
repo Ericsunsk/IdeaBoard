@@ -3,37 +3,42 @@
 > Scope: web-only (`apps/web/src/features/*`). Backend (`apps/api`) and Auth (`apps/auth`) changes follow their own `CONTEXT.md` + ADRs, not this checklist.
 
 Use this when creating a feature under `apps/web/src/features/*` or promoting a
-flat module into a layered one. It answers one question: *what shape must a new
-feature have before it lands?* Contracts live in `DESIGN.md` (Frontend Context
+flat module into a layered one. It answers one question: _what shape must a new
+feature have before it lands?_ Contracts live in `DESIGN.md` (Frontend Context
 Map §1–§6) and `apps/web/DESIGN.md`; this file is the task checklist, not a
 second source of truth.
 
 ## Pre-check
 
 Do not create a sibling doc for what is already covered: `domain.md` (read
-path), `issue-tracker.md` / `triage-labels.md` (process), `shared/CONTEXT.md`
-(shared seams). Extend this checklist instead of forking it.
+path), `issue-tracker.md` / `triage-labels.md` (process), `core/CONTEXT.md`
+(horizontal seams) and `api/CONTEXT.md` (transport/generated code). Extend this
+checklist instead of forking it.
 
 ## Checklist
 
 1. **Barrel `index.ts` at the feature root** — the sole public entrypoint other
    features may import. Cross-feature deep imports (`../library/components/…`)
-   are forbidden; `shared` never imports `features/*`.
+   are forbidden. Horizontal roots (`core`, `api`, `theme`, `lib`, `components`)
+   never import `features/*`; only exact reviewed legacy `shared/*.shim.ts`
+   paths may forward to feature destinations for their one-phase TTL.
    - Documented exceptions (also encoded in
      `scripts/checkPublicApiSurface.ts` `INTENTIONAL_FLATS`): `admin` (vertical
      contexts, no single barrel) and `canvas` (intra-feature seams listed in
-     `knip.jsonc` `entry` instead of a root barrel).
+     `knip.jsonc` `entry` instead of a root barrel). Additional public subpaths
+     such as feature-owned `routePaths.ts` and legal links must be declared in
+     `docs/frontend-seam-inventory.md`; a barrel is not permission for deep imports.
 2. **`CONTEXT.md`** — domain language table, public seams, invariants,
    non-goals. Update it when domain language changes (DESIGN.md Change Rule 7).
 3. **Layer split for complex features, flat for light ones** —
    `domain/` (pure: no Vue, router, Query, DTOs) + `application/` (use-case
    orchestration) + `infrastructure/` (transport/storage adapters, DTO mapping)
-   + `ui/` or `presentation/`; or a documented flat exception (`legal`:
+   and `ui/` or `presentation/`; or a documented flat exception (`legal`:
    `components/`, `useXxx.ts`, `types.ts`, no empty dirs to fake
    the template). Record the choice (layered vs flat + why) in the feature
    `CONTEXT.md` or the PR description.
 4. **Admin adapter boundary** — route pages and components never import
-   `shared/api/generated-query` directly. Target shape per vertical context:
+   `api/generated-query` directly. Target shape per vertical context:
    `pages/` → `application/` use case → `infrastructure/` or `*Resource.ts` /
    `api.ts` adapter → generated code. New verticals must land with this shape;
    existing flats converge toward it (pilot: `settings`, the widest scatter).
@@ -63,8 +68,8 @@ path), `issue-tracker.md` / `triage-labels.md` (process), `shared/CONTEXT.md`
      class-assertion exceptions in `checkTestGuardrails`).
    - Query placement: new cached server state must justify Query in the
      feature `CONTEXT.md`; otherwise follow the feature-store pattern
-     (`shared/CONTEXT.md` Query Scope Rule, pinned by
-     `shared/query/queryPlacement.contract.spec.ts`).
+     (`core/CONTEXT.md` Query Scope Rule, pinned by
+     `core/query/queryPlacement.contract.spec.ts`).
 6. **Naming** — kebab-case dirs, `PascalCase.vue` SFCs, `camelCase.ts` modules,
    no parent-prefix stutter (`resource.ts`, not `libraryResource.ts`),
    `index.ts` is barrel-or-documented-boundary only. P0 subset (warn-only in

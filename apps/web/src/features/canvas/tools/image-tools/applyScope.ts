@@ -12,7 +12,7 @@ import { ref, type Ref } from 'vue'
  * `release` on settle. `cancel` settles from the session side (exit, commit,
  * dismiss) and `onCleanup` runs node cleanup exactly once per registration.
  */
-export type ImageToolApplyScope = {
+type ImageToolApplyScope = {
   readonly scopeId: string
   isCurrent(): boolean
   release(): void

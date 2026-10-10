@@ -41,7 +41,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
 vi.mock('../infrastructure/authContinuation', () => ({
   setPendingSearchAuthAction: mocks.setPendingSearchAuthAction,

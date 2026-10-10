@@ -18,9 +18,9 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useUserStore } from '../session/userSession'
-import { USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
-import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
-import { stringParam, stringParamWhere } from '../../../shared/router/queryParams'
+import { USER_LOGIN_PATH } from '../../workspace/routePaths'
+import { isSafeInternalRedirectPath } from '../../../core/utils/auth'
+import { stringParam, stringParamWhere } from '../../../core/router/queryParams'
 
 const route = useRoute()
 const router = useRouter()

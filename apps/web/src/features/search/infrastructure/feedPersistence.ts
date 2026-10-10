@@ -4,7 +4,7 @@ import {
   readSessionStorageItem,
   removeSessionStorageItem,
   writeSessionStorageItem,
-} from '../../../shared/utils/storage'
+} from '../../../core/utils/storage'
 
 const FEED_CACHE_KEY = 'ideaboard:search:feed_cache'
 const FEED_SCROLL_KEY = 'ideaboard:search:feed_scroll'

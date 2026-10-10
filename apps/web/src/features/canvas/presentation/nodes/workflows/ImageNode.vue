@@ -95,7 +95,7 @@ import {
   type LibraryImportFact,
 } from '../../../../board/ports/canvas'
 import type { ImageNodeAction } from '../../../domain/nodes/imageActionRegistry.ts'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import type { OutpaintDragAnchor } from '../../../application/image-workflow/useImageOutpaintOverlay.ts'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../../tools/image-tools'
 import type { FlowLocalUploadState } from '../../../domain/nodes/flowTypes.ts'

@@ -8,20 +8,20 @@ import {
 } from '../planning/imageExecutionPlan'
 import type { OutpaintRect } from '../../../domain/graph/outpaintGeometry.ts'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 
-export type RunImageDirectActionOptions = {
+type RunImageDirectActionOptions = {
   prompt?: string
   outputCount?: number
   strength?: number
 }
 
-export type RunImageInpaintActionOptions = {
+type RunImageInpaintActionOptions = {
   prompt: string
   maskDataUrl: string
 }
 
-export type OutpaintRectIntent = {
+type OutpaintRectIntent = {
   frameRect: OutpaintRect
   originalImageRect: OutpaintRect
   prompt?: string

@@ -29,8 +29,8 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
-import { stringParam, stringParamWhere } from '../../../shared/router/queryParams'
+import { isSafeInternalRedirectPath } from '../../../core/utils/auth'
+import { stringParam, stringParamWhere } from '../../../core/router/queryParams'
 import {
   HOME_PATH,
   SHARE_JOIN_PATH,
@@ -38,7 +38,7 @@ import {
   USER_CANVAS_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
-} from '../../../shared/constants/routePaths'
+} from '../../workspace/routePaths'
 import AuthModalHost from './AuthModalHost.vue'
 import LoginAuthPanel from './LoginAuthPanel.vue'
 import RegisterAuthPanel from './RegisterAuthPanel.vue'

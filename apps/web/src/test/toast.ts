@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import { useAppToast } from '../shared/composables/useAppToast'
+import { useAppToast } from '../core/composables/useAppToast'
 
 // Converged `useAppToast` test double: the superset of every inline
 // `vi.mock(.../useAppToast)` shim (success/error/warning/info/loading/dismiss).

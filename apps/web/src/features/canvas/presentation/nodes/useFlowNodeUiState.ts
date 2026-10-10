@@ -1,6 +1,6 @@
 import { computed, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   getCanvasNodePrimaryOutputPort,
   getCanvasNodeRequiredInputPorts,

@@ -8,11 +8,11 @@ import AuthModalHost from './AuthModalHost.vue'
 import LoginAuthPanel from './LoginAuthPanel.vue'
 import RegisterAuthPanel from './RegisterAuthPanel.vue'
 
-vi.mock('../../../shared/composables/useSiteBranding', () => ({
+vi.mock('../../../core/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({ projectName: 'IdeaBoard' }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
 const DialogRootStub = defineComponent({
   props: {

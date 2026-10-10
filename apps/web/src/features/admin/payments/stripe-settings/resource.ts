@@ -1,9 +1,9 @@
 import {
   getControlStripeConfig,
   updateControlStripeConfig,
-} from '../../../../shared/api/generated-query/control/control-payments/control-payments'
-import type { ControlStripeConfigRequest } from '../../../../shared/api/generated-query/control/model/controlStripeConfigRequest'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-payments/control-payments'
+import type { ControlStripeConfigRequest } from '../../../../api/generated-query/control/model/controlStripeConfigRequest'
+import { requireContractData } from '../../../../api/contractKernel'
 import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
 import { loadControlSetting } from '../../shared/lib/controlResource'
 import { withControlCopy } from '../../shared/lib/controlCopy'
@@ -17,7 +17,7 @@ import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './
 // keeping a header-only Idempotency-Key. The deleted
 // `/api/admin/payments/stripe-config` route is gone; this module is the
 // single transport.
-export type ApiStripeConfigurationSummary = {
+type ApiStripeConfigurationSummary = {
   configured: boolean
   api_key_configured: boolean
   webhook_secret_configured: boolean

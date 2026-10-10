@@ -1,11 +1,11 @@
 import { readonly, ref } from 'vue'
-import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
+import { useAsyncAction } from '../../../../core/composables/useAsyncAction'
 import {
   getPasswordLengthError,
   validateEmail,
   validateOtpCode,
-} from '../../../../shared/auth/passwordPolicy'
-import { markRequiredError } from '../../../../shared/utils/formValidation'
+} from '../../../../core/auth/passwordPolicy'
+import { markRequiredError } from '../../../../core/utils/formValidation'
 
 /**
  * Auth fields kit: single owner for email/password/OTP validation outcomes

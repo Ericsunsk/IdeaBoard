@@ -1,4 +1,4 @@
-import { isExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { isExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 import type { LibrarySearchReference, WorkspaceLibraryAsset } from './validators'
 import { assertLibraryAssetId } from './validators'
 

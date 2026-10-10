@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
 }))
 
-vi.mock('../../../shared/auth/client', () => ({
+vi.mock('../../../core/auth/client', () => ({
   authClient: {
     signIn: {
       email: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('../../../shared/auth/client', () => ({
   normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
 }))
 
-import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
+import { USER_AUTH_CALLBACK_PATH } from '../../workspace/routePaths'
 import { authTransport } from './transport'
 
 describe('authTransport OAuth providers', () => {

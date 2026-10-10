@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SESSION_FRESH_THRESHOLD_MS } from '../../../shared/config/timing'
+import { SESSION_FRESH_THRESHOLD_MS } from '../../../core/config/timing'
 import { SESSION_TRUST_WINDOW_MS, isSessionFresh } from './freshness'
 
 const NOW = 1_000_000

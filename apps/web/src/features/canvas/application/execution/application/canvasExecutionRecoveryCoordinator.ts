@@ -1,5 +1,5 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../task-runner/taskResultErrors'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
 import {
   PendingImageMaterializationError,

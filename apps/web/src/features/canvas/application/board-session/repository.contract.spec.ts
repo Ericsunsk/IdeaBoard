@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
+import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
 import {
   createBoard,
   getBoardById,
@@ -13,14 +13,14 @@ import {
 import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
-import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
+import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
   return { request }
 })
 
-vi.mock('../../../../shared/api/client', () => ({
+vi.mock('../../../../api/client', () => ({
   api: {
     request: mocks.request,
   },

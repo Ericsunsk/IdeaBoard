@@ -1,10 +1,10 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { fetchCreditWallet, creditsQueryKeys } from '../../infrastructure'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { useAccountWorkspace } from '../accountWorkspace'
 import { useCreditsSync } from './useCreditsSync'
-import { accountScoped } from '../../../../shared/query/queryDefaults'
+import { accountScoped } from '../../../../core/query/queryDefaults'
 
 export type CreditWalletState =
   | { status: 'loading' }

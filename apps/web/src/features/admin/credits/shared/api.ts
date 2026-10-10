@@ -4,18 +4,18 @@ import {
   listControlReconciliationFindings,
   listControlReconciliationRuns,
   startControlReconciliation,
-} from '../../../../shared/api/generated-query/control/control-credits/control-credits'
+} from '../../../../api/generated-query/control/control-credits/control-credits'
 import type {
   ListControlReconciliationFindingsParams,
   ListControlReconciliationRunsParams,
-} from '../../../../shared/api/generated-query/control/model'
+} from '../../../../api/generated-query/control/model'
 import {
   createControlCreditDeduction,
   createControlCreditGrant,
   createControlCreditRefund,
   getControlCreditWallet,
   listControlCreditLedger,
-} from '../../../../shared/api/generated-query/control/control-credits/control-credits'
+} from '../../../../api/generated-query/control/control-credits/control-credits'
 import type {
   ControlCreditCommandRequest,
   ControlCreditRefundRequest,
@@ -23,8 +23,8 @@ import type {
   ControlCreditWallet,
   ControlLedgerTransaction,
   ListControlCreditLedgerParams,
-} from '../../../../shared/api/generated-query/control/model'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/model'
+import { requireContractData } from '../../../../api/contractKernel'
 import {
   buildControlMutationHeaders,
   type ControlMutationOptions,
@@ -47,7 +47,7 @@ export const CreditHealthStatus = {
 
 export type CreditHealthStatus = (typeof CreditHealthStatus)[keyof typeof CreditHealthStatus]
 
-export type CreditHealthFindingSummary = {
+type CreditHealthFindingSummary = {
   total: number
   warning: number
   error: number
@@ -184,12 +184,12 @@ export type ListAdminCreditReconciliationFindingQueueParams = {
   limit?: number
 }
 
-export type CreditReconciliationRunPage = {
+type CreditReconciliationRunPage = {
   runs: CreditReconciliationRun[]
   next_before_id?: number
 }
 
-export type CreditReconciliationFindingPage = {
+type CreditReconciliationFindingPage = {
   findings: CreditReconciliationFinding[]
   next_before_id?: number
 }
@@ -204,7 +204,7 @@ function toControlOptions(options?: ControlRequestOptions) {
 
 // Control wallet projection for the dialog: usr_ user id, status and
 // active restrictions mirror the control wallet read.
-export type ControlWalletView = {
+type ControlWalletView = {
   public_id: string
   display_name: string
   status: string
@@ -223,13 +223,13 @@ export type ControlWalletView = {
   }>
 }
 
-export type ControlLedgerView = {
+type ControlLedgerView = {
   transactions: ControlLedgerTransaction[]
   nextCursor: string | undefined
   hasMore: boolean
 }
 
-export type ControlCreditMutationOptions = ControlMutationOptions & {
+type ControlCreditMutationOptions = ControlMutationOptions & {
   idempotencyKey: string
   signal?: AbortSignal | null | undefined
 }

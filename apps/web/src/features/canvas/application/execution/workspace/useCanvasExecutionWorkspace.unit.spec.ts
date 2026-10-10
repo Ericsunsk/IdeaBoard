@@ -12,7 +12,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../shared/api/mediaAssetDelivery'
+} from '../../../../../api/mediaAssetDelivery'
 
 beforeEach(() => {
   setMediaWorkspaceIdResolver(() => 'ws_test123')

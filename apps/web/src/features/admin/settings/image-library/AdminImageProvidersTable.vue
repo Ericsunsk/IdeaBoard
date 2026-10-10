@@ -141,7 +141,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Search } from '@iconoir/vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'

@@ -10,9 +10,9 @@ import {
   type StorageProviderMeta,
 } from './profiles'
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
-vi.mock('../../../shared/composables/useAsyncAction', () => ({
+vi.mock('../../../core/composables/useAsyncAction', () => ({
   useAsyncAction: () => ({
     runAsyncAction: async (
       action: () => unknown,

@@ -5,7 +5,7 @@ import { mockAppToast } from '../../../../test/toast'
 import AdminOAuthLoginCard from './AdminOAuthLoginCard.vue'
 import type { OAuthProviderSettingsResource } from './resource'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))

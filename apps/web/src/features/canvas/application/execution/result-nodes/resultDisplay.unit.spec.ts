@@ -7,11 +7,10 @@ import {
   getMediaAssetMetadata,
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../../shared/api/mediaAssetDelivery'
+} from '../../../../../api/mediaAssetDelivery'
 
-vi.mock('../../../../../shared/api/mediaAssetDelivery', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('../../../../../shared/api/mediaAssetDelivery')>()
+vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()
   return { ...original, getMediaAssetMetadata: vi.fn() }
 })
 

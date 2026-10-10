@@ -228,7 +228,7 @@ import { computed, ref, watch } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
@@ -239,7 +239,7 @@ import {
   getPaymentOrderStatusPresentation,
   getStripeStatusLabel,
 } from './paymentOrderPresentation'
-import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
+import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { PAYMENT_ORDERS_MESSAGES } from './messages'
 import type {
   AdminPaymentDisputeSummary,

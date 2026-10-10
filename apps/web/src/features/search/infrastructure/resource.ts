@@ -1,11 +1,8 @@
 import type { SearchPage } from '../domain/models'
-import { api } from '../../../shared/api/client'
-import {
-  resolveContractData,
-  type ContractSuccessEnvelope,
-} from '../../../shared/api/contractKernel'
-import { stripUndefined } from '../../../shared/api/stripUndefined'
-import { i18n } from '../../../shared/i18n'
+import { api } from '../../../api/client'
+import { resolveContractData, type ContractSuccessEnvelope } from '../../../api/contractKernel'
+import { stripUndefined } from '../../../api/stripUndefined'
+import { i18n } from '../../../core/i18n'
 
 // Search boundary (issue #809).
 //

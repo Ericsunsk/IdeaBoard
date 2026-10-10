@@ -8,10 +8,7 @@ import {
   normalizeFusionBlendPoint,
   resolveImageNodeStageHeight,
 } from '../../domain'
-import {
-  canonicalizeRuntimeUploadRef,
-  resolveAssetUrl,
-} from '../../../../shared/config/runtimeUrls'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../core/config/runtimeUrls'
 import {
   BLANK_BOARD_PREVIEW_BACKGROUND,
   BLANK_BOARD_PREVIEW_BACKGROUND_DARK,
@@ -21,9 +18,9 @@ import {
   BLANK_BOARD_PREVIEW_DOT_RADIUS,
   BLANK_BOARD_PREVIEW_DOT_SPACING,
 } from './boardPreviewStyle'
-import { isDarkModeActive } from '../../../../shared/theme/composables/useTheme'
-import { clamp } from '../../../../shared/utils/number'
-import { withAlpha } from '../../../../shared/lib/chartPrimitives'
+import { isDarkModeActive } from '../../../../theme/composables/useTheme'
+import { clamp } from '../../../../core/utils/number'
+import { withAlpha } from '../../../../core/lib/chartPrimitives'
 
 interface BoardPreviewFrame {
   key: string

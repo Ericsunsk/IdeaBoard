@@ -1,10 +1,7 @@
 import { computed, onMounted, onScopeDispose, reactive, ref, toRef } from 'vue'
-import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import type { Service } from '../../../shared/domain/imageServices'
-import {
-  getServicePromptVariables,
-  type ServicePromptVariable,
-} from '../../../shared/domain/serviceRegistry'
+import { useAsyncAction } from '../../../core/composables/useAsyncAction'
+import type { Service } from '../../../core/contracts/imageServices'
+import { getServicePromptVariables, type ServicePromptVariable } from './core/promptVariables'
 import type { AdminPromptConfigFeedback } from './usePromptConfigFeedback'
 import {
   createAdminPromptConfigResource,
@@ -12,11 +9,7 @@ import {
   type FeaturePrompt,
 } from './resource'
 
-export type { FeaturePrompt } from './resource'
-export type {
-  ServicePromptVariable as FeaturePromptVariable,
-  ServicePromptVariableTone as FeaturePromptVariableTone,
-} from '../../../shared/domain/serviceRegistry'
+export type { ServicePromptVariable as FeaturePromptVariable } from './core/promptVariables'
 
 type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
 

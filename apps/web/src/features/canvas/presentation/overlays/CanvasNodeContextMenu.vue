@@ -32,8 +32,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CanvasCreatableNodeKind } from '../../../board/ports/canvas'
-import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
-import { handleMenuKeyboardNavigation } from '../../../../shared/interaction/menuKeyboardNavigation'
+import { createPopoverMotionTransition } from '../../../../core/motion/popoverMotion'
+import { handleMenuKeyboardNavigation } from '../../../../core/interaction/menuKeyboardNavigation'
 
 const props = defineProps<{
   visible: boolean

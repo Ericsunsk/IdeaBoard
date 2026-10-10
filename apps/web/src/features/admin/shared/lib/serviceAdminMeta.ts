@@ -1,4 +1,4 @@
-import { SERVICE, type Service } from '../../../../shared/domain/imageServices'
+import { SERVICE, type Service } from '../../../../core/contracts/imageServices'
 
 const ADMIN_SERVICE_GROUP = {
   image: 'image',

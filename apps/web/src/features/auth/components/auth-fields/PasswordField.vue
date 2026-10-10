@@ -43,7 +43,7 @@
 import type { HTMLAttributes } from 'vue'
 import { PasswordInput } from '@/components/ui/input'
 import AuthFieldShell from './AuthFieldShell.vue'
-import { ibFormInputIconClass } from '../../../../shared/theme/formControls'
+import { ibFormInputIconClass } from '../../../../theme/formControls'
 
 withDefaults(
   defineProps<{

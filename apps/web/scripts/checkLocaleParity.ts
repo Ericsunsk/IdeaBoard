@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { SUPPORTED_LOCALES } from '../src/shared/i18n/localeCore'
+import { SUPPORTED_LOCALES } from '../src/core/i18n/localeCore'
 import {
   countLeavesByNamespace,
   diffLocaleBundles,
@@ -8,7 +8,7 @@ import {
   leafPaths,
   localeStructureWarnings,
   maxLeafSegments,
-} from '../src/shared/i18n/localeParity'
+} from '../src/core/i18n/localeParity'
 
 /**
  * Locale parity guard: all User locale trees must contain exactly the same keys.
@@ -18,7 +18,7 @@ import {
  */
 
 const LOCALES = SUPPORTED_LOCALES
-const LOCALE_ROOT = join(import.meta.dirname, '..', 'src', 'shared', 'i18n', 'locales')
+const LOCALE_ROOT = join(import.meta.dirname, '..', 'src', 'core', 'i18n', 'locales')
 
 async function loadBundle(locale: string) {
   const mod = await import(join(LOCALE_ROOT, locale, 'index.ts'))

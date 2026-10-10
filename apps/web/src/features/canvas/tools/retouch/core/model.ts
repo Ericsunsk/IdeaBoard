@@ -66,7 +66,7 @@ export type RetouchNonHslWholeParams =
 /** Label keys and literal parts remain independent of the active UI locale. */
 export type RetouchLayerNamePart = string | { readonly labelKey: string }
 
-export type RetouchSourceLayer = {
+type RetouchSourceLayer = {
   id: string
   type: 'source'
   name: string
@@ -75,7 +75,7 @@ export type RetouchSourceLayer = {
   nameParts?: readonly RetouchLayerNamePart[]
 }
 
-export type RetouchEmptyPaintContent = {
+type RetouchEmptyPaintContent = {
   kind: 'empty'
 }
 
@@ -86,7 +86,7 @@ export type RetouchRasterContent = {
   height: number
 }
 
-export type RetouchPaintContent = RetouchEmptyPaintContent | RetouchRasterContent
+type RetouchPaintContent = RetouchEmptyPaintContent | RetouchRasterContent
 
 export type RetouchPaintLayer = {
   id: string
@@ -97,7 +97,7 @@ export type RetouchPaintLayer = {
   nameParts?: readonly RetouchLayerNamePart[]
 }
 
-export type RetouchHslLayer = {
+type RetouchHslLayer = {
   id: string
   type: 'effect'
   kind: 'hsl'
@@ -107,7 +107,7 @@ export type RetouchHslLayer = {
   nameParts?: readonly RetouchLayerNamePart[]
 }
 
-export type RetouchThresholdLayer = {
+type RetouchThresholdLayer = {
   id: string
   type: 'effect'
   kind: 'threshold'
@@ -117,7 +117,7 @@ export type RetouchThresholdLayer = {
   nameParts?: readonly RetouchLayerNamePart[]
 }
 
-export type RetouchCurvesLayer = {
+type RetouchCurvesLayer = {
   id: string
   type: 'effect'
   kind: 'curves'
@@ -127,7 +127,7 @@ export type RetouchCurvesLayer = {
   nameParts?: readonly RetouchLayerNamePart[]
 }
 
-export type RetouchLevelsLayer = {
+type RetouchLevelsLayer = {
   id: string
   type: 'effect'
   kind: 'levels'
@@ -137,7 +137,7 @@ export type RetouchLevelsLayer = {
   nameParts?: readonly RetouchLayerNamePart[]
 }
 
-export type RetouchSharpenLayer = {
+type RetouchSharpenLayer = {
   id: string
   type: 'effect'
   kind: 'sharpen'

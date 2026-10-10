@@ -1,6 +1,6 @@
 import type { LibraryIslandState } from '../ports/persistencePort'
 import { searchScopedStorageKey } from './browserPersistence'
-import { readSessionStorageItem, writeSessionStorageItem } from '../../../shared/utils/storage'
+import { readSessionStorageItem, writeSessionStorageItem } from '../../../core/utils/storage'
 
 const ISLAND_STATE_KEY = 'ideaboard:search:island_state'
 

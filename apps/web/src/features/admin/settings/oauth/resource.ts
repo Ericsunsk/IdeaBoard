@@ -1,11 +1,11 @@
 import {
   getControlOAuthProvider,
   updateControlOAuthProvider,
-} from '../../../../shared/api/generated-query/control/control-users/control-users'
-import type { ControlOAuthProviderSummary } from '../../../../shared/api/generated-query/control/model/controlOAuthProviderSummary'
-import type { ControlOAuthProviderUpdateRequest } from '../../../../shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest'
-import type { OAuthProviderCode } from '../../../../shared/auth/oauthProviders'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-users/control-users'
+import type { ControlOAuthProviderSummary } from '../../../../api/generated-query/control/model/controlOAuthProviderSummary'
+import type { ControlOAuthProviderUpdateRequest } from '../../../../api/generated-query/control/model/controlOAuthProviderUpdateRequest'
+import type { OAuthProviderCode } from '../../../../core/auth/oauthProviders'
+import { requireContractData } from '../../../../api/contractKernel'
 import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
 import { loadControlSetting } from '../../shared/lib/controlResource'
 import { withControlCopy } from '../../shared/lib/controlCopy'
@@ -18,7 +18,7 @@ export type OAuthProviderSettingsSummary = {
   callbackUrl: string
 }
 
-export type SaveOAuthProviderSettingsInput = {
+type SaveOAuthProviderSettingsInput = {
   enabled: boolean
   clientId: string
   clientSecret: string

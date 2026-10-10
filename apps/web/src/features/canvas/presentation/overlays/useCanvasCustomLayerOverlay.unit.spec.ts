@@ -1,7 +1,7 @@
 import { createApp, defineComponent, h, nextTick, ref, type Ref } from 'vue'
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import { useCanvasCustomLayerOverlay } from './useCanvasCustomLayerOverlay'
-import type { OverlayDismissal } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import type { OverlayDismissal } from '../../../../core/composables/useOverlayInteractionLifecycle'
 
 type LayerHarness = {
   visible: Ref<boolean>

@@ -1,8 +1,8 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { PaymentReturnContext } from '../../domain'
-import { i18n } from '../../../../shared/i18n'
-import { createUniqueId } from '../../../../shared/utils/ids'
+import { i18n } from '../../../../core/i18n'
+import { createUniqueId } from '../../../../core/utils/ids'
 import {
   paymentsQueryKeys,
   usePaymentsContext,
@@ -14,8 +14,8 @@ import {
 } from '../../infrastructure'
 import { useAccountWorkspace } from '../accountWorkspace'
 import { invalidateUserMoney } from '../invalidateUserMoney'
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
-import { noRetry } from '../../../../shared/query/queryDefaults'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
+import { noRetry } from '../../../../core/query/queryDefaults'
 
 const historyPageSize = PAGE_SIZES.standard
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }

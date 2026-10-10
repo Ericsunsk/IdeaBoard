@@ -6,7 +6,7 @@ import { http, HttpResponse } from '../../../../test/msw'
 // caller-owned (board `testing/factories.ts` pattern): GET serves the current
 // hosts through `getAllowHosts`, PUT captures body + operator reason and
 // answers through `respondToUpdate`, with `onUpdate` syncing caller fixtures.
-export type OutboundPolicyUpdate = {
+type OutboundPolicyUpdate = {
   allow_hosts: string[]
 }
 

@@ -1,6 +1,6 @@
 import type { AdminStatistics } from '../../statistics/resource'
 import type { MonitorData, MonitorStats } from '../../monitor/infrastructure/resource'
-import { ADMIN_STATISTICS_PATH, ADMIN_MONITOR_PATH } from '../../../../shared/constants/routePaths'
+import { ADMIN_STATISTICS_PATH, ADMIN_MONITOR_PATH } from '../../routePaths'
 
 export type AdminAnomalySeverity = 'critical' | 'warning' | 'info'
 export type AdminAnomalySource = 'runtime' | 'statistics' | 'account' | 'provider' | 'system'

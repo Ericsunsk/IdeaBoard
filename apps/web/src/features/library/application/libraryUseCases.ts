@@ -1,4 +1,4 @@
-import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 // Workspace-scoped library use cases (issue #844; split from `../workspace`).
 //
 // Save/lookup/materialize orchestration over the transport in
@@ -15,10 +15,10 @@ import { type ExternalImageProvider } from '../../../shared/domain/externalImage
 // rejects and the Canvas pending-fact retry loop (`failLibraryImport` /
 // `retryLibraryImport` / `resumePending`) owns the retry.
 
-import { getWorkspaceMediaAssetMetadata } from '../../../shared/api/mediaAssetDelivery'
-import { PAGE_SIZES } from '../../../shared/config/pagination'
-import { resolveAssetUrl } from '../../../shared/config/runtimeUrls'
-import { i18n } from '../../../shared/i18n'
+import { getWorkspaceMediaAssetMetadata } from '../../../api/mediaAssetDelivery'
+import { PAGE_SIZES } from '../../../core/config/pagination'
+import { resolveAssetUrl } from '../../../core/config/runtimeUrls'
+import { i18n } from '../../../core/i18n'
 import {
   assertLibraryAssetId,
   libraryAssetKey,

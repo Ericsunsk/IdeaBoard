@@ -43,7 +43,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Compass, ViewGrid } from '@iconoir/vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
+import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../routePaths'
 import { useAuthOverlay, useUserStore } from '../../../auth'
 import type { WorkspaceNavigationAdapter } from '../useWorkspaceAccountControls'
 

@@ -1,14 +1,14 @@
 [
   {
-    "path": "src/shared/composables/useSiteBranding.ts",
+    "path": "src/core/composables/useSiteBranding.ts",
     "reason": "validateSiteBrandingSetting messages are consumed only by features/admin branding settings."
   },
   {
-    "path": "src/shared/utils/errorMessages.ts",
+    "path": "src/core/utils/errorMessages.ts",
     "reason": "INTERNAL_ERROR_PATTERN matches backend Chinese transport messages to sanitize them; not User copy."
   },
   {
-    "path": "src/shared/i18n/localeManifest.ts",
+    "path": "src/core/i18n/localeManifest.ts",
     "reason": "displayLabel values are intentional endonyms (简体中文, 한국어, Español, English) shown in each language's own script, not translatable User copy."
   },
   {

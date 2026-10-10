@@ -15,8 +15,8 @@ const SRC_ROOT = join(import.meta.dirname, '..', 'src')
 const ALLOWLIST_PATH = join(import.meta.dirname, 'user-copy-locale-allowlist.json')
 const EXCLUDED_DIR_PARTS = [
   ['features', 'admin'],
-  ['shared', 'api', 'generated-query'],
-  ['shared', 'i18n', 'locales'],
+  ['api', 'generated-query'],
+  ['core', 'i18n', 'locales'],
 ]
 const CJK_PATTERN = /[\u4e00-\u9fff\u3400-\u4dbf]/
 
@@ -88,7 +88,7 @@ function main(): void {
     console.error(
       [
         'User-facing Chinese copy detected. Translate it through the i18n boundary',
-        '(apps/web/src/shared/i18n) or add a reviewed entry to',
+        '(apps/web/src/core/i18n) or add a reviewed entry to',
         'scripts/user-copy-locale-allowlist.json with a reason.',
         '',
         ...violations,

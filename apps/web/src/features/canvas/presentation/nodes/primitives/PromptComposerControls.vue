@@ -80,8 +80,8 @@ import {
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   type OutputResolution,
-} from '../../../../../shared/domain/generationContract'
-import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
+} from '../../../../../core/contracts/generationContract'
+import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
 import type { CanvasBillingQuoteState } from '../../../application/execution'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeTextOptionPicker from './NodeTextOptionPicker.vue'

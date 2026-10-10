@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import ActionButton from '@/shared/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 
 withDefaults(
   defineProps<{

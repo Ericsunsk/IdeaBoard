@@ -9,8 +9,8 @@ import {
   BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
   type BoardSession,
 } from './useBoardSession'
-import { i18n } from '../../../../shared/i18n'
-import { userErrorCode, userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { i18n } from '../../../../core/i18n'
+import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import {
   measureCanvasPerf,
   measureCanvasPerfAsync,
@@ -21,8 +21,8 @@ export type SaveStatus =
   'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover' | 'archived'
 
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'archived' | 'save-failed'
-export type ValueRef<T> = { value: T }
-export type SaveCurrentBoardSnapshotOptions = {
+type ValueRef<T> = { value: T }
+type SaveCurrentBoardSnapshotOptions = {
   waitForPreview?: boolean | undefined
   silent?: boolean | undefined
 }

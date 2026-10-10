@@ -4,15 +4,15 @@ import {
   searchControlRewardCodes,
   setControlRewardCodeEnabled,
   updateControlRewardCode,
-} from '../../../../shared/api/generated-query/control/control-credits/control-credits'
+} from '../../../../api/generated-query/control/control-credits/control-credits'
 import type {
   ControlCreatedRewardCode,
   ControlRewardCode,
   ControlRewardCodePage,
   ControlUpdatedRewardCode,
-} from '../../../../shared/api/generated-query/control/model'
-import { requireContractData } from '../../../../shared/api/contractKernel'
-import { controlCreditIdempotencyKey } from '../../../../shared/api/idempotencyKey'
+} from '../../../../api/generated-query/control/model'
+import { requireContractData } from '../../../../api/contractKernel'
+import { controlCreditIdempotencyKey } from '../../../../api/idempotencyKey'
 import {
   buildControlMutationHeaders,
   buildRoutineControlMutationHeaders,
@@ -42,38 +42,6 @@ const RewardCodeStatus = {
 
 type RewardCodeStatus = (typeof RewardCodeStatus)[keyof typeof RewardCodeStatus]
 
-export type GeneratedRewardCode = {
-  id: number
-  display_name: string
-  masked_code_hint: string
-  credit_amount: number
-  max_redemptions: number
-  redemption_count: number
-  expires_at?: string
-  enabled: boolean
-  status: RewardCodeStatus
-  created_at: string
-  updated_at: string
-}
-
-export type GeneratedCreatedRewardCode = {
-  reward_code: GeneratedRewardCode
-  plaintext: string
-  replayed: boolean
-}
-
-export type GeneratedUpdatedRewardCode = {
-  reward_code: GeneratedRewardCode
-  plaintext?: string
-  replayed?: boolean
-}
-
-export type GeneratedRewardCodePage = {
-  reward_codes: GeneratedRewardCode[]
-  total: number
-  next_before_id?: number
-}
-
 export type RewardCode = {
   id: number
   displayName: string
@@ -93,7 +61,7 @@ export const REWARD_CODE_STATUS_FILTER_ALL = 'all' as const
 
 export type RewardCodeStatusFilter = typeof REWARD_CODE_STATUS_FILTER_ALL | RewardCodeStatus
 
-export type CreateRewardCodeInput = {
+type CreateRewardCodeInput = {
   displayName: string
   code: string
   creditAmount: number
@@ -102,7 +70,7 @@ export type CreateRewardCodeInput = {
   idempotencyKey: string
 }
 
-export type CreatedRewardCode = {
+type CreatedRewardCode = {
   rewardCode: RewardCode
   plaintext: string
   replayed: boolean
@@ -116,7 +84,7 @@ export type UpdateRewardCodeInput = {
   code?: string
 }
 
-export type UpdatedRewardCode = {
+type UpdatedRewardCode = {
   rewardCode: RewardCode
   plaintext?: string | undefined
   replayed?: boolean | undefined
@@ -136,7 +104,7 @@ export type SearchRewardCodesInput = {
   signal?: AbortSignal
 }
 
-export type RewardCodeMutationOptions = ControlMutationOptions
+type RewardCodeMutationOptions = ControlMutationOptions
 
 export type AdminRewardCodeResource = {
   search: (input: SearchRewardCodesInput) => Promise<RewardCodePage>

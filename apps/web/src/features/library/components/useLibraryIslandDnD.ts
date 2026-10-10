@@ -15,8 +15,8 @@ import {
   writeCanvasLibraryImportTransfer,
   writeLibraryFolderMoveTransfer,
 } from '../domain/transfer'
-import { useAppToast } from '../../../shared/composables/useAppToast'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { useAppToast } from '../../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import {
   LIBRARY_ALL_FOLDER_KEY,
   type LibraryFolderTab,

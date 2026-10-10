@@ -1,7 +1,7 @@
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
-import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../shared/utils/workspaceId'
-import { parseContractEnvelope, requireContractData } from '../../../shared/api/contractKernel'
-import { i18n } from '../../../shared/i18n'
+import { formatDisplayErrorMessage } from '../../../core/utils/errorMessages'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../core/utils/workspaceId'
+import { parseContractEnvelope, requireContractData } from '../../../api/contractKernel'
+import { i18n } from '../../../core/i18n'
 
 // Workspace billing seam for the account surface (W2 transports).
 //

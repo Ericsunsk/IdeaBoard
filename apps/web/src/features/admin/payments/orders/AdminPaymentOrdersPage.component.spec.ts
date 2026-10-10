@@ -24,7 +24,7 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => confirm,
 }))
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminPaymentOrdersPage', () => {
   beforeEach(() => {

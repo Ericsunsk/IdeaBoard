@@ -23,10 +23,10 @@ import {
   type ExecutionImageSize,
 } from '../../../domain/execution-contracts/sizeParams.ts'
 import { buildPromptAspectRatioTaskParams } from '../../../domain/execution-contracts/promptAspectRatioTaskParams.ts'
-import { assertRequestedOutputCount } from '../../../../../shared/domain/generationContract'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import { assertRequestedOutputCount } from '../../../../../core/contracts/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import type { PromptAspectRatio } from '../../../../board/ports/canvas'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 import {
   IMAGE_OUTPAINT_ACTION,
   IMAGE_UPSCALE_ACTION,
@@ -60,7 +60,7 @@ function opaqueAssetId(source: { assetId?: string | undefined }): string | null 
   return id ? id : null
 }
 
-export type ImageInpaintTaskRequestInput = {
+type ImageInpaintTaskRequestInput = {
   prompt: string
   originalImageUrl: string
   /** Legacy mask URL; omitted once `maskAssetId` carries the v1 reference. */
@@ -183,7 +183,7 @@ export function buildGenerationTaskRequest(input: {
   mediaAssetIds?: string[] | undefined
   outputCount: number
   outputResolution?:
-    import('../../../../../shared/domain/generationContract').OutputResolution | undefined
+    import('../../../../../core/contracts/generationContract').OutputResolution | undefined
 }): CanvasTaskRequestData {
   const outputCount = assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({

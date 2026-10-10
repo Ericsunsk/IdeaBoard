@@ -86,8 +86,8 @@ import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
-import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
-import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
+import { formatLocaleNumber } from '../../../../core/i18n/formatters'
+import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../core/contracts/generationContract'
 import type {
   AdminBillableItemCard,
   AdminModelPoolEntry,

@@ -1,7 +1,7 @@
-import { i18n } from '../../../../shared/i18n'
-import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
-import { getActiveUserLocale } from '../../../../shared/i18n/userLocale'
-import { formatMinorCurrencyValue, normalizeCurrencyCode } from '../../../../shared/utils/currency'
+import { i18n } from '../../../../core/i18n'
+import { formatLocaleNumber } from '../../../../core/i18n/formatters'
+import { getActiveUserLocale } from '../../../../core/i18n/userLocale'
+import { formatMinorCurrencyValue, normalizeCurrencyCode } from '../../../../core/utils/currency'
 
 const MIN_IDEA_QUANTITY = 500
 const MAX_IDEA_QUANTITY = 500_000

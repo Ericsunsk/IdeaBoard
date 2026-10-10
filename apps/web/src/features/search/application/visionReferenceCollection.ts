@@ -62,5 +62,4 @@ export function createVisionReferenceCollection(initial: VisionReference[] = [])
   }
 }
 
-export type VisionReferenceCollection = ReturnType<typeof createVisionReferenceCollection>
 export { MAX_REFERENCE_COUNT } from '../domain/visionReferencePolicy'

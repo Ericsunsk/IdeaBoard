@@ -15,14 +15,14 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: mocks.replace }) }))
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 vi.mock('../infrastructure/visionBillingResource', () => ({
   fetchVisionSearchPrice: mocks.fetchPrice,
 }))
 vi.mock('../infrastructure/workspace', () => ({
   workspaceSearchApi: { createVisionQuery: mocks.createVisionQuery },
 }))
-vi.mock('../../../shared/api/upload', () => ({
+vi.mock('../../../api/upload', () => ({
   workspaceUploadApi: {},
 }))
 vi.mock('../../library', async (importOriginal) => {

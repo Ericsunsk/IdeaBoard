@@ -1,10 +1,10 @@
 import type { AdminUserListItem } from './resource'
-import { formatDateOnly } from '../../../shared/utils/dateTime'
-import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
+import { formatDateOnly } from '../../../core/utils/dateTime'
+import { formatIdeaAmount } from '../../../core/i18n/userIdeaCurrency'
 
-export type AdminUserRole = 'admin' | 'user'
-export type AdminUserStatus = 0 | 1
-export type AdminUserTagVariant = 'danger' | 'neutral' | 'success'
+type AdminUserRole = 'admin' | 'user'
+type AdminUserStatus = 0 | 1
+type AdminUserTagVariant = 'danger' | 'neutral' | 'success'
 
 export type AdminUserCommandTarget = {
   publicId: string

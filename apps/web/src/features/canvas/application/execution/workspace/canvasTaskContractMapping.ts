@@ -10,13 +10,13 @@
 // catalog and resolutions parse through the shared `parseOutputResolution`
 // catalog. There is no local service/resolution enum here.
 
-import { isOpaqueId, opaqueIdPrefix } from '../../../../../shared/api/contractKernel'
-import type { CreateWorkspaceTaskInput } from '../../../../../shared/api/workspaceTaskContract'
-import { SERVICE_SLUGS, type Service } from '../../../../../shared/domain/imageServices'
+import { isOpaqueId, opaqueIdPrefix } from '../../../../../api/contractKernel'
+import type { CreateWorkspaceTaskInput } from '../../../../../api/workspaceTaskContract'
+import { SERVICE_SLUGS, type Service } from '../../../../../core/contracts/imageServices'
 import {
   parseOutputResolution,
   type OutputResolution,
-} from '../../../../../shared/domain/generationContract'
+} from '../../../../../core/contracts/generationContract'
 import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 
 export type CanvasWorkspaceTaskUnmappableReason =

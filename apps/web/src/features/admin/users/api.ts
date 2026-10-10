@@ -12,9 +12,9 @@ import {
   revokeControlUserSessions,
   unbanControlUser,
   updateControlUserRole,
-} from '../../../shared/api/generated-query/control/control-users/control-users'
-import { requireContractData } from '../../../shared/api/contractKernel'
-import { controlUserIdempotencyKey } from '../../../shared/api/idempotencyKey'
+} from '../../../api/generated-query/control/control-users/control-users'
+import { requireContractData } from '../../../api/contractKernel'
+import { controlUserIdempotencyKey } from '../../../api/idempotencyKey'
 import {
   buildControlMutationHeaders,
   requireOperatorReason,

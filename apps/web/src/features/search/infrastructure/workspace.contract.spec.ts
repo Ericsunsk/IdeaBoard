@@ -10,7 +10,7 @@ import {
 import {
   getCreateWorkspaceVisionQueryUrl,
   getSearchWorkspaceUrl,
-} from '../../../shared/api/generated-query/public/workspace-search/workspace-search'
+} from '../../../api/generated-query/public/workspace-search/workspace-search'
 
 const WORKSPACE_ID = 'ws_abc123'
 const ASSET_ID = 'lasset_asset0001'

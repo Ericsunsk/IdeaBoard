@@ -6,8 +6,8 @@ import { useQuery } from '@tanstack/vue-query'
 import {
   getControlOutboundPolicy,
   updateControlOutboundPolicy,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './contract'
 
@@ -20,7 +20,7 @@ import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './contr
 // is gone; this module is the single transport.
 export const outboundPolicyQueryKey = ['admin', 'settings', 'outbound-policy'] as const
 
-export type OutboundPolicyMutationOptions = ControlMutationOptions
+type OutboundPolicyMutationOptions = ControlMutationOptions
 
 export function useOutboundPolicyResource() {
   const query = useQuery<OutboundPolicySetting, Error>({

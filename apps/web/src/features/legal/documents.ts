@@ -1,4 +1,4 @@
-import { SUPPORT_EMAIL } from '../../shared/constants/contacts'
+import { SUPPORT_EMAIL } from './contacts'
 
 export const LEGAL_DOCUMENT_VERSIONS = {
   terms: '2026-10-09',

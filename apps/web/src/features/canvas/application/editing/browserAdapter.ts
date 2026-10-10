@@ -1,4 +1,4 @@
-import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
+import { IMAGE_UPLOAD_ACCEPT } from '../../../../core/constants/media'
 
 export type CanvasGraphEditingBrowserAdapter = {
   pickImageFile: () => Promise<File | null>

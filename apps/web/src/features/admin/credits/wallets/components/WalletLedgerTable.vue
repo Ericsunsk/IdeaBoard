@@ -124,7 +124,7 @@ import { useI18n } from 'vue-i18n'
 import AdminStatusPill from '../../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
 import AdminMono from '../../../shared/components/AdminMono.vue'
-import ActionButton from '../../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../../core/components/ActionButton.vue'
 import AdminColumn from '../../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../../shared/components/AdminEmptyState.vue'
 import AdminTable from '../../../shared/components/AdminTable.vue'
@@ -135,7 +135,7 @@ import {
   getCreditCommandVariant,
   getCreditCommandSign,
 } from '../../shared/format'
-import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../resource'
 import { isRefundableCharge } from '../creditCommandContract'
 

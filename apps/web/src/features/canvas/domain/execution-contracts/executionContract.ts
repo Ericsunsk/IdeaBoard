@@ -1,6 +1,6 @@
 import type { CanvasTaskRequestData, CanvasTaskParams } from './canvasTaskRequest'
-import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeUrls'
-import { SERVICE } from '../../../../shared/domain/imageServices'
+import { canonicalizeRuntimeUploadRef } from '../../../../core/config/runtimeUrls'
+import { SERVICE } from '../../../../core/contracts/imageServices'
 
 export const EXECUTION_SERVICE = {
   generation: SERVICE.generation,

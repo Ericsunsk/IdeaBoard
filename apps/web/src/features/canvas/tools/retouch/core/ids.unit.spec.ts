@@ -18,7 +18,10 @@ import {
   makeCurvePointId,
   makeRetouchLayerId,
 } from './ids'
-import { SOURCE_LAYER_ID, makeRetouchLayerId as makeRetouchLayerIdFromStack } from './layers/layerStack'
+import {
+  SOURCE_LAYER_ID,
+  makeRetouchLayerId as makeRetouchLayerIdFromStack,
+} from './layers/layerStack'
 
 describe('ids', () => {
   it('keeps layer prefixes and the source id stable', () => {

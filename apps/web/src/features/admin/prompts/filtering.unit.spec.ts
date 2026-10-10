@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computed, ref } from 'vue'
-import { getServicePromptVariables } from '../../../shared/domain/serviceRegistry'
+import { getServicePromptVariables } from './core/promptVariables'
 import { groupedFeatureGroups, type FeatureSlug } from './featurePromptMeta'
 import { usePromptConfigFilters } from './filtering'
 

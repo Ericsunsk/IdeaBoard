@@ -15,7 +15,7 @@ import {
 } from '../../domain/graph/canvasGroupGeometry.ts'
 import type { CanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 
-export type ActiveGroupDrag = {
+type ActiveGroupDrag = {
   transaction: CanvasGraphTransaction
   groupId: CanvasGraphGroupId
   startPoint: CanvasPoint

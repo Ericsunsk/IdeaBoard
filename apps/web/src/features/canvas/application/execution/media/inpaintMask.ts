@@ -1,6 +1,6 @@
-import { workspaceUploadApi } from '../../../../../shared/api/upload'
-import { workspaceUploadIdempotencyKey } from '../../../../../shared/api/idempotencyKey'
-import { i18n } from '../../../../../shared/i18n'
+import { workspaceUploadApi } from '../../../../../api/upload'
+import { workspaceUploadIdempotencyKey } from '../../../../../api/idempotencyKey'
+import { i18n } from '../../../../../core/i18n'
 import { isDataUrl } from '../../../infrastructure/media/canvasMediaIo.ts'
 import {
   CanvasWorkspaceTaskUnmappableError,

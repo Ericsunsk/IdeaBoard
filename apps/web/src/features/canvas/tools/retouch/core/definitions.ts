@@ -88,7 +88,7 @@ type ImageRetouchRangeByKind = {
  * normalize / isNeutral / defaults / guards / clone never fork into
  * per-kind `switch` or order-sensitive `in` chains at call sites.
  */
-export type KindTrait<Raw, Normalized> = {
+type KindTrait<Raw, Normalized> = {
   defaults: Raw
   ranges: unknown
   normalize: (params: Raw) => Normalized

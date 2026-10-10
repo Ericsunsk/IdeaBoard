@@ -20,6 +20,13 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 
 /** Default fan-in/out report path (overridable with `--report=<path>`). */
 const DEFAULT_REPORT_PATH = path.join(webRoot, 'seam-fan-report.json')
+const acceptancePhase = process.argv.find((argument) => argument.startsWith('--phase='))
+if (acceptancePhase !== undefined && acceptancePhase !== '--phase=P1') {
+  console.error(
+    'Supported dependency acceptance phase is P1; omit --phase to check all active Seams.',
+  )
+  process.exit(1)
+}
 
 function reportPathFromArgs(): string {
   const flag = process.argv.find((arg) => arg.startsWith('--report='))
@@ -51,8 +58,7 @@ function listShims(root: string): string[] {
 }
 
 /** The control client module every generated-query fixture points at. */
-const CONTROL_PLATFORM_MODULE =
-  'src/shared/api/generated-query/control/control-platform/control-platform'
+const CONTROL_PLATFORM_MODULE = 'src/api/generated-query/control/control-platform/control-platform'
 
 /**
  * One module a fixture imports.
@@ -175,14 +181,55 @@ const routePageFixtureDirs = [
   'src/features/workspace/layout',
 ] as const
 
+const horizontalRoots = ['shared', 'core', 'api', 'theme', 'lib', 'components']
+const approvedFeatureShims = [
+  'components/UserAccountMenu',
+  'components/UserCreditBalanceButton',
+  'components/userAccountMenu.types',
+  'components/SupportChannelQr',
+  'constants/contacts',
+  'constants/routePaths',
+  'constants/legalLinks',
+  'domain/imageActions',
+  'domain/serviceIcons',
+  'domain/serviceRegistry',
+  'media/preloadImage',
+]
 const fixtureCases: BoundaryFixtureCase[] = [
+  ...horizontalRoots.flatMap((root) =>
+    ['runtime', 'type-only', 're-export'].map<BoundaryFixtureCase>((kind) => ({
+      name: `prohibits ${root} ${kind} dependency on a feature`,
+      expectedRule: root === 'shared' ? 'shared-not-to-features' : 'horizontal-not-to-features',
+      files: [
+        {
+          filePath: `src/${root}/boundary-feature-${kind}.fixture.ts`,
+          content:
+            kind === 'runtime'
+              ? `import { value } from '{target:src/features/legal/index}'; console.log(value);`
+              : kind === 'type-only'
+                ? `import type { value } from '{target:src/features/legal/index}'; export type Probe = typeof value;`
+                : `export { value } from '{target:src/features/legal/index}';`,
+        },
+      ],
+    })),
+  ),
+  ...['shared', 'core'].map<BoundaryFixtureCase>((root) => ({
+    name: `prohibits an unapproved ${root} shim bypass`,
+    expectedRule: root === 'shared' ? 'shared-not-to-features' : 'horizontal-not-to-features',
+    files: [
+      {
+        filePath: `src/${root}/unapproved.shim.ts`,
+        content: `export { value } from '{target:src/features/legal/index}';`,
+      },
+    ],
+  })),
   {
     name: 'prohibits admin features from importing the public generated client',
     expectedRule: 'features-admin-no-public-client',
     files: [
       {
         filePath: 'src/features/admin/boundary-admin-public.fixture.ts',
-        content: `import { getUser } from '{target:src/shared/api/generated-query/public/user/user}'; console.log(getUser);`,
+        content: `import { getUser } from '{target:src/api/generated-query/public/user/user}'; console.log(getUser);`,
       },
     ],
   },
@@ -192,7 +239,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
     files: [
       {
         filePath: 'src/features/board/boundary-non-admin-control.fixture.ts',
-        content: `import { listControlUsers } from '{target:src/shared/api/generated-query/control/control-users/control-users}'; console.log(listControlUsers);`,
+        content: `import { listControlUsers } from '{target:src/api/generated-query/control/control-users/control-users}'; console.log(listControlUsers);`,
       },
     ],
   },
@@ -326,10 +373,20 @@ const fixtureCases: BoundaryFixtureCase[] = [
     files: [
       {
         filePath: `src/features/canvas/tools/retouch/core/boundary-i18n-${module}.fixture.ts`,
-        content: `import { i18n } from '{target:src/shared/i18n/${module}}'; console.log(i18n);`,
+        content: `import { i18n } from '{target:src/core/i18n/${module}}'; console.log(i18n);`,
       },
     ],
   })),
+  {
+    name: 'prohibits tool core modules from importing the retired i18n shim',
+    expectedRule: 'canvas-tool-core-no-i18n-runtime',
+    files: [
+      {
+        filePath: 'src/features/canvas/tools/retouch/core/boundary-i18n-shim.fixture.ts',
+        content: `import { i18n } from '{target:src/shared/i18n/index.shim.ts}'; console.log(i18n);`,
+      },
+    ],
+  },
   {
     name: 'prohibits cross-tool deep imports bypassing the tool index seam',
     expectedRule: 'no-cross-tool-deep-imports',
@@ -450,7 +507,7 @@ function stubModuleSource(filePath: string, exportedNames: readonly string[]): s
 function importedNames(source: string, specifier: string): string[] {
   const names: string[] = []
   const pattern = new RegExp(
-    `import\\s+(?:type\\s+)?\\{([^}]*)\\}\\s+from\\s*['"]${specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`,
+    `(?:import|export)\\s+(?:type\\s+)?\\{([^}]*)\\}\\s+from\\s*['"]${specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`,
     'g',
   )
   for (const match of source.matchAll(pattern)) {
@@ -558,6 +615,7 @@ async function writeFanReport(): Promise<void> {
     }
     seams[seam.path] = {
       ...measured,
+      activationPhase: seam.activationPhase,
       targetFanIn: seam.targetFanIn,
       targetFanOut: seam.targetFanOut,
       advisories,
@@ -572,7 +630,9 @@ async function writeFanReport(): Promise<void> {
     checkpointSha: checkpointSha(),
     scanScope:
       'all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals',
-    inventoryGate: 'P0 advisory; existing cruiser/Board errors remain blocking',
+    inventoryGate: process.argv.includes('--strict')
+      ? `strict ${acceptancePhase ? 'P1 current batch' : 'all active Seams'}; all cruiser/Board errors remain blocking`
+      : 'inventory advisory; existing cruiser/Board errors remain blocking',
     cruiserConfig: '.dependency-cruiser.cjs',
     totals: {
       seams: inventorySeams.length,
@@ -626,7 +686,14 @@ async function writeFanReport(): Promise<void> {
       `  P0 pure-entry advisory: ${impurePaths.length} forbidden runtime dependency path(s).`,
     )
   if (process.argv.includes('--strict')) {
-    const hasMismatch = Object.values(seams).some((value) => {
+    const acceptedRecords = inventorySeams
+      .filter((seam) => acceptancePhase === undefined || /^P1(?:a|b)?$/.test(seam.activationPhase))
+      .map((seam) => seams[seam.path])
+    const declaredShims = new Set(inventorySeams.flatMap((seam) => seam.shims))
+    const shimMismatch =
+      shims.some((shim) => !declaredShims.has(shim)) ||
+      [...declaredShims].some((shim) => !shims.includes(shim))
+    const hasMismatch = acceptedRecords.some((value) => {
       const record = value as ReturnType<typeof measureSeam> & {
         advisories: {
           fanInTargetMismatch: boolean
@@ -636,6 +703,7 @@ async function writeFanReport(): Promise<void> {
         }
       }
       return (
+        record.undeclaredDeepImports.length ||
         record.undeclaredConsumers.length ||
         record.missingConsumers.length ||
         record.advisories.fanInTargetMismatch ||
@@ -644,9 +712,12 @@ async function writeFanReport(): Promise<void> {
         record.advisories.missingFanOutTargets.length
       )
     })
-    if (advisoryDeepEdges.size || hasMismatch || impurePaths.length) {
+    const hasImpurePath = acceptedRecords.some(
+      (value) => (value as { impureRuntimePaths: string[][] }).impureRuntimePaths.length,
+    )
+    if (hasMismatch || hasImpurePath || shimMismatch) {
       console.error(
-        'Strict Seam acceptance failed: frozen consumers/targets or deep edges have not converged.',
+        'Strict Seam acceptance failed: frozen consumers/targets, purity, deep edges or shim inventory have not converged.',
       )
       process.exit(1)
     }
@@ -765,6 +836,30 @@ try {
    * Each case expects zero violations of any boundary rule.
    */
   const positiveCases: Array<{ name: string; file: FixtureFile }> = [
+    ...approvedFeatureShims.map((shim) => ({
+      name: `allows the approved ${shim} compatibility shim`,
+      file: {
+        filePath: `src/shared/${shim}.shim.ts`,
+        content: `export { value } from '{target:src/features/legal/index}';`,
+      },
+    })),
+    ...['runtime', 'type-only'].map((kind) => ({
+      name: `allows feature ${kind} dependency on core route policy`,
+      file: {
+        filePath: `src/features/legal/boundary-policy-${kind}.fixture.ts`,
+        content:
+          kind === 'runtime'
+            ? `import { HOME_PATH } from '{target:src/core/auth/routePolicy}'; console.log(HOME_PATH);`
+            : `import type { HOME_PATH } from '{target:src/core/auth/routePolicy}'; export type Probe = typeof HOME_PATH;`,
+      },
+    })),
+    {
+      name: 'allows horizontal modules to consume core',
+      file: {
+        filePath: 'src/api/boundary-core-ok.fixture.ts',
+        content: `import { HOME_PATH } from '{target:src/core/auth/routePolicy}'; console.log(HOME_PATH);`,
+      },
+    },
     {
       name: 'allows consuming board through its public entrypoint',
       file: {
@@ -783,7 +878,7 @@ try {
       name: 'allows tool core importing the pure localeCore subpath',
       file: {
         filePath: 'src/features/canvas/tools/retouch/core/boundary-locale-core.fixture.ts',
-        content: `import { SUPPORTED_LOCALES } from '{target:src/shared/i18n/localeCore}'; console.log(SUPPORTED_LOCALES);`,
+        content: `import { SUPPORTED_LOCALES } from '{target:src/core/i18n/localeCore}'; console.log(SUPPORTED_LOCALES);`,
       },
     },
   ]

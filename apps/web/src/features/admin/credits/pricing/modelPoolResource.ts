@@ -1,8 +1,8 @@
 import {
   getControlCatalogModelPool,
   replaceControlCatalogModelPool,
-} from '../../../../shared/api/generated-query/control/control-billing/control-billing'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-billing/control-billing'
+import { requireContractData } from '../../../../api/contractKernel'
 import { createAdminGatewayResource } from '../../models/infrastructure/adminGatewayResource'
 import {
   buildRoutineControlMutationHeaders,
@@ -12,7 +12,7 @@ import { withControlCopy } from '../../shared/lib/controlCopy'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
-} from '../../../../shared/domain/generationContract'
+} from '../../../../core/contracts/generationContract'
 import type {
   AdminModelPool,
   AdminModelPoolEntry,
@@ -39,9 +39,9 @@ const MODEL_POOL_CONTROL_MESSAGES = {
 // The add-from-catalog list reuses the existing Model catalog resource
 // (no second catalog): entries are matched by catalog id. The lister is
 // injectable so tests pass a fake without MSW.
-export type ModelPoolMutationOptions = ControlMutationOptions
+type ModelPoolMutationOptions = ControlMutationOptions
 
-export type ModelPoolReplaceInput = {
+type ModelPoolReplaceInput = {
   version: number
   entries: AdminModelPoolEntry[]
 }

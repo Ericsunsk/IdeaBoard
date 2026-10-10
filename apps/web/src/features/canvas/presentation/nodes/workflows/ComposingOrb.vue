@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { getMotionPreference } from '../../../../../shared/motion/motionPolicy'
+import { getMotionPreference } from '../../../../../core/motion/motionPolicy'
 import { COMPOSING_ORB_BASE_SPEED, drawComposingOrb } from './thinking-orbs/composingRenderer'
 
 const ORB_SIZE = 171

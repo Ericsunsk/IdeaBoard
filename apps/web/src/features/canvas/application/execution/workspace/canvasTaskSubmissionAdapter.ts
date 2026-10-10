@@ -2,7 +2,7 @@ import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/
 import { submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
 import { assertTaskSubmitReady } from '../task-runner/taskReadiness'
 
-export type CanvasTaskSubmission = {
+type CanvasTaskSubmission = {
   taskId: string
 }
 

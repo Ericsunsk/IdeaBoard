@@ -79,7 +79,7 @@ Deliberately kept, not omissions:
   pinned by `canvasSurfaceSkin.contract.spec.ts`), board thumbnail bake
   (`boardPreviewStyle.ts`, `BoardCard.vue` preview gradients).
 - Private resolution infrastructure: `--color-*` declarations in
-  `src/app/style.css` / `src/shared/theme/tokens/dark.css` and the
+  `src/app/style.css` / `src/theme/tokens/dark.css` and the
   `adminThemeTokens.ts` / `taskMetricTokens.ts` bridges. Tier-3 standard
   tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`, …)
   resolve directly from canonical semantic tokens; no product-prefixed alias
@@ -87,7 +87,7 @@ Deliberately kept, not omissions:
 
 Type scale (`text-admin-*` sizes) is unaffected by the color-token freeze.
 Dark mode ships through token resolution (`html.dark` overrides in
-`src/shared/theme/tokens/dark.css`); `dark:` overrides stay banned because
+`src/theme/tokens/dark.css`); `dark:` overrides stay banned because
 semantic tokens already cover both modes.
 
 Out of freeze scope, by design:
@@ -96,7 +96,7 @@ Out of freeze scope, by design:
   shadow tokens are elevation, not color. Components may keep domain-owned
   elevation tokens; generic `shadow-ib-*` aliases are forbidden.
 - Tier-3 dual source: `src/app/style.css` `@theme` and
-  `src/shared/theme/tokens/semantic-light.css` (`@layer base` `:root`) both
+  `src/theme/tokens/semantic-light.css` (`@layer base` `:root`) both
   declare standard names (`--color-primary`, `--color-foreground`, …), and the
   same holds for canvas tokens (`@theme` vs `tokens/canvas.css`).
   Verified against the built bundle: `@layer base` wins over `@layer theme`,
@@ -238,7 +238,7 @@ stricter 32px floor, declared once as `--spacing-touch-target-min` in
 (`scripts/checkTouchTargetContract.ts`).
 
 Controls that are visually small by design do not inflate to 32px. Instead the _hit
-area_ grows past the visual box through `src/shared/theme/atoms/touch-target.css`:
+area_ grows past the visual box through `src/theme/atoms/touch-target.css`:
 
 | Class                   | Grows to           | Use for                                                                        |
 | ----------------------- | ------------------ | ------------------------------------------------------------------------------ |

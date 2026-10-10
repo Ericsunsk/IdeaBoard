@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import AdminSupportChannelsEditor from './AdminSupportChannelsEditor.vue'
-import { SUPPORT_CHANNELS_QUERY_KEY } from '../../../../shared/composables/useSupportChannels'
+import { SUPPORT_CHANNELS_QUERY_KEY } from '../../../../core/composables/useSupportChannels'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminSupportChannelsEditor', () => {
   beforeEach(() => mockAppToast())

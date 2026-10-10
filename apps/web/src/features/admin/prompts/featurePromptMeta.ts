@@ -1,4 +1,4 @@
-import type { Service } from '../../../shared/domain/imageServices'
+import type { Service } from '../../../core/contracts/imageServices'
 import {
   ADMIN_SERVICE_GROUPS,
   getAdminServiceGroupMeta,

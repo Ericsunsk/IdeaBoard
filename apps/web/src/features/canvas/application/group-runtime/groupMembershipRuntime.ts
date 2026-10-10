@@ -19,7 +19,7 @@ import {
   type CanvasRect,
 } from '../../domain/graph/canvasGroupGeometry.ts'
 
-export type PendingGroupJoin = {
+type PendingGroupJoin = {
   groupId: CanvasGraphGroupId
   nodeIds: CanvasGraphNodeId[]
 }

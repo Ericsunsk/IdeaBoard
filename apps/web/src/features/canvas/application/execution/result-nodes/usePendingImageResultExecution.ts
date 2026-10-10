@@ -16,7 +16,7 @@ import type {
 import type { BoardAttachment } from '../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../../infrastructure/vue-flow-adapter/flowConnectionAdapter.ts'
 import { canvasNodeToFlowNode } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
-import { createPrefixedId } from '../../../../../shared/utils/ids'
+import { createPrefixedId } from '../../../../../core/utils/ids'
 import type { CanvasRendererMetricsPort } from '../../../infrastructure/vue-flow-adapter'
 import { resolveWritableCanvasGraphStore } from '../../canvasGraphStoreWriter'
 import {

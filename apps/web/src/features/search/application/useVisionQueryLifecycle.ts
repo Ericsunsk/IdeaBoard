@@ -3,16 +3,16 @@ import {
   VISION_REFERENCE_MAX_BYTES,
   VISION_REFERENCE_MAX_COUNT,
   isVisionReferenceFile,
-} from '../../../shared/media/visionIngressPolicy'
+} from '../../../core/media/visionIngressPolicy'
 import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRouter, type Router } from 'vue-router'
-import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
-import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
-import { useAppToast } from '../../../shared/composables/useAppToast'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
-import { i18n } from '../../../shared/i18n'
-import { createUniqueId } from '../../../shared/utils/ids'
-import { workspaceUploadApi } from '../../../shared/api/upload'
+import { USER_SEARCH_PATH } from '../../workspace/routePaths'
+import { formatIdeaAmount } from '../../../core/i18n/userIdeaCurrency'
+import { useAppToast } from '../../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
+import { i18n } from '../../../core/i18n'
+import { createUniqueId } from '../../../core/utils/ids'
+import { workspaceUploadApi } from '../../../api/upload'
 import type { LibraryAssetView } from '../../library'
 import type { SearchAuthAction } from '../domain/authAction'
 import {

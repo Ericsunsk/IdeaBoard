@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { adminPolling, noRetry } from '../../../../shared/query/queryDefaults'
+import { adminPolling, noRetry } from '../../../../core/query/queryDefaults'
 
 type PollableRun = {
   id: number

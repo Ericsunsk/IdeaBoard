@@ -176,7 +176,7 @@ import { BILLING_PRICING_MESSAGES } from './messages'
 // 组合保存 toast 文案收口在此（不改 messages.ts 公共文件）：旧文案“请根据提示重试”
 // 已无 inline 提示可指，自洽文案只说“请重试”，失败明细直接拼在 toast 后缀里。
 const COMBINED_SAVE_FAILED_PREFIX = '部分配置保存失败，请重试'
-import { stringParam } from '../../../../shared/router/queryParams'
+import { stringParam } from '../../../../core/router/queryParams'
 import {
   DEMO_MODE_QUERY_VALUE,
   createDemoBillingItems,

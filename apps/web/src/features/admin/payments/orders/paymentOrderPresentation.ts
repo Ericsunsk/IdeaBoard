@@ -1,8 +1,8 @@
-import { formatMinorCurrencyValue } from '../../../../shared/utils/currency'
+import { formatMinorCurrencyValue } from '../../../../core/utils/currency'
 import type { AdminPaymentOrderStatus } from './paymentOrderTypes'
 
 // Pill 直连：与 AdminStatusPillVariant 同构，模块内自有定义以免依赖组件层。
-export type PaymentOrderStatusVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
+type PaymentOrderStatusVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 
 const lifecyclePresentation: Record<
   AdminPaymentOrderStatus,

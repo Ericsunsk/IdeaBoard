@@ -2,11 +2,11 @@ import type { Component } from 'vue'
 import { DatabaseExport } from '@iconoir/vue'
 import type { StorageCard, StorageProvider, StorageProviderMeta } from './profiles'
 import { getAdminBrandLogo } from '../shared/logos/brandLogos'
-import logoAlibabaCloud from '../../../shared/assets/storage-vendors/alibabacloud.svg'
-import logoAmazonS3 from '../../../shared/assets/storage-vendors/amazons3.svg'
-import logoCloudflare from '../../../shared/assets/storage-vendors/cloudflare.svg'
-import logoMinio from '../../../shared/assets/storage-vendors/minio.svg'
-import logoTencentCloud from '../../../shared/assets/storage-vendors/tencentcloud.ico'
+import logoAlibabaCloud from '../shared/ui/assets/storage-vendors/alibabacloud.svg'
+import logoAmazonS3 from '../shared/ui/assets/storage-vendors/amazons3.svg'
+import logoCloudflare from '../shared/ui/assets/storage-vendors/cloudflare.svg'
+import logoMinio from '../shared/ui/assets/storage-vendors/minio.svg'
+import logoTencentCloud from '../shared/ui/assets/storage-vendors/tencentcloud.ico'
 
 export interface VendorPreset {
   key: string

@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
-import type { TaskImageResult } from '../../../../../shared/query/taskResult'
+import type { TaskImageResult } from '../../../../../core/query/taskResult'
 import type { CanvasGraphStore } from '../../../domain/graph'
 import type { CanvasRendererMetricsPort } from '../../../infrastructure/vue-flow-adapter'
 import { loadImageSizeFromUrl } from '../media/imageSize'
@@ -19,14 +19,14 @@ import type { PendingImageExecutionCore } from '../pending-execution'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
 import { type CanvasTaskSubmissionAdapter } from './canvasTaskSubmissionAdapter'
 import { assemblePendingImageWorkflow } from '../runtime/pendingWorkflowAssembly'
-import { resolveMediaAssetProcessingURL } from '../../../../../shared/api/mediaAssetDelivery'
+import { resolveMediaAssetProcessingURL } from '../../../../../api/mediaAssetDelivery'
 
-export type CanvasExecutionWorkspaceState = {
+type CanvasExecutionWorkspaceState = {
   readonly executionCore: PendingImageExecutionCore
   isNodeRunning: (nodeId: string) => boolean
 }
 
-export type CanvasExecutionWorkspaceCommands = {
+type CanvasExecutionWorkspaceCommands = {
   runGeneration: (plan: ActivatedImageExecutionPlan & { kind: 'generation' }) => Promise<void>
   hydratePendingImageLeases: (snapshot?: BoardSnapshot) => number
   reattachPendingImageResults: () => Promise<void>

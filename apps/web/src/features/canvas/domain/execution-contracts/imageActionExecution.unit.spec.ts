@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
+import { IMAGE_NODE_ACTION } from '../../core/nodes/imageActions'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
   DEFAULT_IMAGE_ACTION_STRENGTHS,

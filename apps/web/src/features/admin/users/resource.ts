@@ -12,17 +12,17 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import {
   getListControlUsersQueryKey,
   listControlUsers,
-} from '../../../shared/api/generated-query/control/control-users/control-users'
+} from '../../../api/generated-query/control/control-users/control-users'
 import type {
   ControlUser,
   ListControlUsersParams,
-} from '../../../shared/api/generated-query/control/model'
-import { stripUndefined } from '../../../shared/api/stripUndefined'
-import { normalizePageSize, PAGE_SIZES } from '../../../shared/config/pagination'
+} from '../../../api/generated-query/control/model'
+import { stripUndefined } from '../../../api/stripUndefined'
+import { normalizePageSize, PAGE_SIZES } from '../../../core/config/pagination'
 import { useAdminCursorCollection } from '../shared/composables/useAdminCursorCollection'
 
-export type AdminUsersRoleFilterValue = 'admin' | 'user'
-export type AdminUsersStatusFilterValue = 0 | 1
+type AdminUsersRoleFilterValue = 'admin' | 'user'
+type AdminUsersStatusFilterValue = 0 | 1
 
 // Feature-owned row item: legacy AdminUserListItem shape, control-sourced.
 // public_id carries the usr_ public id used by every control mutation.

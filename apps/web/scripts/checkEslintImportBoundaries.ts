@@ -18,7 +18,7 @@ const restrictedBoundaryCases: BoundaryCase[] = [
     name: 'route page cannot import the base overlay lifecycle directly',
     filePath: path.join(webRoot, 'src/features/admin/pages/import-boundary.fixture.ts'),
     code: `
-      import { useOverlayInteractionLifecycle } from '../../../shared/composables/useOverlayInteractionLifecycle'
+      import { useOverlayInteractionLifecycle } from '../../../core/composables/useOverlayInteractionLifecycle'
 
       console.log(useOverlayInteractionLifecycle)
     `,
@@ -45,7 +45,7 @@ const allowedBoundaryCases: BoundaryCase[] = [
       'src/features/canvas/presentation/pages/import-boundary.fixture.ts',
     ),
     code: `
-      import { useDialogOverlayLifecycle } from '../../../shared/composables/useDialogOverlayLifecycle'
+      import { useDialogOverlayLifecycle } from '../../../core/composables/useDialogOverlayLifecycle'
       import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 
       console.log(useDialogOverlayLifecycle, useCanvasCustomLayerOverlay)

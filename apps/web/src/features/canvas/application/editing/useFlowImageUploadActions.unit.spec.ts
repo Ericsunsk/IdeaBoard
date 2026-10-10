@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../board'
 import type { CanvasGraphNodeIdForKind } from '../../domain/graph'
-import { unsupportedUploadImageMessage } from '../../../../shared/utils/imageUploadSupport'
+import { unsupportedUploadImageMessage } from '../../../../core/utils/imageUploadSupport'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../shared/api/mediaAssetDelivery'
+} from '../../../../api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
 }))
 
-vi.mock('../../../../shared/media/imageAssetPipeline', () => ({
+vi.mock('../../../../core/media/imageAssetPipeline', () => ({
   prepareImageAssetForUpload: mocks.prepareImageAssetForUpload,
 }))
 

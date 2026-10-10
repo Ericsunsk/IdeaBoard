@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { PromptAspectRatio } from '../../../../board/ports/canvas'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import type { CanvasBillingQuoteState } from '../../../application/execution'
 import PromptComposerControls from './PromptComposerControls.vue'
 import type { PromptComposerResizePayload } from './usePromptComposerControls'

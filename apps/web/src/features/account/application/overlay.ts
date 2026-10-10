@@ -1,13 +1,8 @@
 import { computed, inject, provide, readonly, ref, watch, type InjectionKey, type Ref } from 'vue'
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
-import {
-  ADMIN_ROOT_PATH,
-  USER_LOGIN_PATH,
-  USER_REGISTER_PATH,
-  USER_BOARDS_PATH,
-  isPathUnderRoute,
-} from '../../../shared/constants/routePaths'
-import { stringParam } from '../../../shared/router/queryParams'
+import { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../admin/routePaths'
+import { USER_LOGIN_PATH, USER_REGISTER_PATH, USER_BOARDS_PATH } from '../../workspace/routePaths'
+import { stringParam } from '../../../core/router/queryParams'
 import {
   defaultAccountTab,
   parsePaymentReturnQuery,

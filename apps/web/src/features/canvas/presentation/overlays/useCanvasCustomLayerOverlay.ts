@@ -2,7 +2,7 @@ import { toValue, watchEffect, type MaybeRefOrGetter } from 'vue'
 import {
   useOverlayInteractionLifecycle,
   type OverlayDismissal,
-} from '../../../../shared/composables/useOverlayInteractionLifecycle'
+} from '../../../../core/composables/useOverlayInteractionLifecycle'
 
 type CanvasCustomLayerRoot = MaybeRefOrGetter<HTMLElement | null | undefined>
 

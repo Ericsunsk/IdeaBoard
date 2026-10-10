@@ -24,13 +24,13 @@ import {
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../shared/api/mediaAssetDelivery'
+} from '../../../../api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
 }))
 
-vi.mock('../../../../shared/media/imageAssetPipeline', () => ({
+vi.mock('../../../../core/media/imageAssetPipeline', () => ({
   prepareImageAssetForUpload: mocks.prepareImageAssetForUpload,
 }))
 

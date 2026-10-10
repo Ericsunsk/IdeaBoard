@@ -9,8 +9,8 @@ import {
   saveControlAIGatewayCatalog,
   testControlAIGatewayConnection,
   updateControlAIGateway,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
 import {
   buildControlMutationHeaders,
   buildRoutineControlMutationHeaders,
@@ -41,8 +41,8 @@ import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/c
 // (provider/path required since #847 removed the mapping fallback) keeps
 // its probe note. Callers keep importing these names, never generated code
 // directly.
-export type GatewayMutationOptions = ControlMutationOptions
-export type GatewayConfigSummary = {
+type GatewayMutationOptions = ControlMutationOptions
+type GatewayConfigSummary = {
   base_url?: string
   account_id?: string
   gateway_id?: string
@@ -51,7 +51,7 @@ export type GatewayConfigSummary = {
   updated_at?: string | null
 }
 
-export type GatewayModelCatalogItem = {
+type GatewayModelCatalogItem = {
   id: string
   name: string
   provider: string
@@ -82,7 +82,7 @@ export type DetectedGatewayModel = {
   supports_prompt_caching?: boolean
 }
 
-export type GatewayModelDetection = {
+type GatewayModelDetection = {
   models: DetectedGatewayModel[]
   configured_providers: number
 }
@@ -93,7 +93,7 @@ export type GatewayProviderOption = {
   id_prefix: string
 }
 
-export type GatewayRoutePreview = {
+type GatewayRoutePreview = {
   provider_slug: string
   is_first_party: boolean
   target_path: string
@@ -101,7 +101,7 @@ export type GatewayRoutePreview = {
   path_source_label: string
 }
 
-export type UpdateGatewayConfigRequest = {
+type UpdateGatewayConfigRequest = {
   base_url?: string
   token?: string
   account_id?: string

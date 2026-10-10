@@ -6,8 +6,8 @@ import {
   MIN_REQUESTED_OUTPUT_COUNT,
   REQUESTED_OUTPUT_COUNT_OPTIONS,
   type OutputResolution,
-} from '../../../../shared/domain/generationContract'
-import type { MediaRef } from '../../../../shared/media/mediaRef'
+} from '../../../../core/contracts/generationContract'
+import type { MediaRef } from '../../../../core/media/mediaRef'
 
 export interface CanvasPoint {
   x: number

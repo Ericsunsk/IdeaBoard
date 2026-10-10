@@ -16,7 +16,7 @@ vi.mock('../../infrastructure/media/canvasMediaIo.ts', async (importOriginal) =>
   }
 })
 
-vi.mock('../../../../shared/api/workspaceEventStream', () => ({
+vi.mock('../../../../api/workspaceEventStream', () => ({
   subscribeWorkspaceMediaInvalidation: vi.fn(() => vi.fn()),
 }))
 
@@ -25,7 +25,7 @@ vi.mock('../../../../shared/api/workspaceEventStream', () => ({
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../shared/api/mediaWorkspaceScope'
+} from '../../../../api/mediaWorkspaceScope'
 
 function createCanvasMock() {
   return {
@@ -44,7 +44,7 @@ function createCanvasMock() {
 async function importPreviewModule() {
   const [{ useDisplayImagePreview }, { setMediaWorkspaceIdResolver }] = await Promise.all([
     import('./useDisplayImagePreview'),
-    import('../../../../shared/api/mediaWorkspaceScope'),
+    import('../../../../api/mediaWorkspaceScope'),
   ])
   setMediaWorkspaceIdResolver(() => 'ws_test123')
   return { useDisplayImagePreview }

@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import AdminLayout from './AdminLayout.vue'
 
-vi.mock('../../../shared/composables/useSupportChannels', () => ({
+vi.mock('../../../core/composables/useSupportChannels', () => ({
   useSupportChannels: () => ({ channels: [] }),
 }))
 
@@ -12,7 +12,7 @@ vi.mock('../shared/composables/useAnomalyRadar', () => ({
   useAnomalyRadar: () => ({ anomalies: [], anomalyCount: 0, hasAnomalies: false }),
 }))
 
-vi.mock('../../../shared/composables/useSiteBranding', () => ({
+vi.mock('../../../core/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
     fallbackText: 'IdeaBoard',
     logoURL: '',

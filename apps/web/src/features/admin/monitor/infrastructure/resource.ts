@@ -1,21 +1,21 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
-import { requireContractData } from '../../../../shared/api/contractKernel'
-import { getControlMonitor } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
+import { getControlMonitor } from '../../../../api/generated-query/control/control-platform/control-platform'
 import {
   getControlTask,
   listControlTasks,
-} from '../../../../shared/api/generated-query/control/control-tasks/control-tasks'
+} from '../../../../api/generated-query/control/control-tasks/control-tasks'
 import type {
   ControlTask,
   ControlTaskAttempt,
   ControlTaskRoutingSnapshot,
   ListControlTasksParams as GeneratedListControlTasksParams,
   PaginatedControlTasks,
-} from '../../../../shared/api/generated-query/control/model'
-import type { ControlTaskEnvelope } from '../../../../shared/api/generated-query/control/model/controlTaskEnvelope'
+} from '../../../../api/generated-query/control/model'
+import type { ControlTaskEnvelope } from '../../../../api/generated-query/control/model/controlTaskEnvelope'
 import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
-import { keepPrevious } from '../../../../shared/query/queryDefaults'
+import { keepPrevious } from '../../../../core/query/queryDefaults'
 import type { TaskStatus } from '../../shared/lib/taskMetricTokens'
 
 // Admin monitor/task boundary (#852: task list/detail ride the live
@@ -40,7 +40,7 @@ export type ListAdminTasksParams = {
   page_size?: number
 }
 
-export type AdminMonitorExecutionSnapshot = {
+type AdminMonitorExecutionSnapshot = {
   resolved_model: string
   provider: string
   gateway_step: string
@@ -65,7 +65,7 @@ export type AdminTaskBillingSnapshot = {
   feature_exists?: boolean | undefined
 }
 
-export type TaskExecutionMetrics = {
+type TaskExecutionMetrics = {
   task_id: string
   current_stage: string
   bottleneck_source: string
@@ -85,7 +85,7 @@ export type TaskExecutionMetrics = {
   updated_at: string
 }
 
-export type MonitorTaskOutput = {
+type MonitorTaskOutput = {
   id: number
   task_id: string
   asset_id?: string | undefined
@@ -106,7 +106,7 @@ export type MonitorTaskOutput = {
   updated_at: string
 }
 
-export type AdminTaskExecutionAttempt = {
+type AdminTaskExecutionAttempt = {
   attempt_no: number
   status: string
   stage: string
@@ -133,7 +133,7 @@ export type AdminTaskExecutionAttempt = {
 // Read-only projection over the immutable submit-time routing snapshot
 // (#852, ADR-0012 rule 9): requested service/resolution, eligible pool
 // entries, deterministic selection, single retry candidate, pool version.
-export type AdminTaskRoutingSnapshot = {
+type AdminTaskRoutingSnapshot = {
   service: string
   requested_resolution: string
   eligible_models: string[]
@@ -142,7 +142,7 @@ export type AdminTaskRoutingSnapshot = {
   pool_version: number
 }
 
-export type AdminMonitorDetail = {
+type AdminMonitorDetail = {
   task_id: string
   correlation_id: string
   user_public_id: string
@@ -210,14 +210,14 @@ export type ApiResponseAdminTaskListData = {
   other_count: number
 }
 
-export type MonitorLatencySignal = {
+type MonitorLatencySignal = {
   samples: number
   avg_ms: number
   p95_ms: number
   max_ms: number
 }
 
-export type MonitorGoldenSignals = {
+type MonitorGoldenSignals = {
   window_seconds: number
   sample_count: number
   provider_attempts: number
@@ -228,7 +228,7 @@ export type MonitorGoldenSignals = {
   finalize_latency_ms: MonitorLatencySignal
 }
 
-export type MonitorExecutionPressurePoint = {
+type MonitorExecutionPressurePoint = {
   key: string
   label: string
   count: number
@@ -271,7 +271,7 @@ export type AdminMonitorExecutionAttempt = AdminTaskExecutionAttempt
 
 export const ADMIN_TASK_LIST_QUERY_KEY = ['admin', 'tasks', 'list'] as const
 export const ADMIN_MONITOR_QUERY_KEY = ['admin', 'monitor'] as const
-export const ADMIN_TASK_DETAIL_QUERY_ROOT = [...ADMIN_MONITOR_QUERY_KEY, 'detail'] as const
+const ADMIN_TASK_DETAIL_QUERY_ROOT = [...ADMIN_MONITOR_QUERY_KEY, 'detail'] as const
 
 type NestedQueryOptions = {
   query?: {

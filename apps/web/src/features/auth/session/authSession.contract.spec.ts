@@ -16,10 +16,10 @@ async function getFreshUserStore() {
     getSession: vi.fn(),
   }
 
-  vi.doMock('../../../shared/api/userSession', () => ({
+  vi.doMock('../../../api/userSession', () => ({
     fetchCurrentUserInfo: getUserInfo,
   }))
-  vi.doMock('../../../shared/auth/client', () => ({
+  vi.doMock('../../../core/auth/client', () => ({
     authClient,
     normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
     resolveBetterAuthErrorMessage: (_error: unknown, fallback: string) => fallback,
@@ -27,7 +27,7 @@ async function getFreshUserStore() {
 
   const [{ useUserStore }, { queryClient }] = await Promise.all([
     import('./userSession'),
-    import('../../../shared/query/queryClient'),
+    import('../../../core/query/queryClient'),
   ])
   return {
     store: useUserStore(),
@@ -130,7 +130,7 @@ describe('useUserStore auth cache handling', () => {
 
   it('clears auth state and Vue Query cache after logout succeeds', async () => {
     const { store, queryClient, authClient } = await getFreshUserStore()
-    const { getRecoverableAuthStorageUserScope } = await import('../../../shared/utils/auth')
+    const { getRecoverableAuthStorageUserScope } = await import('../../../core/utils/auth')
     store.setAuth(makeSessionUser())
     expect(getRecoverableAuthStorageUserScope()).not.toBeNull()
     queryClient.setQueryData(['user', 'boards'], { owner: 1 })

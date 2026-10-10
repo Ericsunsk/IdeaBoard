@@ -8,7 +8,7 @@ export type AdminPaymentOrderStatus =
   | 'expired'
   | 'payment_failed'
 
-export type AdminPaymentOrderUser = {
+type AdminPaymentOrderUser = {
   publicId: string
   displayName: string
 }
@@ -37,7 +37,7 @@ export type AdminPaymentOrderPage = {
   nextCursor?: string | undefined
 }
 
-export type AdminPaymentStripeSummary = {
+type AdminPaymentStripeSummary = {
   accountId?: string | undefined
   customerId?: string | undefined
   checkoutSessionId?: string | undefined
@@ -45,7 +45,7 @@ export type AdminPaymentStripeSummary = {
   chargeId?: string | undefined
 }
 
-export type AdminPaymentReconciliation = {
+type AdminPaymentReconciliation = {
   anomalous: boolean
   anomalousAt?: string | undefined
   lastCheckedAt?: string | undefined

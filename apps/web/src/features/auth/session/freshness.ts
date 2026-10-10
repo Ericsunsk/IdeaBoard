@@ -1,4 +1,4 @@
-import { SESSION_FRESH_THRESHOLD_MS } from '../../../shared/config/timing'
+import { SESSION_FRESH_THRESHOLD_MS } from '../../../core/config/timing'
 
 // Auth owns the trust window and predicate shared by the router and session cache.
 export const SESSION_TRUST_WINDOW_MS = SESSION_FRESH_THRESHOLD_MS

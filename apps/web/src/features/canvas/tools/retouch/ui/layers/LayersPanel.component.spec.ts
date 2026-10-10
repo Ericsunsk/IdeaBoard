@@ -7,7 +7,7 @@ import {
   createDefaultImageEffectLayer,
   createInitialLayerStack,
 } from '../../core/layers/layerStack.ts'
-import { setUserLocale } from '../../../../../../shared/i18n'
+import { setUserLocale } from '../../../../../../core/i18n'
 import LayersPanel from './LayersPanel.vue'
 
 // The panel only reads id/type/kind/name/visible. Unknown effect kinds

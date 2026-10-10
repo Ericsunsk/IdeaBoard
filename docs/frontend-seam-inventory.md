@@ -4,28 +4,30 @@ P0 freeze, 2026-10-10. Checkpoint: `70e5758eddad32b588eaf641d1a470848283b0d4`.
 
 This document's schema-validated JSON block is the single source of truth for current/public and future entry contracts. Status changes and consumer rewrites must be reviewed atomically. Planned records are not accepted entries.
 
-- 382 records: 260 active (236 canonical, 24 cascading), 122 planned. All 70 original barrels are retained.
+- 404 records: 273 active (253 canonical, 20 cascading), 3 planned, 128 retired. P1 relocations preserve legacy exports and declare actual public subpaths; all 109 compatibility shims have one-phase TTL and p1-lane deletion ownership. P1 local acceptance passed: frozen retirement/behavior quotas, full dual Knip, strict P1 graph/surface/ledger and final verification are green; CI/checkpoint evidence remains unset.
 - Hypothetical API/theme root wrappers are replaced by direct public subpaths actually consumed today. CSS/token files move with the theme directory and remain governed by existing token contracts; no runtime barrel is introduced for CSS.
 - Explicit ownership scopes define external edges; nested scopes overlap intentionally and their totals must not be summed. For pure single-file entries ownership is exactly that file. The Board Canvas port owns Board, so private Board reexports do not count as outbound.
 - Frozen targets preserve source export/import behavior. Composite Admin/Canvas/account entries expose explicitly mapped exports and redirect the frozen external source consumers. Internal consumers remain within their owning scope; API/generated paths retain their P1a carve-out.
-- P0 inventory and newly added surface differences are advisory. Existing surface contracts and cruiser error gates remain blocking; `api:surface:check -- --strict` enables all surface differences for P1. Missing active entries always fail.
+- Surface differences remain advisory in the default P0-compatible command; `api:surface:check -- --strict` gates every active surface for P1. Existing surface contracts, missing active entries and cruiser direction errors always block. `lint:dependencies -- --strict --phase=P1` checks the current P1 batch while retaining the full report; omit `--phase` to check every active Seam.
+
+P1 corrections transpose the frozen HEAD consumer/outbound edges through reviewed relocations. The four generated barrels keep their declared index-only ownership: their targets use the original index-file edges (7/159/11/236), correcting the P0 planned directory projection. The reviewed deltas cover identity reset, split route policy, service labels and locale/theme specs, including the five exact runtime imports in serviceLocale.contract.spec.ts that verify all eight service labels in four locales. Legacy shim targets expose unchanged exports; `core/auth/routePolicy.ts` adds the reviewed pure security-policy seam. Future planned and retired records preserve their historical contracts.
 
 ## Schema
 
-| Field | Contract |
-|---|---|
-| `path/targetPath` | Normalized unique sorted target entry path; both equal. |
-| `sourcePaths` | Verified existing source(s); active entries name themselves. |
-| `ownershipScope` | Exact files or trailing-slash directories owned by the target. |
-| `sourceOwnershipScope` | For planned entries, measured source scope used to project the target before files exist. |
-| `publicExports/exportMappings` | Sorted exported symbols; planned mappings name source symbol and target alias (Vue default aliases use component filenames). |
-| `owner/activationPhase/status` | Assigned phase lane, activation phase, planned/active/retired. No TBD owners. |
-| `allowedConsumers` | Exact frozen external `{from,to,kind}` edges, sorted by from/to/kind; `kind` is runtime or type-only. |
-| `measuredFanIn/Out` | Current external importer / whole-scope outbound target counts; planned current counts are zero because the target does not exist. |
-| `targetFanIn/Out/targetFanOutTargets` | P0-frozen counts and outbound target identities, projected through known relocations; counts agree with declared edges/targets. |
-| `surfaceBaseline/surfaceSeverity` | Every canonical entry covered; existing 13 entry contracts keep error severity and additions warn during P0. |
-| `shims/shimTtl/retirementPhase/deletionOwner` | Default TTL one phase; shims or scheduled retirement require named deletion owner. No shims introduced by P0. |
-| `purity` | Optional `pure` only after source review confirms computation/types without runtime side effects. Absence of forbidden graph dependencies alone does not prove purity; Vue SFC/DOM/browser modules are runtime entries. |
+| Field                                         | Contract                                                                                                                                                                                                                |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path/targetPath`                             | Normalized unique sorted target entry path; both equal.                                                                                                                                                                 |
+| `sourcePaths`                                 | Verified existing source(s); active entries name themselves.                                                                                                                                                            |
+| `ownershipScope`                              | Exact files or trailing-slash directories owned by the target.                                                                                                                                                          |
+| `sourceOwnershipScope`                        | For planned entries, measured source scope used to project the target before files exist.                                                                                                                               |
+| `publicExports/exportMappings`                | Sorted exported symbols; planned mappings name source symbol and target alias (Vue default aliases use component filenames).                                                                                            |
+| `owner/activationPhase/status`                | Assigned phase lane, activation phase, planned/active/retired. No TBD owners.                                                                                                                                           |
+| `allowedConsumers`                            | Exact frozen external `{from,to,kind}` edges, sorted by from/to/kind; `kind` is runtime or type-only.                                                                                                                   |
+| `measuredFanIn/Out`                           | Current external importer / whole-scope outbound target counts; planned current counts are zero because the target does not exist.                                                                                      |
+| `targetFanIn/Out/targetFanOutTargets`         | P0-frozen counts and outbound target identities, projected through known relocations; counts agree with declared edges/targets.                                                                                         |
+| `surfaceBaseline/surfaceSeverity`             | Every canonical entry covered; existing 13 entry contracts keep error severity and additions warn during P0.                                                                                                            |
+| `shims/shimTtl/retirementPhase/deletionOwner` | Default TTL one phase; shims or scheduled retirement require named deletion owner. No shims introduced by P0.                                                                                                           |
+| `purity`                                      | Optional `pure` only after source review confirms computation/types without runtime side effects. Absence of forbidden graph dependencies alone does not prove purity; Vue SFC/DOM/browser modules are runtime entries. |
 
 Validation/fixtures: `cd apps/web && node --experimental-strip-types scripts/seamInventory.ts --self-test`. Table regeneration: same script with `--render`. Dependency report: `npm run lint:dependencies`; a read-only check can pass `--report=/tmp/seam-report.json`. AST public surface uses TypeScript declarations, including multiline/aliased exports.
 
@@ -47,7 +49,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/client.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -55,7 +57,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/client.contract.spec.ts",
+          "to": "src/api/client.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/client.unit.spec.ts",
+          "to": "src/api/client.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/orvalMutator.ts",
+          "to": "src/api/client.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceUpload.contract.spec.ts",
+          "to": "src/api/client.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/composables/useSiteBranding.ts",
+          "to": "src/api/client.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/composables/useSiteBranding.unit.spec.ts",
           "to": "src/api/client.ts",
           "kind": "runtime"
         },
@@ -90,50 +117,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/api/client.contract.spec.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/client.unit.spec.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/orvalMutator.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceUpload.contract.spec.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useSiteBranding.unit.spec.ts",
+          "from": "src/shared/api/client.shim.ts",
           "to": "src/api/client.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "measuredFanIn": 13,
+      "measuredFanOut": 4,
+      "targetFanIn": 13,
       "targetFanOut": 4,
-      "shims": [],
+      "shims": ["src/shared/api/client.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/client.ts"
-      ],
+      "sourcePaths": ["src/api/client.ts"],
       "targetPath": "src/api/client.ts",
-      "ownershipScope": [
-        "src/api/client.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/client.ts"
-      ],
+      "ownershipScope": ["src/api/client.ts"],
+      "sourceOwnershipScope": ["src/shared/api/client.ts"],
       "publicExports": [
         "ApiClientError",
         "ApiRequestConfig",
@@ -186,13 +187,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/contractKernel.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/contractKernel.contract.spec.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/api/upload.ts",
           "to": "src/api/contractKernel.ts",
@@ -215,6 +221,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/core/composables/useSiteBranding.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/opaqueIds.unit.spec.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -384,35 +395,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/contractKernel.contract.spec.ts",
-          "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/opaqueIds.unit.spec.ts",
+          "from": "src/shared/api/contractKernel.shim.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 40,
+      "measuredFanIn": 41,
+      "measuredFanOut": 2,
+      "targetFanIn": 41,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/api/contractKernel.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/contractKernel.ts"
-      ],
+      "sourcePaths": ["src/api/contractKernel.ts"],
       "targetPath": "src/api/contractKernel.ts",
-      "ownershipScope": [
-        "src/api/contractKernel.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/contractKernel.ts"
-      ],
+      "ownershipScope": ["src/api/contractKernel.ts"],
+      "sourceOwnershipScope": ["src/shared/api/contractKernel.ts"],
       "publicExports": [
         "ContractErrorBody",
         "ContractErrorEnvelope",
@@ -571,7 +571,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/control-billing/control-billing.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -594,8 +594,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 3,
+      "measuredFanOut": 4,
       "targetFanIn": 3,
       "targetFanOut": 4,
       "shims": [],
@@ -604,7 +604,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/control-billing/control-billing.ts"
+        "src/api/generated-query/control/control-billing/control-billing.ts"
       ],
       "targetPath": "src/api/generated-query/control/control-billing/control-billing.ts",
       "ownershipScope": [
@@ -672,8 +672,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/model/index.ts",
-        "src/shared/api/controlMutator.ts"
+        "src/api/controlMutator.ts",
+        "src/api/generated-query/control/model/index.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/control-billing/control-billing.ts"
@@ -965,7 +965,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/control-credits/control-credits.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -993,8 +993,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 4,
+      "measuredFanOut": 4,
       "targetFanIn": 4,
       "targetFanOut": 4,
       "shims": [],
@@ -1003,7 +1003,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/control-credits/control-credits.ts"
+        "src/api/generated-query/control/control-credits/control-credits.ts"
       ],
       "targetPath": "src/api/generated-query/control/control-credits/control-credits.ts",
       "ownershipScope": [
@@ -1160,8 +1160,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/model/index.ts",
-        "src/shared/api/controlMutator.ts"
+        "src/api/controlMutator.ts",
+        "src/api/generated-query/control/model/index.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/control-credits/control-credits.ts"
@@ -1898,7 +1898,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/control-payments/control-payments.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -1921,8 +1921,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 3,
+      "measuredFanOut": 4,
       "targetFanIn": 3,
       "targetFanOut": 4,
       "shims": [],
@@ -1931,7 +1931,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/control-payments/control-payments.ts"
+        "src/api/generated-query/control/control-payments/control-payments.ts"
       ],
       "targetPath": "src/api/generated-query/control/control-payments/control-payments.ts",
       "ownershipScope": [
@@ -1982,8 +1982,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/model/index.ts",
-        "src/shared/api/controlMutator.ts"
+        "src/api/controlMutator.ts",
+        "src/api/generated-query/control/model/index.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/control-payments/control-payments.ts"
@@ -2190,7 +2190,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/control-platform/control-platform.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -2268,8 +2268,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 14,
+      "measuredFanOut": 4,
       "targetFanIn": 14,
       "targetFanOut": 4,
       "shims": [],
@@ -2278,7 +2278,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/control-platform/control-platform.ts"
+        "src/api/generated-query/control/control-platform/control-platform.ts"
       ],
       "targetPath": "src/api/generated-query/control/control-platform/control-platform.ts",
       "ownershipScope": [
@@ -2692,8 +2692,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/model/index.ts",
-        "src/shared/api/controlMutator.ts"
+        "src/api/controlMutator.ts",
+        "src/api/generated-query/control/model/index.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/control-platform/control-platform.ts"
@@ -4715,7 +4715,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/control-tasks/control-tasks.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -4733,8 +4733,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 2,
+      "measuredFanOut": 4,
       "targetFanIn": 2,
       "targetFanOut": 4,
       "shims": [],
@@ -4743,7 +4743,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/control-tasks/control-tasks.ts"
+        "src/api/generated-query/control/control-tasks/control-tasks.ts"
       ],
       "targetPath": "src/api/generated-query/control/control-tasks/control-tasks.ts",
       "ownershipScope": [
@@ -4777,8 +4777,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/model/index.ts",
-        "src/shared/api/controlMutator.ts"
+        "src/api/controlMutator.ts",
+        "src/api/generated-query/control/model/index.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/control-tasks/control-tasks.ts"
@@ -4900,7 +4900,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/control-users/control-users.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -4928,8 +4928,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 4,
+      "measuredFanOut": 4,
       "targetFanIn": 4,
       "targetFanOut": 4,
       "shims": [],
@@ -4938,7 +4938,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/control-users/control-users.ts"
+        "src/api/generated-query/control/control-users/control-users.ts"
       ],
       "targetPath": "src/api/generated-query/control/control-users/control-users.ts",
       "ownershipScope": [
@@ -5030,8 +5030,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/model/index.ts",
-        "src/shared/api/controlMutator.ts"
+        "src/api/controlMutator.ts",
+        "src/api/generated-query/control/model/index.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/control-users/control-users.ts"
@@ -5443,7 +5443,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "generated",
@@ -5451,21 +5451,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [],
       "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanOut": 7,
       "targetFanIn": 0,
-      "targetFanOut": 3,
+      "targetFanOut": 7,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/control/index.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/control/index.ts"],
       "targetPath": "src/api/generated-query/control/index.ts",
-      "ownershipScope": [
-        "src/api/generated-query/control/index.ts"
-      ],
+      "ownershipScope": ["src/api/generated-query/control/index.ts"],
       "publicExports": [
         "AddControlWorkspaceMemberMutationBody",
         "AddControlWorkspaceMemberMutationError",
@@ -6254,13 +6250,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/vue/index.js",
-        "src/shared/api/controlMutator.ts"
+        "src/api/generated-query/control/control-billing/control-billing.ts",
+        "src/api/generated-query/control/control-credits/control-credits.ts",
+        "src/api/generated-query/control/control-payments/control-payments.ts",
+        "src/api/generated-query/control/control-platform/control-platform.ts",
+        "src/api/generated-query/control/control-tasks/control-tasks.ts",
+        "src/api/generated-query/control/control-users/control-users.ts",
+        "src/api/generated-query/control/control-workspaces/control-workspaces.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/api/generated-query/control/"
-      ],
+      "sourceOwnershipScope": ["src/shared/api/generated-query/control/"],
       "exportMappings": [
         {
           "source": "src/shared/api/generated-query/control/index.ts",
@@ -10188,7 +10186,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/controlMailConfigRequest.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -10206,7 +10204,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
       "targetFanIn": 2,
       "targetFanOut": 0,
@@ -10216,15 +10214,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/controlMailConfigRequest.ts"
+        "src/api/generated-query/control/model/controlMailConfigRequest.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/controlMailConfigRequest.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/controlMailConfigRequest.ts"
       ],
-      "publicExports": [
-        "ControlMailConfigRequest"
-      ],
+      "publicExports": ["ControlMailConfigRequest"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "sourceOwnershipScope": [
@@ -10242,13 +10238,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/generated-query/control/model/controlOAuthProviderEnvelope.ts",
+          "to": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
+          "kind": "type-only"
+        },
         {
           "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
@@ -10258,14 +10259,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/settings/oauth/resource.ts",
           "to": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/control/model/controlOAuthProviderEnvelope.ts",
-          "to": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
       "targetFanIn": 3,
       "targetFanOut": 0,
@@ -10275,15 +10271,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts"
+        "src/api/generated-query/control/model/controlOAuthProviderSummary.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/controlOAuthProviderSummary.ts"
       ],
-      "publicExports": [
-        "ControlOAuthProviderSummary"
-      ],
+      "publicExports": ["ControlOAuthProviderSummary"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "sourceOwnershipScope": [
@@ -10301,7 +10295,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -10319,7 +10313,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
       "targetFanIn": 2,
       "targetFanOut": 0,
@@ -10329,15 +10323,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts"
+        "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts"
       ],
-      "publicExports": [
-        "ControlOAuthProviderUpdateRequest"
-      ],
+      "publicExports": ["ControlOAuthProviderUpdateRequest"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "sourceOwnershipScope": [
@@ -10355,7 +10347,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/controlStripeConfigRequest.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -10373,7 +10365,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
       "targetFanIn": 2,
       "targetFanOut": 0,
@@ -10383,15 +10375,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts"
+        "src/api/generated-query/control/model/controlStripeConfigRequest.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/controlStripeConfigRequest.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/controlStripeConfigRequest.ts"
       ],
-      "publicExports": [
-        "ControlStripeConfigRequest"
-      ],
+      "publicExports": ["ControlStripeConfigRequest"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "sourceOwnershipScope": [
@@ -10409,7 +10399,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/controlTaskEnvelope.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -10427,8 +10417,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
@@ -10437,18 +10427,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/controlTaskEnvelope.ts"
+        "src/api/generated-query/control/model/controlTaskEnvelope.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/controlTaskEnvelope.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/controlTaskEnvelope.ts"
       ],
-      "publicExports": [
-        "ControlTaskEnvelope"
-      ],
+      "publicExports": ["ControlTaskEnvelope"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/shared/api/generated-query/control/model/controlTaskEnvelopeData.ts"
+        "src/api/generated-query/control/model/controlTaskEnvelopeData.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/model/controlTaskEnvelope.ts"
@@ -10465,7 +10453,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "generated",
@@ -10499,6 +10487,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/api/generated-query/control/control-users/control-users.ts",
+          "to": "src/api/generated-query/control/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/generated-query/control/control-workspaces/control-workspaces.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
@@ -10551,29 +10544,20 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/users/resource.unit.spec.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/control/control-workspaces/control-workspaces.ts",
-          "to": "src/api/generated-query/control/model/index.ts",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 17,
+      "measuredFanOut": 159,
       "targetFanIn": 17,
-      "targetFanOut": 0,
+      "targetFanOut": 159,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/control/model/index.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/control/model/index.ts"],
       "targetPath": "src/api/generated-query/control/model/index.ts",
-      "ownershipScope": [
-        "src/api/generated-query/control/model/index.ts"
-      ],
+      "ownershipScope": ["src/api/generated-query/control/model/index.ts"],
       "publicExports": [
         "AuditRecord",
         "AuditRecordOperator",
@@ -10736,10 +10720,168 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "UploadControlBrandingLogoBody"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/api/generated-query/control/model/"
+      "targetFanOutTargets": [
+        "src/api/generated-query/control/model/auditRecord.ts",
+        "src/api/generated-query/control/model/auditRecordOperator.ts",
+        "src/api/generated-query/control/model/auditRecordOperatorType.ts",
+        "src/api/generated-query/control/model/auditRecordOutcome.ts",
+        "src/api/generated-query/control/model/auditRecordTarget.ts",
+        "src/api/generated-query/control/model/backfillControlStatisticsBody.ts",
+        "src/api/generated-query/control/model/badRequestResponse.ts",
+        "src/api/generated-query/control/model/conflictResponse.ts",
+        "src/api/generated-query/control/model/controlAckEnvelope.ts",
+        "src/api/generated-query/control/model/controlAckEnvelopeData.ts",
+        "src/api/generated-query/control/model/controlAdminRedemption.ts",
+        "src/api/generated-query/control/model/controlAdminRedemptionDetail.ts",
+        "src/api/generated-query/control/model/controlAdminRedemptionPage.ts",
+        "src/api/generated-query/control/model/controlBanRequest.ts",
+        "src/api/generated-query/control/model/controlBeforeIdParameter.ts",
+        "src/api/generated-query/control/model/controlBillingAccount.ts",
+        "src/api/generated-query/control/model/controlBrandLogoOverride.ts",
+        "src/api/generated-query/control/model/controlBrandLogoOverrideList.ts",
+        "src/api/generated-query/control/model/controlBrandLogoOverrideScope.ts",
+        "src/api/generated-query/control/model/controlBrandingLogoUpload.ts",
+        "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts",
+        "src/api/generated-query/control/model/controlCatalogEnvelope.ts",
+        "src/api/generated-query/control/model/controlCatalogEnvelopeData.ts",
+        "src/api/generated-query/control/model/controlCatalogEnvelopeDataItemsItem.ts",
+        "src/api/generated-query/control/model/controlCreatedRewardCode.ts",
+        "src/api/generated-query/control/model/controlCreditCommandRequest.ts",
+        "src/api/generated-query/control/model/controlCreditCorrectionRequest.ts",
+        "src/api/generated-query/control/model/controlCreditRefundRequest.ts",
+        "src/api/generated-query/control/model/controlCreditResult.ts",
+        "src/api/generated-query/control/model/controlCreditResultEnvelope.ts",
+        "src/api/generated-query/control/model/controlCreditWallet.ts",
+        "src/api/generated-query/control/model/controlCreditWalletEnvelope.ts",
+        "src/api/generated-query/control/model/controlCreditWalletStatus.ts",
+        "src/api/generated-query/control/model/controlDeletedRewardCode.ts",
+        "src/api/generated-query/control/model/controlErrorEnvelope.ts",
+        "src/api/generated-query/control/model/controlErrorEnvelopeError.ts",
+        "src/api/generated-query/control/model/controlErrorEnvelopeErrorDetails.ts",
+        "src/api/generated-query/control/model/controlKeywordParameter.ts",
+        "src/api/generated-query/control/model/controlLedgerTransaction.ts",
+        "src/api/generated-query/control/model/controlLedgerTransactionActor.ts",
+        "src/api/generated-query/control/model/controlLedgerTransactionBusinessReference.ts",
+        "src/api/generated-query/control/model/controlLedgerTransactionCharge.ts",
+        "src/api/generated-query/control/model/controlLimitParameter.ts",
+        "src/api/generated-query/control/model/controlMailConfig.ts",
+        "src/api/generated-query/control/model/controlMailConfigEnvelope.ts",
+        "src/api/generated-query/control/model/controlMailConfigReadiness.ts",
+        "src/api/generated-query/control/model/controlMailConfigRequest.ts",
+        "src/api/generated-query/control/model/controlMailTestRequest.ts",
+        "src/api/generated-query/control/model/controlModelPoolEntry.ts",
+        "src/api/generated-query/control/model/controlModelPoolEntryResolutionsItem.ts",
+        "src/api/generated-query/control/model/controlModelPoolEnvelope.ts",
+        "src/api/generated-query/control/model/controlModelPoolEnvelopeData.ts",
+        "src/api/generated-query/control/model/controlNotFoundResponse.ts",
+        "src/api/generated-query/control/model/controlOAuthProviderEnvelope.ts",
+        "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
+        "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts",
+        "src/api/generated-query/control/model/controlObjectEnvelope.ts",
+        "src/api/generated-query/control/model/controlObjectEnvelopeData.ts",
+        "src/api/generated-query/control/model/controlOutboundPolicyRequest.ts",
+        "src/api/generated-query/control/model/controlPaginationMeta.ts",
+        "src/api/generated-query/control/model/controlPaymentOrderFiltersParameter.ts",
+        "src/api/generated-query/control/model/controlPaymentRefundRequest.ts",
+        "src/api/generated-query/control/model/controlPublishPricesRequest.ts",
+        "src/api/generated-query/control/model/controlPublishPricesRequestPrices.ts",
+        "src/api/generated-query/control/model/controlReasonRequest.ts",
+        "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts",
+        "src/api/generated-query/control/model/controlReplaceModelPoolEnvelopeData.ts",
+        "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts",
+        "src/api/generated-query/control/model/controlRewardCode.ts",
+        "src/api/generated-query/control/model/controlRewardCodeCreateRequest.ts",
+        "src/api/generated-query/control/model/controlRewardCodeEnabledRequest.ts",
+        "src/api/generated-query/control/model/controlRewardCodePage.ts",
+        "src/api/generated-query/control/model/controlRewardCodeSearchRequest.ts",
+        "src/api/generated-query/control/model/controlRewardCodeSearchRequestStatus.ts",
+        "src/api/generated-query/control/model/controlRewardCodeStatus.ts",
+        "src/api/generated-query/control/model/controlRewardCodeUpdateRequest.ts",
+        "src/api/generated-query/control/model/controlRoleParameter.ts",
+        "src/api/generated-query/control/model/controlSetAvailabilityRequest.ts",
+        "src/api/generated-query/control/model/controlSetRoleRequest.ts",
+        "src/api/generated-query/control/model/controlSetRoleRequestRole.ts",
+        "src/api/generated-query/control/model/controlStatusParameter.ts",
+        "src/api/generated-query/control/model/controlStripeConfigRequest.ts",
+        "src/api/generated-query/control/model/controlTask.ts",
+        "src/api/generated-query/control/model/controlTaskAttempt.ts",
+        "src/api/generated-query/control/model/controlTaskAttemptRetryLayer.ts",
+        "src/api/generated-query/control/model/controlTaskBilling.ts",
+        "src/api/generated-query/control/model/controlTaskEnvelope.ts",
+        "src/api/generated-query/control/model/controlTaskEnvelopeData.ts",
+        "src/api/generated-query/control/model/controlTaskExecutionMetrics.ts",
+        "src/api/generated-query/control/model/controlTaskExecutionSnapshot.ts",
+        "src/api/generated-query/control/model/controlTaskListCounts.ts",
+        "src/api/generated-query/control/model/controlTaskListMeta.ts",
+        "src/api/generated-query/control/model/controlTaskOutputsItem.ts",
+        "src/api/generated-query/control/model/controlTaskRoutingSnapshot.ts",
+        "src/api/generated-query/control/model/controlTaskStatusParameter.ts",
+        "src/api/generated-query/control/model/controlTaskUserParameter.ts",
+        "src/api/generated-query/control/model/controlUpdatedRewardCode.ts",
+        "src/api/generated-query/control/model/controlUser.ts",
+        "src/api/generated-query/control/model/controlUserEnvelope.ts",
+        "src/api/generated-query/control/model/controlUserRole.ts",
+        "src/api/generated-query/control/model/controlWalletRestriction.ts",
+        "src/api/generated-query/control/model/controlWalletRestrictionCreatedBy.ts",
+        "src/api/generated-query/control/model/controlWalletRestrictionRelatedObject.ts",
+        "src/api/generated-query/control/model/controlWorkspace.ts",
+        "src/api/generated-query/control/model/controlWorkspaceEnvelope.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMember.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMemberEnvelope.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMemberRequest.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMemberRequestRole.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMemberRole.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMemberRoleRequest.ts",
+        "src/api/generated-query/control/model/controlWorkspaceMemberRoleRequestRole.ts",
+        "src/api/generated-query/control/model/createControlStorageProfileBody.ts",
+        "src/api/generated-query/control/model/cursorParameter.ts",
+        "src/api/generated-query/control/model/detectControlAIGatewayModelsParams.ts",
+        "src/api/generated-query/control/model/forbiddenResponse.ts",
+        "src/api/generated-query/control/model/getControlAIGatewayBrandLogoParams.ts",
+        "src/api/generated-query/control/model/getControlAIGatewayModelReferenceParams.ts",
+        "src/api/generated-query/control/model/getControlStatisticsParams.ts",
+        "src/api/generated-query/control/model/idempotencyConflictResponse.ts",
+        "src/api/generated-query/control/model/idempotencyKeyParameter.ts",
+        "src/api/generated-query/control/model/listControlBillingAccountsParams.ts",
+        "src/api/generated-query/control/model/listControlCreditLedgerParams.ts",
+        "src/api/generated-query/control/model/listControlPaymentOrdersParams.ts",
+        "src/api/generated-query/control/model/listControlReconciliationFindingsParams.ts",
+        "src/api/generated-query/control/model/listControlReconciliationFindingsStatus.ts",
+        "src/api/generated-query/control/model/listControlReconciliationRunsParams.ts",
+        "src/api/generated-query/control/model/listControlRewardRedemptionsParams.ts",
+        "src/api/generated-query/control/model/listControlTasksParams.ts",
+        "src/api/generated-query/control/model/listControlUsersParams.ts",
+        "src/api/generated-query/control/model/operatorReasonParameter.ts",
+        "src/api/generated-query/control/model/pageSizeParameter.ts",
+        "src/api/generated-query/control/model/paginatedControlBillingAccounts.ts",
+        "src/api/generated-query/control/model/paginatedControlLedger.ts",
+        "src/api/generated-query/control/model/paginatedControlTasks.ts",
+        "src/api/generated-query/control/model/paginatedControlUsers.ts",
+        "src/api/generated-query/control/model/paginatedControlWorkspaceMembers.ts",
+        "src/api/generated-query/control/model/paginatedControlWorkspaces.ts",
+        "src/api/generated-query/control/model/previewControlAIGatewayRouteBody.ts",
+        "src/api/generated-query/control/model/rateLimitedResponse.ts",
+        "src/api/generated-query/control/model/saveControlAIGatewayCatalogBody.ts",
+        "src/api/generated-query/control/model/saveControlBrandLogoOverrideBody.ts",
+        "src/api/generated-query/control/model/saveControlFeaturePromptBody.ts",
+        "src/api/generated-query/control/model/supportChannel.ts",
+        "src/api/generated-query/control/model/supportChannelKind.ts",
+        "src/api/generated-query/control/model/supportChannelsSetting.ts",
+        "src/api/generated-query/control/model/supportChannelsSettingEnvelope.ts",
+        "src/api/generated-query/control/model/testControlAIGatewayConnectionBody.ts",
+        "src/api/generated-query/control/model/unauthorizedResponse.ts",
+        "src/api/generated-query/control/model/unprocessableEntityResponse.ts",
+        "src/api/generated-query/control/model/updateControlAIGatewayBody.ts",
+        "src/api/generated-query/control/model/updateControlBrandingSettingBody.ts",
+        "src/api/generated-query/control/model/updateControlLoginLockoutSettingBody.ts",
+        "src/api/generated-query/control/model/updateControlMediaUploadSettingBody.ts",
+        "src/api/generated-query/control/model/updateControlRateLimitSettingBody.ts",
+        "src/api/generated-query/control/model/updateControlRegistrationSettingBody.ts",
+        "src/api/generated-query/control/model/updateControlSearchProviderBody.ts",
+        "src/api/generated-query/control/model/updateControlStorageProfileBody.ts",
+        "src/api/generated-query/control/model/uploadControlBrandingLogoBody.ts"
       ],
+      "sourceOwnershipScope": ["src/shared/api/generated-query/control/model/"],
       "exportMappings": [
         {
           "source": "src/shared/api/generated-query/control/model/index.ts",
@@ -11542,7 +11684,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/supportChannelKind.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -11555,17 +11697,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/api/generated-query/control/model/supportChannel.ts",
+          "to": "src/api/generated-query/control/model/supportChannelKind.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/settings/support-channels/resource.ts",
           "to": "src/api/generated-query/control/model/supportChannelKind.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/generated-query/control/model/supportChannel.ts",
-          "to": "src/api/generated-query/control/model/supportChannelKind.ts",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
       "targetFanIn": 3,
       "targetFanOut": 0,
@@ -11575,15 +11717,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/supportChannelKind.ts"
+        "src/api/generated-query/control/model/supportChannelKind.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/supportChannelKind.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/supportChannelKind.ts"
       ],
-      "publicExports": [
-        "SupportChannelKind"
-      ],
+      "publicExports": ["SupportChannelKind"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "sourceOwnershipScope": [
@@ -11601,7 +11741,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/control/model/supportChannelsSetting.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -11614,18 +11754,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
+          "from": "src/api/generated-query/control/model/supportChannelsSettingEnvelope.ts",
           "to": "src/api/generated-query/control/model/supportChannelsSetting.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/shared/api/generated-query/control/model/supportChannelsSettingEnvelope.ts",
+          "from": "src/features/admin/settings/support-channels/resource.ts",
           "to": "src/api/generated-query/control/model/supportChannelsSetting.ts",
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 3,
+      "measuredFanOut": 1,
       "targetFanIn": 3,
       "targetFanOut": 1,
       "shims": [],
@@ -11634,18 +11774,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/control/model/supportChannelsSetting.ts"
+        "src/api/generated-query/control/model/supportChannelsSetting.ts"
       ],
       "targetPath": "src/api/generated-query/control/model/supportChannelsSetting.ts",
       "ownershipScope": [
         "src/api/generated-query/control/model/supportChannelsSetting.ts"
       ],
-      "publicExports": [
-        "SupportChannelsSetting"
-      ],
+      "publicExports": ["SupportChannelsSetting"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/shared/api/generated-query/control/model/supportChannel.ts"
+        "src/api/generated-query/control/model/supportChannel.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/control/model/supportChannelsSetting.ts"
@@ -11662,7 +11800,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/boards/boards.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -11680,8 +11818,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 2,
+      "measuredFanOut": 4,
       "targetFanIn": 2,
       "targetFanOut": 4,
       "shims": [],
@@ -11689,13 +11827,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/boards/boards.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/public/boards/boards.ts"],
       "targetPath": "src/api/generated-query/public/boards/boards.ts",
-      "ownershipScope": [
-        "src/api/generated-query/public/boards/boards.ts"
-      ],
+      "ownershipScope": ["src/api/generated-query/public/boards/boards.ts"],
       "publicExports": [
         "AddBoardMemberMutationBody",
         "AddBoardMemberMutationError",
@@ -11847,7 +11981,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/boards/boards.ts"
@@ -12579,7 +12713,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "generated",
@@ -12587,21 +12721,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [],
       "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanOut": 11,
       "targetFanIn": 0,
-      "targetFanOut": 3,
+      "targetFanOut": 11,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/index.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/public/index.ts"],
       "targetPath": "src/api/generated-query/public/index.ts",
-      "ownershipScope": [
-        "src/api/generated-query/public/index.ts"
-      ],
+      "ownershipScope": ["src/api/generated-query/public/index.ts"],
       "publicExports": [
         "AbandonWorkspacePendingOrderMutationError",
         "AbandonWorkspacePendingOrderMutationResult",
@@ -13225,13 +13355,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/vue/index.js",
-        "src/shared/api/publicMutator.ts"
+        "src/api/generated-query/public/boards/boards.ts",
+        "src/api/generated-query/public/organizations/organizations.ts",
+        "src/api/generated-query/public/user/user.ts",
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-library/workspace-library.ts",
+        "src/api/generated-query/public/workspace-media/workspace-media.ts",
+        "src/api/generated-query/public/workspace-members/workspace-members.ts",
+        "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
+        "src/api/generated-query/public/workspace-search/workspace-search.ts",
+        "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts",
+        "src/api/generated-query/public/workspaces/workspaces.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/api/generated-query/public/"
-      ],
+      "sourceOwnershipScope": ["src/shared/api/generated-query/public/"],
       "exportMappings": [
         {
           "source": "src/shared/api/generated-query/public/index.ts",
@@ -16334,7 +16470,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/model/board.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -16342,28 +16478,28 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/generated-query/public/model/boardEnvelope.ts",
+          "to": "src/api/generated-query/public/model/board.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/board.ts",
           "kind": "runtime"
         },
         {
+          "from": "src/api/generated-query/public/model/paginatedBoards.ts",
+          "to": "src/api/generated-query/public/model/board.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/board/infrastructure/api/boardsResource.ts",
-          "to": "src/api/generated-query/public/model/board.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/model/boardEnvelope.ts",
-          "to": "src/api/generated-query/public/model/board.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/model/paginatedBoards.ts",
           "to": "src/api/generated-query/public/model/board.ts",
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 4,
+      "measuredFanOut": 2,
       "targetFanIn": 4,
       "targetFanOut": 2,
       "shims": [],
@@ -16371,20 +16507,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/model/board.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/public/model/board.ts"],
       "targetPath": "src/api/generated-query/public/model/board.ts",
-      "ownershipScope": [
-        "src/api/generated-query/public/model/board.ts"
-      ],
-      "publicExports": [
-        "Board"
-      ],
+      "ownershipScope": ["src/api/generated-query/public/model/board.ts"],
+      "publicExports": ["Board"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/shared/api/generated-query/public/model/boardId.ts",
-        "src/shared/api/generated-query/public/model/workspaceId.ts"
+        "src/api/generated-query/public/model/boardId.ts",
+        "src/api/generated-query/public/model/workspaceId.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/model/board.ts"
@@ -16401,13 +16531,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/model/boardDocument.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/generated-query/public/model/boardDocumentEnvelope.ts",
+          "to": "src/api/generated-query/public/model/boardDocument.ts",
+          "kind": "type-only"
+        },
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/boardDocument.ts",
@@ -16417,15 +16552,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/board/infrastructure/api/boardsResource.ts",
           "to": "src/api/generated-query/public/model/boardDocument.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/model/boardDocumentEnvelope.ts",
-          "to": "src/api/generated-query/public/model/boardDocument.ts",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
       "targetFanIn": 3,
       "targetFanOut": 2,
       "shims": [],
@@ -16433,20 +16563,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/model/boardDocument.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/public/model/boardDocument.ts"],
       "targetPath": "src/api/generated-query/public/model/boardDocument.ts",
       "ownershipScope": [
         "src/api/generated-query/public/model/boardDocument.ts"
       ],
-      "publicExports": [
-        "BoardDocument"
-      ],
+      "publicExports": ["BoardDocument"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/shared/api/generated-query/public/model/boardDocumentDocument.ts",
-        "src/shared/api/generated-query/public/model/boardId.ts"
+        "src/api/generated-query/public/model/boardDocumentDocument.ts",
+        "src/api/generated-query/public/model/boardId.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/model/boardDocument.ts"
@@ -16463,7 +16589,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/model/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "generated",
@@ -16472,6 +16598,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/generated-query/public/boards/boards.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/generated-query/public/organizations/organizations.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
@@ -16491,12 +16622,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
+          "from": "src/api/generated-query/public/workspace-media/workspace-media.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/generated-query/public/workspace-members/workspace-members.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
           "from": "src/api/generated-query/public/workspace-search/workspace-search.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
@@ -16544,44 +16690,20 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/infrastructure/workspaceResource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/organizations/organizations.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/workspace-media/workspace-media.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/workspace-members/workspace-members.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/generated-query/public/workspace-tasks/workspace-tasks.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 19,
+      "measuredFanOut": 236,
       "targetFanIn": 19,
-      "targetFanOut": 0,
+      "targetFanOut": 236,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/model/index.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/public/model/index.ts"],
       "targetPath": "src/api/generated-query/public/model/index.ts",
-      "ownershipScope": [
-        "src/api/generated-query/public/model/index.ts"
-      ],
+      "ownershipScope": ["src/api/generated-query/public/model/index.ts"],
       "publicExports": [
         "AddBoardMemberRequest",
         "AddBoardMemberRequestData",
@@ -16821,10 +16943,245 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "WorkspaceVisionQueryStatus"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/api/generated-query/public/model/"
+      "targetFanOutTargets": [
+        "src/api/generated-query/public/model/addBoardMemberRequest.ts",
+        "src/api/generated-query/public/model/addBoardMemberRequestData.ts",
+        "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts",
+        "src/api/generated-query/public/model/addWorkspaceMemberRequestData.ts",
+        "src/api/generated-query/public/model/avatarUploadResult.ts",
+        "src/api/generated-query/public/model/avatarUploadResultEnvelope.ts",
+        "src/api/generated-query/public/model/badRequestResponse.ts",
+        "src/api/generated-query/public/model/batchGetMediaAssetsRequest.ts",
+        "src/api/generated-query/public/model/batchGetMediaAssetsRequestData.ts",
+        "src/api/generated-query/public/model/batchGetMediaAssetsResult.ts",
+        "src/api/generated-query/public/model/batchGetMediaAssetsResultEnvelope.ts",
+        "src/api/generated-query/public/model/billingRecord.ts",
+        "src/api/generated-query/public/model/billingRecordKind.ts",
+        "src/api/generated-query/public/model/board.ts",
+        "src/api/generated-query/public/model/boardDocument.ts",
+        "src/api/generated-query/public/model/boardDocumentDocument.ts",
+        "src/api/generated-query/public/model/boardDocumentEnvelope.ts",
+        "src/api/generated-query/public/model/boardEnvelope.ts",
+        "src/api/generated-query/public/model/boardId.ts",
+        "src/api/generated-query/public/model/boardMember.ts",
+        "src/api/generated-query/public/model/boardMemberEnvelope.ts",
+        "src/api/generated-query/public/model/boardMemberList.ts",
+        "src/api/generated-query/public/model/boardRevision.ts",
+        "src/api/generated-query/public/model/boardRevisionDetail.ts",
+        "src/api/generated-query/public/model/boardRevisionDetailEnvelope.ts",
+        "src/api/generated-query/public/model/boardRevisionDetailSnapshot.ts",
+        "src/api/generated-query/public/model/boardRole.ts",
+        "src/api/generated-query/public/model/boardShareToken.ts",
+        "src/api/generated-query/public/model/boardShareTokenEnvelope.ts",
+        "src/api/generated-query/public/model/boardShareTokenList.ts",
+        "src/api/generated-query/public/model/cancelWorkspaceTaskRequest.ts",
+        "src/api/generated-query/public/model/cancelWorkspaceTaskRequestData.ts",
+        "src/api/generated-query/public/model/completeUploadEnvelope.ts",
+        "src/api/generated-query/public/model/completeUploadRequest.ts",
+        "src/api/generated-query/public/model/completeUploadRequestData.ts",
+        "src/api/generated-query/public/model/completeUploadRequestDataMediaKind.ts",
+        "src/api/generated-query/public/model/completeUploadResult.ts",
+        "src/api/generated-query/public/model/conflictResponse.ts",
+        "src/api/generated-query/public/model/createBoardRequest.ts",
+        "src/api/generated-query/public/model/createBoardRequestData.ts",
+        "src/api/generated-query/public/model/createLibraryFolderRequest.ts",
+        "src/api/generated-query/public/model/createLibraryFolderRequestData.ts",
+        "src/api/generated-query/public/model/createOrganizationRequest.ts",
+        "src/api/generated-query/public/model/createOrganizationRequestData.ts",
+        "src/api/generated-query/public/model/createOrganizationWorkspaceRequest.ts",
+        "src/api/generated-query/public/model/createOrganizationWorkspaceRequestData.ts",
+        "src/api/generated-query/public/model/createShareTokenRequest.ts",
+        "src/api/generated-query/public/model/createShareTokenRequestData.ts",
+        "src/api/generated-query/public/model/createUploadRequest.ts",
+        "src/api/generated-query/public/model/createUploadRequestData.ts",
+        "src/api/generated-query/public/model/createUploadRequestDataMediaKind.ts",
+        "src/api/generated-query/public/model/createWorkspaceBillingQuoteRequest.ts",
+        "src/api/generated-query/public/model/createWorkspaceBillingQuoteRequestData.ts",
+        "src/api/generated-query/public/model/createWorkspaceBillingQuoteRequestDataOutputResolution.ts",
+        "src/api/generated-query/public/model/createWorkspaceCheckoutRequest.ts",
+        "src/api/generated-query/public/model/createWorkspaceCheckoutRequestData.ts",
+        "src/api/generated-query/public/model/createWorkspaceRequest.ts",
+        "src/api/generated-query/public/model/createWorkspaceRequestData.ts",
+        "src/api/generated-query/public/model/createWorkspaceTaskRequest.ts",
+        "src/api/generated-query/public/model/createWorkspaceTaskRequestData.ts",
+        "src/api/generated-query/public/model/createWorkspaceTaskRequestDataInputs.ts",
+        "src/api/generated-query/public/model/createWorkspaceTaskRequestDataParams.ts",
+        "src/api/generated-query/public/model/createWorkspaceVisionQueryRequest.ts",
+        "src/api/generated-query/public/model/createWorkspaceVisionQueryRequestData.ts",
+        "src/api/generated-query/public/model/creditsLedgerEntry.ts",
+        "src/api/generated-query/public/model/creditsLedgerEntryCommandType.ts",
+        "src/api/generated-query/public/model/cursorParameter.ts",
+        "src/api/generated-query/public/model/deletedEnvelope.ts",
+        "src/api/generated-query/public/model/deletedEnvelopeData.ts",
+        "src/api/generated-query/public/model/errorEnvelope.ts",
+        "src/api/generated-query/public/model/errorEnvelopeError.ts",
+        "src/api/generated-query/public/model/errorEnvelopeErrorDetails.ts",
+        "src/api/generated-query/public/model/eventId.ts",
+        "src/api/generated-query/public/model/forbiddenResponse.ts",
+        "src/api/generated-query/public/model/getWorkspaceUsageParams.ts",
+        "src/api/generated-query/public/model/getWorkspaceUsageRange.ts",
+        "src/api/generated-query/public/model/idempotencyKeyParameter.ts",
+        "src/api/generated-query/public/model/ifMatchParameter.ts",
+        "src/api/generated-query/public/model/joinBoardRequest.ts",
+        "src/api/generated-query/public/model/joinBoardRequestData.ts",
+        "src/api/generated-query/public/model/libraryAsset.ts",
+        "src/api/generated-query/public/model/libraryAssetEnvelope.ts",
+        "src/api/generated-query/public/model/libraryAssetId.ts",
+        "src/api/generated-query/public/model/libraryAssetProvider.ts",
+        "src/api/generated-query/public/model/libraryFolder.ts",
+        "src/api/generated-query/public/model/libraryFolderEnvelope.ts",
+        "src/api/generated-query/public/model/libraryFolderId.ts",
+        "src/api/generated-query/public/model/listBoardRevisionsParams.ts",
+        "src/api/generated-query/public/model/listBoardsParams.ts",
+        "src/api/generated-query/public/model/listOrganizationsParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceBillingRecordsParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceCreditsLedgerParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceLibraryAssetsParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceLibraryFoldersParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceMediaAssetsParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceRechargesParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceRewardRedemptionsParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceTasksParams.ts",
+        "src/api/generated-query/public/model/listWorkspacesParams.ts",
+        "src/api/generated-query/public/model/mediaAsset.ts",
+        "src/api/generated-query/public/model/mediaAssetDerivatives.ts",
+        "src/api/generated-query/public/model/mediaAssetEnvelope.ts",
+        "src/api/generated-query/public/model/mediaAssetId.ts",
+        "src/api/generated-query/public/model/mediaAssetMediaKind.ts",
+        "src/api/generated-query/public/model/mediaAssetStatus.ts",
+        "src/api/generated-query/public/model/mediaDerivative.ts",
+        "src/api/generated-query/public/model/mediaDerivativeStatus.ts",
+        "src/api/generated-query/public/model/membershipRole.ts",
+        "src/api/generated-query/public/model/moveLibraryAssetRequest.ts",
+        "src/api/generated-query/public/model/moveLibraryAssetRequestData.ts",
+        "src/api/generated-query/public/model/notFoundResponse.ts",
+        "src/api/generated-query/public/model/organization.ts",
+        "src/api/generated-query/public/model/organizationEnvelope.ts",
+        "src/api/generated-query/public/model/organizationId.ts",
+        "src/api/generated-query/public/model/pageSizeParameter.ts",
+        "src/api/generated-query/public/model/paginatedBillingRecords.ts",
+        "src/api/generated-query/public/model/paginatedBoardRevisions.ts",
+        "src/api/generated-query/public/model/paginatedBoards.ts",
+        "src/api/generated-query/public/model/paginatedCreditsLedger.ts",
+        "src/api/generated-query/public/model/paginatedLibraryAssets.ts",
+        "src/api/generated-query/public/model/paginatedLibraryFolders.ts",
+        "src/api/generated-query/public/model/paginatedMediaAssets.ts",
+        "src/api/generated-query/public/model/paginatedOrganizations.ts",
+        "src/api/generated-query/public/model/paginatedWorkspaceRecharges.ts",
+        "src/api/generated-query/public/model/paginatedWorkspaceRewardRedemptions.ts",
+        "src/api/generated-query/public/model/paginatedWorkspaceSearchResults.ts",
+        "src/api/generated-query/public/model/paginatedWorkspaceTasks.ts",
+        "src/api/generated-query/public/model/paginatedWorkspaces.ts",
+        "src/api/generated-query/public/model/paginationMeta.ts",
+        "src/api/generated-query/public/model/quoteWorkspaceTaskRequest.ts",
+        "src/api/generated-query/public/model/quoteWorkspaceTaskRequestData.ts",
+        "src/api/generated-query/public/model/redeemWorkspaceRewardRequest.ts",
+        "src/api/generated-query/public/model/redeemWorkspaceRewardRequestData.ts",
+        "src/api/generated-query/public/model/redeemWorkspaceRewardResult.ts",
+        "src/api/generated-query/public/model/redeemWorkspaceRewardResultEnvelope.ts",
+        "src/api/generated-query/public/model/renameLibraryFolderRequest.ts",
+        "src/api/generated-query/public/model/renameLibraryFolderRequestData.ts",
+        "src/api/generated-query/public/model/replaceBoardDocumentRequest.ts",
+        "src/api/generated-query/public/model/replaceBoardDocumentRequestData.ts",
+        "src/api/generated-query/public/model/replaceBoardDocumentRequestDataPayload.ts",
+        "src/api/generated-query/public/model/requestIdParameter.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetItem.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetResult.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetResultStatus.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetsEnvelope.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetsRequest.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetsRequestData.ts",
+        "src/api/generated-query/public/model/resolveLibraryAssetsResult.ts",
+        "src/api/generated-query/public/model/saveLibraryAssetRequest.ts",
+        "src/api/generated-query/public/model/saveLibraryAssetRequestData.ts",
+        "src/api/generated-query/public/model/searchWorkspaceParams.ts",
+        "src/api/generated-query/public/model/searchWorkspaceProviderItem.ts",
+        "src/api/generated-query/public/model/service.ts",
+        "src/api/generated-query/public/model/shareRole.ts",
+        "src/api/generated-query/public/model/shareTokenId.ts",
+        "src/api/generated-query/public/model/successEnvelope.ts",
+        "src/api/generated-query/public/model/successEnvelopeData.ts",
+        "src/api/generated-query/public/model/successEnvelopeMeta.ts",
+        "src/api/generated-query/public/model/supportChannel.ts",
+        "src/api/generated-query/public/model/supportChannelKind.ts",
+        "src/api/generated-query/public/model/supportChannelsSetting.ts",
+        "src/api/generated-query/public/model/supportChannelsSettingEnvelope.ts",
+        "src/api/generated-query/public/model/taskBillingSnapshot.ts",
+        "src/api/generated-query/public/model/taskBillingSnapshotEnvelope.ts",
+        "src/api/generated-query/public/model/taskEnvelope.ts",
+        "src/api/generated-query/public/model/taskId.ts",
+        "src/api/generated-query/public/model/taskOutputKind.ts",
+        "src/api/generated-query/public/model/taskOutputRef.ts",
+        "src/api/generated-query/public/model/taskSettlementState.ts",
+        "src/api/generated-query/public/model/taskStatus.ts",
+        "src/api/generated-query/public/model/unauthorizedResponse.ts",
+        "src/api/generated-query/public/model/unprocessableEntityResponse.ts",
+        "src/api/generated-query/public/model/updateBoardMemberRequest.ts",
+        "src/api/generated-query/public/model/updateBoardMemberRequestData.ts",
+        "src/api/generated-query/public/model/updateBoardRequest.ts",
+        "src/api/generated-query/public/model/updateBoardRequestData.ts",
+        "src/api/generated-query/public/model/updateOrganizationRequest.ts",
+        "src/api/generated-query/public/model/updateOrganizationRequestData.ts",
+        "src/api/generated-query/public/model/updateWorkspaceMemberRequest.ts",
+        "src/api/generated-query/public/model/updateWorkspaceMemberRequestData.ts",
+        "src/api/generated-query/public/model/updateWorkspaceRequest.ts",
+        "src/api/generated-query/public/model/updateWorkspaceRequestData.ts",
+        "src/api/generated-query/public/model/uploadId.ts",
+        "src/api/generated-query/public/model/uploadSession.ts",
+        "src/api/generated-query/public/model/uploadSessionEnvelope.ts",
+        "src/api/generated-query/public/model/uploadSessionMediaKind.ts",
+        "src/api/generated-query/public/model/uploadSessionStatus.ts",
+        "src/api/generated-query/public/model/uploadTarget.ts",
+        "src/api/generated-query/public/model/uploadTargetKind.ts",
+        "src/api/generated-query/public/model/user.ts",
+        "src/api/generated-query/public/model/userEnvelope.ts",
+        "src/api/generated-query/public/model/userId.ts",
+        "src/api/generated-query/public/model/userRole.ts",
+        "src/api/generated-query/public/model/visionQueryId.ts",
+        "src/api/generated-query/public/model/workspace.ts",
+        "src/api/generated-query/public/model/workspaceBillingAccount.ts",
+        "src/api/generated-query/public/model/workspaceBillingAccountEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceBillingAccountOwnerType.ts",
+        "src/api/generated-query/public/model/workspaceBillingQuote.ts",
+        "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceCheckoutSession.ts",
+        "src/api/generated-query/public/model/workspaceCheckoutSessionEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceCreditsBalance.ts",
+        "src/api/generated-query/public/model/workspaceCreditsBalanceEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceCreditsBalanceStatus.ts",
+        "src/api/generated-query/public/model/workspaceEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceId.ts",
+        "src/api/generated-query/public/model/workspaceList.ts",
+        "src/api/generated-query/public/model/workspaceMember.ts",
+        "src/api/generated-query/public/model/workspaceMemberEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceMemberList.ts",
+        "src/api/generated-query/public/model/workspacePendingOrder.ts",
+        "src/api/generated-query/public/model/workspacePendingOrderEnvelope.ts",
+        "src/api/generated-query/public/model/workspacePendingOrderList.ts",
+        "src/api/generated-query/public/model/workspacePendingOrderListEnvelope.ts",
+        "src/api/generated-query/public/model/workspacePendingOrderStatus.ts",
+        "src/api/generated-query/public/model/workspacePurchaseOptions.ts",
+        "src/api/generated-query/public/model/workspacePurchaseOptionsEnvelope.ts",
+        "src/api/generated-query/public/model/workspacePurchaseOptionsRefundPolicy.ts",
+        "src/api/generated-query/public/model/workspacePurchaseOptionsTerms.ts",
+        "src/api/generated-query/public/model/workspaceRechargeHistoryItem.ts",
+        "src/api/generated-query/public/model/workspaceRechargeHistoryItemStatus.ts",
+        "src/api/generated-query/public/model/workspaceRewardRedemption.ts",
+        "src/api/generated-query/public/model/workspaceRewardRedemptionHistoryItem.ts",
+        "src/api/generated-query/public/model/workspaceSearchResult.ts",
+        "src/api/generated-query/public/model/workspaceTask.ts",
+        "src/api/generated-query/public/model/workspaceTaskOutputs.ts",
+        "src/api/generated-query/public/model/workspaceTaskOutputsEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceUsage.ts",
+        "src/api/generated-query/public/model/workspaceUsageEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceUsageLifetime.ts",
+        "src/api/generated-query/public/model/workspaceUsageTimezone.ts",
+        "src/api/generated-query/public/model/workspaceUsageTrendItem.ts",
+        "src/api/generated-query/public/model/workspaceVisionQuery.ts",
+        "src/api/generated-query/public/model/workspaceVisionQueryEnvelope.ts",
+        "src/api/generated-query/public/model/workspaceVisionQueryStatus.ts"
       ],
+      "sourceOwnershipScope": ["src/shared/api/generated-query/public/model/"],
       "exportMappings": [
         {
           "source": "src/shared/api/generated-query/public/model/index.ts",
@@ -18012,7 +18369,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/user/user.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -18045,8 +18402,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 5,
+      "measuredFanOut": 4,
       "targetFanIn": 5,
       "targetFanOut": 4,
       "shims": [],
@@ -18054,13 +18411,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/user/user.ts"
-      ],
+      "sourcePaths": ["src/api/generated-query/public/user/user.ts"],
       "targetPath": "src/api/generated-query/public/user/user.ts",
-      "ownershipScope": [
-        "src/api/generated-query/public/user/user.ts"
-      ],
+      "ownershipScope": ["src/api/generated-query/public/user/user.ts"],
       "publicExports": [
         "GetSupportChannelsQueryError",
         "GetSupportChannelsQueryResult",
@@ -18091,7 +18444,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/user/user.ts"
@@ -18218,7 +18571,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -18256,8 +18609,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 6,
+      "measuredFanOut": 4,
       "targetFanIn": 6,
       "targetFanOut": 4,
       "shims": [],
@@ -18266,7 +18619,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts"
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts"
       ],
       "targetPath": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
       "ownershipScope": [
@@ -18376,7 +18729,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts"
@@ -18873,7 +19226,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/workspace-library/workspace-library.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -18896,8 +19249,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 3,
+      "measuredFanOut": 4,
       "targetFanIn": 3,
       "targetFanOut": 4,
       "shims": [],
@@ -18906,7 +19259,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/public/workspace-library/workspace-library.ts"
+        "src/api/generated-query/public/workspace-library/workspace-library.ts"
       ],
       "targetPath": "src/api/generated-query/public/workspace-library/workspace-library.ts",
       "ownershipScope": [
@@ -18994,7 +19347,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/workspace-library/workspace-library.ts"
@@ -19381,7 +19734,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -19399,8 +19752,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 2,
+      "measuredFanOut": 4,
       "targetFanIn": 2,
       "targetFanOut": 4,
       "shims": [],
@@ -19409,7 +19762,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts"
+        "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts"
       ],
       "targetPath": "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
       "ownershipScope": [
@@ -19438,7 +19791,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts"
@@ -19530,7 +19883,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/workspace-search/workspace-search.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -19553,8 +19906,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 3,
+      "measuredFanOut": 4,
       "targetFanIn": 3,
       "targetFanOut": 4,
       "shims": [],
@@ -19563,7 +19916,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/public/workspace-search/workspace-search.ts"
+        "src/api/generated-query/public/workspace-search/workspace-search.ts"
       ],
       "targetPath": "src/api/generated-query/public/workspace-search/workspace-search.ts",
       "ownershipScope": [
@@ -19592,7 +19945,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/workspace-search/workspace-search.ts"
@@ -19684,7 +20037,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/generated-query/public/workspaces/workspaces.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -19702,8 +20055,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 2,
+      "measuredFanOut": 4,
       "targetFanIn": 2,
       "targetFanOut": 4,
       "shims": [],
@@ -19712,7 +20065,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
       "sourcePaths": [
-        "src/shared/api/generated-query/public/workspaces/workspaces.ts"
+        "src/api/generated-query/public/workspaces/workspaces.ts"
       ],
       "targetPath": "src/api/generated-query/public/workspaces/workspaces.ts",
       "ownershipScope": [
@@ -19765,7 +20118,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/generated-query/public/model/index.ts",
-        "src/shared/api/publicMutator.ts"
+        "src/api/publicMutator.ts"
       ],
       "sourceOwnershipScope": [
         "src/shared/api/generated-query/public/workspaces/workspaces.ts"
@@ -19977,7 +20330,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/idempotencyKey.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -19986,6 +20339,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/upload.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceTasks.contract.spec.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceUpload.contract.spec.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -20035,35 +20398,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/workspaceTasks.contract.spec.ts",
-          "to": "src/api/idempotencyKey.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceUpload.contract.spec.ts",
+          "from": "src/shared/api/idempotencyKey.shim.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 13,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 13,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/api/idempotencyKey.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/idempotencyKey.ts"
-      ],
+      "sourcePaths": ["src/api/idempotencyKey.ts"],
       "targetPath": "src/api/idempotencyKey.ts",
-      "ownershipScope": [
-        "src/api/idempotencyKey.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/idempotencyKey.ts"
-      ],
+      "ownershipScope": ["src/api/idempotencyKey.ts"],
+      "sourceOwnershipScope": ["src/shared/api/idempotencyKey.ts"],
       "publicExports": [
         "boardOperationIdempotencyKey",
         "controlCreditIdempotencyKey",
@@ -20153,7 +20505,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/mediaAssetDelivery.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -20161,7 +20513,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/mediaAssetDelivery.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceUpload.contract.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/media/mediaRef.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/media/mediaRef.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/query/taskResult.contract.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -20266,45 +20643,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetDelivery.unit.spec.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceUpload.contract.spec.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/media/mediaRef.unit.spec.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/query/taskResult.contract.spec.ts",
+          "from": "src/shared/api/mediaAssetDelivery.shim.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 25,
+      "measuredFanIn": 27,
+      "measuredFanOut": 4,
+      "targetFanIn": 27,
       "targetFanOut": 4,
-      "shims": [],
+      "shims": ["src/shared/api/mediaAssetDelivery.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/mediaAssetDelivery.ts"
-      ],
+      "sourcePaths": ["src/api/mediaAssetDelivery.ts"],
       "targetPath": "src/api/mediaAssetDelivery.ts",
-      "ownershipScope": [
-        "src/api/mediaAssetDelivery.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/mediaAssetDelivery.ts"
-      ],
+      "ownershipScope": ["src/api/mediaAssetDelivery.ts"],
+      "sourceOwnershipScope": ["src/shared/api/mediaAssetDelivery.ts"],
       "publicExports": [
         "ApiResponseMediaAssetMetadata",
         "MediaAssetDeliveryMetadata",
@@ -20461,17 +20817,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
+        "src/api/mediaAssetMetadata.ts",
+        "src/api/mediaAssetUrls.ts",
         "src/api/mediaWorkspaceScope.ts",
-        "src/shared/api/mediaAssetMetadata.ts",
-        "src/shared/api/mediaAssetUrls.ts",
-        "src/shared/api/useMediaAssetDelivery.ts"
+        "src/api/useMediaAssetDelivery.ts"
       ]
     },
     {
       "path": "src/api/mediaWorkspaceScope.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -20480,6 +20836,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/mediaAssetDelivery.ts",
+          "to": "src/api/mediaWorkspaceScope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/mediaAssetUrls.ts",
+          "to": "src/api/mediaWorkspaceScope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/mediaAssetUrls.unit.spec.ts",
           "to": "src/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
         },
@@ -20499,35 +20865,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetUrls.ts",
-          "to": "src/api/mediaWorkspaceScope.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/mediaAssetUrls.unit.spec.ts",
+          "from": "src/shared/api/mediaWorkspaceScope.shim.ts",
           "to": "src/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/api/mediaWorkspaceScope.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/mediaWorkspaceScope.ts"
-      ],
+      "sourcePaths": ["src/api/mediaWorkspaceScope.ts"],
       "targetPath": "src/api/mediaWorkspaceScope.ts",
-      "ownershipScope": [
-        "src/api/mediaWorkspaceScope.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/mediaWorkspaceScope.ts"
-      ],
+      "ownershipScope": ["src/api/mediaWorkspaceScope.ts"],
+      "sourceOwnershipScope": ["src/shared/api/mediaWorkspaceScope.ts"],
       "publicExports": [
         "readMediaWorkspaceId",
         "resetMediaWorkspaceIdResolver",
@@ -20557,7 +20912,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/sessionUserType.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -20565,12 +20920,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/client.contract.spec.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/api/userSession.ts",
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
         },
         {
           "from": "src/core/utils/auth.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/core/utils/auth.unit.spec.ts",
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
         },
@@ -20586,6 +20951,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/auth/session/browserSessionTransition.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
         },
@@ -20615,14 +20985,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/api/client.contract.spec.ts",
+          "from": "src/shared/api/sessionUserType.shim.ts",
           "to": "src/api/sessionUserType.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/utils/auth.unit.spec.ts",
-          "to": "src/api/sessionUserType.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/test/factories/user.ts",
@@ -20630,28 +20995,20 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 15,
       "measuredFanOut": 0,
-      "targetFanIn": 13,
+      "targetFanIn": 15,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/api/sessionUserType.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/sessionUserType.ts"
-      ],
+      "sourcePaths": ["src/api/sessionUserType.ts"],
       "targetPath": "src/api/sessionUserType.ts",
-      "ownershipScope": [
-        "src/api/sessionUserType.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/sessionUserType.ts"
-      ],
-      "publicExports": [
-        "User"
-      ],
+      "ownershipScope": ["src/api/sessionUserType.ts"],
+      "sourceOwnershipScope": ["src/shared/api/sessionUserType.ts"],
+      "publicExports": ["User"],
       "exportMappings": [
         {
           "source": "src/shared/api/sessionUserType.ts",
@@ -20666,13 +21023,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/stripUndefined.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/stripUndefined.unit.spec.ts",
+          "to": "src/api/stripUndefined.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/credits/health/findingQueueResource.ts",
           "to": "src/api/stripUndefined.ts",
@@ -20724,34 +21086,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/stripUndefined.unit.spec.ts",
+          "from": "src/shared/api/stripUndefined.shim.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 12,
       "measuredFanOut": 0,
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/api/stripUndefined.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/stripUndefined.ts"
-      ],
+      "sourcePaths": ["src/api/stripUndefined.ts"],
       "targetPath": "src/api/stripUndefined.ts",
-      "ownershipScope": [
-        "src/api/stripUndefined.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/stripUndefined.ts"
-      ],
-      "publicExports": [
-        "DefinedOnly",
-        "stripUndefined"
-      ],
+      "ownershipScope": ["src/api/stripUndefined.ts"],
+      "sourceOwnershipScope": ["src/shared/api/stripUndefined.ts"],
+      "publicExports": ["DefinedOnly", "stripUndefined"],
       "exportMappings": [
         {
           "source": "src/shared/api/stripUndefined.ts",
@@ -20771,13 +21124,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/upload.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/mediaAssetUrls.ts",
+          "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/upload.contract.spec.ts",
+          "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceUpload.contract.spec.ts",
+          "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/opaqueIds.unit.spec.ts",
+          "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/application/profile/useAvatarUpload.ts",
           "to": "src/api/upload.ts",
@@ -20809,45 +21182,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetUrls.ts",
-          "to": "src/api/upload.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/upload.contract.spec.ts",
-          "to": "src/api/upload.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceUpload.contract.spec.ts",
-          "to": "src/api/upload.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/opaqueIds.unit.spec.ts",
+          "from": "src/shared/api/upload.shim.ts",
           "to": "src/api/upload.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 10,
+      "measuredFanIn": 11,
+      "measuredFanOut": 7,
+      "targetFanIn": 11,
       "targetFanOut": 7,
-      "shims": [],
+      "shims": ["src/shared/api/upload.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/upload.ts"
-      ],
+      "sourcePaths": ["src/api/upload.ts"],
       "targetPath": "src/api/upload.ts",
-      "ownershipScope": [
-        "src/api/upload.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/upload.ts"
-      ],
+      "ownershipScope": ["src/api/upload.ts"],
+      "sourceOwnershipScope": ["src/shared/api/upload.ts"],
       "publicExports": [
         "UPLOAD_OPERATION_TIMEOUT_MS",
         "UploadAvatarMetadata",
@@ -20989,17 +21341,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/user/user.ts",
+        "src/api/generated-query/public/workspace-media/workspace-media.ts",
         "src/api/idempotencyKey.ts",
         "src/core/i18n/index.ts",
-        "src/core/utils/opaqueIds.ts",
-        "src/shared/api/generated-query/public/workspace-media/workspace-media.ts"
+        "src/core/utils/opaqueIds.ts"
       ]
     },
     {
       "path": "src/api/userSession.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -21007,39 +21359,35 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/userSession.unit.spec.ts",
+          "to": "src/api/userSession.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/auth/session/browserSessionTransition.ts",
           "to": "src/api/userSession.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/userSession.unit.spec.ts",
+          "from": "src/shared/api/userSession.shim.ts",
           "to": "src/api/userSession.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 3,
+      "targetFanIn": 3,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/api/userSession.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/userSession.ts"
-      ],
+      "sourcePaths": ["src/api/userSession.ts"],
       "targetPath": "src/api/userSession.ts",
-      "ownershipScope": [
-        "src/api/userSession.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/userSession.ts"
-      ],
-      "publicExports": [
-        "fetchCurrentUserInfo",
-        "toSessionUser"
-      ],
+      "ownershipScope": ["src/api/userSession.ts"],
+      "sourceOwnershipScope": ["src/shared/api/userSession.ts"],
+      "publicExports": ["fetchCurrentUserInfo", "toSessionUser"],
       "exportMappings": [
         {
           "source": "src/shared/api/userSession.ts",
@@ -21063,13 +21411,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/workspaceEventStream.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/mediaAssetMetadata.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceEventStream.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/api/workspaceTaskWaiter.ts",
           "to": "src/api/workspaceEventStream.ts",
@@ -21086,35 +21444,34 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetMetadata.ts",
+          "from": "src/features/auth/session/browserSessionTransition.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/workspaceEventStream.contract.spec.ts",
+          "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/api/workspaceEventStream.shim.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 5,
-      "targetFanOut": 3,
-      "shims": [],
+      "measuredFanIn": 8,
+      "measuredFanOut": 4,
+      "targetFanIn": 8,
+      "targetFanOut": 4,
+      "shims": ["src/shared/api/workspaceEventStream.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/workspaceEventStream.ts"
-      ],
+      "sourcePaths": ["src/api/workspaceEventStream.ts"],
       "targetPath": "src/api/workspaceEventStream.ts",
-      "ownershipScope": [
-        "src/api/workspaceEventStream.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/workspaceEventStream.ts"
-      ],
+      "ownershipScope": ["src/api/workspaceEventStream.ts"],
+      "sourceOwnershipScope": ["src/shared/api/workspaceEventStream.ts"],
       "publicExports": [
         "SubscribeWorkspaceEventsOptions",
         "WORKSPACE_EVENT_TYPES",
@@ -21129,6 +21486,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "isWorkspaceEventType",
         "normalizeWorkspaceEventTypesFilter",
         "parseWorkspaceEventEnvelope",
+        "resetWorkspaceEventStreams",
         "resetWorkspaceEventStreamsForTests",
         "subscribeWorkspaceEvent",
         "subscribeWorkspaceMediaInvalidation",
@@ -21237,14 +21595,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "src/api/contractKernel.ts",
         "src/core/config/runtimeUrls.ts",
-        "src/core/config/timing.ts"
+        "src/core/config/timing.ts",
+        "src/core/utils/auth.ts"
       ]
     },
     {
       "path": "src/api/workspaceTaskContract.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -21275,27 +21634,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskContract.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/shared/api/workspaceTaskContract.shim.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "measuredFanIn": 6,
+      "measuredFanOut": 2,
+      "targetFanIn": 6,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/api/workspaceTaskContract.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTaskContract.ts"
-      ],
+      "sourcePaths": ["src/api/workspaceTaskContract.ts"],
       "targetPath": "src/api/workspaceTaskContract.ts",
-      "ownershipScope": [
-        "src/api/workspaceTaskContract.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/workspaceTaskContract.ts"
-      ],
+      "ownershipScope": ["src/api/workspaceTaskContract.ts"],
+      "sourceOwnershipScope": ["src/shared/api/workspaceTaskContract.ts"],
       "publicExports": [
         "CreateWorkspaceTaskInput",
         "WorkspaceTaskBillingSnapshot",
@@ -21394,7 +21752,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/workspaceTaskTransport.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -21435,27 +21793,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
           "to": "src/api/workspaceTaskTransport.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/api/workspaceTaskTransport.shim.ts",
+          "to": "src/api/workspaceTaskTransport.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "measuredFanIn": 8,
+      "measuredFanOut": 5,
+      "targetFanIn": 8,
       "targetFanOut": 5,
-      "shims": [],
+      "shims": ["src/shared/api/workspaceTaskTransport.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTaskTransport.ts"
-      ],
+      "sourcePaths": ["src/api/workspaceTaskTransport.ts"],
       "targetPath": "src/api/workspaceTaskTransport.ts",
-      "ownershipScope": [
-        "src/api/workspaceTaskTransport.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/workspaceTaskTransport.ts"
-      ],
+      "ownershipScope": ["src/api/workspaceTaskTransport.ts"],
+      "sourceOwnershipScope": ["src/shared/api/workspaceTaskTransport.ts"],
       "publicExports": [
         "cancelWorkspaceTask",
         "createWorkspaceTask",
@@ -21506,16 +21863,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts",
         "src/api/workspaceTaskContract.ts",
-        "src/core/config/pagination.ts",
-        "src/shared/api/generated-query/public/workspace-tasks/workspace-tasks.ts"
+        "src/core/config/pagination.ts"
       ]
     },
     {
       "path": "src/api/workspaceTaskWaiter.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -21531,27 +21888,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskWaiter.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/api/workspaceTaskWaiter.shim.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 5,
+      "targetFanIn": 3,
       "targetFanOut": 5,
-      "shims": [],
+      "shims": ["src/shared/api/workspaceTaskWaiter.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTaskWaiter.ts"
-      ],
+      "sourcePaths": ["src/api/workspaceTaskWaiter.ts"],
       "targetPath": "src/api/workspaceTaskWaiter.ts",
-      "ownershipScope": [
-        "src/api/workspaceTaskWaiter.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/workspaceTaskWaiter.ts"
-      ],
+      "ownershipScope": ["src/api/workspaceTaskWaiter.ts"],
+      "sourceOwnershipScope": ["src/shared/api/workspaceTaskWaiter.ts"],
       "publicExports": [
         "WaitWorkspaceTaskOptions",
         "waitWorkspaceTaskTerminal"
@@ -21581,7 +21937,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/api/workspaceTasks.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -21589,40 +21945,39 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/shared/api/workspaceEventStream.contract.spec.ts",
+          "from": "src/api/workspaceEventStream.contract.spec.ts",
           "to": "src/api/workspaceTasks.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/workspaceTasks.contract.spec.ts",
+          "from": "src/api/workspaceTasks.contract.spec.ts",
           "to": "src/api/workspaceTasks.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/utils/opaqueIds.unit.spec.ts",
+          "from": "src/core/utils/opaqueIds.unit.spec.ts",
+          "to": "src/api/workspaceTasks.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/api/workspaceTasks.shim.ts",
           "to": "src/api/workspaceTasks.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "measuredFanIn": 4,
+      "measuredFanOut": 3,
+      "targetFanIn": 4,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/api/workspaceTasks.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/api (§10.3). P1a declares the generated-query carve-out first; no generated file contents move in P1a.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTasks.ts"
-      ],
+      "sourcePaths": ["src/api/workspaceTasks.ts"],
       "targetPath": "src/api/workspaceTasks.ts",
-      "ownershipScope": [
-        "src/api/workspaceTasks.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/api/workspaceTasks.ts"
-      ],
+      "ownershipScope": ["src/api/workspaceTasks.ts"],
+      "sourceOwnershipScope": ["src/shared/api/workspaceTasks.ts"],
       "publicExports": [
         "CreateWorkspaceTaskInput",
         "WaitWorkspaceTaskOptions",
@@ -21790,7 +22145,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 13,
+      "measuredFanOut": 14,
       "targetFanIn": 1,
       "targetFanOut": 13,
       "shims": [],
@@ -21798,31 +22153,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "app-layer wiring seam; consumed by app/main.",
-      "sourcePaths": [
-        "src/app/router/index.ts"
-      ],
+      "sourcePaths": ["src/app/router/index.ts"],
       "targetPath": "src/app/router/index.ts",
-      "ownershipScope": [
-        "src/app/router/"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/app/router/"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-router/index.cjs",
+        "src/core/auth/sessionPolicy.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/i18n/index.ts",
+        "src/core/seo/routeSeo.ts",
+        "src/core/utils/storage.ts",
         "src/features/admin/app/navigationMeta.ts",
         "src/features/admin/app/routes.ts",
         "src/features/auth/index.ts",
         "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
-        "src/features/workspace/routes/workspaceRoutes.ts",
-        "src/shared/auth/sessionPolicy.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/seo/routeSeo.ts",
-        "src/shared/utils/storage.ts"
+        "src/features/workspace/routePaths.ts",
+        "src/features/workspace/routes/workspaceRoutes.ts"
       ]
     },
     {
@@ -21856,18 +22205,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/avatar/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/avatar/index.ts"],
       "targetPath": "src/components/ui/avatar/index.ts",
-      "ownershipScope": [
-        "src/components/ui/avatar/"
-      ],
-      "publicExports": [
-        "Avatar",
-        "AvatarFallback",
-        "AvatarImage"
-      ],
+      "ownershipScope": ["src/components/ui/avatar/"],
+      "publicExports": ["Avatar", "AvatarFallback", "AvatarImage"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/reka-ui/dist/index.cjs",
@@ -21892,12 +22233,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminBadge.vue",
+          "from": "src/core/components/StatusBadge.vue",
           "to": "src/components/ui/badge/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/StatusBadge.vue",
+          "from": "src/features/admin/shared/components/AdminBadge.vue",
           "to": "src/components/ui/badge/index.ts",
           "kind": "runtime"
         }
@@ -21911,18 +22252,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/badge/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/badge/index.ts"],
       "targetPath": "src/components/ui/badge/index.ts",
-      "ownershipScope": [
-        "src/components/ui/badge/"
-      ],
-      "publicExports": [
-        "Badge",
-        "BadgeVariants",
-        "badgeVariants"
-      ],
+      "ownershipScope": ["src/components/ui/badge/"],
+      "publicExports": ["Badge", "BadgeVariants", "badgeVariants"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/class-variance-authority/dist/index.js",
@@ -21943,6 +22276,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/components/ui/primitives.unit.spec.ts",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/ActionButton.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/UserConfirmDialog.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -22050,16 +22393,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/ActionButton.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/UserConfirmDialog.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
         }
       ],
       "measuredFanIn": 24,
@@ -22071,13 +22404,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/button/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/button/index.ts"],
       "targetPath": "src/components/ui/button/index.ts",
-      "ownershipScope": [
-        "src/components/ui/button/"
-      ],
+      "ownershipScope": ["src/components/ui/button/"],
       "publicExports": [
         "Button",
         "ButtonChromeSeverity",
@@ -22112,12 +22441,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
+          "from": "src/core/components/ChartCard.vue",
           "to": "src/components/ui/card/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/ChartCard.vue",
+          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/components/ui/card/index.ts",
           "kind": "runtime"
         }
@@ -22131,13 +22460,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/card/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/card/index.ts"],
       "targetPath": "src/components/ui/card/index.ts",
-      "ownershipScope": [
-        "src/components/ui/card/"
-      ],
+      "ownershipScope": ["src/components/ui/card/"],
       "publicExports": [
         "Card",
         "CardContent",
@@ -22171,6 +22496,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/components/ui/dialog/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/presentation/dialog/AccountDialog.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
@@ -22189,11 +22519,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/components/LibraryFolderDialogs.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/UserConfirmDialog.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
         }
       ],
       "measuredFanIn": 6,
@@ -22205,13 +22530,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/dialog/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/dialog/index.ts"],
       "targetPath": "src/components/ui/dialog/index.ts",
-      "ownershipScope": [
-        "src/components/ui/dialog/"
-      ],
+      "ownershipScope": ["src/components/ui/dialog/"],
       "publicExports": [
         "Dialog",
         "DialogClose",
@@ -22251,17 +22572,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "to": "src/components/ui/dropdown-menu/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/components/ui/dropdown-menu/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/presentation/catalog/BoardCard.vue",
-          "to": "src/components/ui/dropdown-menu/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/SupportChannelQr.vue",
-          "to": "src/components/ui/dropdown-menu/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/UserAccountMenu.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
           "kind": "runtime"
         }
@@ -22275,13 +22596,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/dropdown-menu/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/dropdown-menu/index.ts"],
       "targetPath": "src/components/ui/dropdown-menu/index.ts",
-      "ownershipScope": [
-        "src/components/ui/dropdown-menu/"
-      ],
+      "ownershipScope": ["src/components/ui/dropdown-menu/"],
       "publicExports": [
         "DropdownMenu",
         "DropdownMenuCheckboxItem",
@@ -22357,13 +22674,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/form/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/form/index.ts"],
       "targetPath": "src/components/ui/form/index.ts",
-      "ownershipScope": [
-        "src/components/ui/form/"
-      ],
+      "ownershipScope": ["src/components/ui/form/"],
       "publicExports": [
         "Form",
         "FormContext",
@@ -22456,13 +22769,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/input/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/input/index.ts"],
       "targetPath": "src/components/ui/input/index.ts",
-      "ownershipScope": [
-        "src/components/ui/input/"
-      ],
+      "ownershipScope": ["src/components/ui/input/"],
       "publicExports": [
         "Input",
         "InputVariants",
@@ -22495,12 +22804,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "src/components/ui/popover/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/SupportChannelQr.vue",
+          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
           "to": "src/components/ui/popover/index.ts",
           "kind": "runtime"
         }
@@ -22514,13 +22823,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/popover/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/popover/index.ts"],
       "targetPath": "src/components/ui/popover/index.ts",
-      "ownershipScope": [
-        "src/components/ui/popover/"
-      ],
+      "ownershipScope": ["src/components/ui/popover/"],
       "publicExports": [
         "Popover",
         "PopoverAnchor",
@@ -22565,13 +22870,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/select/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/select/index.ts"],
       "targetPath": "src/components/ui/select/index.ts",
-      "ownershipScope": [
-        "src/components/ui/select/"
-      ],
+      "ownershipScope": ["src/components/ui/select/"],
       "publicExports": [
         "Select",
         "SelectContent",
@@ -22649,21 +22950,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/skeleton/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/skeleton/index.ts"],
       "targetPath": "src/components/ui/skeleton/index.ts",
-      "ownershipScope": [
-        "src/components/ui/skeleton/"
-      ],
-      "publicExports": [
-        "Skeleton"
-      ],
+      "ownershipScope": ["src/components/ui/skeleton/"],
+      "publicExports": ["Skeleton"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/lib/utils.ts"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"]
     },
     {
       "path": "src/components/ui/spinner/index.ts",
@@ -22678,6 +22970,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/components/ui/button/Button.vue",
+          "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/DataTableFrame.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
@@ -22710,11 +23007,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/DataTableFrame.vue",
-          "to": "src/components/ui/spinner/index.ts",
-          "kind": "runtime"
         }
       ],
       "measuredFanIn": 8,
@@ -22726,27 +23018,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "",
-      "sourcePaths": [
-        "src/components/ui/spinner/index.ts"
-      ],
+      "sourcePaths": ["src/components/ui/spinner/index.ts"],
       "targetPath": "src/components/ui/spinner/index.ts",
-      "ownershipScope": [
-        "src/components/ui/spinner/"
-      ],
-      "publicExports": [
-        "Spinner"
-      ],
+      "ownershipScope": ["src/components/ui/spinner/"],
+      "publicExports": ["Spinner"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/lib/utils.ts"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"]
     },
     {
       "path": "src/core/auth/adminAccess.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -22757,33 +23040,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/auth/adminAccess.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/auth/adminAccess.shim.ts",
+          "to": "src/core/auth/adminAccess.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 1,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/auth/adminAccess.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/auth/adminAccess.ts"
-      ],
+      "sourcePaths": ["src/core/auth/adminAccess.ts"],
       "targetPath": "src/core/auth/adminAccess.ts",
-      "ownershipScope": [
-        "src/core/auth/adminAccess.ts"
-      ],
-      "publicExports": [
-        "AdminAccessUser",
-        "canAccessAdmin"
-      ],
+      "ownershipScope": ["src/core/auth/adminAccess.ts"],
+      "publicExports": ["AdminAccessUser", "canAccessAdmin"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/auth/adminAccess.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/auth/adminAccess.ts"],
       "exportMappings": [
         {
           "source": "src/shared/auth/adminAccess.ts",
@@ -22801,7 +23080,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/auth/client.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -22809,32 +23088,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/core/auth/client.contract.spec.ts",
+          "to": "src/core/auth/client.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/auth/session/transport.ts",
           "to": "src/core/auth/client.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/auth/client.contract.spec.ts",
+          "from": "src/shared/auth/client.shim.ts",
           "to": "src/core/auth/client.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 4,
+      "targetFanIn": 3,
       "targetFanOut": 4,
-      "shims": [],
+      "shims": ["src/shared/auth/client.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/auth/client.ts"
-      ],
+      "sourcePaths": ["src/core/auth/client.ts"],
       "targetPath": "src/core/auth/client.ts",
-      "ownershipScope": [
-        "src/core/auth/client.ts"
-      ],
+      "ownershipScope": ["src/core/auth/client.ts"],
       "publicExports": [
         "authClient",
         "normalizeCanonicalEmail",
@@ -22847,9 +23127,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/config/runtimeUrls.ts",
         "src/core/errors/errorCatalog.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/auth/client.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/auth/client.ts"],
       "exportMappings": [
         {
           "source": "src/shared/auth/client.ts",
@@ -22872,7 +23150,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/auth/oauthProviders.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -22908,33 +23186,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/session/transport.ts",
           "to": "src/core/auth/oauthProviders.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/auth/oauthProviders.shim.ts",
+          "to": "src/core/auth/oauthProviders.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/auth/oauthProviders.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/auth/oauthProviders.ts"
-      ],
+      "sourcePaths": ["src/core/auth/oauthProviders.ts"],
       "targetPath": "src/core/auth/oauthProviders.ts",
-      "ownershipScope": [
-        "src/core/auth/oauthProviders.ts"
-      ],
-      "publicExports": [
-        "OAuthProviderCode",
-        "getOAuthProviderLabel"
-      ],
+      "ownershipScope": ["src/core/auth/oauthProviders.ts"],
+      "publicExports": ["OAuthProviderCode", "getOAuthProviderLabel"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/auth/oauthProviders.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/auth/oauthProviders.ts"],
       "exportMappings": [
         {
           "source": "src/shared/auth/oauthProviders.ts",
@@ -22952,7 +23226,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/auth/passwordPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -22983,24 +23257,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/components/auth-fields/useAuthForm.ts",
           "to": "src/core/auth/passwordPolicy.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/auth/passwordPolicy.shim.ts",
+          "to": "src/core/auth/passwordPolicy.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "measuredFanIn": 6,
+      "measuredFanOut": 1,
+      "targetFanIn": 6,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/auth/passwordPolicy.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/auth/passwordPolicy.ts"
-      ],
+      "sourcePaths": ["src/core/auth/passwordPolicy.ts"],
       "targetPath": "src/core/auth/passwordPolicy.ts",
-      "ownershipScope": [
-        "src/core/auth/passwordPolicy.ts"
-      ],
+      "ownershipScope": ["src/core/auth/passwordPolicy.ts"],
       "publicExports": [
         "OTP_CODE_PATTERN",
         "PASSWORD_LENGTH_LIMIT",
@@ -23012,12 +23287,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "validateOtpCode"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/valibot/dist/index.mjs"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/auth/passwordPolicy.ts"
-      ],
+      "targetFanOutTargets": ["node_modules/valibot/dist/index.mjs"],
+      "sourceOwnershipScope": ["src/shared/auth/passwordPolicy.ts"],
       "exportMappings": [
         {
           "source": "src/shared/auth/passwordPolicy.ts",
@@ -23062,10 +23333,64 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
+      "path": "src/core/auth/routePolicy.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/auth/sessionPolicy.ts",
+          "to": "src/core/auth/routePolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/routePaths.ts",
+          "to": "src/core/auth/routePolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routePaths.ts",
+          "to": "src/core/auth/routePolicy.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 0,
+      "targetFanIn": 3,
+      "targetFanOut": 0,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/auth/routePolicy.ts"],
+      "targetPath": "src/core/auth/routePolicy.ts",
+      "ownershipScope": ["src/core/auth/routePolicy.ts"],
+      "publicExports": [
+        "ADMIN_LOGIN_PATH",
+        "ADMIN_ROOT_PATH",
+        "HOME_PATH",
+        "SHARE_JOIN_PATH",
+        "USER_BOARDS_PATH",
+        "USER_LOGIN_PATH",
+        "USER_REGISTER_PATH",
+        "USER_ROOT_PATH",
+        "isPathUnderRoute"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [],
+      "purity": "pure"
+    },
+    {
       "path": "src/core/auth/sessionPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -23074,6 +23399,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/app/router/authGate.ts",
+          "to": "src/core/auth/sessionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/auth/sessionPolicy.contract.spec.ts",
           "to": "src/core/auth/sessionPolicy.ts",
           "kind": "runtime"
         },
@@ -23098,27 +23428,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/auth/sessionPolicy.contract.spec.ts",
+          "from": "src/shared/auth/sessionPolicy.shim.ts",
           "to": "src/core/auth/sessionPolicy.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "measuredFanIn": 6,
+      "measuredFanOut": 1,
+      "targetFanIn": 6,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/auth/sessionPolicy.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/auth/sessionPolicy.ts"
-      ],
+      "sourcePaths": ["src/core/auth/sessionPolicy.ts"],
       "targetPath": "src/core/auth/sessionPolicy.ts",
-      "ownershipScope": [
-        "src/core/auth/sessionPolicy.ts"
-      ],
+      "ownershipScope": ["src/core/auth/sessionPolicy.ts"],
       "publicExports": [
         "AuthFailureAction",
         "AuthFailureActionKind",
@@ -23130,12 +23456,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "resolveAuthFailureAction"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/constants/routePaths.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/auth/sessionPolicy.ts"
-      ],
+      "targetFanOutTargets": ["src/core/auth/routePolicy.ts"],
+      "sourceOwnershipScope": ["src/shared/auth/sessionPolicy.ts"],
       "exportMappings": [
         {
           "source": "src/shared/auth/sessionPolicy.ts",
@@ -23183,13 +23505,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/ActionButton.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/components/ActionButton.component.spec.ts",
+          "to": "src/core/components/ActionButton.vue",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
           "to": "src/core/components/ActionButton.vue",
@@ -23341,27 +23668,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/ActionButton.component.spec.ts",
+          "from": "src/shared/components/ActionButton.shim.ts",
+          "to": "src/core/components/ActionButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/ActionButton.shim.ts",
+          "to": "src/core/components/ActionButton.vue",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 31,
+      "measuredFanIn": 33,
+      "measuredFanOut": 5,
+      "targetFanIn": 33,
       "targetFanOut": 5,
-      "shims": [],
+      "shims": ["src/shared/components/ActionButton.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/ActionButton.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/ActionButton.vue"],
       "targetPath": "src/core/components/ActionButton.vue",
-      "ownershipScope": [
-        "src/core/components/ActionButton.vue"
-      ],
+      "ownershipScope": ["src/core/components/ActionButton.vue"],
       "publicExports": [
         "ActionButtonSeverity",
         "ActionButtonSize",
@@ -23376,9 +23709,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/components/ui/button/index.ts",
         "src/lib/utils.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/ActionButton.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/ActionButton.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/ActionButton.vue",
@@ -23406,7 +23737,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/ChartCard.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -23422,35 +23753,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/shared/components/AdminChartCard.vue",
           "to": "src/core/components/ChartCard.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/ChartCard.shim.ts",
+          "to": "src/core/components/ChartCard.vue",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
+      "targetFanIn": 3,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/components/ChartCard.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/ChartCard.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/ChartCard.vue"],
       "targetPath": "src/core/components/ChartCard.vue",
-      "ownershipScope": [
-        "src/core/components/ChartCard.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/ChartCard.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
         "src/components/ui/card/index.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/ChartCard.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/ChartCard.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/ChartCard.vue",
@@ -23463,7 +23791,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/ChartPanel.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -23484,35 +23812,34 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/shared/components/AdminChartCard.vue",
           "to": "src/core/components/ChartPanel.vue",
           "kind": "type-only"
+        },
+        {
+          "from": "src/shared/components/ChartPanel.shim.ts",
+          "to": "src/core/components/ChartPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/ChartPanel.shim.ts",
+          "to": "src/core/components/ChartPanel.vue",
+          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 1,
+      "targetFanIn": 3,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/components/ChartPanel.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/ChartPanel.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/ChartPanel.vue"],
       "targetPath": "src/core/components/ChartPanel.vue",
-      "ownershipScope": [
-        "src/core/components/ChartPanel.vue"
-      ],
-      "publicExports": [
-        "ChartPanelSize",
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/ChartPanel.vue"],
+      "publicExports": ["ChartPanelSize", "default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/components/ChartPanel.vue"
-      ],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "sourceOwnershipScope": ["src/shared/components/ChartPanel.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/ChartPanel.vue",
@@ -23530,7 +23857,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/ChartRenderer.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -23551,36 +23878,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
           "to": "src/core/components/ChartRenderer.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/ChartRenderer.shim.ts",
+          "to": "src/core/components/ChartRenderer.vue",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "measuredFanIn": 4,
+      "measuredFanOut": 3,
+      "targetFanIn": 4,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/components/ChartRenderer.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/ChartRenderer.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/ChartRenderer.vue"],
       "targetPath": "src/core/components/ChartRenderer.vue",
-      "ownershipScope": [
-        "src/core/components/ChartRenderer.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/ChartRenderer.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/chart.js/auto/auto.cjs",
         "node_modules/vue/index.js",
         "src/core/lib/chartPrimitives.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/ChartRenderer.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/ChartRenderer.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/ChartRenderer.vue",
@@ -23593,13 +23917,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/DataTableColumn.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/components/DataTableFrame.component.spec.ts",
+          "to": "src/core/components/DataTableColumn.vue",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/presentation/billing/BillingPane.vue",
           "to": "src/core/components/DataTableColumn.vue",
@@ -23616,39 +23945,36 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/DataTableFrame.component.spec.ts",
+          "from": "src/shared/components/DataTableColumn.shim.ts",
           "to": "src/core/components/DataTableColumn.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/DataTableColumn.shim.ts",
+          "to": "src/core/components/DataTableColumn.vue",
+          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "measuredFanIn": 5,
+      "measuredFanOut": 1,
+      "targetFanIn": 5,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/components/DataTableColumn.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/DataTableColumn.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/DataTableColumn.vue"],
       "targetPath": "src/core/components/DataTableColumn.vue",
-      "ownershipScope": [
-        "src/core/components/DataTableColumn.vue"
-      ],
+      "ownershipScope": ["src/core/components/DataTableColumn.vue"],
       "publicExports": [
         "DataTableColumnBodySlotProps",
         "DataTableColumnSlots",
         "default"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/components/DataTableColumn.vue"
-      ],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "sourceOwnershipScope": ["src/shared/components/DataTableColumn.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/DataTableColumn.vue",
@@ -23671,13 +23997,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/DataTableFrame.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/components/DataTableFrame.component.spec.ts",
+          "to": "src/core/components/DataTableFrame.vue",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/presentation/billing/BillingPane.vue",
           "to": "src/core/components/DataTableFrame.vue",
@@ -23694,40 +24025,36 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/DataTableFrame.component.spec.ts",
+          "from": "src/shared/components/DataTableFrame.shim.ts",
           "to": "src/core/components/DataTableFrame.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/DataTableFrame.shim.ts",
+          "to": "src/core/components/DataTableFrame.vue",
+          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "measuredFanIn": 5,
+      "measuredFanOut": 3,
+      "targetFanIn": 5,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/components/DataTableFrame.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/DataTableFrame.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/DataTableFrame.vue"],
       "targetPath": "src/core/components/DataTableFrame.vue",
-      "ownershipScope": [
-        "src/core/components/DataTableFrame.vue"
-      ],
-      "publicExports": [
-        "DataTableFrameRowClickPayload",
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/DataTableFrame.vue"],
+      "publicExports": ["DataTableFrameRowClickPayload", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "src/components/ui/spinner/index.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/DataTableFrame.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/DataTableFrame.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/DataTableFrame.vue",
@@ -23745,13 +24072,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/IbFormField.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/components/IbFormField.component.spec.ts",
+          "to": "src/core/components/IbFormField.vue",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
           "to": "src/core/components/IbFormField.vue",
@@ -23773,40 +24105,36 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/IbFormField.component.spec.ts",
+          "from": "src/shared/components/IbFormField.shim.ts",
           "to": "src/core/components/IbFormField.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/IbFormField.shim.ts",
+          "to": "src/core/components/IbFormField.vue",
+          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "measuredFanIn": 6,
+      "measuredFanOut": 3,
+      "targetFanIn": 6,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/components/IbFormField.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/IbFormField.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/IbFormField.vue"],
       "targetPath": "src/core/components/IbFormField.vue",
-      "ownershipScope": [
-        "src/core/components/IbFormField.vue"
-      ],
-      "publicExports": [
-        "IbFormFieldSlotProps",
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/IbFormField.vue"],
+      "publicExports": ["IbFormFieldSlotProps", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
         "src/core/components/formFieldContract.ts",
         "src/core/utils/formValidation.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/IbFormField.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/IbFormField.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/IbFormField.vue",
@@ -23824,7 +24152,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/RangedLineChartCard.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -23840,28 +24168,31 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
           "to": "src/core/components/RangedLineChartCard.vue",
           "kind": "type-only"
+        },
+        {
+          "from": "src/shared/components/RangedLineChartCard.shim.ts",
+          "to": "src/core/components/RangedLineChartCard.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/RangedLineChartCard.shim.ts",
+          "to": "src/core/components/RangedLineChartCard.vue",
+          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 7,
+      "targetFanIn": 3,
       "targetFanOut": 7,
-      "shims": [],
+      "shims": ["src/shared/components/RangedLineChartCard.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/RangedLineChartCard.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/RangedLineChartCard.vue"],
       "targetPath": "src/core/components/RangedLineChartCard.vue",
-      "ownershipScope": [
-        "src/core/components/RangedLineChartCard.vue"
-      ],
-      "publicExports": [
-        "RangedLineChartProps",
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/RangedLineChartCard.vue"],
+      "publicExports": ["RangedLineChartProps", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
@@ -23872,9 +24203,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/components/ChartRenderer.vue",
         "src/core/lib/chartPrimitives.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/RangedLineChartCard.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/RangedLineChartCard.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/RangedLineChartCard.vue",
@@ -23892,7 +24221,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/SiteBrandLogo.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -23918,32 +24247,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
           "to": "src/core/components/SiteBrandLogo.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/SiteBrandLogo.shim.ts",
+          "to": "src/core/components/SiteBrandLogo.vue",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/components/SiteBrandLogo.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/SiteBrandLogo.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/SiteBrandLogo.vue"],
       "targetPath": "src/core/components/SiteBrandLogo.vue",
-      "ownershipScope": [
-        "src/core/components/SiteBrandLogo.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/SiteBrandLogo.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/components/SiteBrandLogo.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/SiteBrandLogo.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/SiteBrandLogo.vue",
@@ -23956,13 +24282,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/StatusBadge.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/components/StatusBadge.component.spec.ts",
+          "to": "src/core/components/StatusBadge.vue",
+          "kind": "type-only"
+        },
         {
           "from": "src/features/account/presentation/profile/ProfilePane.vue",
           "to": "src/core/components/StatusBadge.vue",
@@ -23979,41 +24310,36 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/StatusBadge.component.spec.ts",
+          "from": "src/shared/components/StatusBadge.shim.ts",
+          "to": "src/core/components/StatusBadge.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/StatusBadge.shim.ts",
           "to": "src/core/components/StatusBadge.vue",
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "measuredFanIn": 5,
+      "measuredFanOut": 3,
+      "targetFanIn": 5,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/components/StatusBadge.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/StatusBadge.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/StatusBadge.vue"],
       "targetPath": "src/core/components/StatusBadge.vue",
-      "ownershipScope": [
-        "src/core/components/StatusBadge.vue"
-      ],
-      "publicExports": [
-        "AppStatusBadgeSize",
-        "AppStatusTone",
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/StatusBadge.vue"],
+      "publicExports": ["AppStatusBadgeSize", "AppStatusTone", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
         "src/components/ui/badge/index.ts",
         "src/lib/utils.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/StatusBadge.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/StatusBadge.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/StatusBadge.vue",
@@ -24036,7 +24362,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/StudioName.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -24052,34 +24378,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
           "to": "src/core/components/StudioName.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/StudioName.shim.ts",
+          "to": "src/core/components/StudioName.vue",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 1,
+      "targetFanIn": 3,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/components/StudioName.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/StudioName.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/StudioName.vue"],
       "targetPath": "src/core/components/StudioName.vue",
-      "ownershipScope": [
-        "src/core/components/StudioName.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/StudioName.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/assets/eric-studio-logo.svg"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/components/StudioName.vue"
-      ],
+      "targetFanOutTargets": ["src/core/assets/eric-studio-logo.svg"],
+      "sourceOwnershipScope": ["src/shared/components/StudioName.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/StudioName.vue",
@@ -24092,7 +24413,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/UserConfirmDialog.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -24100,35 +24421,39 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/core/components/UserConfirmDialog.component.spec.ts",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/components/LibraryFloatingIsland.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/UserConfirmDialog.component.spec.ts",
+          "from": "src/shared/components/UserConfirmDialog.shim.ts",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 4,
+      "measuredFanOut": 6,
+      "targetFanIn": 4,
       "targetFanOut": 6,
-      "shims": [],
+      "shims": ["src/shared/components/UserConfirmDialog.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/UserConfirmDialog.vue"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/UserConfirmDialog.vue"],
       "targetPath": "src/core/components/UserConfirmDialog.vue",
-      "ownershipScope": [
-        "src/core/components/UserConfirmDialog.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/core/components/UserConfirmDialog.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-i18n/index.js",
@@ -24138,9 +24463,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/theme/dialogMask.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/components/UserConfirmDialog.vue"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/UserConfirmDialog.vue"],
       "exportMappings": [
         {
           "source": "src/shared/components/UserConfirmDialog.vue",
@@ -24153,7 +24476,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/components/formFieldContract.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -24169,33 +24492,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/shared/components/AdminFormField.vue",
           "to": "src/core/components/formFieldContract.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/shared/components/formFieldContract.shim.ts",
+          "to": "src/core/components/formFieldContract.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/components/formFieldContract.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/components/formFieldContract.ts"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-components applied 2026-10-10: consumers rewritten to src/core/components; TTL shims (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/core/components/formFieldContract.ts"],
       "targetPath": "src/core/components/formFieldContract.ts",
-      "ownershipScope": [
-        "src/core/components/formFieldContract.ts"
-      ],
-      "publicExports": [
-        "FormFieldContractProps",
-        "FormFieldContractSlotProps"
-      ],
+      "ownershipScope": ["src/core/components/formFieldContract.ts"],
+      "publicExports": ["FormFieldContractProps", "FormFieldContractSlotProps"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/components/formFieldContract.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/components/formFieldContract.ts"],
       "exportMappings": [
         {
           "source": "src/shared/components/formFieldContract.ts",
@@ -24213,13 +24532,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useAppClipboard.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/composables/useAppClipboard.unit.spec.ts",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.vue",
           "to": "src/core/composables/useAppClipboard.ts",
@@ -24241,35 +24565,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/composables/useAppClipboard.unit.spec.ts",
+          "from": "src/shared/composables/useAppClipboard.shim.ts",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/composables/useAppClipboard.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useAppClipboard.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useAppClipboard.ts"],
       "targetPath": "src/core/composables/useAppClipboard.ts",
-      "ownershipScope": [
-        "src/core/composables/useAppClipboard.ts"
-      ],
-      "publicExports": [
-        "useAppClipboard"
-      ],
+      "ownershipScope": ["src/core/composables/useAppClipboard.ts"],
+      "publicExports": ["useAppClipboard"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/composables/useAppClipboard.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/composables/useAppClipboard.ts"],
       "exportMappings": [
         {
           "source": "src/shared/composables/useAppClipboard.ts",
@@ -24282,7 +24598,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useAppToast.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -24370,38 +24686,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/shared/composables/useAppToast.shim.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/test/toast.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 17,
+      "measuredFanIn": 18,
+      "measuredFanOut": 1,
+      "targetFanIn": 18,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/composables/useAppToast.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useAppToast.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useAppToast.ts"],
       "targetPath": "src/core/composables/useAppToast.ts",
-      "ownershipScope": [
-        "src/core/composables/useAppToast.ts"
-      ],
-      "publicExports": [
-        "dismissAppToasts",
-        "useAppToast"
-      ],
+      "ownershipScope": ["src/core/composables/useAppToast.ts"],
+      "publicExports": ["dismissAppToasts", "useAppToast"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-sonner/lib/index.js"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/composables/useAppToast.ts"
-      ],
+      "targetFanOutTargets": ["node_modules/vue-sonner/lib/index.js"],
+      "sourceOwnershipScope": ["src/shared/composables/useAppToast.ts"],
       "exportMappings": [
         {
           "source": "src/shared/composables/useAppToast.ts",
@@ -24419,13 +24729,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useAsyncAction.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/composables/useAsyncAction.unit.spec.ts",
+          "to": "src/core/composables/useAsyncAction.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/application/profile/useAvatarUpload.ts",
           "to": "src/core/composables/useAsyncAction.ts",
@@ -24502,39 +24817,31 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/composables/useAsyncAction.unit.spec.ts",
+          "from": "src/shared/composables/useAsyncAction.shim.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 16,
+      "measuredFanIn": 17,
+      "measuredFanOut": 1,
+      "targetFanIn": 17,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/composables/useAsyncAction.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useAsyncAction.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useAsyncAction.ts"],
       "targetPath": "src/core/composables/useAsyncAction.ts",
-      "ownershipScope": [
-        "src/core/composables/useAsyncAction.ts"
-      ],
+      "ownershipScope": ["src/core/composables/useAsyncAction.ts"],
       "publicExports": [
         "AsyncActionFeedback",
         "AsyncActionLoadingHandle",
         "useAsyncAction"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/composables/useAsyncAction.ts"
-      ],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "sourceOwnershipScope": ["src/shared/composables/useAsyncAction.ts"],
       "exportMappings": [
         {
           "source": "src/shared/composables/useAsyncAction.ts",
@@ -24557,13 +24864,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useLogoutRedirect.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/composables/useLogoutRedirect.unit.spec.ts",
+          "to": "src/core/composables/useLogoutRedirect.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
           "to": "src/core/composables/useLogoutRedirect.ts",
@@ -24590,37 +24902,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/composables/useLogoutRedirect.unit.spec.ts",
+          "from": "src/shared/composables/useLogoutRedirect.shim.ts",
           "to": "src/core/composables/useLogoutRedirect.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "measuredFanIn": 7,
+      "measuredFanOut": 1,
+      "targetFanIn": 7,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/composables/useLogoutRedirect.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useLogoutRedirect.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useLogoutRedirect.ts"],
       "targetPath": "src/core/composables/useLogoutRedirect.ts",
-      "ownershipScope": [
-        "src/core/composables/useLogoutRedirect.ts"
-      ],
-      "publicExports": [
-        "useLogoutRedirect"
-      ],
+      "ownershipScope": ["src/core/composables/useLogoutRedirect.ts"],
+      "publicExports": ["useLogoutRedirect"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-router/index.cjs"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/composables/useLogoutRedirect.ts"
-      ],
+      "targetFanOutTargets": ["node_modules/vue-router/index.cjs"],
+      "sourceOwnershipScope": ["src/shared/composables/useLogoutRedirect.ts"],
       "exportMappings": [
         {
           "source": "src/shared/composables/useLogoutRedirect.ts",
@@ -24630,10 +24932,48 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
+      "path": "src/core/composables/useMenuTriggerFocusRestore.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/core/composables/useMenuTriggerFocusRestore.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/composables/useMenuTriggerFocusRestore.shim.ts",
+          "to": "src/core/composables/useMenuTriggerFocusRestore.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": ["src/shared/composables/useMenuTriggerFocusRestore.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/composables/useMenuTriggerFocusRestore.ts"],
+      "targetPath": "src/core/composables/useMenuTriggerFocusRestore.ts",
+      "ownershipScope": ["src/core/composables/useMenuTriggerFocusRestore.ts"],
+      "publicExports": ["useMenuTriggerFocusRestore"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
+    },
+    {
       "path": "src/core/composables/useOverlayInteractionLifecycle.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -24642,6 +24982,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/composables/useOverlayInteractionLifecycle.unit.spec.ts",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -24681,7 +25026,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/composables/useOverlayInteractionLifecycle.unit.spec.ts",
+          "from": "src/shared/composables/useOverlayInteractionLifecycle.shim.ts",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -24691,18 +25036,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 10,
+      "measuredFanIn": 11,
+      "measuredFanOut": 1,
+      "targetFanIn": 11,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": [
+        "src/shared/composables/useOverlayInteractionLifecycle.shim.ts"
+      ],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useOverlayInteractionLifecycle.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useOverlayInteractionLifecycle.ts"],
       "targetPath": "src/core/composables/useOverlayInteractionLifecycle.ts",
       "ownershipScope": [
         "src/core/composables/useOverlayInteractionLifecycle.ts"
@@ -24716,9 +25061,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "useOverlayInteractionLifecycle"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
       "sourceOwnershipScope": [
         "src/shared/composables/useOverlayInteractionLifecycle.ts"
       ],
@@ -24759,7 +25102,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useSiteBranding.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -24768,6 +25111,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/app/App.vue",
+          "to": "src/core/composables/useSiteBranding.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/composables/useSiteBranding.unit.spec.ts",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
         },
@@ -24802,27 +25150,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/composables/useSiteBranding.unit.spec.ts",
+          "from": "src/shared/composables/useSiteBranding.shim.ts",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "measuredFanIn": 9,
+      "measuredFanOut": 5,
+      "targetFanIn": 9,
       "targetFanOut": 5,
-      "shims": [],
+      "shims": ["src/shared/composables/useSiteBranding.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useSiteBranding.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useSiteBranding.ts"],
       "targetPath": "src/core/composables/useSiteBranding.ts",
-      "ownershipScope": [
-        "src/core/composables/useSiteBranding.ts"
-      ],
+      "ownershipScope": ["src/core/composables/useSiteBranding.ts"],
       "publicExports": [
         "ApiResponseBrandingSetting",
         "BrandingSetting",
@@ -24849,9 +25193,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/api/contractKernel.ts",
         "src/core/config/runtimeUrls.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/composables/useSiteBranding.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/composables/useSiteBranding.ts"],
       "exportMappings": [
         {
           "source": "src/shared/composables/useSiteBranding.ts",
@@ -24939,13 +25281,28 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useSupportChannels.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/composables/useSupportChannels.unit.spec.ts",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/core/composables/useSupportChannels.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/core/composables/useSupportChannels.ts",
@@ -24977,37 +25334,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/SupportChannelQr.vue",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/components/UserAccountMenu.component.spec.ts",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useSupportChannels.unit.spec.ts",
+          "from": "src/shared/composables/useSupportChannels.shim.ts",
           "to": "src/core/composables/useSupportChannels.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 9,
+      "measuredFanIn": 10,
+      "measuredFanOut": 6,
+      "targetFanIn": 10,
       "targetFanOut": 6,
-      "shims": [],
+      "shims": ["src/shared/composables/useSupportChannels.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useSupportChannels.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useSupportChannels.ts"],
       "targetPath": "src/core/composables/useSupportChannels.ts",
-      "ownershipScope": [
-        "src/core/composables/useSupportChannels.ts"
-      ],
+      "ownershipScope": ["src/core/composables/useSupportChannels.ts"],
       "publicExports": [
         "SUPPORT_CHANNELS_QUERY_KEY",
         "SupportChannel",
@@ -25018,14 +25361,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/generated-query/public/model/supportChannel.ts",
+        "src/api/generated-query/public/model/supportChannelKind.ts",
         "src/api/generated-query/public/user/user.ts",
-        "src/core/query/queryDefaults.ts",
-        "src/shared/api/generated-query/public/model/supportChannel.ts",
-        "src/shared/api/generated-query/public/model/supportChannelKind.ts"
+        "src/core/query/queryDefaults.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/composables/useSupportChannels.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/composables/useSupportChannels.ts"],
       "exportMappings": [
         {
           "source": "src/shared/composables/useSupportChannels.ts",
@@ -25053,13 +25394,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/composables/useUserConfirmDialog.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/composables/useUserConfirmDialog.unit.spec.ts",
+          "to": "src/core/composables/useUserConfirmDialog.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/library/components/LibraryFloatingIsland.vue",
           "to": "src/core/composables/useUserConfirmDialog.ts",
@@ -25071,35 +25417,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/composables/useUserConfirmDialog.unit.spec.ts",
+          "from": "src/shared/composables/useUserConfirmDialog.shim.ts",
           "to": "src/core/composables/useUserConfirmDialog.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "measuredFanIn": 4,
+      "measuredFanOut": 1,
+      "targetFanIn": 4,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/composables/useUserConfirmDialog.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/composables/useUserConfirmDialog.ts"
-      ],
+      "sourcePaths": ["src/core/composables/useUserConfirmDialog.ts"],
       "targetPath": "src/core/composables/useUserConfirmDialog.ts",
-      "ownershipScope": [
-        "src/core/composables/useUserConfirmDialog.ts"
-      ],
-      "publicExports": [
-        "UserConfirmRequest",
-        "useUserConfirmDialog"
-      ],
+      "ownershipScope": ["src/core/composables/useUserConfirmDialog.ts"],
+      "publicExports": ["UserConfirmRequest", "useUserConfirmDialog"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
       "sourceOwnershipScope": [
         "src/shared/composables/useUserConfirmDialog.ts"
       ],
@@ -25120,7 +25457,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/config/pagination.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -25129,6 +25466,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/workspaceTaskTransport.ts",
+          "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/config/pagination.unit.spec.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -25198,36 +25540,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/config/pagination.unit.spec.ts",
+          "from": "src/shared/config/pagination.shim.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 16,
       "measuredFanOut": 0,
-      "targetFanIn": 15,
+      "targetFanIn": 16,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/config/pagination.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/config/pagination.ts"
-      ],
+      "sourcePaths": ["src/core/config/pagination.ts"],
       "targetPath": "src/core/config/pagination.ts",
-      "ownershipScope": [
-        "src/core/config/pagination.ts"
-      ],
-      "publicExports": [
-        "PAGE_SIZES",
-        "normalizePageSize"
-      ],
+      "ownershipScope": ["src/core/config/pagination.ts"],
+      "publicExports": ["PAGE_SIZES", "normalizePageSize"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/config/pagination.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/config/pagination.ts"],
       "exportMappings": [
         {
           "source": "src/shared/config/pagination.ts",
@@ -25245,7 +25578,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/config/runtimeUrls.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -25254,6 +25587,21 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/client.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/mediaAssetMetadata.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/mediaAssetUrls.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/useMediaAssetDelivery.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -25269,6 +25617,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/core/composables/useSiteBranding.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/config/runtimeUrls.unit.spec.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -25323,42 +25676,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetMetadata.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/mediaAssetUrls.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/useMediaAssetDelivery.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/config/runtimeUrls.unit.spec.ts",
+          "from": "src/shared/config/runtimeUrls.shim.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 19,
       "measuredFanOut": 0,
-      "targetFanIn": 18,
+      "targetFanIn": 19,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/config/runtimeUrls.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/config/runtimeUrls.ts"
-      ],
+      "sourcePaths": ["src/core/config/runtimeUrls.ts"],
       "targetPath": "src/core/config/runtimeUrls.ts",
-      "ownershipScope": [
-        "src/core/config/runtimeUrls.ts"
-      ],
+      "ownershipScope": ["src/core/config/runtimeUrls.ts"],
       "publicExports": [
         "API_BASE_URL",
         "AUTH_BASE_URL",
@@ -25371,9 +25705,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/config/runtimeUrls.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/config/runtimeUrls.ts"],
       "exportMappings": [
         {
           "source": "src/shared/config/runtimeUrls.ts",
@@ -25421,7 +25753,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/config/timing.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -25429,12 +25761,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/mediaAssetMetadata.ts",
+          "to": "src/core/config/timing.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/api/workspaceEventStream.ts",
           "to": "src/core/config/timing.ts",
           "kind": "runtime"
         },
         {
           "from": "src/api/workspaceTaskWaiter.ts",
+          "to": "src/core/config/timing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/config/timing.unit.spec.ts",
           "to": "src/core/config/timing.ts",
           "kind": "runtime"
         },
@@ -25449,32 +25791,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetMetadata.ts",
-          "to": "src/core/config/timing.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/config/timing.unit.spec.ts",
+          "from": "src/shared/config/timing.shim.ts",
           "to": "src/core/config/timing.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/config/timing.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/config/timing.ts"
-      ],
+      "sourcePaths": ["src/core/config/timing.ts"],
       "targetPath": "src/core/config/timing.ts",
-      "ownershipScope": [
-        "src/core/config/timing.ts"
-      ],
+      "ownershipScope": ["src/core/config/timing.ts"],
       "publicExports": [
         "EVENT_STREAM_RECONNECT_BACKOFF_FACTOR",
         "EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS",
@@ -25487,9 +25820,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/config/timing.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/config/timing.ts"],
       "exportMappings": [
         {
           "source": "src/shared/config/timing.ts",
@@ -25534,66 +25865,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
-      "path": "src/core/constants/legalLinks.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "planned",
-      "owner": "p1-lane",
-      "activationPhase": "P1",
-      "scope": "shared-runtime",
-      "exportStyle": "explicit frozen source export mapping",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
-          "to": "src/core/constants/legalLinks.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/legal/components/PublicLegalPage.vue",
-          "to": "src/core/constants/legalLinks.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/constants/legalLinks.ts"
-      ],
-      "targetPath": "src/core/constants/legalLinks.ts",
-      "ownershipScope": [
-        "src/core/constants/legalLinks.ts"
-      ],
-      "publicExports": [
-        "PUBLIC_LEGAL_LINKS"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/constants/routePaths.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/constants/legalLinks.ts"
-      ],
-      "exportMappings": [
-        {
-          "source": "src/shared/constants/legalLinks.ts",
-          "name": "PUBLIC_LEGAL_LINKS",
-          "exportedAs": "PUBLIC_LEGAL_LINKS"
-        }
-      ]
-    },
-    {
       "path": "src/core/constants/media.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -25602,6 +25877,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/core/media/visionIngressPolicy.ts",
+          "to": "src/core/constants/media.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/media/visionIngressPolicy.unit.spec.ts",
           "to": "src/core/constants/media.ts",
           "kind": "runtime"
         },
@@ -25621,27 +25901,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/media/visionIngressPolicy.unit.spec.ts",
+          "from": "src/shared/constants/media.shim.ts",
           "to": "src/core/constants/media.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/constants/media.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/constants/media.ts"
-      ],
+      "sourcePaths": ["src/core/constants/media.ts"],
       "targetPath": "src/core/constants/media.ts",
-      "ownershipScope": [
-        "src/core/constants/media.ts"
-      ],
+      "ownershipScope": ["src/core/constants/media.ts"],
       "publicExports": [
         "DEFAULT_IMAGE_DOWNLOAD_NAME",
         "IMAGE_UPLOAD_ACCEPT",
@@ -25651,9 +25927,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/constants/media.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/constants/media.ts"],
       "exportMappings": [
         {
           "source": "src/shared/constants/media.ts",
@@ -25686,13 +25960,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/contracts/externalImageProviders.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/contracts/externalImageProviders.unit.spec.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/settings/image-library/searchProviderTypes.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
@@ -25749,30 +26028,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/domain/externalImageProviders.unit.spec.ts",
+          "from": "src/shared/domain/externalImageProviders.shim.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 13,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 13,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/domain/externalImageProviders.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Pure subpath from shared/domain/externalImageProviders.ts (§10.3). Consumers: Search, Library, Admin.",
-      "sourcePaths": [
-        "src/shared/domain/externalImageProviders.ts"
-      ],
+      "sourcePaths": ["src/core/contracts/externalImageProviders.ts"],
       "targetPath": "src/core/contracts/externalImageProviders.ts",
-      "ownershipScope": [
-        "src/core/contracts/externalImageProviders.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/domain/externalImageProviders.ts"
-      ],
+      "ownershipScope": ["src/core/contracts/externalImageProviders.ts"],
+      "sourceOwnershipScope": ["src/shared/domain/externalImageProviders.ts"],
       "publicExports": [
         "EXTERNAL_IMAGE_PROVIDERS",
         "EXTERNAL_IMAGE_PROVIDER_LABELS",
@@ -25809,13 +26082,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/contracts/generationContract.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/contracts/generationContract.unit.spec.ts",
+          "to": "src/core/contracts/generationContract.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
           "to": "src/core/contracts/generationContract.ts",
@@ -25937,30 +26215,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/domain/generationContract.unit.spec.ts",
+          "from": "src/shared/domain/generationContract.shim.ts",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 24,
       "measuredFanOut": 0,
-      "targetFanIn": 23,
+      "targetFanIn": 24,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/domain/generationContract.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Pure subpath from shared/domain/generationContract.ts (§10.3). Consumers: Board, Canvas, Admin via direct pure-subpath import, not the Canvas root.",
-      "sourcePaths": [
-        "src/shared/domain/generationContract.ts"
-      ],
+      "sourcePaths": ["src/core/contracts/generationContract.ts"],
       "targetPath": "src/core/contracts/generationContract.ts",
-      "ownershipScope": [
-        "src/core/contracts/generationContract.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/domain/generationContract.ts"
-      ],
+      "ownershipScope": ["src/core/contracts/generationContract.ts"],
+      "sourceOwnershipScope": ["src/shared/domain/generationContract.ts"],
       "publicExports": [
         "GENERATION_PRIMITIVE",
         "GENERATION_PRIMITIVE_OPTIONS",
@@ -26081,7 +26353,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/contracts/imageServices.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -26089,7 +26361,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/core/contracts/imageServices.unit.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/pricing/serviceResolutionCatalog.contract.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/core/promptVariables.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/core/promptVariables.unit.spec.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
         },
@@ -26154,6 +26441,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/core/nodes/serviceLabelKey.unit.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/domain/execution-contracts/executionContract.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
@@ -26189,50 +26486,45 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/serviceImageActionText.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/serviceImageActionText.unit.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.vue",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/domain/imageServices.unit.spec.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/serviceRegistry.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/serviceRegistry.unit.spec.ts",
+          "from": "src/shared/domain/imageServices.shim.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 30,
       "measuredFanOut": 0,
-      "targetFanIn": 24,
+      "targetFanIn": 30,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/domain/imageServices.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Pure subpath from shared/domain/imageServices.ts (§10.3). Consumers: Canvas, Admin; keep aligned with backend/OpenAPI.",
-      "sourcePaths": [
-        "src/shared/domain/imageServices.ts"
-      ],
+      "sourcePaths": ["src/core/contracts/imageServices.ts"],
       "targetPath": "src/core/contracts/imageServices.ts",
-      "ownershipScope": [
-        "src/core/contracts/imageServices.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/domain/imageServices.ts"
-      ],
-      "publicExports": [
-        "SERVICE",
-        "SERVICE_SLUGS",
-        "Service"
-      ],
+      "ownershipScope": ["src/core/contracts/imageServices.ts"],
+      "sourceOwnershipScope": ["src/shared/domain/imageServices.ts"],
+      "publicExports": ["SERVICE", "SERVICE_SLUGS", "Service"],
       "exportMappings": [
         {
           "source": "src/shared/domain/imageServices.ts",
@@ -26258,7 +26550,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/errors/errorCatalog.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -26267,6 +26559,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/core/auth/client.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/errors/errorCatalog.unit.spec.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -26411,27 +26708,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/errors/errorCatalog.unit.spec.ts",
+          "from": "src/shared/errors/errorCatalog.shim.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 30,
+      "measuredFanIn": 31,
+      "measuredFanOut": 1,
+      "targetFanIn": 31,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/errors/errorCatalog.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/errors/errorCatalog.ts"
-      ],
+      "sourcePaths": ["src/core/errors/errorCatalog.ts"],
       "targetPath": "src/core/errors/errorCatalog.ts",
-      "ownershipScope": [
-        "src/core/errors/errorCatalog.ts"
-      ],
+      "ownershipScope": ["src/core/errors/errorCatalog.ts"],
       "publicExports": [
         "ErrorCodeCopyKeyMap",
         "readinessErrorCodeCopyKey",
@@ -26440,12 +26733,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "userFacingErrorCopy"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/i18n/index.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/errors/errorCatalog.ts"
-      ],
+      "targetFanOutTargets": ["src/core/i18n/index.ts"],
+      "sourceOwnershipScope": ["src/shared/errors/errorCatalog.ts"],
       "exportMappings": [
         {
           "source": "src/shared/errors/errorCatalog.ts",
@@ -26478,13 +26767,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/i18n/formatters.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/i18n/formatters.unit.spec.ts",
+          "to": "src/core/i18n/formatters.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/fourLocaleServiceCopy.contract.spec.ts",
+          "to": "src/core/i18n/formatters.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/core/i18n/userIdeaCurrency.ts",
           "to": "src/core/i18n/formatters.ts",
@@ -26581,27 +26880,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/i18n/formatters.unit.spec.ts",
+          "from": "src/shared/i18n/formatters.shim.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 20,
+      "measuredFanIn": 22,
+      "measuredFanOut": 2,
+      "targetFanIn": 22,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/i18n/formatters.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/i18n/formatters.ts"
-      ],
+      "deletionOwner": "p1-lane",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-i18n applied 2026-10-10: consumers rewritten to src/core/i18n; TTL shims (1 phase, delete after P1, owner p1-lane).",
+      "sourcePaths": ["src/core/i18n/formatters.ts"],
       "targetPath": "src/core/i18n/formatters.ts",
-      "ownershipScope": [
-        "src/core/i18n/formatters.ts"
-      ],
+      "ownershipScope": ["src/core/i18n/formatters.ts"],
       "publicExports": [
         "formatLocaleDate",
         "formatLocaleNumber",
@@ -26611,12 +26906,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/core/i18n/userLocale.ts",
-        "src/shared/i18n/localeManifest.ts"
+        "src/core/i18n/localeManifest.ts",
+        "src/core/i18n/userLocale.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/i18n/formatters.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/i18n/formatters.ts"],
       "exportMappings": [
         {
           "source": "src/shared/i18n/formatters.ts",
@@ -26649,7 +26942,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/i18n/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -26658,6 +26951,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/client.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/mediaAssetMetadata.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -26793,6 +27091,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/account/presentation/usage/UsagePane.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27072,6 +27375,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/serviceImageActionText.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -27192,17 +27505,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetMetadata.ts",
+          "from": "src/shared/i18n/index.shim.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/UserAccountMenu.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/serviceRegistry.ts",
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27217,25 +27525,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 112,
+      "measuredFanIn": 115,
+      "measuredFanOut": 5,
+      "targetFanIn": 115,
       "targetFanOut": 5,
-      "shims": [],
+      "shims": ["src/shared/i18n/index.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Destination of shared/i18n (§10.3). Path-governance PR must cover old shims + new runtime + pure-subpath fixtures in the same change (§10.4).",
-      "sourcePaths": [
-        "src/shared/i18n/index.ts"
-      ],
+      "deletionOwner": "p1-lane",
+      "notes": "Destination of shared/i18n (§10.3). Path-governance PR must cover old shims + new runtime + pure-subpath fixtures in the same change (§10.4). P1b-i18n applied 2026-10-10: consumers rewritten to src/core/i18n; TTL shims (1 phase, delete after P1, owner p1-lane).",
+      "sourcePaths": ["src/core/i18n/index.ts"],
       "targetPath": "src/core/i18n/index.ts",
-      "ownershipScope": [
-        "src/core/i18n/"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/i18n/"
-      ],
+      "ownershipScope": ["src/core/i18n/"],
+      "sourceOwnershipScope": ["src/shared/i18n/"],
       "publicExports": [
         "AppI18n",
         "SupportedLocale",
@@ -27295,7 +27597,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/i18n/localeCore.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -27303,47 +27605,48 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/core/i18n/i18nRuntime.ts",
+          "to": "src/core/i18n/localeCore.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/core/i18n/localeDetection.ts",
+          "to": "src/core/i18n/localeCore.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/localeManifest.ts",
+          "to": "src/core/i18n/localeCore.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/core/i18n/localeParity.unit.spec.ts",
+          "to": "src/core/i18n/localeCore.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/i18n/userLocale.ts",
           "to": "src/core/i18n/localeCore.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/i18n/i18nRuntime.ts",
-          "to": "src/core/i18n/localeCore.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/i18n/localeDetection.ts",
-          "to": "src/core/i18n/localeCore.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/localeManifest.ts",
-          "to": "src/core/i18n/localeCore.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/i18n/localeParity.unit.spec.ts",
+          "from": "src/shared/i18n/localeCore.shim.ts",
           "to": "src/core/i18n/localeCore.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/i18n/localeCore.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/i18n/localeCore.ts"
-      ],
+      "deletionOwner": "p1-lane",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-i18n applied 2026-10-10: consumers rewritten to src/core/i18n; TTL shims (1 phase, delete after P1, owner p1-lane).",
+      "sourcePaths": ["src/core/i18n/localeCore.ts"],
       "targetPath": "src/core/i18n/localeCore.ts",
-      "ownershipScope": [
-        "src/core/i18n/localeCore.ts"
-      ],
+      "ownershipScope": ["src/core/i18n/localeCore.ts"],
       "publicExports": [
         "LocaleBundle",
         "LocaleLoader",
@@ -27354,9 +27657,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "purity": "pure",
-      "sourceOwnershipScope": [
-        "src/shared/i18n/localeCore.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/i18n/localeCore.ts"],
       "exportMappings": [
         {
           "source": "src/shared/i18n/localeCore.ts",
@@ -27386,16 +27687,305 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
+      "path": "src/core/i18n/localeManifest.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/i18n/formatters.ts",
+          "to": "src/core/i18n/localeManifest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/fourLocaleServiceCopy.contract.spec.ts",
+          "to": "src/core/i18n/localeManifest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/userLocale.ts",
+          "to": "src/core/i18n/localeManifest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/userLocale.unit.spec.ts",
+          "to": "src/core/i18n/localeManifest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/core/i18n/localeManifest.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 5,
+      "targetFanIn": 5,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/i18n/localeManifest.ts"],
+      "targetPath": "src/core/i18n/localeManifest.ts",
+      "ownershipScope": ["src/core/i18n/localeManifest.ts"],
+      "publicExports": ["LOCALE_MANIFEST", "LocaleArtifact"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "src/core/i18n/i18nRuntime.ts",
+        "src/core/i18n/localeCore.ts",
+        "src/core/i18n/locales/es/index.ts",
+        "src/core/i18n/locales/ko/index.ts",
+        "src/core/i18n/locales/zh-CN/index.ts"
+      ]
+    },
+    {
+      "path": "src/core/i18n/locales/en/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit (star=0, named=1, decl=0)",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/i18n/i18nRuntime.ts",
+          "to": "src/core/i18n/locales/en/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/localeParity.unit.spec.ts",
+          "to": "src/core/i18n/locales/en/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "to": "src/core/i18n/locales/en/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/i18n/locales/en/index.shim.ts",
+          "to": "src/core/i18n/locales/en/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 0,
+      "targetFanIn": 4,
+      "targetFanOut": 0,
+      "shims": ["src/shared/i18n/locales/en/index.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption. Reviewed public-bundle convergence: runtime resident messages and AccountDialog mock import named bundle exports instead of private locale modules; translation objects remain identical.",
+      "sourcePaths": ["src/core/i18n/locales/en/index.ts"],
+      "targetPath": "src/core/i18n/locales/en/index.ts",
+      "ownershipScope": ["src/core/i18n/locales/en/"],
+      "publicExports": [
+        "account",
+        "admin",
+        "auth",
+        "billing",
+        "canvas",
+        "common",
+        "default",
+        "errors",
+        "library",
+        "search",
+        "workspace"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
+    },
+    {
+      "path": "src/core/i18n/locales/es/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit (star=0, named=1, decl=0)",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/i18n/localeManifest.ts",
+          "to": "src/core/i18n/locales/es/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/localeParity.unit.spec.ts",
+          "to": "src/core/i18n/locales/es/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/i18n/locales/es/index.shim.ts",
+          "to": "src/core/i18n/locales/es/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 0,
+      "targetFanIn": 3,
+      "targetFanOut": 0,
+      "shims": ["src/shared/i18n/locales/es/index.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/i18n/locales/es/index.ts"],
+      "targetPath": "src/core/i18n/locales/es/index.ts",
+      "ownershipScope": ["src/core/i18n/locales/es/"],
+      "publicExports": [
+        "account",
+        "admin",
+        "auth",
+        "billing",
+        "canvas",
+        "common",
+        "default",
+        "errors",
+        "library",
+        "search",
+        "workspace"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
+    },
+    {
+      "path": "src/core/i18n/locales/ko/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit (star=0, named=1, decl=0)",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/i18n/localeManifest.ts",
+          "to": "src/core/i18n/locales/ko/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/localeParity.unit.spec.ts",
+          "to": "src/core/i18n/locales/ko/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/i18n/locales/ko/index.shim.ts",
+          "to": "src/core/i18n/locales/ko/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 0,
+      "targetFanIn": 3,
+      "targetFanOut": 0,
+      "shims": ["src/shared/i18n/locales/ko/index.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/i18n/locales/ko/index.ts"],
+      "targetPath": "src/core/i18n/locales/ko/index.ts",
+      "ownershipScope": ["src/core/i18n/locales/ko/"],
+      "publicExports": [
+        "account",
+        "admin",
+        "auth",
+        "billing",
+        "canvas",
+        "common",
+        "default",
+        "errors",
+        "library",
+        "search",
+        "workspace"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
+    },
+    {
+      "path": "src/core/i18n/locales/zh-CN/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit (star=0, named=1, decl=0)",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/i18n/localeManifest.ts",
+          "to": "src/core/i18n/locales/zh-CN/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/localeParity.unit.spec.ts",
+          "to": "src/core/i18n/locales/zh-CN/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/i18n/locales/zh-CN/index.shim.ts",
+          "to": "src/core/i18n/locales/zh-CN/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 0,
+      "targetFanIn": 3,
+      "targetFanOut": 0,
+      "shims": ["src/shared/i18n/locales/zh-CN/index.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/i18n/locales/zh-CN/index.ts"],
+      "targetPath": "src/core/i18n/locales/zh-CN/index.ts",
+      "ownershipScope": ["src/core/i18n/locales/zh-CN/"],
+      "publicExports": [
+        "account",
+        "admin",
+        "auth",
+        "billing",
+        "canvas",
+        "common",
+        "default",
+        "errors",
+        "library",
+        "search",
+        "workspace"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
+    },
+    {
       "path": "src/core/i18n/userIdeaCurrency.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/i18n/userIdeaCurrency.unit.spec.ts",
+          "to": "src/core/i18n/userIdeaCurrency.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/application/profile/useProfileFeedback.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
@@ -27497,37 +28087,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/i18n/userIdeaCurrency.unit.spec.ts",
+          "from": "src/shared/i18n/userIdeaCurrency.shim.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 21,
+      "measuredFanIn": 22,
+      "measuredFanOut": 1,
+      "targetFanIn": 22,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/i18n/userIdeaCurrency.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/i18n/userIdeaCurrency.ts"
-      ],
+      "deletionOwner": "p1-lane",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-i18n applied 2026-10-10: consumers rewritten to src/core/i18n; TTL shims (1 phase, delete after P1, owner p1-lane).",
+      "sourcePaths": ["src/core/i18n/userIdeaCurrency.ts"],
       "targetPath": "src/core/i18n/userIdeaCurrency.ts",
-      "ownershipScope": [
-        "src/core/i18n/userIdeaCurrency.ts"
-      ],
-      "publicExports": [
-        "formatIdeaAmount"
-      ],
+      "ownershipScope": ["src/core/i18n/userIdeaCurrency.ts"],
+      "publicExports": ["formatIdeaAmount"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/i18n/formatters.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/i18n/userIdeaCurrency.ts"
-      ],
+      "targetFanOutTargets": ["src/core/i18n/formatters.ts"],
+      "sourceOwnershipScope": ["src/shared/i18n/userIdeaCurrency.ts"],
       "exportMappings": [
         {
           "source": "src/shared/i18n/userIdeaCurrency.ts",
@@ -27540,7 +28120,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/i18n/userLocale.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -27553,7 +28133,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/core/i18n/fourLocaleServiceCopy.contract.spec.ts",
+          "to": "src/core/i18n/userLocale.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/i18n/index.ts",
+          "to": "src/core/i18n/userLocale.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/userIdeaCurrency.unit.spec.ts",
+          "to": "src/core/i18n/userLocale.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/userLocale.unit.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
@@ -27608,37 +28203,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "to": "src/core/i18n/userLocale.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/i18n/userIdeaCurrency.unit.spec.ts",
-          "to": "src/core/i18n/userLocale.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/userLocale.unit.spec.ts",
+          "from": "src/shared/i18n/userLocale.shim.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 15,
+      "measuredFanIn": 18,
+      "measuredFanOut": 6,
+      "targetFanIn": 18,
       "targetFanOut": 6,
-      "shims": [],
+      "shims": ["src/shared/i18n/userLocale.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/i18n/userLocale.ts"
-      ],
+      "deletionOwner": "p1-lane",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P1b-i18n applied 2026-10-10: consumers rewritten to src/core/i18n; TTL shims (1 phase, delete after P1, owner p1-lane).",
+      "sourcePaths": ["src/core/i18n/userLocale.ts"],
       "targetPath": "src/core/i18n/userLocale.ts",
-      "ownershipScope": [
-        "src/core/i18n/userLocale.ts"
-      ],
+      "ownershipScope": ["src/core/i18n/userLocale.ts"],
       "publicExports": [
         "SUPPORTED_LOCALES",
         "SupportedLocale",
@@ -27653,15 +28244,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/core/composables/useAppToast.ts",
+        "src/core/i18n/i18nRuntime.ts",
         "src/core/i18n/localeCore.ts",
-        "src/core/utils/storage.ts",
-        "src/shared/i18n/i18nRuntime.ts",
-        "src/shared/i18n/localeDetection.ts",
-        "src/shared/i18n/localeManifest.ts"
+        "src/core/i18n/localeDetection.ts",
+        "src/core/i18n/localeManifest.ts",
+        "src/core/utils/storage.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/i18n/userLocale.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/i18n/userLocale.ts"],
       "exportMappings": [
         {
           "source": "src/shared/i18n/userLocale.ts",
@@ -27714,13 +28303,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/interaction/interactiveControlState.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/interaction/interactiveControlState.unit.spec.ts",
+          "to": "src/core/interaction/interactiveControlState.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
           "to": "src/core/interaction/interactiveControlState.ts",
@@ -27757,27 +28351,28 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/interaction/interactiveControlState.unit.spec.ts",
+          "from": "src/shared/interaction/interactiveControlState.shim.ts",
+          "to": "src/core/interaction/interactiveControlState.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/composables/themeKeyboard.contract.spec.ts",
           "to": "src/core/interaction/interactiveControlState.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 10,
       "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "targetFanIn": 10,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/interaction/interactiveControlState.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/interaction/interactiveControlState.ts"
-      ],
+      "sourcePaths": ["src/core/interaction/interactiveControlState.ts"],
       "targetPath": "src/core/interaction/interactiveControlState.ts",
-      "ownershipScope": [
-        "src/core/interaction/interactiveControlState.ts"
-      ],
+      "ownershipScope": ["src/core/interaction/interactiveControlState.ts"],
       "publicExports": [
         "InteractiveControlState",
         "InteractiveControlStateAttrs",
@@ -27823,7 +28418,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/interaction/menuKeyboardNavigation.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -27839,27 +28434,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/components/LibraryFolderContextMenu.vue",
           "to": "src/core/interaction/menuKeyboardNavigation.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/interaction/menuKeyboardNavigation.shim.ts",
+          "to": "src/core/interaction/menuKeyboardNavigation.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/interaction/menuKeyboardNavigation.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/interaction/menuKeyboardNavigation.ts"
-      ],
+      "sourcePaths": ["src/core/interaction/menuKeyboardNavigation.ts"],
       "targetPath": "src/core/interaction/menuKeyboardNavigation.ts",
-      "ownershipScope": [
-        "src/core/interaction/menuKeyboardNavigation.ts"
-      ],
-      "publicExports": [
-        "handleMenuKeyboardNavigation"
-      ],
+      "ownershipScope": ["src/core/interaction/menuKeyboardNavigation.ts"],
+      "publicExports": ["handleMenuKeyboardNavigation"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "sourceOwnershipScope": [
@@ -27877,7 +28471,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/lib/brandMark.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -27903,33 +28497,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
           "to": "src/core/lib/brandMark.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/lib/brandMark.shim.ts",
+          "to": "src/core/lib/brandMark.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/lib/brandMark.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/lib/brandMark.ts"
-      ],
+      "sourcePaths": ["src/core/lib/brandMark.ts"],
       "targetPath": "src/core/lib/brandMark.ts",
-      "ownershipScope": [
-        "src/core/lib/brandMark.ts"
-      ],
-      "publicExports": [
-        "brandMarkClasses",
-        "createBrandMarkClass"
-      ],
+      "ownershipScope": ["src/core/lib/brandMark.ts"],
+      "publicExports": ["brandMarkClasses", "createBrandMarkClass"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/lib/brandMark.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/lib/brandMark.ts"],
       "exportMappings": [
         {
           "source": "src/shared/lib/brandMark.ts",
@@ -27947,7 +28537,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/lib/chartPrimitives.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -27963,6 +28553,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/components/RangedLineChartCard.vue",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/core/lib/chartPrimitives.unit.spec.ts",
+          "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/core/motion/chartMotion.ts",
@@ -28010,27 +28605,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/lib/chartPrimitives.unit.spec.ts",
+          "from": "src/shared/lib/chartPrimitives.shim.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "measuredFanIn": 13,
+      "measuredFanOut": 3,
+      "targetFanIn": 13,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/lib/chartPrimitives.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/lib/chartPrimitives.ts"
-      ],
+      "sourcePaths": ["src/core/lib/chartPrimitives.ts"],
       "targetPath": "src/core/lib/chartPrimitives.ts",
-      "ownershipScope": [
-        "src/core/lib/chartPrimitives.ts"
-      ],
+      "ownershipScope": ["src/core/lib/chartPrimitives.ts"],
       "publicExports": [
         "ChartData",
         "ChartEmptyStatePluginInput",
@@ -28054,9 +28645,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue/index.js",
         "src/core/i18n/index.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/lib/chartPrimitives.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/lib/chartPrimitives.ts"],
       "exportMappings": [
         {
           "source": "src/shared/lib/chartPrimitives.ts",
@@ -28139,13 +28728,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/lib/chartTimeRange.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/lib/chartTimeRange.unit.spec.ts",
+          "to": "src/core/lib/chartTimeRange.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/domain/usage/chart.ts",
           "to": "src/core/lib/chartTimeRange.ts",
@@ -28157,27 +28751,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/lib/chartTimeRange.unit.spec.ts",
+          "from": "src/shared/lib/chartTimeRange.shim.ts",
           "to": "src/core/lib/chartTimeRange.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/lib/chartTimeRange.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/lib/chartTimeRange.ts"
-      ],
+      "sourcePaths": ["src/core/lib/chartTimeRange.ts"],
       "targetPath": "src/core/lib/chartTimeRange.ts",
-      "ownershipScope": [
-        "src/core/lib/chartTimeRange.ts"
-      ],
+      "ownershipScope": ["src/core/lib/chartTimeRange.ts"],
       "publicExports": [
         "BuildChartTimeBucketsInput",
         "ChartTimeBucket",
@@ -28189,9 +28779,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/lib/chartTimeRange.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/lib/chartTimeRange.ts"],
       "exportMappings": [
         {
           "source": "src/shared/lib/chartTimeRange.ts",
@@ -28234,7 +28822,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/lib/pageChrome.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -28255,24 +28843,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/overlays/CanvasSelectionGroupActionButton.vue",
           "to": "src/core/lib/pageChrome.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/lib/pageChrome.shim.ts",
+          "to": "src/core/lib/pageChrome.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/lib/pageChrome.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/lib/pageChrome.ts"
-      ],
+      "sourcePaths": ["src/core/lib/pageChrome.ts"],
       "targetPath": "src/core/lib/pageChrome.ts",
-      "ownershipScope": [
-        "src/core/lib/pageChrome.ts"
-      ],
+      "ownershipScope": ["src/core/lib/pageChrome.ts"],
       "publicExports": [
         "createPageChromeAccountRoundControlClass",
         "createPageChromeRoundControlClass",
@@ -28280,9 +28869,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/lib/pageChrome.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/lib/pageChrome.ts"],
       "exportMappings": [
         {
           "source": "src/shared/lib/pageChrome.ts",
@@ -28305,13 +28892,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/media/imageAssetPipeline.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/media/imageAssetPipeline.unit.spec.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
           "to": "src/core/media/imageAssetPipeline.ts",
@@ -28328,27 +28920,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/media/imageAssetPipeline.unit.spec.ts",
+          "from": "src/shared/media/imageAssetPipeline.shim.ts",
           "to": "src/core/media/imageAssetPipeline.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "measuredFanIn": 5,
+      "measuredFanOut": 6,
+      "targetFanIn": 5,
       "targetFanOut": 6,
-      "shims": [],
+      "shims": ["src/shared/media/imageAssetPipeline.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/media/imageAssetPipeline.ts"
-      ],
+      "sourcePaths": ["src/core/media/imageAssetPipeline.ts"],
       "targetPath": "src/core/media/imageAssetPipeline.ts",
-      "ownershipScope": [
-        "src/core/media/imageAssetPipeline.ts"
-      ],
+      "ownershipScope": ["src/core/media/imageAssetPipeline.ts"],
       "publicExports": [
         "IMAGE_ASSET_PIPELINE_CONFIG",
         "ImageAssetCompressionPolicy",
@@ -28366,9 +28954,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/media/visionIngressPolicy.ts",
         "src/core/utils/imageUploadSupport.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/media/imageAssetPipeline.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/media/imageAssetPipeline.ts"],
       "exportMappings": [
         {
           "source": "src/shared/media/imageAssetPipeline.ts",
@@ -28406,13 +28992,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/media/imageDimensions.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/media/imageDimensions.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/application/execution/media/imageSize.ts",
           "to": "src/core/media/imageDimensions.ts",
@@ -28429,27 +29020,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/media/imageDimensions.unit.spec.ts",
+          "from": "src/shared/media/imageDimensions.shim.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/media/imageDimensions.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/media/imageDimensions.ts"
-      ],
+      "sourcePaths": ["src/core/media/imageDimensions.ts"],
       "targetPath": "src/core/media/imageDimensions.ts",
-      "ownershipScope": [
-        "src/core/media/imageDimensions.ts"
-      ],
+      "ownershipScope": ["src/core/media/imageDimensions.ts"],
       "publicExports": [
         "ImageNaturalSize",
         "clearImageDimensionCacheForTesting",
@@ -28458,9 +29045,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/media/imageDimensions.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/media/imageDimensions.ts"],
       "exportMappings": [
         {
           "source": "src/shared/media/imageDimensions.ts",
@@ -28488,13 +29073,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/media/mediaRef.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/media/mediaRef.unit.spec.ts",
+          "to": "src/core/media/mediaRef.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/core/query/taskResult.ts",
           "to": "src/core/media/mediaRef.ts",
@@ -28551,27 +29141,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/media/mediaRef.unit.spec.ts",
+          "from": "src/shared/media/mediaRef.shim.ts",
           "to": "src/core/media/mediaRef.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "measuredFanIn": 13,
+      "measuredFanOut": 1,
+      "targetFanIn": 13,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/media/mediaRef.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/media/mediaRef.ts"
-      ],
+      "sourcePaths": ["src/core/media/mediaRef.ts"],
       "targetPath": "src/core/media/mediaRef.ts",
-      "ownershipScope": [
-        "src/core/media/mediaRef.ts"
-      ],
+      "ownershipScope": ["src/core/media/mediaRef.ts"],
       "publicExports": [
         "MediaRef",
         "MediaRefDerivativeTier",
@@ -28580,12 +29166,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "mediaRefEquals"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/api/mediaAssetDelivery.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/media/mediaRef.ts"
-      ],
+      "targetFanOutTargets": ["src/api/mediaAssetDelivery.ts"],
+      "sourceOwnershipScope": ["src/shared/media/mediaRef.ts"],
       "exportMappings": [
         {
           "source": "src/shared/media/mediaRef.ts",
@@ -28618,7 +29200,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/media/visionIngressPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -28627,6 +29209,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/core/media/imageAssetPipeline.ts",
+          "to": "src/core/media/visionIngressPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/media/visionIngressPolicy.unit.spec.ts",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
@@ -28651,27 +29238,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/media/visionIngressPolicy.unit.spec.ts",
+          "from": "src/shared/media/visionIngressPolicy.shim.ts",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "measuredFanIn": 7,
+      "measuredFanOut": 2,
+      "targetFanIn": 7,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/media/visionIngressPolicy.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/media/visionIngressPolicy.ts"
-      ],
+      "sourcePaths": ["src/core/media/visionIngressPolicy.ts"],
       "targetPath": "src/core/media/visionIngressPolicy.ts",
-      "ownershipScope": [
-        "src/core/media/visionIngressPolicy.ts"
-      ],
+      "ownershipScope": ["src/core/media/visionIngressPolicy.ts"],
       "publicExports": [
         "VISION_HEIC_EXTENSIONS",
         "VISION_HEIC_MIME_TYPES",
@@ -28687,9 +29270,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/constants/media.ts",
         "src/core/utils/imageUploadSupport.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/media/visionIngressPolicy.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/media/visionIngressPolicy.ts"],
       "exportMappings": [
         {
           "source": "src/shared/media/visionIngressPolicy.ts",
@@ -28737,13 +29318,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/motion/chartMotion.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/motion/chartMotion.unit.spec.ts",
+          "to": "src/core/motion/chartMotion.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/domain/usage/chart.ts",
           "to": "src/core/motion/chartMotion.ts",
@@ -28755,38 +29341,30 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/motion/chartMotion.unit.spec.ts",
+          "from": "src/shared/motion/chartMotion.shim.ts",
           "to": "src/core/motion/chartMotion.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "measuredFanIn": 4,
+      "measuredFanOut": 2,
+      "targetFanIn": 4,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/motion/chartMotion.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/motion/chartMotion.ts"
-      ],
+      "sourcePaths": ["src/core/motion/chartMotion.ts"],
       "targetPath": "src/core/motion/chartMotion.ts",
-      "ownershipScope": [
-        "src/core/motion/chartMotion.ts"
-      ],
-      "publicExports": [
-        "resolveChartAnimation"
-      ],
+      "ownershipScope": ["src/core/motion/chartMotion.ts"],
+      "publicExports": ["resolveChartAnimation"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/core/lib/chartPrimitives.ts",
         "src/core/motion/motionPolicy.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/motion/chartMotion.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/motion/chartMotion.ts"],
       "exportMappings": [
         {
           "source": "src/shared/motion/chartMotion.ts",
@@ -28796,10 +29374,48 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
+      "path": "src/core/motion/dialogMotion.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/shared/motion/dialogMotion.shim.ts",
+          "to": "src/core/motion/dialogMotion.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/core/motion/dialogMotion.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": ["src/shared/motion/dialogMotion.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/motion/dialogMotion.ts"],
+      "targetPath": "src/core/motion/dialogMotion.ts",
+      "ownershipScope": ["src/core/motion/dialogMotion.ts"],
+      "publicExports": ["dialogMotionTransitionName"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": ["src/core/motion/dialog-motion.css"]
+    },
+    {
       "path": "src/core/motion/motionPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -28808,6 +29424,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/core/motion/chartMotion.ts",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/motion/motionPolicy.unit.spec.ts",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
         },
@@ -28827,27 +29448,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/motion/motionPolicy.unit.spec.ts",
+          "from": "src/shared/motion/motionPolicy.shim.ts",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/motion/motionPolicy.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/motion/motionPolicy.ts"
-      ],
+      "sourcePaths": ["src/core/motion/motionPolicy.ts"],
       "targetPath": "src/core/motion/motionPolicy.ts",
-      "ownershipScope": [
-        "src/core/motion/motionPolicy.ts"
-      ],
+      "ownershipScope": ["src/core/motion/motionPolicy.ts"],
       "publicExports": [
         "MotionIntent",
         "MotionPreference",
@@ -28858,9 +29475,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/motion/motionPolicy.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/motion/motionPolicy.ts"],
       "exportMappings": [
         {
           "source": "src/shared/motion/motionPolicy.ts",
@@ -28898,13 +29513,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/motion/popoverMotion.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/motion/popoverMotion.unit.spec.ts",
+          "to": "src/core/motion/popoverMotion.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue",
           "to": "src/core/motion/popoverMotion.ts",
@@ -28931,27 +29551,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/motion/popoverMotion.unit.spec.ts",
+          "from": "src/shared/motion/popoverMotion.shim.ts",
           "to": "src/core/motion/popoverMotion.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "measuredFanIn": 7,
+      "measuredFanOut": 2,
+      "targetFanIn": 7,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/motion/popoverMotion.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/motion/popoverMotion.ts"
-      ],
+      "sourcePaths": ["src/core/motion/popoverMotion.ts"],
       "targetPath": "src/core/motion/popoverMotion.ts",
-      "ownershipScope": [
-        "src/core/motion/popoverMotion.ts"
-      ],
+      "ownershipScope": ["src/core/motion/popoverMotion.ts"],
       "publicExports": [
         "PopoverMotionTransition",
         "createPopoverMotionTransition",
@@ -28960,11 +29576,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/core/motion/motionPolicy.ts",
-        "src/shared/motion/popover-motion.css"
+        "src/core/motion/popover-motion.css"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/motion/popoverMotion.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/motion/popoverMotion.ts"],
       "exportMappings": [
         {
           "source": "src/shared/motion/popoverMotion.ts",
@@ -28987,7 +29601,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/query/queryClient.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -29015,38 +29629,39 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/query/queryClient.shim.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "measuredFanIn": 7,
+      "measuredFanOut": 1,
+      "targetFanIn": 7,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/query/queryClient.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/query/queryClient.ts"
-      ],
+      "sourcePaths": ["src/core/query/queryClient.ts"],
       "targetPath": "src/core/query/queryClient.ts",
-      "ownershipScope": [
-        "src/core/query/queryClient.ts"
-      ],
-      "publicExports": [
-        "clearAuthScopedQueryCache",
-        "queryClient"
-      ],
+      "ownershipScope": ["src/core/query/queryClient.ts"],
+      "publicExports": ["clearAuthScopedQueryCache", "queryClient"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/query/queryClient.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/query/queryClient.ts"],
       "exportMappings": [
         {
           "source": "src/shared/query/queryClient.ts",
@@ -29064,7 +29679,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/query/queryDefaults.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -29073,6 +29688,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/core/composables/useSupportChannels.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/query/queryDefaults.unit.spec.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -29147,27 +29767,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/query/queryDefaults.unit.spec.ts",
+          "from": "src/shared/query/queryDefaults.shim.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 17,
       "measuredFanOut": 0,
-      "targetFanIn": 16,
+      "targetFanIn": 17,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/query/queryDefaults.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/query/queryDefaults.ts"
-      ],
+      "sourcePaths": ["src/core/query/queryDefaults.ts"],
       "targetPath": "src/core/query/queryDefaults.ts",
-      "ownershipScope": [
-        "src/core/query/queryDefaults.ts"
-      ],
+      "ownershipScope": ["src/core/query/queryDefaults.ts"],
       "publicExports": [
         "STALE_TIME_MS",
         "accountScoped",
@@ -29177,9 +29793,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/query/queryDefaults.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/query/queryDefaults.ts"],
       "exportMappings": [
         {
           "source": "src/shared/query/queryDefaults.ts",
@@ -29212,13 +29826,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/query/taskResult.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/query/taskResult.contract.spec.ts",
+          "to": "src/core/query/taskResult.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/application/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/query/taskResult.ts",
@@ -29255,27 +29874,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/query/taskResult.contract.spec.ts",
+          "from": "src/shared/query/taskResult.shim.ts",
           "to": "src/core/query/taskResult.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "measuredFanIn": 9,
+      "measuredFanOut": 1,
+      "targetFanIn": 9,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/query/taskResult.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/query/taskResult.ts"
-      ],
+      "sourcePaths": ["src/core/query/taskResult.ts"],
       "targetPath": "src/core/query/taskResult.ts",
-      "ownershipScope": [
-        "src/core/query/taskResult.ts"
-      ],
+      "ownershipScope": ["src/core/query/taskResult.ts"],
       "publicExports": [
         "TaskImageResult",
         "TaskResultPayloadLike",
@@ -29284,12 +29899,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "normalizeTaskImageResults"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/media/mediaRef.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/query/taskResult.ts"
-      ],
+      "targetFanOutTargets": ["src/core/media/mediaRef.ts"],
+      "sourceOwnershipScope": ["src/shared/query/taskResult.ts"],
       "exportMappings": [
         {
           "source": "src/shared/query/taskResult.ts",
@@ -29322,7 +29933,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/query/userCreditsInvalidation.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -29358,24 +29969,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/query/userCreditsInvalidation.shim.ts",
+          "to": "src/core/query/userCreditsInvalidation.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/query/userCreditsInvalidation.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/query/userCreditsInvalidation.ts"
-      ],
+      "sourcePaths": ["src/core/query/userCreditsInvalidation.ts"],
       "targetPath": "src/core/query/userCreditsInvalidation.ts",
-      "ownershipScope": [
-        "src/core/query/userCreditsInvalidation.ts"
-      ],
+      "ownershipScope": ["src/core/query/userCreditsInvalidation.ts"],
       "publicExports": [
         "UserCreditsInvalidationEvent",
         "UserCreditsInvalidationListener",
@@ -29384,9 +29996,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/query/userCreditsInvalidation.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/query/userCreditsInvalidation.ts"],
       "exportMappings": [
         {
           "source": "src/shared/query/userCreditsInvalidation.ts",
@@ -29414,13 +30024,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/router/queryParams.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/router/queryParams.unit.spec.ts",
+          "to": "src/core/router/queryParams.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/application/overlay.ts",
           "to": "src/core/router/queryParams.ts",
@@ -29487,39 +30102,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/router/queryParams.unit.spec.ts",
+          "from": "src/shared/router/queryParams.shim.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 14,
+      "measuredFanIn": 15,
+      "measuredFanOut": 1,
+      "targetFanIn": 15,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/router/queryParams.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/router/queryParams.ts"
-      ],
+      "sourcePaths": ["src/core/router/queryParams.ts"],
       "targetPath": "src/core/router/queryParams.ts",
-      "ownershipScope": [
-        "src/core/router/queryParams.ts"
-      ],
-      "publicExports": [
-        "RouteQueryParam",
-        "stringParam",
-        "stringParamWhere"
-      ],
+      "ownershipScope": ["src/core/router/queryParams.ts"],
+      "publicExports": ["RouteQueryParam", "stringParam", "stringParamWhere"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-router/index.cjs"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/router/queryParams.ts"
-      ],
+      "targetFanOutTargets": ["node_modules/vue-router/index.cjs"],
+      "sourceOwnershipScope": ["src/shared/router/queryParams.ts"],
       "exportMappings": [
         {
           "source": "src/shared/router/queryParams.ts",
@@ -29542,7 +30145,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/seo/routeSeo.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -29560,32 +30163,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/seo/routeSeo.unit.spec.ts",
+          "from": "src/core/seo/routeSeo.unit.spec.ts",
           "to": "src/core/seo/routeSeo.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/seo/seoStaticHtml.ts",
+          "from": "src/core/seo/seoStaticHtml.ts",
+          "to": "src/core/seo/routeSeo.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/seo/routeSeo.shim.ts",
           "to": "src/core/seo/routeSeo.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/seo/routeSeo.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/seo/routeSeo.ts"
-      ],
+      "sourcePaths": ["src/core/seo/routeSeo.ts"],
       "targetPath": "src/core/seo/routeSeo.ts",
-      "ownershipScope": [
-        "src/core/seo/routeSeo.ts"
-      ],
+      "ownershipScope": ["src/core/seo/routeSeo.ts"],
       "publicExports": [
         "PUBLIC_SITE_ORIGIN",
         "ROUTE_SEO",
@@ -29602,9 +30206,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/seo/routeSeo.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/seo/routeSeo.ts"],
       "exportMappings": [
         {
           "source": "src/shared/seo/routeSeo.ts",
@@ -29669,10 +30271,48 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
+      "path": "src/core/seo/seoStaticHtml.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/core/seo/routeSeo.unit.spec.ts",
+          "to": "src/core/seo/seoStaticHtml.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/seo/seoStaticHtml.shim.ts",
+          "to": "src/core/seo/seoStaticHtml.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": ["src/shared/seo/seoStaticHtml.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/core/seo/seoStaticHtml.ts"],
+      "targetPath": "src/core/seo/seoStaticHtml.ts",
+      "ownershipScope": ["src/core/seo/seoStaticHtml.ts"],
+      "publicExports": ["renderStaticSeoDocument"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": ["src/core/seo/routeSeo.ts"]
+    },
+    {
       "path": "src/core/utils/auth.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -29680,7 +30320,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/client.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/api/client.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/mediaAssetMetadata.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceEventStream.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/auth.unit.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -29706,6 +30366,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/auth/session/browserSessionTransition.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -29750,32 +30415,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/client.contract.spec.ts",
-          "to": "src/core/utils/auth.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/auth.unit.spec.ts",
+          "from": "src/shared/utils/auth.shim.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 16,
+      "measuredFanIn": 20,
+      "measuredFanOut": 4,
+      "targetFanIn": 20,
       "targetFanOut": 4,
-      "shims": [],
+      "shims": ["src/shared/utils/auth.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/auth.ts"
-      ],
+      "sourcePaths": ["src/core/utils/auth.ts"],
       "targetPath": "src/core/utils/auth.ts",
-      "ownershipScope": [
-        "src/core/utils/auth.ts"
-      ],
+      "ownershipScope": ["src/core/utils/auth.ts"],
       "publicExports": [
         "AuthFailureAction",
         "SafeInternalRedirectPath",
@@ -29791,6 +30447,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "isSafeInternalRedirectPath",
         "normalizeSafeInternalRedirectPath",
         "setStoredAuth",
+        "subscribeAuthStateReset",
         "subscribeAuthStorageScopeChange"
       ],
       "surfaceSeverity": "warn",
@@ -29800,9 +30457,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/query/queryClient.ts",
         "src/core/utils/storage.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/utils/auth.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/auth.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/auth.ts",
@@ -29885,7 +30540,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/currency.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -29901,24 +30556,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/admin/payments/orders/paymentOrderPresentation.ts",
           "to": "src/core/utils/currency.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/utils/currency.shim.ts",
+          "to": "src/core/utils/currency.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
+      "targetFanIn": 3,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/utils/currency.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/currency.ts"
-      ],
+      "sourcePaths": ["src/core/utils/currency.ts"],
       "targetPath": "src/core/utils/currency.ts",
-      "ownershipScope": [
-        "src/core/utils/currency.ts"
-      ],
+      "ownershipScope": ["src/core/utils/currency.ts"],
       "publicExports": [
         "currencyFractionDigits",
         "formatMinorCurrencyValue",
@@ -29929,9 +30585,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/i18n/formatters.ts",
         "src/core/i18n/userLocale.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/utils/currency.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/currency.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/currency.ts",
@@ -29954,13 +30608,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/dateTime.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/utils/dateTime.unit.spec.ts",
+          "to": "src/core/utils/dateTime.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/presentation/profile/ProfilePane.vue",
           "to": "src/core/utils/dateTime.ts",
@@ -29987,27 +30646,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/utils/dateTime.unit.spec.ts",
+          "from": "src/shared/utils/dateTime.shim.ts",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "measuredFanIn": 7,
+      "measuredFanOut": 2,
+      "targetFanIn": 7,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/utils/dateTime.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/dateTime.ts"
-      ],
+      "sourcePaths": ["src/core/utils/dateTime.ts"],
       "targetPath": "src/core/utils/dateTime.ts",
-      "ownershipScope": [
-        "src/core/utils/dateTime.ts"
-      ],
+      "ownershipScope": ["src/core/utils/dateTime.ts"],
       "publicExports": [
         "calcDurationSeconds",
         "formatAdminDateTime",
@@ -30020,9 +30675,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/i18n/formatters.ts",
         "src/core/i18n/userLocale.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/utils/dateTime.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/dateTime.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/dateTime.ts",
@@ -30055,7 +30708,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/errorMessages.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30064,6 +30717,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/api/contractKernel.ts",
+          "to": "src/core/utils/errorMessages.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/errorMessages.unit.spec.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
@@ -30113,27 +30771,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/utils/errorMessages.unit.spec.ts",
+          "from": "src/shared/utils/errorMessages.shim.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 12,
       "measuredFanOut": 0,
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/errorMessages.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/errorMessages.ts"
-      ],
+      "sourcePaths": ["src/core/utils/errorMessages.ts"],
       "targetPath": "src/core/utils/errorMessages.ts",
-      "ownershipScope": [
-        "src/core/utils/errorMessages.ts"
-      ],
+      "ownershipScope": ["src/core/utils/errorMessages.ts"],
       "publicExports": [
         "extractSafeApiErrorMessage",
         "formatDisplayErrorMessage",
@@ -30142,9 +30796,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/errorMessages.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/errorMessages.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/errorMessages.ts",
@@ -30172,7 +30824,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/formValidation.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30198,24 +30850,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/components/auth-fields/useAuthForm.ts",
           "to": "src/core/utils/formValidation.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/utils/formValidation.shim.ts",
+          "to": "src/core/utils/formValidation.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/formValidation.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/formValidation.ts"
-      ],
+      "sourcePaths": ["src/core/utils/formValidation.ts"],
       "targetPath": "src/core/utils/formValidation.ts",
-      "ownershipScope": [
-        "src/core/utils/formValidation.ts"
-      ],
+      "ownershipScope": ["src/core/utils/formValidation.ts"],
       "publicExports": [
         "displayErrorMessage",
         "isRequiredErrorMessage",
@@ -30223,9 +30876,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/formValidation.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/formValidation.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/formValidation.ts",
@@ -30248,7 +30899,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/ids.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30309,24 +30960,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/application/useVisionQueryLifecycle.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/utils/ids.shim.ts",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 12,
       "measuredFanOut": 0,
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/ids.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/ids.ts"
-      ],
+      "sourcePaths": ["src/core/utils/ids.ts"],
       "targetPath": "src/core/utils/ids.ts",
-      "ownershipScope": [
-        "src/core/utils/ids.ts"
-      ],
+      "ownershipScope": ["src/core/utils/ids.ts"],
       "publicExports": [
         "createPrefixedId",
         "createUniqueId",
@@ -30334,9 +30986,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/ids.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/ids.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/ids.ts",
@@ -30359,7 +31009,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/imageUploadSupport.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30400,24 +31050,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/editing/useFlowImageUploadActions.unit.spec.ts",
           "to": "src/core/utils/imageUploadSupport.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/utils/imageUploadSupport.shim.ts",
+          "to": "src/core/utils/imageUploadSupport.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "measuredFanIn": 8,
+      "measuredFanOut": 2,
+      "targetFanIn": 8,
       "targetFanOut": 2,
-      "shims": [],
+      "shims": ["src/shared/utils/imageUploadSupport.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/imageUploadSupport.ts"
-      ],
+      "sourcePaths": ["src/core/utils/imageUploadSupport.ts"],
       "targetPath": "src/core/utils/imageUploadSupport.ts",
-      "ownershipScope": [
-        "src/core/utils/imageUploadSupport.ts"
-      ],
+      "ownershipScope": ["src/core/utils/imageUploadSupport.ts"],
       "publicExports": [
         "getFileExtension",
         "isSupportedUploadImageFile",
@@ -30428,9 +31079,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/constants/media.ts",
         "src/core/i18n/index.ts"
       ],
-      "sourceOwnershipScope": [
-        "src/shared/utils/imageUploadSupport.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/imageUploadSupport.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/imageUploadSupport.ts",
@@ -30453,13 +31102,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/number.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/core/utils/number.unit.spec.ts",
+          "to": "src/core/utils/number.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/board/domain/document/fusionBlend.ts",
           "to": "src/core/utils/number.ts",
@@ -30531,37 +31185,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/utils/number.unit.spec.ts",
+          "from": "src/shared/utils/number.shim.ts",
           "to": "src/core/utils/number.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 16,
       "measuredFanOut": 0,
-      "targetFanIn": 15,
+      "targetFanIn": 16,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/number.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/number.ts"
-      ],
+      "sourcePaths": ["src/core/utils/number.ts"],
       "targetPath": "src/core/utils/number.ts",
-      "ownershipScope": [
-        "src/core/utils/number.ts"
-      ],
-      "publicExports": [
-        "clamp",
-        "clampUnit",
-        "clampWithFallback"
-      ],
+      "ownershipScope": ["src/core/utils/number.ts"],
+      "publicExports": ["clamp", "clampUnit", "clampWithFallback"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/number.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/number.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/number.ts",
@@ -30584,7 +31228,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/opaqueIds.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30603,6 +31247,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/api/workspaceTaskContract.ts",
+          "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/opaqueIds.unit.spec.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -30627,27 +31276,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/utils/opaqueIds.unit.spec.ts",
+          "from": "src/shared/utils/opaqueIds.shim.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 9,
       "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "targetFanIn": 9,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/opaqueIds.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/opaqueIds.ts"
-      ],
+      "sourcePaths": ["src/core/utils/opaqueIds.ts"],
       "targetPath": "src/core/utils/opaqueIds.ts",
-      "ownershipScope": [
-        "src/core/utils/opaqueIds.ts"
-      ],
+      "ownershipScope": ["src/core/utils/opaqueIds.ts"],
       "publicExports": [
         "OPAQUE_ID_SUFFIX_SOURCE",
         "assertOpaqueId",
@@ -30657,9 +31302,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/opaqueIds.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/opaqueIds.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/opaqueIds.ts",
@@ -30692,7 +31335,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/polling.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30700,7 +31343,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/api/useMediaAssetDelivery.ts",
+          "to": "src/core/utils/polling.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/api/workspaceTaskWaiter.ts",
+          "to": "src/core/utils/polling.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/polling.unit.spec.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
         },
@@ -30710,32 +31363,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/useMediaAssetDelivery.ts",
-          "to": "src/core/utils/polling.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/polling.unit.spec.ts",
+          "from": "src/shared/utils/polling.shim.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/polling.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/polling.ts"
-      ],
+      "sourcePaths": ["src/core/utils/polling.ts"],
       "targetPath": "src/core/utils/polling.ts",
-      "ownershipScope": [
-        "src/core/utils/polling.ts"
-      ],
+      "ownershipScope": ["src/core/utils/polling.ts"],
       "publicExports": [
         "PollDelayIterator",
         "PollDelayPolicy",
@@ -30745,9 +31389,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/polling.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/polling.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/polling.ts",
@@ -30780,7 +31422,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/storage.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
@@ -30789,6 +31431,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/app/router/index.ts",
+          "to": "src/core/utils/storage.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/i18n/localeDetection.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
@@ -30853,27 +31500,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/i18n/localeDetection.ts",
+          "from": "src/shared/utils/storage.shim.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 15,
       "measuredFanOut": 0,
-      "targetFanIn": 14,
+      "targetFanIn": 15,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/utils/storage.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/storage.ts"
-      ],
+      "sourcePaths": ["src/core/utils/storage.ts"],
       "targetPath": "src/core/utils/storage.ts",
-      "ownershipScope": [
-        "src/core/utils/storage.ts"
-      ],
+      "ownershipScope": ["src/core/utils/storage.ts"],
       "publicExports": [
         "readLocalStorageItem",
         "readLocalStorageJson",
@@ -30886,9 +31529,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/shared/utils/storage.ts"
-      ],
+      "sourceOwnershipScope": ["src/shared/utils/storage.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/storage.ts",
@@ -30936,13 +31577,28 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/core/utils/workspaceId.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "shared-runtime",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/api/mediaAssetUrls.ts",
+          "to": "src/core/utils/workspaceId.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/opaqueIds.unit.spec.ts",
+          "to": "src/core/utils/workspaceId.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/utils/workspaceId.unit.spec.ts",
+          "to": "src/core/utils/workspaceId.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/infrastructure/workspaceBilling.ts",
           "to": "src/core/utils/workspaceId.ts",
@@ -30969,48 +31625,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/api/mediaAssetUrls.ts",
-          "to": "src/core/utils/workspaceId.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/opaqueIds.unit.spec.ts",
-          "to": "src/core/utils/workspaceId.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/workspaceId.unit.spec.ts",
+          "from": "src/shared/utils/workspaceId.shim.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "measuredFanIn": 9,
+      "measuredFanOut": 1,
+      "targetFanIn": 9,
       "targetFanOut": 1,
-      "shims": [],
+      "shims": ["src/shared/utils/workspaceId.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
-      "sourcePaths": [
-        "src/shared/utils/workspaceId.ts"
-      ],
+      "sourcePaths": ["src/core/utils/workspaceId.ts"],
       "targetPath": "src/core/utils/workspaceId.ts",
-      "ownershipScope": [
-        "src/core/utils/workspaceId.ts"
-      ],
-      "publicExports": [
-        "assertWorkspaceId",
-        "requireWorkspaceId"
-      ],
+      "ownershipScope": ["src/core/utils/workspaceId.ts"],
+      "publicExports": ["assertWorkspaceId", "requireWorkspaceId"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/utils/opaqueIds.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/utils/workspaceId.ts"
-      ],
+      "targetFanOutTargets": ["src/core/utils/opaqueIds.ts"],
+      "sourceOwnershipScope": ["src/shared/utils/workspaceId.ts"],
       "exportMappings": [
         {
           "source": "src/shared/utils/workspaceId.ts",
@@ -31042,7 +31677,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 27,
+      "measuredFanOut": 28,
       "targetFanIn": 1,
       "targetFanOut": 27,
       "shims": [],
@@ -31050,13 +31685,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/account root; sole consumer is the parent.",
-      "sourcePaths": [
-        "src/features/account/application/index.ts"
-      ],
+      "sourcePaths": ["src/features/account/application/index.ts"],
       "targetPath": "src/features/account/application/index.ts",
-      "ownershipScope": [
-        "src/features/account/application/"
-      ],
+      "ownershipScope": ["src/features/account/application/"],
       "publicExports": [
         "AccountOverlay",
         "AccountOverlayLocation",
@@ -31094,6 +31725,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/upload.ts",
+        "src/core/auth/passwordPolicy.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/config/pagination.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/formValidation.ts",
+        "src/core/utils/ids.ts",
         "src/features/account/domain/index.ts",
         "src/features/account/infrastructure/billing/resource.ts",
         "src/features/account/infrastructure/index.ts",
@@ -31101,20 +31745,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/account/infrastructure/usage/resource.ts",
         "src/features/auth/index.ts",
         "src/features/workspace/infrastructure/workspaceContext.ts",
-        "src/shared/api/upload.ts",
-        "src/shared/auth/passwordPolicy.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useAsyncAction.ts",
-        "src/shared/config/pagination.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/query/queryDefaults.ts",
-        "src/shared/query/userCreditsInvalidation.ts",
-        "src/shared/router/queryParams.ts",
-        "src/shared/utils/formValidation.ts",
-        "src/shared/utils/ids.ts",
+        "src/features/workspace/routePaths.ts",
         "src/test/render.ts"
       ]
     },
@@ -31219,13 +31850,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/account root; ",
-      "sourcePaths": [
-        "src/features/account/domain/index.ts"
-      ],
+      "sourcePaths": ["src/features/account/domain/index.ts"],
       "targetPath": "src/features/account/domain/index.ts",
-      "ownershipScope": [
-        "src/features/account/domain/"
-      ],
+      "ownershipScope": ["src/features/account/domain/"],
       "publicExports": [
         "AccountTab",
         "IdeaQuantityParseResult",
@@ -31254,14 +31881,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/i18n/userLocale.ts",
-        "src/shared/lib/chartPrimitives.ts",
-        "src/shared/lib/chartTimeRange.ts",
-        "src/shared/motion/chartMotion.ts",
-        "src/shared/utils/currency.ts"
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTimeRange.ts",
+        "src/core/motion/chartMotion.ts",
+        "src/core/utils/currency.ts"
       ]
     },
     {
@@ -31297,7 +31924,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 72,
+      "measuredFanOut": 83,
       "targetFanIn": 4,
       "targetFanOut": 72,
       "shims": [],
@@ -31305,13 +31932,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "account feature seam; cross-feature consumers in workspace shell.",
-      "sourcePaths": [
-        "src/features/account/index.ts"
-      ],
+      "sourcePaths": ["src/features/account/index.ts"],
       "targetPath": "src/features/account/index.ts",
-      "ownershipScope": [
-        "src/features/account/"
-      ],
+      "ownershipScope": ["src/features/account/"],
       "publicExports": [
         "ACCOUNT_GUIDANCE_COPY_KEYS",
         "AccountDialog",
@@ -31458,6 +32081,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
         "path",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/sessionUserType.ts",
+        "src/api/upload.ts",
+        "src/api/workspaceEventStream.ts",
         "src/app/style.css",
         "src/components/ui/avatar/index.ts",
         "src/components/ui/button/index.ts",
@@ -31465,58 +32096,50 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/components/ui/skeleton/index.ts",
+        "src/core/auth/passwordPolicy.ts",
+        "src/core/components/DataTableColumn.vue",
+        "src/core/components/DataTableFrame.vue",
+        "src/core/components/IbFormField.vue",
+        "src/core/components/RangedLineChartCard.vue",
+        "src/core/components/SiteBrandLogo.vue",
+        "src/core/components/StatusBadge.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/composables/useSiteBranding.ts",
+        "src/core/config/pagination.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/locales/en/account.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/lib/brandMark.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTimeRange.ts",
+        "src/core/motion/chartMotion.ts",
+        "src/core/motion/motionPolicy.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/currency.ts",
+        "src/core/utils/dateTime.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/formValidation.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/workspaceId.ts",
         "src/features/auth/index.ts",
         "src/features/workspace/infrastructure/workspaceContext.ts",
+        "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
-        "src/shared/api/contractKernel.ts",
-        "src/shared/api/generated-query/public/model/index.ts",
-        "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
-        "src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
-        "src/shared/api/idempotencyKey.ts",
-        "src/shared/api/sessionUserType.ts",
-        "src/shared/api/upload.ts",
-        "src/shared/api/workspaceEventStream.ts",
-        "src/shared/auth/passwordPolicy.ts",
-        "src/shared/components/DataTableColumn.vue",
-        "src/shared/components/DataTableFrame.vue",
-        "src/shared/components/IbFormField.vue",
-        "src/shared/components/RangedLineChartCard.vue",
-        "src/shared/components/SiteBrandLogo.vue",
-        "src/shared/components/StatusBadge.vue",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useAsyncAction.ts",
-        "src/shared/composables/useLogoutRedirect.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/composables/useSiteBranding.ts",
-        "src/shared/config/pagination.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/locales/en/account.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/i18n/userLocale.ts",
-        "src/shared/interaction/interactiveControlState.ts",
-        "src/shared/lib/brandMark.ts",
-        "src/shared/lib/chartPrimitives.ts",
-        "src/shared/lib/chartTimeRange.ts",
-        "src/shared/motion/chartMotion.ts",
-        "src/shared/motion/motionPolicy.ts",
-        "src/shared/query/queryDefaults.ts",
-        "src/shared/query/userCreditsInvalidation.ts",
-        "src/shared/router/queryParams.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/shared/theme/formControls.ts",
-        "src/shared/utils/currency.ts",
-        "src/shared/utils/dateTime.ts",
-        "src/shared/utils/errorMessages.ts",
-        "src/shared/utils/formValidation.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/workspaceId.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
+        "src/theme/dialogMask.ts",
+        "src/theme/formControls.ts",
         "vitest/browser"
       ]
     },
@@ -31671,13 +32294,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/account root; ",
-      "sourcePaths": [
-        "src/features/account/infrastructure/index.ts"
-      ],
+      "sourcePaths": ["src/features/account/infrastructure/index.ts"],
       "targetPath": "src/features/account/infrastructure/index.ts",
-      "ownershipScope": [
-        "src/features/account/infrastructure/"
-      ],
+      "ownershipScope": ["src/features/account/infrastructure/"],
       "publicExports": [
         "ACCOUNT_GUIDANCE_COPY_KEYS",
         "AccountUsage",
@@ -31740,15 +32359,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
-        "src/shared/api/contractKernel.ts",
-        "src/shared/api/generated-query/public/model/index.ts",
-        "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
-        "src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
-        "src/shared/api/idempotencyKey.ts",
-        "src/shared/api/workspaceEventStream.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/utils/errorMessages.ts",
-        "src/shared/utils/workspaceId.ts"
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/workspaceEventStream.ts",
+        "src/core/i18n/index.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/workspaceId.ts"
       ]
     },
     {
@@ -31777,13 +32396,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "declared knip entry surface, but sole consumer is the features/account parent; P3 decides promote-or-fold.",
-      "sourcePaths": [
-        "src/features/account/presentation/index.ts"
-      ],
+      "sourcePaths": ["src/features/account/presentation/index.ts"],
       "targetPath": "src/features/account/presentation/index.ts",
-      "ownershipScope": [
-        "src/features/account/presentation/"
-      ],
+      "ownershipScope": ["src/features/account/presentation/"],
       "publicExports": [
         "AccountDialog",
         "AccountDialogContent",
@@ -31819,6 +32434,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/sessionUserType.ts",
         "src/app/style.css",
         "src/components/ui/avatar/index.ts",
         "src/components/ui/button/index.ts",
@@ -31826,6 +32442,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/components/ui/skeleton/index.ts",
+        "src/core/components/DataTableColumn.vue",
+        "src/core/components/DataTableFrame.vue",
+        "src/core/components/IbFormField.vue",
+        "src/core/components/RangedLineChartCard.vue",
+        "src/core/components/SiteBrandLogo.vue",
+        "src/core/components/StatusBadge.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/composables/useSiteBranding.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/locales/en/account.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/lib/brandMark.ts",
+        "src/core/motion/motionPolicy.ts",
+        "src/core/utils/dateTime.ts",
         "src/features/account/application/billing/useBillingRecords.ts",
         "src/features/account/application/overlay.ts",
         "src/features/account/application/profile/useAvatarUpload.ts",
@@ -31838,36 +32474,186 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/account/domain/index.ts",
         "src/features/account/infrastructure/index.ts",
         "src/features/auth/index.ts",
+        "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
-        "src/shared/api/sessionUserType.ts",
-        "src/shared/components/DataTableColumn.vue",
-        "src/shared/components/DataTableFrame.vue",
-        "src/shared/components/IbFormField.vue",
-        "src/shared/components/RangedLineChartCard.vue",
-        "src/shared/components/SiteBrandLogo.vue",
-        "src/shared/components/StatusBadge.vue",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useAsyncAction.ts",
-        "src/shared/composables/useLogoutRedirect.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/composables/useSiteBranding.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/locales/en/account.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/interaction/interactiveControlState.ts",
-        "src/shared/lib/brandMark.ts",
-        "src/shared/motion/motionPolicy.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/shared/theme/formControls.ts",
-        "src/shared/utils/dateTime.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
+        "src/theme/dialogMask.ts",
+        "src/theme/formControls.ts",
         "vitest/browser"
+      ]
+    },
+    {
+      "path": "src/features/account/ui/chrome/SupportChannelQr.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/SupportChannelQr.shim.ts",
+          "to": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 9,
+      "targetFanIn": 2,
+      "targetFanOut": 9,
+      "shims": ["src/shared/components/SupportChannelQr.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/account/ui/chrome/SupportChannelQr.vue"],
+      "targetPath": "src/features/account/ui/chrome/SupportChannelQr.vue",
+      "ownershipScope": ["src/features/account/ui/chrome/SupportChannelQr.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/components/ui/dropdown-menu/index.ts",
+        "src/components/ui/popover/index.ts",
+        "src/core/composables/useSupportChannels.ts",
+        "src/theme/appOverlayMenu.ts"
+      ]
+    },
+    {
+      "path": "src/features/account/ui/chrome/UserAccountMenu.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/AdminHeaderBar.vue",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/presentation/chrome/components/CanvasChrome.vue",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/UserAccountMenu.shim.ts",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/userAccountMenu.browser.spec.ts",
+          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 7,
+      "measuredFanOut": 14,
+      "targetFanIn": 7,
+      "targetFanOut": 14,
+      "shims": ["src/shared/components/UserAccountMenu.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/account/ui/chrome/UserAccountMenu.vue"],
+      "targetPath": "src/features/account/ui/chrome/UserAccountMenu.vue",
+      "ownershipScope": ["src/features/account/ui/chrome/UserAccountMenu.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/components/ui/dropdown-menu/index.ts",
+        "src/core/composables/useMenuTriggerFocusRestore.ts",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/i18n/localeManifest.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/features/account/ui/chrome/SupportChannelQr.vue",
+        "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts"
+      ]
+    },
+    {
+      "path": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/components/UserCreditBalanceButton.shim.ts",
+          "to": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": ["src/shared/components/UserCreditBalanceButton.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": [
+        "src/features/account/ui/chrome/UserCreditBalanceButton.vue"
+      ],
+      "targetPath": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
+      "ownershipScope": [
+        "src/features/account/ui/chrome/UserCreditBalanceButton.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts"
       ]
     },
     {
@@ -31942,16 +32728,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "deletionOwner": null,
       "notes": "Identity UI destination (§10.3). Sources verified by P0 import graph.",
       "sourcePaths": [
-        "src/shared/components/UserAccountMenu.vue",
-        "src/shared/components/userAccountMenu.types.ts"
+        "src/features/account/ui/chrome/UserAccountMenu.vue",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts"
       ],
       "targetPath": "src/features/account/ui/chrome/index.ts",
-      "ownershipScope": [
-        "src/features/account/ui/chrome/"
-      ],
+      "ownershipScope": ["src/features/account/ui/chrome/"],
       "sourceOwnershipScope": [
-        "src/shared/components/UserAccountMenu.vue",
-        "src/shared/components/userAccountMenu.types.ts"
+        "src/features/account/ui/chrome/UserAccountMenu.vue",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts"
       ],
       "publicExports": [
         "UserAccountMenu",
@@ -31962,27 +32746,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "exportMappings": [
         {
-          "source": "src/shared/components/UserAccountMenu.vue",
+          "source": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "name": "default",
           "exportedAs": "UserAccountMenu"
         },
         {
-          "source": "src/shared/components/userAccountMenu.types.ts",
+          "source": "src/features/account/ui/chrome/userAccountMenu.types.ts",
           "name": "UserAccountMenuItem",
           "exportedAs": "UserAccountMenuItem"
         },
         {
-          "source": "src/shared/components/userAccountMenu.types.ts",
+          "source": "src/features/account/ui/chrome/userAccountMenu.types.ts",
           "name": "UserAccountMenuItemKey",
           "exportedAs": "UserAccountMenuItemKey"
         },
         {
-          "source": "src/shared/components/userAccountMenu.types.ts",
+          "source": "src/features/account/ui/chrome/userAccountMenu.types.ts",
           "name": "UserAccountMenuItemTone",
           "exportedAs": "UserAccountMenuItemTone"
         },
         {
-          "source": "src/shared/components/userAccountMenu.types.ts",
+          "source": "src/features/account/ui/chrome/userAccountMenu.types.ts",
           "name": "UserIdeaBalanceControl",
           "exportedAs": "UserIdeaBalanceControl"
         }
@@ -32003,6 +32787,78 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts"
       ]
+    },
+    {
+      "path": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/app/AdminHeaderBar.vue",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/presentation/chrome/components/types.ts",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/shared/components/userAccountMenu.types.shim.ts",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 7,
+      "measuredFanOut": 0,
+      "targetFanIn": 7,
+      "targetFanOut": 0,
+      "shims": ["src/shared/components/userAccountMenu.types.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": [
+        "src/features/account/ui/chrome/userAccountMenu.types.ts"
+      ],
+      "targetPath": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+      "ownershipScope": [
+        "src/features/account/ui/chrome/userAccountMenu.types.ts"
+      ],
+      "publicExports": [
+        "UserAccountMenuItem",
+        "UserAccountMenuItemKey",
+        "UserAccountMenuItemTone",
+        "UserIdeaBalanceControl"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/admin/credits/wallets/index.ts",
@@ -32030,16 +32886,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "admin vertical seam; cross-vertical consumer AdminUsersPage (users vertical). Per plan, vertical index exists only for cross-vertical consumers.",
-      "sourcePaths": [
-        "src/features/admin/credits/wallets/index.ts"
-      ],
+      "sourcePaths": ["src/features/admin/credits/wallets/index.ts"],
       "targetPath": "src/features/admin/credits/wallets/index.ts",
-      "ownershipScope": [
-        "src/features/admin/credits/wallets/"
-      ],
-      "publicExports": [
-        "AdminUserWalletDialog"
-      ],
+      "ownershipScope": ["src/features/admin/credits/wallets/"],
+      "publicExports": ["AdminUserWalletDialog"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -32047,6 +32897,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/api/generated-query/control/model/index.ts",
+        "src/core/components/ActionButton.vue",
+        "src/core/config/pagination.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/utils/ids.ts",
         "src/features/admin/credits/shared/AdminActionReasonField.vue",
         "src/features/admin/credits/shared/api.ts",
         "src/features/admin/credits/shared/feedback.ts",
@@ -32063,23 +32922,71 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/admin/shared/components/AdminTable.vue",
         "src/features/admin/shared/composables/useAdminConfirm.ts",
         "src/features/admin/shared/lib/cellPlaceholders.ts",
-        "src/shared/api/generated-query/control/model/index.ts",
-        "src/shared/components/ActionButton.vue",
-        "src/shared/config/pagination.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/i18n/userLocale.ts",
-        "src/shared/query/queryDefaults.ts",
-        "src/shared/query/userCreditsInvalidation.ts",
-        "src/shared/utils/ids.ts",
         "src/test/render.ts"
       ]
+    },
+    {
+      "path": "src/features/admin/prompts/core/promptVariables.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/prompts/core/promptVariables.unit.spec.ts",
+          "to": "src/features/admin/prompts/core/promptVariables.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/filtering.unit.spec.ts",
+          "to": "src/features/admin/prompts/core/promptVariables.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/workspace.ts",
+          "to": "src/features/admin/prompts/core/promptVariables.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/workspace.ts",
+          "to": "src/features/admin/prompts/core/promptVariables.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/shared/domain/serviceRegistry.shim.ts",
+          "to": "src/features/admin/prompts/core/promptVariables.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 1,
+      "targetFanIn": 4,
+      "targetFanOut": 1,
+      "shims": ["src/shared/domain/serviceRegistry.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/admin/prompts/core/promptVariables.ts"],
+      "targetPath": "src/features/admin/prompts/core/promptVariables.ts",
+      "ownershipScope": ["src/features/admin/prompts/core/promptVariables.ts"],
+      "publicExports": [
+        "ServicePromptVariable",
+        "ServicePromptVariableTone",
+        "getServicePromptVariables"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": ["src/core/contracts/imageServices.ts"]
     },
     {
       "path": "src/features/admin/routePaths.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1b",
       "scope": "cross-feature",
@@ -32092,12 +32999,62 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/core/auth/sessionPolicy.ts",
+          "from": "src/features/account/application/overlay.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/overlay.ts",
+          "from": "src/features/admin/app/AdminHeaderBar.vue",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/AdminLayout.vue",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/navigation.ts",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/navigationMeta.ts",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/routes.ts",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.component.spec.ts",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/routePaths.unit.spec.ts",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/lib/anomalyRules.ts",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/lib/anomalyRules.unit.spec.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
@@ -32117,30 +33074,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/constants/routePaths.unit.spec.ts",
+          "from": "src/shared/constants/routePaths.shim.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 7,
-      "targetFanOut": 0,
-      "shims": [],
+      "measuredFanIn": 17,
+      "measuredFanOut": 1,
+      "targetFanIn": 17,
+      "targetFanOut": 1,
+      "shims": ["src/shared/constants/routePaths.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Admin-owned route paths split from shared/constants/routePaths.ts (§10.3, §10 target tree).",
-      "sourcePaths": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "Admin-owned route paths split from shared/constants/routePaths.ts (§10.3, §10 target tree). P1b-routes applied 2026-10-10: consumers rewritten to feature routePaths; TTL shim (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/features/admin/routePaths.ts"],
       "targetPath": "src/features/admin/routePaths.ts",
-      "ownershipScope": [
-        "src/features/admin/routePaths.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "ownershipScope": ["src/features/admin/routePaths.ts"],
+      "sourceOwnershipScope": ["src/core/constants/routePaths.ts"],
       "publicExports": [
         "ADMIN_CREDITS_PATH",
         "ADMIN_CREDIT_HEALTH_PATH",
@@ -32154,7 +33105,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "ADMIN_ROOT_PATH",
         "ADMIN_SETTINGS_PATH",
         "ADMIN_STATISTICS_PATH",
-        "ADMIN_USERS_PATH"
+        "ADMIN_USERS_PATH",
+        "isPathUnderRoute"
       ],
       "exportMappings": [
         {
@@ -32221,10 +33173,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "source": "src/shared/constants/routePaths.ts",
           "name": "ADMIN_USERS_PATH",
           "exportedAs": "ADMIN_USERS_PATH"
+        },
+        {
+          "source": "src/shared/constants/routePaths.ts",
+          "name": "isPathUnderRoute",
+          "exportedAs": "isPathUnderRoute"
         }
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": ["src/core/auth/routePolicy.ts"]
     },
     {
       "path": "src/features/admin/shared/components/AdminAlert.vue",
@@ -32347,22 +33304,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminAlert.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminAlert.vue"],
       "targetPath": "src/features/admin/shared/components/AdminAlert.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminAlert.vue"
-      ],
-      "publicExports": [
-        "AdminAlertSeverity",
-        "default"
-      ],
+      "ownershipScope": ["src/features/admin/shared/components/AdminAlert.vue"],
+      "publicExports": ["AdminAlertSeverity", "default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/lib/utils.ts"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"]
     },
     {
       "path": "src/features/admin/shared/components/AdminBadge.vue",
@@ -32395,17 +33342,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminBadge.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminBadge.vue"],
       "targetPath": "src/features/admin/shared/components/AdminBadge.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminBadge.vue"
-      ],
-      "publicExports": [
-        "AdminBadgeVariant",
-        "default"
-      ],
+      "ownershipScope": ["src/features/admin/shared/components/AdminBadge.vue"],
+      "publicExports": ["AdminBadgeVariant", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -32574,18 +33514,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminButton.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminButton.vue"],
       "targetPath": "src/features/admin/shared/components/AdminButton.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminButton.vue"
       ],
-      "publicExports": [
-        "AdminButtonSize",
-        "AdminButtonVariant",
-        "default"
-      ],
+      "publicExports": ["AdminButtonSize", "AdminButtonVariant", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -32627,13 +33561,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminChartCard.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/shared/components/ChartCard.vue",
-        "src/shared/components/ChartPanel.vue"
+        "src/core/components/ChartCard.vue",
+        "src/core/components/ChartPanel.vue"
       ]
     },
     {
@@ -32679,9 +33611,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminCollectionPageShell.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/features/admin/shared/components/AdminPagerControls.vue",
@@ -32784,16 +33714,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminColumn.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminColumn.vue"],
       "targetPath": "src/features/admin/shared/components/AdminColumn.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminColumn.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -32835,9 +33761,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminConfirmDialog.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/reka-ui/dist/index.cjs",
@@ -32928,13 +33852,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminDialogActions.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/shared/components/ActionButton.vue"
+        "src/core/components/ActionButton.vue",
+        "src/features/admin/shared/components/AdminButton.vue"
       ]
     },
     {
@@ -33065,8 +33987,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/reka-ui/dist/index.cjs",
         "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/uiClasses.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts"
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/features/admin/shared/lib/uiClasses.ts"
       ]
     },
     {
@@ -33100,21 +34022,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminDrawer.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminDrawer.vue"],
       "targetPath": "src/features/admin/shared/components/AdminDrawer.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminDrawer.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/reka-ui/dist/index.cjs",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts"
+        "src/core/composables/useOverlayInteractionLifecycle.ts"
       ]
     },
     {
@@ -33180,13 +34098,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminEditorActions.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/components/ActionButton.vue"
-      ]
+      "targetFanOutTargets": ["src/core/components/ActionButton.vue"]
     },
     {
       "path": "src/features/admin/shared/components/AdminEmptyState.vue",
@@ -33291,9 +34205,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminEmptyState.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -33343,9 +34255,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminFilterPopover.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -33448,14 +34358,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminFormField.vue"
       ],
-      "publicExports": [
-        "AdminFormFieldSlotProps",
-        "default"
-      ],
+      "publicExports": ["AdminFormFieldSlotProps", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
-        "src/shared/components/formFieldContract.ts"
+        "src/core/components/formFieldContract.ts"
       ]
     },
     {
@@ -33569,16 +34476,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminInput.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminInput.vue"],
       "targetPath": "src/features/admin/shared/components/AdminInput.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminInput.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/features/admin/shared/components/AdminInput.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -33621,19 +34522,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminLogoCropDialog.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/vue-advanced-cropper/dist/index.cjs.js",
         "node_modules/vue-advanced-cropper/dist/style.css",
         "node_modules/vue/index.js",
+        "src/core/components/ActionButton.vue",
         "src/features/admin/shared/components/AdminButton.vue",
         "src/features/admin/shared/components/AdminDialogShell.vue",
-        "src/features/admin/shared/lib/uiClasses.ts",
-        "src/shared/components/ActionButton.vue"
+        "src/features/admin/shared/lib/uiClasses.ts"
       ]
     },
     {
@@ -33679,9 +34578,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminLogoPickerPopover.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -33758,16 +34655,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminMono.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminMono.vue"],
       "targetPath": "src/features/admin/shared/components/AdminMono.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminMono.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/features/admin/shared/components/AdminMono.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -33828,9 +34719,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminNumberInput.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -33886,10 +34775,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminOptionFilter.vue"
       ],
-      "publicExports": [
-        "AdminOptionFilterOption",
-        "default"
-      ],
+      "publicExports": ["AdminOptionFilterOption", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -33949,9 +34835,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminPagerControls.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -33990,20 +34874,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminPopover.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminPopover.vue"],
       "targetPath": "src/features/admin/shared/components/AdminPopover.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminPopover.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs"
-      ]
+      "targetFanOutTargets": ["node_modules/reka-ui/dist/index.cjs"]
     },
     {
       "path": "src/features/admin/shared/components/AdminPopoverContent.vue",
@@ -34043,9 +34921,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminPopoverContent.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/reka-ui/dist/index.cjs",
@@ -34091,13 +34967,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminPopoverTrigger.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs"
-      ]
+      "targetFanOutTargets": ["node_modules/reka-ui/dist/index.cjs"]
     },
     {
       "path": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
@@ -34132,13 +35004,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminRangedLineChartCard.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/components/RangedLineChartCard.vue"
-      ]
+      "targetFanOutTargets": ["src/core/components/RangedLineChartCard.vue"]
     },
     {
       "path": "src/features/admin/shared/components/AdminRefreshButton.vue",
@@ -34188,13 +35056,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminRefreshButton.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/@iconoir/vue/dist/index.js"]
     },
     {
       "path": "src/features/admin/shared/components/AdminResourceToolbar.vue",
@@ -34234,9 +35098,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminResourceToolbar.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -34286,10 +35148,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminRowActionsPopover.vue"
       ],
-      "publicExports": [
-        "AdminRowActionItem",
-        "default"
-      ],
+      "publicExports": ["AdminRowActionItem", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/reka-ui/dist/index.cjs",
@@ -34372,17 +35231,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminSelect.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminSelect.vue"],
       "targetPath": "src/features/admin/shared/components/AdminSelect.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminSelect.vue"
       ],
-      "publicExports": [
-        "SelectOptionItem",
-        "default"
-      ],
+      "publicExports": ["SelectOptionItem", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -34430,9 +35284,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminSettingsDialogFrame.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/features/admin/shared/components/AdminAlert.vue",
@@ -34518,21 +35370,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminSpinner.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminSpinner.vue"],
       "targetPath": "src/features/admin/shared/components/AdminSpinner.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminSpinner.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/lib/utils.ts"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"]
     },
     {
       "path": "src/features/admin/shared/components/AdminStatusPill.vue",
@@ -34682,14 +35527,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminStatusPill.vue"
       ],
-      "publicExports": [
-        "AdminStatusPillVariant",
-        "default"
-      ],
+      "publicExports": ["AdminStatusPillVariant", "default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/components/StatusBadge.vue"
-      ]
+      "targetFanOutTargets": ["src/core/components/StatusBadge.vue"]
     },
     {
       "path": "src/features/admin/shared/components/AdminSubNavigationLayout.vue",
@@ -34724,10 +35564,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminSubNavigationLayout.vue"
       ],
-      "publicExports": [
-        "AdminSubNavigationItem",
-        "default"
-      ],
+      "publicExports": ["AdminSubNavigationItem", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-router/index.cjs",
@@ -34768,9 +35605,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminSummaryCard.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -34860,16 +35695,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminSwitch.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminSwitch.vue"],
       "targetPath": "src/features/admin/shared/components/AdminSwitch.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminSwitch.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/reka-ui/dist/index.cjs",
@@ -34978,13 +35809,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminTable.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminTable.vue"],
       "targetPath": "src/features/admin/shared/components/AdminTable.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminTable.vue"
-      ],
+      "ownershipScope": ["src/features/admin/shared/components/AdminTable.vue"],
       "publicExports": [
         "AdminTableRowClickEvent",
         "AdminTableRowCollapseEvent",
@@ -35052,9 +35879,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminTablePanel.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -35102,16 +35927,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminTextarea.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/AdminTextarea.vue"],
       "targetPath": "src/features/admin/shared/components/AdminTextarea.vue",
       "ownershipScope": [
         "src/features/admin/shared/components/AdminTextarea.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -35192,9 +36013,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/components/AdminToolbarSearch.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -35243,17 +36062,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/SwitchRow.vue"
-      ],
+      "sourcePaths": ["src/features/admin/shared/components/SwitchRow.vue"],
       "targetPath": "src/features/admin/shared/components/SwitchRow.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/SwitchRow.vue"
-      ],
-      "publicExports": [
-        "AdminSwitchRowPillSize",
-        "default"
-      ],
+      "ownershipScope": ["src/features/admin/shared/components/SwitchRow.vue"],
+      "publicExports": ["AdminSwitchRowPillSize", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/features/admin/shared/components/AdminStatusPill.vue",
@@ -35298,14 +36110,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/composables/useAdminCollectionQuery.ts"
       ],
-      "publicExports": [
-        "useAdminCollectionQuery"
-      ],
+      "publicExports": ["useAdminCollectionQuery"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
-        "src/shared/query/queryDefaults.ts"
+        "src/core/query/queryDefaults.ts"
       ]
     },
     {
@@ -35458,9 +36268,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "useAdminConfirm"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
@@ -35520,9 +36328,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/composables/useAdminCursorCollection.ts"
       ],
-      "publicExports": [
-        "useAdminCursorCollection"
-      ],
+      "publicExports": ["useAdminCursorCollection"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -35564,9 +36370,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/composables/useAnomalyRadar.ts"
       ],
-      "publicExports": [
-        "useAnomalyRadar"
-      ],
+      "publicExports": ["useAnomalyRadar"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -35635,9 +36439,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "useOptimisticToggle"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/features/admin/shared/composables/usePagePagination.ts",
@@ -35682,13 +36484,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/composables/usePagePagination.ts"
       ],
-      "publicExports": [
-        "usePagePagination"
-      ],
+      "publicExports": ["usePagePagination"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
-        "src/shared/config/pagination.ts"
+        "src/core/config/pagination.ts"
       ]
     },
     {
@@ -35734,9 +36534,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/composables/useQueryPolling.ts"
       ],
-      "publicExports": [
-        "useQueryPolling"
-      ],
+      "publicExports": ["useQueryPolling"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
@@ -35781,13 +36579,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/composables/useRefetchOnClose.ts"
       ],
-      "publicExports": [
-        "useRefetchOnClose"
-      ],
+      "publicExports": ["useRefetchOnClose"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/features/admin/shared/index.ts",
@@ -36581,12 +37375,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/admin/shared/validation/actionReasonContract.ts"
       ],
       "targetPath": "src/features/admin/shared/index.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/"
-      ],
-      "sourceOwnershipScope": [
-        "src/features/admin/shared/"
-      ],
+      "ownershipScope": ["src/features/admin/shared/"],
+      "sourceOwnershipScope": ["src/features/admin/shared/"],
       "publicExports": [
         "ADMIN_CONTROL_UNAVAILABLE_CODE",
         "ADMIN_IDENTITY_EMPTY",
@@ -37473,13 +38263,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/anomalyRules.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/anomalyRules.ts"],
       "targetPath": "src/features/admin/shared/lib/anomalyRules.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/anomalyRules.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/anomalyRules.ts"],
       "publicExports": [
         "AdminAnomalyItem",
         "AdminAnomalySeverity",
@@ -37490,7 +38276,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "src/features/admin/monitor/infrastructure/resource.ts",
         "src/features/admin/statistics/resource.ts",
-        "src/shared/constants/routePaths.ts"
+        "src/features/workspace/routePaths.ts"
       ]
     },
     {
@@ -37534,13 +38320,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/cellClasses.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/cellClasses.ts"],
       "targetPath": "src/features/admin/shared/lib/cellClasses.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/cellClasses.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/cellClasses.ts"],
       "publicExports": [
         "adminInlineJumpClass",
         "adminMonoClass",
@@ -37606,13 +38388,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/cellPlaceholders.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/cellPlaceholders.ts"],
       "targetPath": "src/features/admin/shared/lib/cellPlaceholders.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/cellPlaceholders.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/cellPlaceholders.ts"],
       "publicExports": [
         "ADMIN_IDENTITY_EMPTY",
         "ADMIN_NUMERIC_EMPTY",
@@ -37683,13 +38461,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/chart.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/chart.ts"],
       "targetPath": "src/features/admin/shared/lib/chart.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/chart.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/chart.ts"],
       "publicExports": [
         "adminChartLegend",
         "adminChartPlugins",
@@ -37710,10 +38484,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
         "node_modules/vue/index.js",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/motion/chartMotion.ts",
         "src/features/admin/shared/lib/adminThemeTokens.ts",
-        "src/shared/lib/chartPrimitives.ts",
-        "src/shared/motion/chartMotion.ts",
-        "src/shared/theme/composables/useTheme.ts"
+        "src/theme/composables/useTheme.ts"
       ]
     },
     {
@@ -37792,9 +38566,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/confirmSettingsSave.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/confirmSettingsSave.ts"],
       "targetPath": "src/features/admin/shared/lib/confirmSettingsSave.ts",
       "ownershipScope": [
         "src/features/admin/shared/lib/confirmSettingsSave.ts"
@@ -37925,17 +38697,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/controlCopy.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/controlCopy.ts"],
       "targetPath": "src/features/admin/shared/lib/controlCopy.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/controlCopy.ts"
-      ],
-      "publicExports": [
-        "ControlErrorMessages",
-        "withControlCopy"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/controlCopy.ts"],
+      "publicExports": ["ControlErrorMessages", "withControlCopy"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/features/admin/shared/lib/controlMutation.ts"
@@ -37992,13 +38757,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/controlGuidance.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/controlGuidance.ts"],
       "targetPath": "src/features/admin/shared/lib/controlGuidance.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/controlGuidance.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/controlGuidance.ts"],
       "publicExports": [
         "ADMIN_CONTROL_UNAVAILABLE_CODE",
         "AdminControlUnavailableError",
@@ -38153,13 +38914,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/controlMutation.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/controlMutation.ts"],
       "targetPath": "src/features/admin/shared/lib/controlMutation.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/controlMutation.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/controlMutation.ts"],
       "publicExports": [
         "ControlError",
         "ControlErrorMessages",
@@ -38173,9 +38930,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "requireOperatorReason"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/api/contractKernel.ts"
-      ]
+      "targetFanOutTargets": ["src/api/contractKernel.ts"]
     },
     {
       "path": "src/features/admin/shared/lib/controlResource.ts",
@@ -38223,22 +38978,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/controlResource.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/controlResource.ts"],
       "targetPath": "src/features/admin/shared/lib/controlResource.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/controlResource.ts"
-      ],
-      "publicExports": [
-        "LoadControlSettingOptions",
-        "loadControlSetting"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/controlResource.ts"],
+      "publicExports": ["LoadControlSettingOptions", "loadControlSetting"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
+        "src/api/contractKernel.ts",
         "src/features/admin/shared/lib/controlCopy.ts",
-        "src/features/admin/shared/lib/controlMutation.ts",
-        "src/shared/api/contractKernel.ts"
+        "src/features/admin/shared/lib/controlMutation.ts"
       ]
     },
     {
@@ -38282,16 +39030,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/reconcileStableRows.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/reconcileStableRows.ts"],
       "targetPath": "src/features/admin/shared/lib/reconcileStableRows.ts",
       "ownershipScope": [
         "src/features/admin/shared/lib/reconcileStableRows.ts"
       ],
-      "publicExports": [
-        "reconcileStableRows"
-      ],
+      "publicExports": ["reconcileStableRows"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -38336,20 +39080,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/secretSchema.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/secretSchema.ts"],
       "targetPath": "src/features/admin/shared/lib/secretSchema.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/secretSchema.ts"
-      ],
-      "publicExports": [
-        "secretField"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/secretSchema.ts"],
+      "publicExports": ["secretField"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/valibot/dist/index.mjs"
-      ]
+      "targetFanOutTargets": ["node_modules/valibot/dist/index.mjs"]
     },
     {
       "path": "src/features/admin/shared/lib/serviceAdminMeta.ts",
@@ -38387,13 +39123,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/serviceAdminMeta.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/serviceAdminMeta.ts"],
       "targetPath": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/serviceAdminMeta.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/serviceAdminMeta.ts"],
       "publicExports": [
         "ADMIN_SERVICE_GROUPS",
         "AdminServiceGroupKey",
@@ -38403,9 +39135,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "getAdminServiceMeta"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/domain/imageServices.ts"
-      ]
+      "targetFanOutTargets": ["src/core/contracts/imageServices.ts"]
     },
     {
       "path": "src/features/admin/shared/lib/tableColumns.ts",
@@ -38468,13 +39198,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/tableColumns.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/tableColumns.ts"],
       "targetPath": "src/features/admin/shared/lib/tableColumns.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/tableColumns.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/tableColumns.ts"],
       "publicExports": [
         "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
         "ADMIN_TABLE_MORE_COLUMN_WIDTH"
@@ -38573,13 +39299,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/taskMetricTokens.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/taskMetricTokens.ts"],
       "targetPath": "src/features/admin/shared/lib/taskMetricTokens.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/taskMetricTokens.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/taskMetricTokens.ts"],
       "publicExports": [
         "TaskMetricDefinition",
         "TaskMetricKey",
@@ -38635,13 +39357,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/timeRange.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/timeRange.ts"],
       "targetPath": "src/features/admin/shared/lib/timeRange.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/timeRange.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/timeRange.ts"],
       "publicExports": [
         "AdminTimeRangeBucket",
         "AdminTimeRangeOption",
@@ -38651,8 +39369,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/features/admin/statistics/resource.ts",
-        "src/shared/lib/chartTimeRange.ts"
+        "src/core/lib/chartTimeRange.ts",
+        "src/features/admin/statistics/resource.ts"
       ]
     },
     {
@@ -38876,13 +39594,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/toast.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/toast.ts"],
       "targetPath": "src/features/admin/shared/lib/toast.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/toast.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/toast.ts"],
       "publicExports": [
         "AdminToastPort",
         "formatAdminApiError",
@@ -38891,8 +39605,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/utils/errorMessages.ts"
+        "src/core/composables/useAppToast.ts",
+        "src/core/utils/errorMessages.ts"
       ]
     },
     {
@@ -39096,13 +39810,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/lib/uiClasses.ts"],
       "targetPath": "src/features/admin/shared/lib/uiClasses.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/lib/uiClasses.ts"],
       "publicExports": [
         "adminAnomalyPopoverClass",
         "adminChartCanvasClass",
@@ -39222,13 +39932,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/logos/brandLogos.ts"
-      ],
+      "sourcePaths": ["src/features/admin/shared/logos/brandLogos.ts"],
       "targetPath": "src/features/admin/shared/logos/brandLogos.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/logos/brandLogos.ts"
-      ],
+      "ownershipScope": ["src/features/admin/shared/logos/brandLogos.ts"],
       "publicExports": [
         "ADMIN_BRAND_CATEGORIES",
         "ALL_ADMIN_BRAND_LOGOS",
@@ -39248,19 +39954,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
+        "src/api/generated-query/control/control-platform/control-platform.ts",
+        "src/core/assets/oauth/discord.svg",
+        "src/core/assets/oauth/google.svg",
+        "src/core/config/runtimeUrls.ts",
         "src/features/admin/shared/lib/controlTransport.ts",
-        "src/shared/api/generated-query/control/control-platform/control-platform.ts",
-        "src/shared/assets/oauth/discord.svg",
-        "src/shared/assets/oauth/github.svg",
-        "src/shared/assets/oauth/google.svg",
-        "src/shared/assets/search-providers/pexels.svg",
-        "src/shared/assets/search-providers/unsplash.svg",
-        "src/shared/assets/storage-vendors/alibabacloud.svg",
-        "src/shared/assets/storage-vendors/amazons3.svg",
-        "src/shared/assets/storage-vendors/cloudflare.svg",
-        "src/shared/assets/storage-vendors/minio.svg",
-        "src/shared/assets/storage-vendors/tencentcloud.ico",
-        "src/shared/config/runtimeUrls.ts"
+        "src/features/admin/shared/ui/assets/oauth/github.svg",
+        "src/features/admin/shared/ui/assets/search-providers/pexels.svg",
+        "src/features/admin/shared/ui/assets/search-providers/unsplash.svg",
+        "src/features/admin/shared/ui/assets/storage-vendors/alibabacloud.svg",
+        "src/features/admin/shared/ui/assets/storage-vendors/amazons3.svg",
+        "src/features/admin/shared/ui/assets/storage-vendors/cloudflare.svg",
+        "src/features/admin/shared/ui/assets/storage-vendors/minio.svg",
+        "src/features/admin/shared/ui/assets/storage-vendors/tencentcloud.ico"
       ]
     },
     {
@@ -39296,16 +40002,66 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/admin/shared/logos/useBrandLogoOverrides.ts"
       ],
-      "publicExports": [
-        "useBrandLogoOverrides"
-      ],
+      "publicExports": ["useBrandLogoOverrides"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
+        "src/core/query/queryDefaults.ts",
         "src/features/admin/shared/lib/controlGuidance.ts",
-        "src/features/admin/shared/logos/brandLogoResource.ts",
-        "src/shared/query/queryDefaults.ts"
+        "src/features/admin/shared/logos/brandLogoResource.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/serviceIcons.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/credits/pricing/BillingServiceCell.vue",
+          "to": "src/features/admin/shared/ui/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/presentation/columns.ts",
+          "to": "src/features/admin/shared/ui/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
+          "to": "src/features/admin/shared/ui/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/domain/serviceIcons.shim.ts",
+          "to": "src/features/admin/shared/ui/serviceIcons.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 3,
+      "targetFanIn": 4,
+      "targetFanOut": 3,
+      "shims": ["src/shared/domain/serviceIcons.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/admin/shared/ui/serviceIcons.ts"],
+      "targetPath": "src/features/admin/shared/ui/serviceIcons.ts",
+      "ownershipScope": ["src/features/admin/shared/ui/serviceIcons.ts"],
+      "publicExports": ["getServiceIcon"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue/index.js",
+        "src/core/contracts/imageServices.ts"
       ]
     },
     {
@@ -39390,13 +40146,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/auth root; ",
-      "sourcePaths": [
-        "src/features/auth/components/auth-fields/index.ts"
-      ],
+      "sourcePaths": ["src/features/auth/components/auth-fields/index.ts"],
       "targetPath": "src/features/auth/components/auth-fields/index.ts",
-      "ownershipScope": [
-        "src/features/auth/components/auth-fields/"
-      ],
+      "ownershipScope": ["src/features/auth/components/auth-fields/"],
       "publicExports": [
         "AUTH_DISPLAY_NAME_LIMIT",
         "EmailField",
@@ -39415,13 +40167,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue/index.js",
         "src/components/ui/input/index.ts",
         "src/components/ui/spinner/index.ts",
-        "src/shared/auth/passwordPolicy.ts",
-        "src/shared/components/IbFormField.vue",
-        "src/shared/composables/useAsyncAction.ts",
-        "src/shared/interaction/interactiveControlState.ts",
-        "src/shared/theme/formControls.ts",
-        "src/shared/utils/formValidation.ts",
-        "src/test/render.ts"
+        "src/core/auth/passwordPolicy.ts",
+        "src/core/components/IbFormField.vue",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/utils/formValidation.ts",
+        "src/test/render.ts",
+        "src/theme/formControls.ts"
       ]
     },
     {
@@ -39577,7 +40329,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 28,
-      "measuredFanOut": 41,
+      "measuredFanOut": 45,
       "targetFanIn": 28,
       "targetFanOut": 41,
       "shims": [],
@@ -39585,13 +40337,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "auth feature seam; 28 external importers across app and 5 features.",
-      "sourcePaths": [
-        "src/features/auth/index.ts"
-      ],
+      "sourcePaths": ["src/features/auth/index.ts"],
       "targetPath": "src/features/auth/index.ts",
-      "ownershipScope": [
-        "src/features/auth/"
-      ],
+      "ownershipScope": ["src/features/auth/"],
       "publicExports": [
         "AUTH_DISPLAY_NAME_LIMIT",
         "AuthFeedback",
@@ -39629,42 +40377,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/sessionUserType.ts",
+        "src/api/userSession.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/assets/oauth/discord.svg",
+        "src/core/assets/oauth/google.svg",
+        "src/core/auth/client.ts",
+        "src/core/auth/oauthProviders.ts",
+        "src/core/auth/passwordPolicy.ts",
+        "src/core/auth/sessionPolicy.ts",
+        "src/core/components/IbFormField.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/config/timing.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/auth.ts",
+        "src/core/utils/formValidation.ts",
+        "src/core/utils/storage.ts",
         "src/features/admin/pages/login/AdminLoginPage.vue",
+        "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
-        "src/shared/api/sessionUserType.ts",
-        "src/shared/api/userSession.ts",
-        "src/shared/assets/oauth/discord.svg",
-        "src/shared/assets/oauth/google.svg",
-        "src/shared/auth/client.ts",
-        "src/shared/auth/oauthProviders.ts",
-        "src/shared/auth/passwordPolicy.ts",
-        "src/shared/auth/sessionPolicy.ts",
-        "src/shared/components/IbFormField.vue",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useAsyncAction.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/config/timing.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/interaction/interactiveControlState.ts",
-        "src/shared/query/queryClient.ts",
-        "src/shared/router/queryParams.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/shared/theme/formControls.ts",
-        "src/shared/utils/auth.ts",
-        "src/shared/utils/formValidation.ts",
-        "src/shared/utils/storage.ts",
         "src/test/factories/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
-        "src/test/toast.ts"
+        "src/test/toast.ts",
+        "src/theme/dialogMask.ts",
+        "src/theme/formControls.ts"
       ]
     },
     {
@@ -39698,13 +40446,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root.",
-      "sourcePaths": [
-        "src/features/board/application/catalog/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/application/catalog/index.ts"],
       "targetPath": "src/features/board/application/catalog/index.ts",
-      "ownershipScope": [
-        "src/features/board/application/catalog/"
-      ],
+      "ownershipScope": ["src/features/board/application/catalog/"],
       "publicExports": [
         "BoardCommandDependencies",
         "BoardCommands",
@@ -39754,14 +40498,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/core/utils/auth.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/storage.ts",
         "src/features/board/application/sync/boardSync.ts",
         "src/features/board/infrastructure/api/boardsResource.ts",
         "src/features/board/infrastructure/persistence/index.ts",
         "src/features/board/testing/index.ts",
         "src/features/workspace/index.ts",
-        "src/shared/utils/auth.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/storage.ts",
         "src/test/factories/index.ts"
       ]
     },
@@ -39791,25 +40535,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root.",
-      "sourcePaths": [
-        "src/features/board/application/collaboration/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/application/collaboration/index.ts"],
       "targetPath": "src/features/board/application/collaboration/index.ts",
-      "ownershipScope": [
-        "src/features/board/application/collaboration/"
-      ],
-      "publicExports": [
-        "JoinSharedBoardResult",
-        "joinSharedBoardByToken"
-      ],
+      "ownershipScope": ["src/features/board/application/collaboration/"],
+      "publicExports": ["JoinSharedBoardResult", "joinSharedBoardByToken"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
+        "src/core/i18n/index.ts",
         "src/features/board/application/catalog/repository.ts",
         "src/features/board/domain/index.ts",
         "src/features/board/infrastructure/api/boardsResource.ts",
-        "src/features/workspace/index.ts",
-        "src/shared/i18n/index.ts"
+        "src/features/workspace/index.ts"
       ]
     },
     {
@@ -39843,13 +40580,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root.",
-      "sourcePaths": [
-        "src/features/board/application/sync/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/application/sync/index.ts"],
       "targetPath": "src/features/board/application/sync/index.ts",
-      "ownershipScope": [
-        "src/features/board/application/sync/"
-      ],
+      "ownershipScope": ["src/features/board/application/sync/"],
       "publicExports": [
         "BoardSyncConflictKind",
         "HydrateBoardsFromServerOptions",
@@ -39869,17 +40602,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
+        "src/api/stripUndefined.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/utils/auth.ts",
         "src/features/board/application/catalog/boards.ts",
         "src/features/board/application/catalog/scope.ts",
         "src/features/board/domain/index.ts",
         "src/features/board/infrastructure/api/boardsResource.ts",
         "src/features/board/infrastructure/persistence/index.ts",
         "src/features/board/testing/index.ts",
-        "src/features/workspace/index.ts",
-        "src/shared/api/stripUndefined.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/query/queryClient.ts",
-        "src/shared/utils/auth.ts"
+        "src/features/workspace/index.ts"
       ]
     },
     {
@@ -39908,13 +40641,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by board/domain barrel.",
-      "sourcePaths": [
-        "src/features/board/domain/document/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/domain/document/index.ts"],
       "targetPath": "src/features/board/domain/document/index.ts",
-      "ownershipScope": [
-        "src/features/board/domain/document/"
-      ],
+      "ownershipScope": ["src/features/board/domain/document/"],
       "publicExports": [
         "BOARD_STATE_SCHEMA_VERSION",
         "BoardSnapshot",
@@ -40008,10 +40737,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
-        "src/features/board/domain/schema/stateSchema.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/utils/number.ts"
+        "src/core/contracts/generationContract.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/utils/number.ts",
+        "src/features/board/domain/schema/stateSchema.ts"
       ]
     },
     {
@@ -40110,13 +40839,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root; ",
-      "sourcePaths": [
-        "src/features/board/domain/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/domain/index.ts"],
       "targetPath": "src/features/board/domain/index.ts",
-      "ownershipScope": [
-        "src/features/board/domain/"
-      ],
+      "ownershipScope": ["src/features/board/domain/"],
       "publicExports": [
         "BOARD_STATE_SCHEMA_VERSION",
         "BoardSnapshot",
@@ -40215,11 +40940,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
-        "src/features/board/testing/index.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/utils/number.ts",
-        "src/shared/utils/opaqueIds.ts"
+        "src/core/contracts/generationContract.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/utils/number.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/features/board/testing/index.ts"
       ]
     },
     {
@@ -40248,16 +40973,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by board/domain barrel.",
-      "sourcePaths": [
-        "src/features/board/domain/media/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/domain/media/index.ts"],
       "targetPath": "src/features/board/domain/media/index.ts",
-      "ownershipScope": [
-        "src/features/board/domain/media/"
-      ],
-      "publicExports": [
-        "rebuildBoardMediaRefs"
-      ],
+      "ownershipScope": ["src/features/board/domain/media/"],
+      "publicExports": ["rebuildBoardMediaRefs"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -40291,13 +41010,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by board/domain barrel.",
-      "sourcePaths": [
-        "src/features/board/domain/schema/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/domain/schema/index.ts"],
       "targetPath": "src/features/board/domain/schema/index.ts",
-      "ownershipScope": [
-        "src/features/board/domain/schema/"
-      ],
+      "ownershipScope": ["src/features/board/domain/schema/"],
       "publicExports": [
         "BoardStateEnvelopeContract",
         "boardSnapshotSchema",
@@ -40308,13 +41023,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
+        "src/core/contracts/generationContract.ts",
+        "src/core/utils/opaqueIds.ts",
         "src/features/board/domain/document/latestBoardState.ts",
         "src/features/board/domain/document/nodeRegistry.ts",
         "src/features/board/domain/document/nodes.ts",
         "src/features/board/domain/document/promptAspectRatio.ts",
-        "src/features/board/testing/index.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/utils/opaqueIds.ts"
+        "src/features/board/testing/index.ts"
       ]
     },
     {
@@ -40588,13 +41303,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "board feature seam; 48 external importers (canvas board-session, workspace). Canvas orchestrates via ports/canvas, not this root.",
-      "sourcePaths": [
-        "src/features/board/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/index.ts"],
       "targetPath": "src/features/board/index.ts",
-      "ownershipScope": [
-        "src/features/board/"
-      ],
+      "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_PREVIEW_RENDERER_VERSION",
         "BOARD_STATE_SCHEMA_VERSION",
@@ -40787,42 +41498,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/generated-query/public/boards/boards.ts",
+        "src/api/generated-query/public/model/board.ts",
+        "src/api/generated-query/public/model/boardDocument.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/stripUndefined.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/config/pagination.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/contracts/generationContract.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/utils/auth.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/number.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/core/utils/storage.ts",
+        "src/core/utils/workspaceId.ts",
         "src/features/workspace/index.ts",
+        "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
-        "src/shared/api/generated-query/public/boards/boards.ts",
-        "src/shared/api/generated-query/public/model/board.ts",
-        "src/shared/api/generated-query/public/model/boardDocument.ts",
-        "src/shared/api/idempotencyKey.ts",
-        "src/shared/api/stripUndefined.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/config/pagination.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/lib/chartPrimitives.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/query/queryClient.ts",
-        "src/shared/theme/appOverlayMenu.ts",
-        "src/shared/theme/composables/useTheme.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/shared/utils/auth.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/number.ts",
-        "src/shared/utils/opaqueIds.ts",
-        "src/shared/utils/storage.ts",
-        "src/shared/utils/workspaceId.ts",
         "src/test/factories/index.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
+        "src/theme/dialogMask.ts"
       ]
     },
     {
@@ -40881,13 +41592,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root; ",
-      "sourcePaths": [
-        "src/features/board/infrastructure/persistence/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/infrastructure/persistence/index.ts"],
       "targetPath": "src/features/board/infrastructure/persistence/index.ts",
-      "ownershipScope": [
-        "src/features/board/infrastructure/persistence/"
-      ],
+      "ownershipScope": ["src/features/board/infrastructure/persistence/"],
       "publicExports": [
         "BoardStateSerializationResult",
         "BoardStateSerializationTarget",
@@ -40906,10 +41613,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
+        "src/core/utils/storage.ts",
         "src/features/board/application/catalog/scope.ts",
         "src/features/board/domain/index.ts",
-        "src/features/board/testing/index.ts",
-        "src/shared/utils/storage.ts"
+        "src/features/board/testing/index.ts"
       ]
     },
     {
@@ -40963,13 +41670,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root; ",
-      "sourcePaths": [
-        "src/features/board/infrastructure/preview/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/infrastructure/preview/index.ts"],
       "targetPath": "src/features/board/infrastructure/preview/index.ts",
-      "ownershipScope": [
-        "src/features/board/infrastructure/preview/"
-      ],
+      "ownershipScope": ["src/features/board/infrastructure/preview/"],
       "publicExports": [
         "BOARD_PREVIEW_RENDERER_VERSION",
         "BoardPreviewRefreshQueue",
@@ -40981,16 +41684,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/utils/number.ts",
+        "src/core/utils/storage.ts",
         "src/features/board/application/catalog/boards.ts",
         "src/features/board/application/sync/boardSync.ts",
         "src/features/board/domain/index.ts",
         "src/features/board/infrastructure/persistence/index.ts",
         "src/features/board/testing/index.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/lib/chartPrimitives.ts",
-        "src/shared/theme/composables/useTheme.ts",
-        "src/shared/utils/number.ts",
-        "src/shared/utils/storage.ts"
+        "src/theme/composables/useTheme.ts"
       ]
     },
     {
@@ -41519,13 +42222,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "narrow board->canvas port; canvas board-session orchestrates through here, not the board root. ~  includes duplicates).",
-      "sourcePaths": [
-        "src/features/board/ports/canvas.ts"
-      ],
+      "sourcePaths": ["src/features/board/ports/canvas.ts"],
       "targetPath": "src/features/board/ports/canvas.ts",
-      "ownershipScope": [
-        "src/features/board/"
-      ],
+      "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_PREVIEW_RENDERER_VERSION",
         "BoardRepository",
@@ -41619,42 +42318,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/generated-query/public/boards/boards.ts",
+        "src/api/generated-query/public/model/board.ts",
+        "src/api/generated-query/public/model/boardDocument.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/stripUndefined.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/config/pagination.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/contracts/generationContract.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/utils/auth.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/number.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/core/utils/storage.ts",
+        "src/core/utils/workspaceId.ts",
         "src/features/workspace/index.ts",
+        "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
-        "src/shared/api/generated-query/public/boards/boards.ts",
-        "src/shared/api/generated-query/public/model/board.ts",
-        "src/shared/api/generated-query/public/model/boardDocument.ts",
-        "src/shared/api/idempotencyKey.ts",
-        "src/shared/api/stripUndefined.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/config/pagination.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/lib/chartPrimitives.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/query/queryClient.ts",
-        "src/shared/theme/appOverlayMenu.ts",
-        "src/shared/theme/composables/useTheme.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/shared/utils/auth.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/number.ts",
-        "src/shared/utils/opaqueIds.ts",
-        "src/shared/utils/storage.ts",
-        "src/shared/utils/workspaceId.ts",
         "src/test/factories/index.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
+        "src/theme/dialogMask.ts"
       ]
     },
     {
@@ -41683,13 +42382,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root.",
-      "sourcePaths": [
-        "src/features/board/presentation/catalog/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/presentation/catalog/index.ts"],
       "targetPath": "src/features/board/presentation/catalog/index.ts",
-      "ownershipScope": [
-        "src/features/board/presentation/catalog/"
-      ],
+      "ownershipScope": ["src/features/board/presentation/catalog/"],
       "publicExports": [
         "BoardFeedback",
         "BoardsPage",
@@ -41719,22 +42414,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
         "src/features/board/application/catalog/boards.ts",
         "src/features/board/application/catalog/commands.ts",
         "src/features/board/application/catalog/repository.ts",
         "src/features/board/application/sync/boardSync.ts",
         "src/features/board/infrastructure/preview/index.ts",
         "src/features/workspace/index.ts",
+        "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/theme/appOverlayMenu.ts",
-        "src/shared/theme/composables/useTheme.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
+        "src/theme/dialogMask.ts"
       ]
     },
     {
@@ -41793,13 +42488,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "test-only seam;  not re-exported by board root.",
-      "sourcePaths": [
-        "src/features/board/testing/index.ts"
-      ],
+      "sourcePaths": ["src/features/board/testing/index.ts"],
       "targetPath": "src/features/board/testing/index.ts",
-      "ownershipScope": [
-        "src/features/board/testing/"
-      ],
+      "ownershipScope": ["src/features/board/testing/"],
       "publicExports": [
         "MockBoardRecordFixture",
         "MockWorkspaceBoardApiState",
@@ -41810,9 +42501,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "makePendingImageNodeSnapshot"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/features/board/domain/index.ts"
-      ]
+      "targetFanOutTargets": ["src/features/board/domain/index.ts"]
     },
     {
       "path": "src/features/canvas/application/board-session/index.ts",
@@ -41865,13 +42554,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "intra-feature seam; consumed by canvas workspace runtime internals and viewport adapter.",
-      "sourcePaths": [
-        "src/features/canvas/application/board-session/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/application/board-session/index.ts"],
       "targetPath": "src/features/canvas/application/board-session/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/application/board-session/"
-      ],
+      "ownershipScope": ["src/features/canvas/application/board-session/"],
       "publicExports": [
         "BoardLoadResult",
         "BoardSaveReconciliation",
@@ -41888,20 +42573,20 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/api/mediaAssetDelivery.ts",
+        "src/api/upload.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/media/imageAssetPipeline.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/utils/auth.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/testing/boardFixtures.ts",
         "src/features/canvas/infrastructure/browser/canvasInteractionMetrics.ts",
         "src/features/canvas/infrastructure/browser/canvasPerfProbe.ts",
         "src/features/canvas/infrastructure/media/canvasMediaIo.ts",
-        "src/features/workspace/index.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/api/upload.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/media/imageAssetPipeline.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/utils/auth.ts"
+        "src/features/workspace/index.ts"
       ]
     },
     {
@@ -41950,13 +42635,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "intra-feature seam; consumed by workspace runtime parts and CanvasScreen.",
-      "sourcePaths": [
-        "src/features/canvas/application/editing/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/application/editing/index.ts"],
       "targetPath": "src/features/canvas/application/editing/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/application/editing/"
-      ],
+      "ownershipScope": ["src/features/canvas/application/editing/"],
       "publicExports": [
         "CanvasGraphEditingBrowserAdapter",
         "CanvasGraphEditingNodeInteractions",
@@ -41974,6 +42655,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/api/mediaAssetDelivery.ts",
+        "src/core/constants/media.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/media/imageAssetPipeline.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/imageUploadSupport.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/board-session/currentBoardId.ts",
@@ -41999,18 +42689,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/nodes/useFlowNodeUiState.ts",
         "src/features/canvas/presentation/screens/useFlowCanvasInteractionState.ts",
         "src/features/canvas/presentation/screens/useFlowTransientUiDismissal.ts",
+        "src/features/canvas/session/media/preloadImage.ts",
         "src/features/canvas/tools/retouch/index.ts",
-        "src/features/library/index.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/constants/media.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userLocale.ts",
-        "src/shared/media/imageAssetPipeline.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/media/preloadImage.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/imageUploadSupport.ts"
+        "src/features/library/index.ts"
       ]
     },
     {
@@ -42101,10 +42782,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/canvas/application/execution/board-attachment/"
       ],
-      "publicExports": [
-        "BoardAttachment",
-        "BoardSessionIdentity"
-      ],
+      "publicExports": ["BoardAttachment", "BoardSessionIdentity"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -42239,13 +42917,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "declared entry surface; ",
-      "sourcePaths": [
-        "src/features/canvas/application/execution/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/application/execution/index.ts"],
       "targetPath": "src/features/canvas/application/execution/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/application/execution/"
-      ],
+      "ownershipScope": ["src/features/canvas/application/execution/"],
       "publicExports": [
         "BoardGraphSession",
         "BoardGraphSessionOptions",
@@ -42311,9 +42985,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
         "path",
+        "src/api/client.ts",
+        "src/api/contractKernel.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/mediaAssetDelivery.ts",
+        "src/api/upload.ts",
+        "src/api/workspaceTaskContract.ts",
+        "src/api/workspaceTaskTransport.ts",
+        "src/api/workspaceTaskWaiter.ts",
+        "src/core/contracts/generationContract.ts",
+        "src/core/contracts/imageServices.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/media/imageDimensions.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/query/taskResult.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/polling.ts",
+        "src/core/utils/workspaceId.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/canvasGraphStoreWriter.ts",
+        "src/features/canvas/core/nodes/imageActions.ts",
         "src/features/canvas/domain/execution-contracts/canvasTaskRequest.ts",
         "src/features/canvas/domain/execution-contracts/executionContract.ts",
         "src/features/canvas/domain/execution-contracts/imageActionExecution.ts",
@@ -42334,29 +43031,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/infrastructure/vue-flow-adapter/index.ts",
         "src/features/canvas/infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter.ts",
         "src/features/workspace/index.ts",
-        "src/shared/api/client.ts",
-        "src/shared/api/contractKernel.ts",
-        "src/shared/api/idempotencyKey.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/api/upload.ts",
-        "src/shared/api/workspaceTaskContract.ts",
-        "src/shared/api/workspaceTaskTransport.ts",
-        "src/shared/api/workspaceTaskWaiter.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/domain/imageActions.ts",
-        "src/shared/domain/imageServices.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/i18n/userLocale.ts",
-        "src/shared/media/imageDimensions.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/query/taskResult.ts",
-        "src/shared/query/userCreditsInvalidation.ts",
-        "src/shared/utils/errorMessages.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/polling.ts",
-        "src/shared/utils/workspaceId.ts",
         "src/test/msw.ts"
       ]
     },
@@ -42531,12 +43205,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
+        "src/core/media/mediaRef.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/execution/board-attachment/index.ts",
         "src/features/canvas/domain/graph/index.ts",
-        "src/features/canvas/infrastructure/vue-flow-adapter/canvasEdgeProjection.ts",
-        "src/shared/media/mediaRef.ts"
+        "src/features/canvas/infrastructure/vue-flow-adapter/canvasEdgeProjection.ts"
       ]
     },
     {
@@ -42610,6 +43284,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/api/mediaAssetDelivery.ts",
+        "src/core/i18n/index.ts",
+        "src/core/media/imageDimensions.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/query/taskResult.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/polling.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/canvasGraphStoreWriter.ts",
@@ -42622,14 +43303,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/infrastructure/vue-flow-adapter/flowConnectionAdapter.ts",
         "src/features/canvas/infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts",
         "src/features/canvas/infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts",
-        "src/features/canvas/infrastructure/vue-flow-adapter/index.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/media/imageDimensions.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/query/taskResult.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/polling.ts"
+        "src/features/canvas/infrastructure/vue-flow-adapter/index.ts"
       ]
     },
     {
@@ -42671,9 +43345,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "createCanvasTaskLifecycle"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vitest/dist/index.js"]
     },
     {
       "path": "src/features/canvas/application/image-workflow/index.ts",
@@ -42720,9 +43392,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/application/image-workflow/index.ts"
       ],
       "targetPath": "src/features/canvas/application/image-workflow/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/application/image-workflow/"
-      ],
+      "ownershipScope": ["src/features/canvas/application/image-workflow/"],
       "publicExports": [
         "CanvasImageWorkflow",
         "CanvasImageWorkflowUiAdapter",
@@ -42734,6 +43404,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/api/mediaAssetDelivery.ts",
+        "src/core/contracts/imageServices.ts",
+        "src/core/i18n/index.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/query/taskResult.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/editing/useFlowMediaInputImages.ts",
         "src/features/canvas/application/execution/commands/imageTaskRequests.ts",
@@ -42742,6 +43417,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/application/execution/task-runner/imageDirectActionExecutor.ts",
         "src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.ts",
         "src/features/canvas/application/workspace/useCanvasFeedback.ts",
+        "src/features/canvas/core/nodes/imageActions.ts",
         "src/features/canvas/domain/graph/index.ts",
         "src/features/canvas/domain/graph/outpaintGeometry.ts",
         "src/features/canvas/domain/nodes/imageActionRegistry.ts",
@@ -42757,12 +43433,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/tools/image-tools/index.ts",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/workspace/index.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/domain/imageActions.ts",
-        "src/shared/domain/imageServices.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/media/mediaRef.ts",
-        "src/shared/query/taskResult.ts",
         "src/test/render.ts"
       ]
     },
@@ -42807,23 +43477,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "declared entry surface; ",
-      "sourcePaths": [
-        "src/features/canvas/application/workspace/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/application/workspace/index.ts"],
       "targetPath": "src/features/canvas/application/workspace/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/application/workspace/"
-      ],
-      "publicExports": [
-        "CanvasWorkspaceRuntime",
-        "useCanvasWorkspaceRuntime"
-      ],
+      "ownershipScope": ["src/features/canvas/application/workspace/"],
+      "publicExports": ["CanvasWorkspaceRuntime", "useCanvasWorkspaceRuntime"],
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/core/composables/useAppToast.ts",
+        "src/core/i18n/index.ts",
+        "src/core/router/queryParams.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/board-session/index.ts",
@@ -42846,11 +43512,124 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter.ts",
         "src/features/canvas/presentation/chrome/useBoardHeaderActions.ts",
         "src/features/library/index.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/router/queryParams.ts"
+        "src/features/workspace/routePaths.ts"
       ]
+    },
+    {
+      "path": "src/features/canvas/core/nodes/imageActions.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/application/execution/commands/imageTaskRequests.unit.spec.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/application/image-workflow/imageActionStrengthControl.unit.spec.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/domain/execution-contracts/imageActionExecution.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/domain/execution-contracts/imageActionExecution.unit.spec.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/domain/nodes/imageActionRegistry.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/domain/imageActions.shim.ts",
+          "to": "src/features/canvas/core/nodes/imageActions.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 7,
+      "measuredFanOut": 1,
+      "targetFanIn": 7,
+      "targetFanOut": 1,
+      "shims": ["src/shared/domain/imageActions.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/canvas/core/nodes/imageActions.ts"],
+      "targetPath": "src/features/canvas/core/nodes/imageActions.ts",
+      "ownershipScope": ["src/features/canvas/core/nodes/imageActions.ts"],
+      "publicExports": ["IMAGE_NODE_ACTION"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": ["src/core/contracts/imageServices.ts"]
+    },
+    {
+      "path": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/core/nodes/serviceLabelKey.unit.spec.ts",
+          "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/domain/nodes/imageActionRegistry.ts",
+          "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/serviceImageActionText.ts",
+          "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/domain/serviceRegistry.shim.ts",
+          "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 1,
+      "targetFanIn": 5,
+      "targetFanOut": 1,
+      "shims": ["src/shared/domain/serviceRegistry.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/canvas/core/nodes/serviceLabelKey.ts"],
+      "targetPath": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+      "ownershipScope": ["src/features/canvas/core/nodes/serviceLabelKey.ts"],
+      "publicExports": ["serviceLabelKey"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": ["src/core/contracts/imageServices.ts"]
     },
     {
       "path": "src/features/canvas/domain/graph/index.ts",
@@ -43168,13 +43947,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "declared entry surface;  widest canvas seam.",
-      "sourcePaths": [
-        "src/features/canvas/domain/graph/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/domain/graph/index.ts"],
       "targetPath": "src/features/canvas/domain/graph/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/domain/graph/"
-      ],
+      "ownershipScope": ["src/features/canvas/domain/graph/"],
       "publicExports": [
         "CanvasGraphBounds",
         "CanvasGraphCollectionPatch",
@@ -43278,16 +44053,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/pages/CanvasPage.vue"
       ],
       "targetPath": "src/features/canvas/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/"
-      ],
-      "sourceOwnershipScope": [
-        "src/features/canvas/"
-      ],
-      "publicExports": [
-        "CanvasLandingPage",
-        "CanvasPage"
-      ],
+      "ownershipScope": ["src/features/canvas/"],
+      "sourceOwnershipScope": ["src/features/canvas/"],
+      "publicExports": ["CanvasLandingPage", "CanvasPage"],
       "exportMappings": [
         {
           "source": "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
@@ -43539,6 +44307,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
+        "src/api/mediaAssetDelivery.ts",
+        "src/api/mediaWorkspaceScope.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/contracts/generationContract.ts",
+        "src/core/i18n/index.ts",
+        "src/core/media/mediaRef.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/board-session/index.ts",
@@ -43555,13 +44329,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/infrastructure/browser/canvasViewportPersistence.ts",
         "src/features/canvas/infrastructure/browser/interaction/useRafScheduler.ts",
         "src/features/canvas/infrastructure/media/canvasMediaIo.ts",
-        "src/features/canvas/infrastructure/media/displayImagePreviewEncoding.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/api/mediaWorkspaceScope.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/media/mediaRef.ts"
+        "src/features/canvas/infrastructure/media/displayImagePreviewEncoding.ts"
       ]
     },
     {
@@ -43594,9 +44362,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/chrome/components/index.ts"
       ],
       "targetPath": "src/features/canvas/presentation/chrome/components/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/chrome/components/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/chrome/components/"],
       "publicExports": [
         "CanvasChrome",
         "CanvasChromeAccountState",
@@ -43611,14 +44377,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/core/motion/popoverMotion.ts",
+        "src/features/account/ui/chrome/UserAccountMenu.vue",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts",
         "src/features/canvas/presentation/chrome/CanvasMiniMap.vue",
-        "src/shared/components/UserAccountMenu.vue",
-        "src/shared/components/userAccountMenu.types.ts",
-        "src/shared/composables/useSupportChannels.ts",
-        "src/shared/lib/pageChrome.ts",
-        "src/shared/motion/popoverMotion.ts",
-        "src/shared/theme/appOverlayMenu.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "src/theme/appOverlayMenu.ts"
       ]
     },
     {
@@ -43647,13 +44413,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "star-forwards chrome/components; sole consumer is CanvasScreen.",
-      "sourcePaths": [
-        "src/features/canvas/presentation/chrome/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/presentation/chrome/index.ts"],
       "targetPath": "src/features/canvas/presentation/chrome/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/chrome/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/chrome/"],
       "publicExports": [
         "CanvasChrome",
         "CanvasChromeAccountState",
@@ -43671,20 +44433,20 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/i18n/index.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/core/motion/popoverMotion.ts",
+        "src/core/utils/auth.ts",
+        "src/features/account/ui/chrome/UserAccountMenu.vue",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/infrastructure/browser/interaction/usePointerDragSession.ts",
         "src/features/workspace/index.ts",
-        "src/shared/components/UserAccountMenu.vue",
-        "src/shared/components/userAccountMenu.types.ts",
-        "src/shared/composables/useSupportChannels.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/lib/pageChrome.ts",
-        "src/shared/motion/popoverMotion.ts",
-        "src/shared/theme/appOverlayMenu.ts",
-        "src/shared/utils/auth.ts",
-        "src/test/render.ts"
+        "src/features/workspace/routePaths.ts",
+        "src/test/render.ts",
+        "src/theme/appOverlayMenu.ts"
       ]
     },
     {
@@ -43723,13 +44485,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "standalone leaf seam; consumed by CanvasScreen and surface interactions.",
-      "sourcePaths": [
-        "src/features/canvas/presentation/nodes/groups/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/presentation/nodes/groups/index.ts"],
       "targetPath": "src/features/canvas/presentation/nodes/groups/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/nodes/groups/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/nodes/groups/"],
       "publicExports": [
         "CanvasGroupPresentation",
         "CanvasGroupPresentationInteraction",
@@ -43786,13 +44544,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "declared entry surface; ",
-      "sourcePaths": [
-        "src/features/canvas/presentation/nodes/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/presentation/nodes/index.ts"],
       "targetPath": "src/features/canvas/presentation/nodes/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/nodes/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/nodes/"],
       "publicExports": [
         "CanvasNodePresentationIntent",
         "FusionNodePresentationBinding",
@@ -43813,6 +44567,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/core/contracts/generationContract.ts",
+        "src/core/contracts/imageServices.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/motion/motionPolicy.ts",
+        "src/core/motion/popoverMotion.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/execution/billing/readiness.ts",
@@ -43821,6 +44582,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/application/group-runtime/useCanvasGroupRuntime.ts",
         "src/features/canvas/application/image-workflow/components/ImageOutpaintOverlay.vue",
         "src/features/canvas/application/image-workflow/useImageOutpaintOverlay.ts",
+        "src/features/canvas/core/nodes/imageActions.ts",
         "src/features/canvas/domain/execution-contracts/canvasTaskRequest.ts",
         "src/features/canvas/domain/graph/canvasGroupGeometry.ts",
         "src/features/canvas/domain/graph/index.ts",
@@ -43847,14 +44609,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/screens/useFlowTransientUiDismissal.ts",
         "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
         "src/features/canvas/tools/image-tools/index.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/domain/imageActions.ts",
-        "src/shared/domain/imageServices.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/interaction/interactiveControlState.ts",
-        "src/shared/motion/motionPolicy.ts",
-        "src/shared/motion/popoverMotion.ts",
         "src/test/render.ts"
       ]
     },
@@ -43908,9 +44662,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/nodes/primitives/index.ts"
       ],
       "targetPath": "src/features/canvas/presentation/nodes/primitives/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/nodes/primitives/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/nodes/primitives/"],
       "publicExports": [
         "NodeActionButton",
         "NodeAspectRatioPicker",
@@ -43941,15 +44693,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/core/contracts/generationContract.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/motion/popoverMotion.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/execution/index.ts",
         "src/features/canvas/infrastructure/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/infrastructure/vue-flow-adapter/useDisplayImagePreview.ts",
         "src/features/canvas/presentation/overlays/index.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/interaction/interactiveControlState.ts",
-        "src/shared/motion/popoverMotion.ts",
         "src/test/render.ts"
       ]
     },
@@ -43983,9 +44735,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/nodes/workflows/index.ts"
       ],
       "targetPath": "src/features/canvas/presentation/nodes/workflows/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/nodes/workflows/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/nodes/workflows/"],
       "publicExports": [
         "ComposingOrb",
         "FusionNode",
@@ -44003,6 +44753,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/core/contracts/generationContract.ts",
+        "src/core/contracts/imageServices.ts",
+        "src/core/motion/motionPolicy.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/execution/commands/imageTaskRequests.ts",
         "src/features/canvas/application/execution/index.ts",
@@ -44026,9 +44779,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/nodes/primitives/useImageInputSlots.ts",
         "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
         "src/features/canvas/tools/image-tools/index.ts",
-        "src/shared/domain/generationContract.ts",
-        "src/shared/domain/imageServices.ts",
-        "src/shared/motion/motionPolicy.ts",
         "src/test/render.ts"
       ]
     },
@@ -44078,13 +44828,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "intra-feature seam; external consumer is a src/test overlay-lifecycle contract spec.",
-      "sourcePaths": [
-        "src/features/canvas/presentation/overlays/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/presentation/overlays/index.ts"],
       "targetPath": "src/features/canvas/presentation/overlays/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/overlays/"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/overlays/"],
       "publicExports": [
         "UseCanvasCustomLayerOverlayOptions",
         "useCanvasCustomLayerOverlay"
@@ -44098,14 +44844,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "path",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/interaction/menuKeyboardNavigation.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/core/motion/popoverMotion.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/group-runtime/useCanvasGroupRuntime.ts",
         "src/features/canvas/domain/graph/canvasGroupGeometry.ts",
         "src/features/canvas/presentation/nodes/primitives/NodeToolPopover.vue",
-        "src/shared/composables/useOverlayInteractionLifecycle.ts",
-        "src/shared/interaction/menuKeyboardNavigation.ts",
-        "src/shared/lib/pageChrome.ts",
-        "src/shared/motion/popoverMotion.ts",
         "src/test/render.ts"
       ]
     },
@@ -44147,21 +44893,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/features/canvas/presentation/pages/CanvasLandingPage.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
+        "src/core/components/StudioName.vue",
+        "src/core/composables/useSiteBranding.ts",
         "src/features/canvas/assets/home/boots.svg",
         "src/features/canvas/assets/home/portrait.svg",
         "src/features/canvas/assets/home/socks.svg",
         "src/features/canvas/assets/home/starburst.svg",
-        "src/shared/components/StudioName.vue",
-        "src/shared/composables/useSiteBranding.ts",
-        "src/shared/constants/legalLinks.ts",
-        "src/shared/constants/routePaths.ts"
+        "src/features/legal/legalLinks.ts",
+        "src/features/workspace/routePaths.ts"
       ]
     },
     {
@@ -44195,22 +44939,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/canvas/presentation/pages/CanvasPage.vue"
-      ],
+      "sourcePaths": ["src/features/canvas/presentation/pages/CanvasPage.vue"],
       "targetPath": "src/features/canvas/presentation/pages/CanvasPage.vue",
       "ownershipScope": [
         "src/features/canvas/presentation/pages/CanvasPage.vue"
       ],
-      "publicExports": [
-        "default"
-      ],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-router/index.cjs",
+        "src/core/composables/useLogoutRedirect.ts",
         "src/features/auth/index.ts",
-        "src/features/canvas/presentation/screens/index.ts",
-        "src/shared/composables/useLogoutRedirect.ts"
+        "src/features/canvas/presentation/screens/index.ts"
       ]
     },
     {
@@ -44239,16 +44979,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "standalone leaf seam; consumed by CanvasPage route wiring.",
-      "sourcePaths": [
-        "src/features/canvas/presentation/screens/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/presentation/screens/index.ts"],
       "targetPath": "src/features/canvas/presentation/screens/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/presentation/screens/"
-      ],
-      "publicExports": [
-        "CanvasScreen"
-      ],
+      "ownershipScope": ["src/features/canvas/presentation/screens/"],
+      "publicExports": ["CanvasScreen"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "fs",
@@ -44264,6 +44998,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "path",
         "photoswipe/lightbox",
         "photoswipe/style.css",
+        "src/api/mediaAssetDelivery.ts",
+        "src/api/upload.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/i18n/index.ts",
+        "src/core/media/imageDimensions.ts",
+        "src/core/router/queryParams.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/editing/index.ts",
         "src/features/canvas/application/image-workflow/index.ts",
@@ -44294,14 +45034,100 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/tools/image-tools/index.ts",
         "src/features/library/index.ts",
         "src/features/workspace/index.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/api/upload.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/media/imageDimensions.ts",
-        "src/shared/router/queryParams.ts",
+        "src/features/workspace/routePaths.ts",
         "src/test/render.ts"
+      ]
+    },
+    {
+      "path": "src/features/canvas/session/media/preloadImage.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/application/editing/useCanvasLibraryImportRuntime.ts",
+          "to": "src/features/canvas/session/media/preloadImage.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/application/editing/useFlowImageUploadActions.ts",
+          "to": "src/features/canvas/session/media/preloadImage.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/media/preloadImage.shim.ts",
+          "to": "src/features/canvas/session/media/preloadImage.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 0,
+      "targetFanIn": 3,
+      "targetFanOut": 0,
+      "shims": ["src/shared/media/preloadImage.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/canvas/session/media/preloadImage.ts"],
+      "targetPath": "src/features/canvas/session/media/preloadImage.ts",
+      "ownershipScope": ["src/features/canvas/session/media/preloadImage.ts"],
+      "publicExports": ["preloadImage"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
+    },
+    {
+      "path": "src/features/canvas/session/serviceImageActionText.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/serviceImageActionText.unit.spec.ts",
+          "to": "src/features/canvas/session/serviceImageActionText.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "to": "src/features/canvas/session/serviceImageActionText.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/domain/serviceRegistry.shim.ts",
+          "to": "src/features/canvas/session/serviceImageActionText.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 3,
+      "targetFanIn": 3,
+      "targetFanOut": 3,
+      "shims": ["src/shared/domain/serviceRegistry.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/canvas/session/serviceImageActionText.ts"],
+      "targetPath": "src/features/canvas/session/serviceImageActionText.ts",
+      "ownershipScope": [
+        "src/features/canvas/session/serviceImageActionText.ts"
+      ],
+      "publicExports": ["ServiceImageActionText", "getServiceImageActionText"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "src/core/contracts/imageServices.ts",
+        "src/core/i18n/index.ts",
+        "src/features/canvas/core/nodes/serviceLabelKey.ts"
       ]
     },
     {
@@ -44370,13 +45196,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "legacy flat-scope tool seam;  cross-tool (inpaint) debt; P6 applies standard governance.",
-      "sourcePaths": [
-        "src/features/canvas/tools/image-tools/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/tools/image-tools/index.ts"],
       "targetPath": "src/features/canvas/tools/image-tools/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/tools/image-tools/"
-      ],
+      "ownershipScope": ["src/features/canvas/tools/image-tools/"],
       "publicExports": [
         "CanvasImageTools",
         "ImageActionBinding",
@@ -44397,6 +45219,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
         "path",
+        "src/api/mediaAssetDelivery.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userLocale.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/application/execution/index.ts",
@@ -44411,9 +45236,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
         "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userLocale.ts",
         "src/test/render.ts"
       ]
     },
@@ -44463,13 +45285,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "tool seam per ADR-0013;  image-tools legacy debt.",
-      "sourcePaths": [
-        "src/features/canvas/tools/inpaint/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/tools/inpaint/index.ts"],
       "targetPath": "src/features/canvas/tools/inpaint/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/tools/inpaint/"
-      ],
+      "ownershipScope": ["src/features/canvas/tools/inpaint/"],
       "publicExports": [
         "ImageInpaintChrome",
         "ImageInpaintOverlay",
@@ -44486,14 +45304,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/core/contracts/imageServices.ts",
+        "src/core/i18n/index.ts",
+        "src/core/utils/number.ts",
         "src/features/canvas/application/execution/index.ts",
         "src/features/canvas/infrastructure/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/presentation/nodes/primitives/index.ts",
         "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
         "src/features/canvas/tools/retouch/index.ts",
-        "src/shared/domain/imageServices.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/utils/number.ts",
         "src/test/render.ts"
       ]
     },
@@ -44537,9 +45355,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/tools/inpaint/session/fabric/index.ts"
       ],
       "targetPath": "src/features/canvas/tools/inpaint/session/fabric/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/tools/inpaint/session/fabric/"
-      ],
+      "ownershipScope": ["src/features/canvas/tools/inpaint/session/fabric/"],
       "publicExports": [
         "MaskPainter",
         "MaskPainterClientPoint",
@@ -44553,10 +45369,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/fabric/index.ts",
         "node_modules/vitest/dist/index.js",
+        "src/core/utils/number.ts",
         "src/features/canvas/tools/inpaint/core/constants.ts",
         "src/features/canvas/tools/inpaint/core/painter.ts",
-        "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
-        "src/shared/utils/number.ts"
+        "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts"
       ]
     },
     {
@@ -44650,13 +45466,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "tool seam per ADR-0013; explicitly excluded from P7 thinning; ",
-      "sourcePaths": [
-        "src/features/canvas/tools/retouch/index.ts"
-      ],
+      "sourcePaths": ["src/features/canvas/tools/retouch/index.ts"],
       "targetPath": "src/features/canvas/tools/retouch/index.ts",
-      "ownershipScope": [
-        "src/features/canvas/tools/retouch/"
-      ],
+      "ownershipScope": ["src/features/canvas/tools/retouch/"],
       "publicExports": [
         "ImageRetouchKind",
         "ImageRetouchRenderSource",
@@ -44704,6 +45516,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "path",
+        "src/api/mediaAssetDelivery.ts",
+        "src/core/i18n/index.ts",
+        "src/core/utils/number.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/domain/graph/index.ts",
         "src/features/canvas/domain/graph/outpaintGeometry.ts",
@@ -44718,11 +45533,46 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/presentation/nodes/primitives/index.ts",
         "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
         "src/features/canvas/tools/image-tools/imageToolChrome.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/utils/number.ts",
         "src/test/render.ts"
       ]
+    },
+    {
+      "path": "src/features/legal/contacts.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "AST-verified public direct subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/legal/documents.ts",
+          "to": "src/features/legal/contacts.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/constants/contacts.shim.ts",
+          "to": "src/features/legal/contacts.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 0,
+      "targetFanIn": 2,
+      "targetFanOut": 0,
+      "shims": ["src/shared/constants/contacts.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/features/legal/contacts.ts"],
+      "targetPath": "src/features/legal/contacts.ts",
+      "ownershipScope": ["src/features/legal/contacts.ts"],
+      "publicExports": ["SUPPORT_EMAIL"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/legal/index.ts",
@@ -44736,7 +45586,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [],
       "measuredFanIn": 0,
-      "measuredFanOut": 5,
+      "measuredFanOut": 3,
       "targetFanIn": 0,
       "targetFanOut": 5,
       "shims": [],
@@ -44744,13 +45594,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "flat-feature root barrel by design; zero barrel importers today (router imports legal pages directly). P2 legal is a no-op; retain.",
-      "sourcePaths": [
-        "src/features/legal/index.ts"
-      ],
+      "sourcePaths": ["src/features/legal/index.ts"],
       "targetPath": "src/features/legal/index.ts",
-      "ownershipScope": [
-        "src/features/legal/"
-      ],
+      "ownershipScope": ["src/features/legal/"],
       "publicExports": [
         "AcceptableUsePage",
         "LEGAL_CONTACTS",
@@ -44762,18 +45608,69 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
-        "src/shared/composables/useSiteBranding.ts",
-        "src/shared/constants/contacts.ts",
-        "src/shared/constants/legalLinks.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/i18n/index.ts"
+        "src/core/composables/useSiteBranding.ts",
+        "src/core/i18n/index.ts",
+        "src/features/legal/contacts.ts",
+        "src/features/legal/legalLinks.ts",
+        "src/features/workspace/routePaths.ts"
+      ]
+    },
+    {
+      "path": "src/features/legal/legalLinks.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1",
+      "scope": "shared-runtime",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
+          "to": "src/features/legal/legalLinks.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/legal/components/PublicLegalPage.vue",
+          "to": "src/features/legal/legalLinks.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/constants/legalLinks.shim.ts",
+          "to": "src/features/legal/legalLinks.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 1,
+      "targetFanIn": 3,
+      "targetFanOut": 1,
+      "shims": ["src/shared/constants/legalLinks.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
+      "sourcePaths": ["src/features/legal/legalLinks.ts"],
+      "targetPath": "src/features/legal/legalLinks.ts",
+      "ownershipScope": ["src/features/legal/legalLinks.ts"],
+      "publicExports": ["PUBLIC_LEGAL_LINKS"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["src/features/legal/routePaths.ts"],
+      "sourceOwnershipScope": ["src/shared/constants/legalLinks.ts"],
+      "exportMappings": [
+        {
+          "source": "src/shared/constants/legalLinks.ts",
+          "name": "PUBLIC_LEGAL_LINKS",
+          "exportedAs": "PUBLIC_LEGAL_LINKS"
+        }
       ]
     },
     {
       "path": "src/features/legal/routePaths.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "cross-feature",
@@ -44781,12 +45678,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/core/constants/legalLinks.ts",
+          "from": "src/features/auth/components/RegisterAuthPanel.vue",
           "to": "src/features/legal/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/auth/components/RegisterAuthPanel.vue",
+          "from": "src/features/legal/legalLinks.ts",
           "to": "src/features/legal/routePaths.ts",
           "kind": "runtime"
         },
@@ -44794,27 +45691,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/routes/workspaceRoutes.ts",
           "to": "src/features/legal/routePaths.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/constants/routePaths.shim.ts",
+          "to": "src/features/legal/routePaths.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/constants/routePaths.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Legal-owned route paths split from shared/constants/routePaths.ts (§10.3). Legal already owns its pages; path file is new.",
-      "sourcePaths": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "Legal-owned route paths split from shared/constants/routePaths.ts (§10.3). Legal already owns its pages; path file is new. P1b-routes applied 2026-10-10: consumers rewritten to feature routePaths; TTL shim (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/features/legal/routePaths.ts"],
       "targetPath": "src/features/legal/routePaths.ts",
-      "ownershipScope": [
-        "src/features/legal/routePaths.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "ownershipScope": ["src/features/legal/routePaths.ts"],
+      "sourceOwnershipScope": ["src/core/constants/routePaths.ts"],
       "publicExports": [
         "ACCEPTABLE_USE_PATH",
         "PRIVACY_POLICY_PATH",
@@ -44987,13 +45883,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "library feature seam; 23 external importers (canvas editing/workspace).",
-      "sourcePaths": [
-        "src/features/library/index.ts"
-      ],
+      "sourcePaths": ["src/features/library/index.ts"],
       "targetPath": "src/features/library/index.ts",
-      "ownershipScope": [
-        "src/features/library/"
-      ],
+      "ownershipScope": ["src/features/library/"],
       "publicExports": [
         "CANVAS_LIBRARY_IMPORT_MIME",
         "CanvasLibraryImportDescriptor",
@@ -45074,36 +45966,36 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
         "path",
+        "src/api/client.ts",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/workspace-library/workspace-library.ts",
+        "src/api/mediaAssetDelivery.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
+        "src/core/components/IbFormField.vue",
+        "src/core/components/UserConfirmDialog.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useUserConfirmDialog.ts",
+        "src/core/config/pagination.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/contracts/externalImageProviders.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/interaction/menuKeyboardNavigation.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/core/utils/workspaceId.ts",
         "src/lib/utils.ts",
-        "src/shared/api/client.ts",
-        "src/shared/api/contractKernel.ts",
-        "src/shared/api/generated-query/public/workspace-library/workspace-library.ts",
-        "src/shared/api/mediaAssetDelivery.ts",
-        "src/shared/components/IbFormField.vue",
-        "src/shared/components/UserConfirmDialog.vue",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/composables/useUserConfirmDialog.ts",
-        "src/shared/config/pagination.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/domain/externalImageProviders.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/interaction/menuKeyboardNavigation.ts",
-        "src/shared/router/queryParams.ts",
-        "src/shared/theme/appOverlayMenu.ts",
-        "src/shared/theme/dialogMask.ts",
-        "src/shared/theme/formControls.ts",
-        "src/shared/theme/lightboxScrim.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/opaqueIds.ts",
-        "src/shared/utils/workspaceId.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
-        "src/test/toast.ts"
+        "src/test/toast.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/dialogMask.ts",
+        "src/theme/formControls.ts",
+        "src/theme/lightboxScrim.ts"
       ]
     },
     {
@@ -45137,13 +46029,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "search feature seam; 2 workspace consumers (layout + routes); narrow surface with lazy page loader.",
-      "sourcePaths": [
-        "src/features/search/index.ts"
-      ],
+      "sourcePaths": ["src/features/search/index.ts"],
       "targetPath": "src/features/search/index.ts",
-      "ownershipScope": [
-        "src/features/search/"
-      ],
+      "ownershipScope": ["src/features/search/"],
       "publicExports": [
         "LibrarySearchReference",
         "SearchAuthAction",
@@ -45180,34 +46068,34 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
         "path",
+        "src/api/client.ts",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-search/workspace-search.ts",
+        "src/api/stripUndefined.ts",
+        "src/api/upload.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/popover/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/contracts/externalImageProviders.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/media/visionIngressPolicy.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/core/utils/storage.ts",
+        "src/core/utils/workspaceId.ts",
         "src/features/auth/index.ts",
         "src/features/library/index.ts",
         "src/features/workspace/index.ts",
-        "src/shared/api/client.ts",
-        "src/shared/api/contractKernel.ts",
-        "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
-        "src/shared/api/generated-query/public/workspace-search/workspace-search.ts",
-        "src/shared/api/stripUndefined.ts",
-        "src/shared/api/upload.ts",
-        "src/shared/composables/useAppToast.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/domain/externalImageProviders.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/media/visionIngressPolicy.ts",
-        "src/shared/router/queryParams.ts",
-        "src/shared/theme/lightboxScrim.ts",
-        "src/shared/utils/ids.ts",
-        "src/shared/utils/opaqueIds.ts",
-        "src/shared/utils/storage.ts",
-        "src/shared/utils/workspaceId.ts",
+        "src/features/workspace/routePaths.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
+        "src/theme/lightboxScrim.ts",
         "vitest/browser"
       ]
     },
@@ -45304,7 +46192,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 16,
-      "measuredFanOut": 48,
+      "measuredFanOut": 50,
       "targetFanIn": 16,
       "targetFanOut": 48,
       "shims": [],
@@ -45312,13 +46200,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "workspace feature seam; 16 external importers (board catalog/sync, canvas).",
-      "sourcePaths": [
-        "src/features/workspace/index.ts"
-      ],
+      "sourcePaths": ["src/features/workspace/index.ts"],
       "targetPath": "src/features/workspace/index.ts",
-      "ownershipScope": [
-        "src/features/workspace/"
-      ],
+      "ownershipScope": ["src/features/workspace/"],
       "publicExports": [
         "PrincipalSummary",
         "ProvisionWorkspaceInput",
@@ -45361,10 +46245,35 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/client.ts",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/user/user.ts",
+        "src/api/generated-query/public/workspaces/workspaces.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/mediaWorkspaceScope.ts",
+        "src/api/sessionUserType.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/card/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/auth/adminAccess.ts",
+        "src/core/components/StudioName.vue",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/config/pagination.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/auth.ts",
+        "src/core/utils/storage.ts",
         "src/features/account/index.ts",
+        "src/features/account/ui/chrome/UserAccountMenu.vue",
+        "src/features/account/ui/chrome/userAccountMenu.types.ts",
         "src/features/auth/index.ts",
         "src/features/board/index.ts",
         "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
@@ -45374,32 +46283,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/legal/pages/RefundPolicyPage.vue",
         "src/features/legal/pages/TermsPage.vue",
         "src/features/search/index.ts",
-        "src/shared/api/client.ts",
-        "src/shared/api/contractKernel.ts",
-        "src/shared/api/generated-query/public/model/index.ts",
-        "src/shared/api/generated-query/public/user/user.ts",
-        "src/shared/api/generated-query/public/workspaces/workspaces.ts",
-        "src/shared/api/idempotencyKey.ts",
-        "src/shared/api/mediaWorkspaceScope.ts",
-        "src/shared/api/sessionUserType.ts",
-        "src/shared/auth/adminAccess.ts",
-        "src/shared/components/StudioName.vue",
-        "src/shared/components/UserAccountMenu.vue",
-        "src/shared/components/userAccountMenu.types.ts",
-        "src/shared/composables/useAsyncAction.ts",
-        "src/shared/composables/useLogoutRedirect.ts",
-        "src/shared/composables/useSupportChannels.ts",
-        "src/shared/config/pagination.ts",
-        "src/shared/config/runtimeUrls.ts",
-        "src/shared/constants/routePaths.ts",
-        "src/shared/errors/errorCatalog.ts",
-        "src/shared/i18n/formatters.ts",
-        "src/shared/i18n/index.ts",
-        "src/shared/i18n/userIdeaCurrency.ts",
-        "src/shared/query/queryDefaults.ts",
-        "src/shared/router/queryParams.ts",
-        "src/shared/utils/auth.ts",
-        "src/shared/utils/storage.ts",
+        "src/features/workspace/routePaths.ts",
         "src/test/factories/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts"
@@ -45409,7 +46293,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/workspace/routePaths.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "cross-feature",
@@ -45417,7 +46301,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/core/auth/sessionPolicy.ts",
+          "from": "src/app/router/index.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -45427,7 +46311,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/app/AdminHeaderBar.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/routePaths.unit.spec.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -45437,7 +46351,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/auth/pages/UserAuthCallbackPage.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/auth/session/browserSessionTransition.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/session/transport.oauth.contract.spec.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/session/transport.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -45448,6 +46377,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/canvas/application/workspace/internal/useBoardRuntime.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/application/workspace/internal/useBoardRuntime.unit.spec.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -45467,6 +46401,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/legal/components/PublicLegalPage.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/application/useSearchSession.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
@@ -45480,39 +46419,97 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/presentation/pages/SearchPage.vue",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/layout/WorkspaceLayout.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routes/workspaceRoutes.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/components/WorkspaceHeader.component.spec.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/components/WorkspaceNavigation.component.spec.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/components/WorkspaceNavigation.vue",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceAccountControls.unit.spec.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/shared/constants/routePaths.shim.ts",
+          "to": "src/features/workspace/routePaths.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 13,
-      "targetFanOut": 0,
-      "shims": [],
+      "measuredFanIn": 34,
+      "measuredFanOut": 1,
+      "targetFanIn": 34,
+      "targetFanOut": 1,
+      "shims": ["src/shared/constants/routePaths.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Feature-owned route paths split from shared/constants/routePaths.ts (§10.3). workspace/routes/workspaceRoutes.ts stays public for router chunk splitting.",
-      "sourcePaths": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "deletionOwner": "p1b-core",
+      "notes": "Feature-owned route paths split from shared/constants/routePaths.ts (§10.3). workspace/routes/workspaceRoutes.ts stays public for router chunk splitting. P1b-routes applied 2026-10-10: consumers rewritten to feature routePaths; TTL shim (1 phase, delete after P1, owner p1b-core).",
+      "sourcePaths": ["src/features/workspace/routePaths.ts"],
       "targetPath": "src/features/workspace/routePaths.ts",
-      "ownershipScope": [
-        "src/features/workspace/routePaths.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "ownershipScope": ["src/features/workspace/routePaths.ts"],
+      "sourceOwnershipScope": ["src/core/constants/routePaths.ts"],
       "publicExports": [
+        "HOME_PATH",
         "SHARE_JOIN_PATH",
+        "USER_AUTH_CALLBACK_PATH",
         "USER_BOARDS_PATH",
         "USER_CANVAS_PATH",
+        "USER_LOGIN_PATH",
+        "USER_REGISTER_PATH",
         "USER_ROOT_PATH",
         "USER_SEARCH_PATH"
       ],
       "exportMappings": [
         {
           "source": "src/shared/constants/routePaths.ts",
+          "name": "HOME_PATH",
+          "exportedAs": "HOME_PATH"
+        },
+        {
+          "source": "src/shared/constants/routePaths.ts",
           "name": "SHARE_JOIN_PATH",
           "exportedAs": "SHARE_JOIN_PATH"
+        },
+        {
+          "source": "src/shared/constants/routePaths.ts",
+          "name": "USER_AUTH_CALLBACK_PATH",
+          "exportedAs": "USER_AUTH_CALLBACK_PATH"
         },
         {
           "source": "src/shared/constants/routePaths.ts",
@@ -45526,6 +46523,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "source": "src/shared/constants/routePaths.ts",
+          "name": "USER_LOGIN_PATH",
+          "exportedAs": "USER_LOGIN_PATH"
+        },
+        {
+          "source": "src/shared/constants/routePaths.ts",
+          "name": "USER_REGISTER_PATH",
+          "exportedAs": "USER_REGISTER_PATH"
+        },
+        {
+          "source": "src/shared/constants/routePaths.ts",
           "name": "USER_ROOT_PATH",
           "exportedAs": "USER_ROOT_PATH"
         },
@@ -45536,13 +46543,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": ["src/core/auth/routePolicy.ts"]
     },
     {
       "path": "src/shared/api/client.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -45619,13 +46626,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/client.ts"
-      ],
+      "sourcePaths": ["src/shared/api/client.ts"],
       "targetPath": "src/shared/api/client.ts",
-      "ownershipScope": [
-        "src/shared/api/client.ts"
-      ],
+      "ownershipScope": ["src/shared/api/client.ts"],
       "publicExports": [
         "ApiClientError",
         "ApiRequestConfig",
@@ -45646,7 +46649,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/contractKernel.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -45863,13 +46866,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/contractKernel.ts"
-      ],
+      "sourcePaths": ["src/shared/api/contractKernel.ts"],
       "targetPath": "src/shared/api/contractKernel.ts",
-      "ownershipScope": [
-        "src/shared/api/contractKernel.ts"
-      ],
+      "ownershipScope": ["src/shared/api/contractKernel.ts"],
       "publicExports": [
         "ContractErrorBody",
         "ContractErrorEnvelope",
@@ -45906,7 +46905,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/control-billing/control-billing.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -46015,7 +47014,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/control-credits/control-credits.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -46218,7 +47217,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/control-payments/control-payments.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -46310,7 +47309,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/control-platform/control-platform.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -46820,7 +47819,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/control-tasks/control-tasks.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -46890,7 +47889,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/control-users/control-users.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -47028,7 +48027,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "generated",
@@ -47044,13 +48043,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "generated intermediate root; zero importers (consumers use deep endpoint paths or model barrel); retained as-is under P1a carve-out.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/control/index.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/control/index.ts"],
       "targetPath": "src/shared/api/generated-query/control/index.ts",
-      "ownershipScope": [
-        "src/shared/api/generated-query/control/"
-      ],
+      "ownershipScope": ["src/shared/api/generated-query/control/"],
       "publicExports": [
         "AddControlWorkspaceMemberMutationBody",
         "AddControlWorkspaceMemberMutationError",
@@ -47848,7 +48843,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/controlMailConfigRequest.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -47882,9 +48877,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/controlMailConfigRequest.ts"
       ],
-      "publicExports": [
-        "ControlMailConfigRequest"
-      ],
+      "publicExports": ["ControlMailConfigRequest"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -47892,7 +48885,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -47931,9 +48924,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts"
       ],
-      "publicExports": [
-        "ControlOAuthProviderSummary"
-      ],
+      "publicExports": ["ControlOAuthProviderSummary"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -47941,7 +48932,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -47975,9 +48966,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts"
       ],
-      "publicExports": [
-        "ControlOAuthProviderUpdateRequest"
-      ],
+      "publicExports": ["ControlOAuthProviderUpdateRequest"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -47985,7 +48974,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -48019,9 +49008,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts"
       ],
-      "publicExports": [
-        "ControlStripeConfigRequest"
-      ],
+      "publicExports": ["ControlStripeConfigRequest"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -48029,7 +49016,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/controlTaskEnvelope.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -48063,9 +49050,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/controlTaskEnvelope.ts"
       ],
-      "publicExports": [
-        "ControlTaskEnvelope"
-      ],
+      "publicExports": ["ControlTaskEnvelope"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/shared/api/generated-query/control/model/controlTaskEnvelopeData.ts"
@@ -48075,7 +49060,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "generated",
@@ -48177,13 +49162,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "generated DTO seam; 10 admin importers; P1a carve-out.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/control/model/index.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/control/model/index.ts"],
       "targetPath": "src/shared/api/generated-query/control/model/index.ts",
-      "ownershipScope": [
-        "src/shared/api/generated-query/control/model/"
-      ],
+      "ownershipScope": ["src/shared/api/generated-query/control/model/"],
       "publicExports": [
         "AuditRecord",
         "AuditRecordOperator",
@@ -48352,7 +49333,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/supportChannelKind.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -48391,9 +49372,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/supportChannelKind.ts"
       ],
-      "publicExports": [
-        "SupportChannelKind"
-      ],
+      "publicExports": ["SupportChannelKind"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -48401,7 +49380,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/control/model/supportChannelsSetting.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -48440,9 +49419,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/control/model/supportChannelsSetting.ts"
       ],
-      "publicExports": [
-        "SupportChannelsSetting"
-      ],
+      "publicExports": ["SupportChannelsSetting"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/shared/api/generated-query/control/model/supportChannel.ts"
@@ -48452,7 +49429,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/boards/boards.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -48479,9 +49456,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/boards/boards.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/public/boards/boards.ts"],
       "targetPath": "src/shared/api/generated-query/public/boards/boards.ts",
       "ownershipScope": [
         "src/shared/api/generated-query/public/boards/boards.ts"
@@ -48644,7 +49619,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "generated",
@@ -48660,13 +49635,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "generated intermediate root; zero importers (consumers use deep endpoint paths or model barrel); retained as-is under P1a carve-out.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/index.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/public/index.ts"],
       "targetPath": "src/shared/api/generated-query/public/index.ts",
-      "ownershipScope": [
-        "src/shared/api/generated-query/public/"
-      ],
+      "ownershipScope": ["src/shared/api/generated-query/public/"],
       "publicExports": [
         "AbandonWorkspacePendingOrderMutationError",
         "AbandonWorkspacePendingOrderMutationResult",
@@ -49299,7 +50270,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/model/board.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -49336,16 +50307,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/model/board.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/public/model/board.ts"],
       "targetPath": "src/shared/api/generated-query/public/model/board.ts",
       "ownershipScope": [
         "src/shared/api/generated-query/public/model/board.ts"
       ],
-      "publicExports": [
-        "Board"
-      ],
+      "publicExports": ["Board"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/shared/api/generated-query/public/model/boardId.ts",
@@ -49356,7 +50323,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/model/boardDocument.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -49395,9 +50362,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": [
         "src/shared/api/generated-query/public/model/boardDocument.ts"
       ],
-      "publicExports": [
-        "BoardDocument"
-      ],
+      "publicExports": ["BoardDocument"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/shared/api/generated-query/public/model/boardDocumentDocument.ts",
@@ -49408,7 +50373,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/model/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "generated",
@@ -49520,13 +50485,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "generated DTO seam; 6 account/workspace importers; P1a carve-out.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/model/index.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/public/model/index.ts"],
       "targetPath": "src/shared/api/generated-query/public/model/index.ts",
-      "ownershipScope": [
-        "src/shared/api/generated-query/public/model/"
-      ],
+      "ownershipScope": ["src/shared/api/generated-query/public/model/"],
       "publicExports": [
         "AddBoardMemberRequest",
         "AddBoardMemberRequestData",
@@ -49772,7 +50733,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/user/user.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -49814,13 +50775,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/api/generated-query/public/user/user.ts"
-      ],
+      "sourcePaths": ["src/shared/api/generated-query/public/user/user.ts"],
       "targetPath": "src/shared/api/generated-query/public/user/user.ts",
-      "ownershipScope": [
-        "src/shared/api/generated-query/public/user/user.ts"
-      ],
+      "ownershipScope": ["src/shared/api/generated-query/public/user/user.ts"],
       "publicExports": [
         "GetSupportChannelsQueryError",
         "GetSupportChannelsQueryResult",
@@ -49858,7 +50815,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50023,7 +50980,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/workspace-library/workspace-library.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50151,7 +51108,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50215,7 +51172,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/workspace-search/workspace-search.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50284,7 +51241,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/generated-query/public/workspaces/workspaces.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50372,7 +51329,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/idempotencyKey.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50449,13 +51406,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/idempotencyKey.ts"
-      ],
+      "sourcePaths": ["src/shared/api/idempotencyKey.ts"],
       "targetPath": "src/shared/api/idempotencyKey.ts",
-      "ownershipScope": [
-        "src/shared/api/idempotencyKey.ts"
-      ],
+      "ownershipScope": ["src/shared/api/idempotencyKey.ts"],
       "publicExports": [
         "boardOperationIdempotencyKey",
         "controlCreditIdempotencyKey",
@@ -50478,7 +51431,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/mediaAssetDelivery.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50620,13 +51573,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/mediaAssetDelivery.ts"
-      ],
+      "sourcePaths": ["src/shared/api/mediaAssetDelivery.ts"],
       "targetPath": "src/shared/api/mediaAssetDelivery.ts",
-      "ownershipScope": [
-        "src/shared/api/mediaAssetDelivery.ts"
-      ],
+      "ownershipScope": ["src/shared/api/mediaAssetDelivery.ts"],
       "publicExports": [
         "ApiResponseMediaAssetMetadata",
         "MediaAssetDeliveryMetadata",
@@ -50666,7 +51615,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/mediaWorkspaceScope.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50713,13 +51662,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/mediaWorkspaceScope.ts"
-      ],
+      "sourcePaths": ["src/shared/api/mediaWorkspaceScope.ts"],
       "targetPath": "src/shared/api/mediaWorkspaceScope.ts",
-      "ownershipScope": [
-        "src/shared/api/mediaWorkspaceScope.ts"
-      ],
+      "ownershipScope": ["src/shared/api/mediaWorkspaceScope.ts"],
       "publicExports": [
         "readMediaWorkspaceId",
         "resetMediaWorkspaceIdResolver",
@@ -50732,7 +51677,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/sessionUserType.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50814,16 +51759,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/sessionUserType.ts"
-      ],
+      "sourcePaths": ["src/shared/api/sessionUserType.ts"],
       "targetPath": "src/shared/api/sessionUserType.ts",
-      "ownershipScope": [
-        "src/shared/api/sessionUserType.ts"
-      ],
-      "publicExports": [
-        "User"
-      ],
+      "ownershipScope": ["src/shared/api/sessionUserType.ts"],
+      "publicExports": ["User"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -50831,7 +51770,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/stripUndefined.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50903,17 +51842,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/stripUndefined.ts"
-      ],
+      "sourcePaths": ["src/shared/api/stripUndefined.ts"],
       "targetPath": "src/shared/api/stripUndefined.ts",
-      "ownershipScope": [
-        "src/shared/api/stripUndefined.ts"
-      ],
-      "publicExports": [
-        "DefinedOnly",
-        "stripUndefined"
-      ],
+      "ownershipScope": ["src/shared/api/stripUndefined.ts"],
+      "publicExports": ["DefinedOnly", "stripUndefined"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -50921,7 +51853,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/upload.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -50988,13 +51920,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/upload.ts"
-      ],
+      "sourcePaths": ["src/shared/api/upload.ts"],
       "targetPath": "src/shared/api/upload.ts",
-      "ownershipScope": [
-        "src/shared/api/upload.ts"
-      ],
+      "ownershipScope": ["src/shared/api/upload.ts"],
       "publicExports": [
         "UPLOAD_OPERATION_TIMEOUT_MS",
         "UploadAvatarMetadata",
@@ -51034,7 +51962,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/userSession.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51061,17 +51989,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/userSession.ts"
-      ],
+      "sourcePaths": ["src/shared/api/userSession.ts"],
       "targetPath": "src/shared/api/userSession.ts",
-      "ownershipScope": [
-        "src/shared/api/userSession.ts"
-      ],
-      "publicExports": [
-        "fetchCurrentUserInfo",
-        "toSessionUser"
-      ],
+      "ownershipScope": ["src/shared/api/userSession.ts"],
+      "publicExports": ["fetchCurrentUserInfo", "toSessionUser"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/shared/api/generated-query/public/user/user.ts",
@@ -51083,7 +52004,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/workspaceEventStream.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51125,13 +52046,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/workspaceEventStream.ts"
-      ],
+      "sourcePaths": ["src/shared/api/workspaceEventStream.ts"],
       "targetPath": "src/shared/api/workspaceEventStream.ts",
-      "ownershipScope": [
-        "src/shared/api/workspaceEventStream.ts"
-      ],
+      "ownershipScope": ["src/shared/api/workspaceEventStream.ts"],
       "publicExports": [
         "SubscribeWorkspaceEventsOptions",
         "WORKSPACE_EVENT_TYPES",
@@ -51164,7 +52081,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/workspaceTaskContract.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51206,13 +52123,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTaskContract.ts"
-      ],
+      "sourcePaths": ["src/shared/api/workspaceTaskContract.ts"],
       "targetPath": "src/shared/api/workspaceTaskContract.ts",
-      "ownershipScope": [
-        "src/shared/api/workspaceTaskContract.ts"
-      ],
+      "ownershipScope": ["src/shared/api/workspaceTaskContract.ts"],
       "publicExports": [
         "CreateWorkspaceTaskInput",
         "WorkspaceTaskBillingSnapshot",
@@ -51239,7 +52152,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/workspaceTaskTransport.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51291,13 +52204,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTaskTransport.ts"
-      ],
+      "sourcePaths": ["src/shared/api/workspaceTaskTransport.ts"],
       "targetPath": "src/shared/api/workspaceTaskTransport.ts",
-      "ownershipScope": [
-        "src/shared/api/workspaceTaskTransport.ts"
-      ],
+      "ownershipScope": ["src/shared/api/workspaceTaskTransport.ts"],
       "publicExports": [
         "cancelWorkspaceTask",
         "createWorkspaceTask",
@@ -51320,7 +52229,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/workspaceTaskWaiter.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51347,13 +52256,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTaskWaiter.ts"
-      ],
+      "sourcePaths": ["src/shared/api/workspaceTaskWaiter.ts"],
       "targetPath": "src/shared/api/workspaceTaskWaiter.ts",
-      "ownershipScope": [
-        "src/shared/api/workspaceTaskWaiter.ts"
-      ],
+      "ownershipScope": ["src/shared/api/workspaceTaskWaiter.ts"],
       "publicExports": [
         "WaitWorkspaceTaskOptions",
         "waitWorkspaceTaskTerminal"
@@ -51371,7 +52276,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/api/workspaceTasks.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51403,13 +52308,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/api/workspaceTasks.ts"
-      ],
+      "sourcePaths": ["src/shared/api/workspaceTasks.ts"],
       "targetPath": "src/shared/api/workspaceTasks.ts",
-      "ownershipScope": [
-        "src/shared/api/workspaceTasks.ts"
-      ],
+      "ownershipScope": ["src/shared/api/workspaceTasks.ts"],
       "publicExports": [
         "CreateWorkspaceTaskInput",
         "WaitWorkspaceTaskOptions",
@@ -51446,7 +52347,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/auth/adminAccess.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51468,17 +52369,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/auth/adminAccess.ts"
-      ],
+      "sourcePaths": ["src/shared/auth/adminAccess.ts"],
       "targetPath": "src/shared/auth/adminAccess.ts",
-      "ownershipScope": [
-        "src/shared/auth/adminAccess.ts"
-      ],
-      "publicExports": [
-        "AdminAccessUser",
-        "canAccessAdmin"
-      ],
+      "ownershipScope": ["src/shared/auth/adminAccess.ts"],
+      "publicExports": ["AdminAccessUser", "canAccessAdmin"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -51486,7 +52380,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/auth/client.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51513,13 +52407,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/auth/client.ts"
-      ],
+      "sourcePaths": ["src/shared/auth/client.ts"],
       "targetPath": "src/shared/auth/client.ts",
-      "ownershipScope": [
-        "src/shared/auth/client.ts"
-      ],
+      "ownershipScope": ["src/shared/auth/client.ts"],
       "publicExports": [
         "authClient",
         "normalizeCanonicalEmail",
@@ -51537,7 +52427,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/auth/oauthProviders.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51584,17 +52474,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/auth/oauthProviders.ts"
-      ],
+      "sourcePaths": ["src/shared/auth/oauthProviders.ts"],
       "targetPath": "src/shared/auth/oauthProviders.ts",
-      "ownershipScope": [
-        "src/shared/auth/oauthProviders.ts"
-      ],
-      "publicExports": [
-        "OAuthProviderCode",
-        "getOAuthProviderLabel"
-      ],
+      "ownershipScope": ["src/shared/auth/oauthProviders.ts"],
+      "publicExports": ["OAuthProviderCode", "getOAuthProviderLabel"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -51602,7 +52485,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/auth/passwordPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51644,13 +52527,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/auth/passwordPolicy.ts"
-      ],
+      "sourcePaths": ["src/shared/auth/passwordPolicy.ts"],
       "targetPath": "src/shared/auth/passwordPolicy.ts",
-      "ownershipScope": [
-        "src/shared/auth/passwordPolicy.ts"
-      ],
+      "ownershipScope": ["src/shared/auth/passwordPolicy.ts"],
       "publicExports": [
         "OTP_CODE_PATTERN",
         "PASSWORD_LENGTH_LIMIT",
@@ -51662,15 +52541,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "validateOtpCode"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/valibot/dist/index.mjs"
-      ]
+      "targetFanOutTargets": ["node_modules/valibot/dist/index.mjs"]
     },
     {
       "path": "src/shared/auth/sessionPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51717,13 +52594,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/auth/sessionPolicy.ts"
-      ],
+      "sourcePaths": ["src/shared/auth/sessionPolicy.ts"],
       "targetPath": "src/shared/auth/sessionPolicy.ts",
-      "ownershipScope": [
-        "src/shared/auth/sessionPolicy.ts"
-      ],
+      "ownershipScope": ["src/shared/auth/sessionPolicy.ts"],
       "publicExports": [
         "AuthFailureAction",
         "AuthFailureActionKind",
@@ -51735,15 +52608,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "resolveAuthFailureAction"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/constants/routePaths.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/constants/routePaths.ts"]
     },
     {
       "path": "src/shared/components/ActionButton.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51915,13 +52786,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/ActionButton.vue"
-      ],
+      "sourcePaths": ["src/shared/components/ActionButton.vue"],
       "targetPath": "src/shared/components/ActionButton.vue",
-      "ownershipScope": [
-        "src/shared/components/ActionButton.vue"
-      ],
+      "ownershipScope": ["src/shared/components/ActionButton.vue"],
       "publicExports": [
         "ActionButtonSeverity",
         "ActionButtonSize",
@@ -51941,7 +52808,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/ChartCard.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -51968,16 +52835,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/ChartCard.vue"
-      ],
+      "sourcePaths": ["src/shared/components/ChartCard.vue"],
       "targetPath": "src/shared/components/ChartCard.vue",
-      "ownershipScope": [
-        "src/shared/components/ChartCard.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/ChartCard.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -51988,7 +52849,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/ChartPanel.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52020,27 +52881,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/ChartPanel.vue"
-      ],
+      "sourcePaths": ["src/shared/components/ChartPanel.vue"],
       "targetPath": "src/shared/components/ChartPanel.vue",
-      "ownershipScope": [
-        "src/shared/components/ChartPanel.vue"
-      ],
-      "publicExports": [
-        "ChartPanelSize",
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/ChartPanel.vue"],
+      "publicExports": ["ChartPanelSize", "default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/shared/components/ChartRenderer.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52072,16 +52924,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/ChartRenderer.vue"
-      ],
+      "sourcePaths": ["src/shared/components/ChartRenderer.vue"],
       "targetPath": "src/shared/components/ChartRenderer.vue",
-      "ownershipScope": [
-        "src/shared/components/ChartRenderer.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/ChartRenderer.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/chart.js/auto/auto.cjs",
@@ -52093,7 +52939,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/DataTableColumn.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52130,28 +52976,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/DataTableColumn.vue"
-      ],
+      "sourcePaths": ["src/shared/components/DataTableColumn.vue"],
       "targetPath": "src/shared/components/DataTableColumn.vue",
-      "ownershipScope": [
-        "src/shared/components/DataTableColumn.vue"
-      ],
+      "ownershipScope": ["src/shared/components/DataTableColumn.vue"],
       "publicExports": [
         "DataTableColumnBodySlotProps",
         "DataTableColumnSlots",
         "default"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/shared/components/DataTableFrame.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52188,17 +53028,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/DataTableFrame.vue"
-      ],
+      "sourcePaths": ["src/shared/components/DataTableFrame.vue"],
       "targetPath": "src/shared/components/DataTableFrame.vue",
-      "ownershipScope": [
-        "src/shared/components/DataTableFrame.vue"
-      ],
-      "publicExports": [
-        "DataTableFrameRowClickPayload",
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/DataTableFrame.vue"],
+      "publicExports": ["DataTableFrameRowClickPayload", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-i18n/index.js",
@@ -52210,7 +53043,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/IbFormField.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52252,17 +53085,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/IbFormField.vue"
-      ],
+      "sourcePaths": ["src/shared/components/IbFormField.vue"],
       "targetPath": "src/shared/components/IbFormField.vue",
-      "ownershipScope": [
-        "src/shared/components/IbFormField.vue"
-      ],
-      "publicExports": [
-        "IbFormFieldSlotProps",
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/IbFormField.vue"],
+      "publicExports": ["IbFormFieldSlotProps", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -52274,7 +53100,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/RangedLineChartCard.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52301,17 +53127,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/RangedLineChartCard.vue"
-      ],
+      "sourcePaths": ["src/shared/components/RangedLineChartCard.vue"],
       "targetPath": "src/shared/components/RangedLineChartCard.vue",
-      "ownershipScope": [
-        "src/shared/components/RangedLineChartCard.vue"
-      ],
-      "publicExports": [
-        "RangedLineChartProps",
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/RangedLineChartCard.vue"],
+      "publicExports": ["RangedLineChartProps", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
@@ -52327,7 +53146,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/SiteBrandLogo.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52364,16 +53183,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/SiteBrandLogo.vue"
-      ],
+      "sourcePaths": ["src/shared/components/SiteBrandLogo.vue"],
       "targetPath": "src/shared/components/SiteBrandLogo.vue",
-      "ownershipScope": [
-        "src/shared/components/SiteBrandLogo.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/SiteBrandLogo.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -52381,7 +53194,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/StatusBadge.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52418,18 +53231,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/StatusBadge.vue"
-      ],
+      "sourcePaths": ["src/shared/components/StatusBadge.vue"],
       "targetPath": "src/shared/components/StatusBadge.vue",
-      "ownershipScope": [
-        "src/shared/components/StatusBadge.vue"
-      ],
-      "publicExports": [
-        "AppStatusBadgeSize",
-        "AppStatusTone",
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/StatusBadge.vue"],
+      "publicExports": ["AppStatusBadgeSize", "AppStatusTone", "default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
@@ -52441,7 +53246,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/StudioName.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52468,26 +53273,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/StudioName.vue"
-      ],
+      "sourcePaths": ["src/shared/components/StudioName.vue"],
       "targetPath": "src/shared/components/StudioName.vue",
-      "ownershipScope": [
-        "src/shared/components/StudioName.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/StudioName.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/assets/eric-studio-logo.svg"
-      ]
+      "targetFanOutTargets": ["src/shared/assets/eric-studio-logo.svg"]
     },
     {
       "path": "src/shared/components/UserAccountMenu.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -52529,16 +53326,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/components/UserAccountMenu.vue"
-      ],
+      "sourcePaths": ["src/shared/components/UserAccountMenu.vue"],
       "targetPath": "src/shared/components/UserAccountMenu.vue",
-      "ownershipScope": [
-        "src/shared/components/UserAccountMenu.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/UserAccountMenu.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -52561,7 +53352,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/UserConfirmDialog.vue",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52588,16 +53379,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/UserConfirmDialog.vue"
-      ],
+      "sourcePaths": ["src/shared/components/UserConfirmDialog.vue"],
       "targetPath": "src/shared/components/UserConfirmDialog.vue",
-      "ownershipScope": [
-        "src/shared/components/UserConfirmDialog.vue"
-      ],
-      "publicExports": [
-        "default"
-      ],
+      "ownershipScope": ["src/shared/components/UserConfirmDialog.vue"],
+      "publicExports": ["default"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue-i18n/index.js",
@@ -52612,7 +53397,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/formFieldContract.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52639,17 +53424,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/components/formFieldContract.ts"
-      ],
+      "sourcePaths": ["src/shared/components/formFieldContract.ts"],
       "targetPath": "src/shared/components/formFieldContract.ts",
-      "ownershipScope": [
-        "src/shared/components/formFieldContract.ts"
-      ],
-      "publicExports": [
-        "FormFieldContractProps",
-        "FormFieldContractSlotProps"
-      ],
+      "ownershipScope": ["src/shared/components/formFieldContract.ts"],
+      "publicExports": ["FormFieldContractProps", "FormFieldContractSlotProps"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -52657,7 +53435,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/components/userAccountMenu.types.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -52704,13 +53482,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/components/userAccountMenu.types.ts"
-      ],
+      "sourcePaths": ["src/shared/components/userAccountMenu.types.ts"],
       "targetPath": "src/shared/components/userAccountMenu.types.ts",
-      "ownershipScope": [
-        "src/shared/components/userAccountMenu.types.ts"
-      ],
+      "ownershipScope": ["src/shared/components/userAccountMenu.types.ts"],
       "publicExports": [
         "UserAccountMenuItem",
         "UserAccountMenuItemKey",
@@ -52724,7 +53498,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/composables/useAppClipboard.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52766,16 +53540,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useAppClipboard.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useAppClipboard.ts"],
       "targetPath": "src/shared/composables/useAppClipboard.ts",
-      "ownershipScope": [
-        "src/shared/composables/useAppClipboard.ts"
-      ],
-      "publicExports": [
-        "useAppClipboard"
-      ],
+      "ownershipScope": ["src/shared/composables/useAppClipboard.ts"],
+      "publicExports": ["useAppClipboard"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -52783,7 +53551,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/composables/useAppToast.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -52885,27 +53653,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useAppToast.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useAppToast.ts"],
       "targetPath": "src/shared/composables/useAppToast.ts",
-      "ownershipScope": [
-        "src/shared/composables/useAppToast.ts"
-      ],
-      "publicExports": [
-        "dismissAppToasts",
-        "useAppToast"
-      ],
+      "ownershipScope": ["src/shared/composables/useAppToast.ts"],
+      "publicExports": ["dismissAppToasts", "useAppToast"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-sonner/lib/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue-sonner/lib/index.js"]
     },
     {
       "path": "src/shared/composables/useAsyncAction.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53002,28 +53761,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useAsyncAction.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useAsyncAction.ts"],
       "targetPath": "src/shared/composables/useAsyncAction.ts",
-      "ownershipScope": [
-        "src/shared/composables/useAsyncAction.ts"
-      ],
+      "ownershipScope": ["src/shared/composables/useAsyncAction.ts"],
       "publicExports": [
         "AsyncActionFeedback",
         "AsyncActionLoadingHandle",
         "useAsyncAction"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/shared/composables/useLogoutRedirect.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53070,26 +53823,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useLogoutRedirect.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useLogoutRedirect.ts"],
       "targetPath": "src/shared/composables/useLogoutRedirect.ts",
-      "ownershipScope": [
-        "src/shared/composables/useLogoutRedirect.ts"
-      ],
-      "publicExports": [
-        "useLogoutRedirect"
-      ],
+      "ownershipScope": ["src/shared/composables/useLogoutRedirect.ts"],
+      "publicExports": ["useLogoutRedirect"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-router/index.cjs"
-      ]
+      "targetFanOutTargets": ["node_modules/vue-router/index.cjs"]
     },
     {
       "path": "src/shared/composables/useOverlayInteractionLifecycle.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53172,15 +53917,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "useOverlayInteractionLifecycle"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/shared/composables/useSiteBranding.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53237,13 +53980,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useSiteBranding.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useSiteBranding.ts"],
       "targetPath": "src/shared/composables/useSiteBranding.ts",
-      "ownershipScope": [
-        "src/shared/composables/useSiteBranding.ts"
-      ],
+      "ownershipScope": ["src/shared/composables/useSiteBranding.ts"],
       "publicExports": [
         "ApiResponseBrandingSetting",
         "BrandingSetting",
@@ -53275,7 +54014,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/composables/useSupportChannels.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53337,13 +54076,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useSupportChannels.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useSupportChannels.ts"],
       "targetPath": "src/shared/composables/useSupportChannels.ts",
-      "ownershipScope": [
-        "src/shared/composables/useSupportChannels.ts"
-      ],
+      "ownershipScope": ["src/shared/composables/useSupportChannels.ts"],
       "publicExports": [
         "SUPPORT_CHANNELS_QUERY_KEY",
         "SupportChannel",
@@ -53364,7 +54099,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/composables/useUserConfirmDialog.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53396,27 +54131,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/composables/useUserConfirmDialog.ts"
-      ],
+      "sourcePaths": ["src/shared/composables/useUserConfirmDialog.ts"],
       "targetPath": "src/shared/composables/useUserConfirmDialog.ts",
-      "ownershipScope": [
-        "src/shared/composables/useUserConfirmDialog.ts"
-      ],
-      "publicExports": [
-        "UserConfirmRequest",
-        "useUserConfirmDialog"
-      ],
+      "ownershipScope": ["src/shared/composables/useUserConfirmDialog.ts"],
+      "publicExports": ["UserConfirmRequest", "useUserConfirmDialog"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js"
-      ]
+      "targetFanOutTargets": ["node_modules/vue/index.js"]
     },
     {
       "path": "src/shared/config/pagination.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53508,17 +54234,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/config/pagination.ts"
-      ],
+      "sourcePaths": ["src/shared/config/pagination.ts"],
       "targetPath": "src/shared/config/pagination.ts",
-      "ownershipScope": [
-        "src/shared/config/pagination.ts"
-      ],
-      "publicExports": [
-        "PAGE_SIZES",
-        "normalizePageSize"
-      ],
+      "ownershipScope": ["src/shared/config/pagination.ts"],
+      "publicExports": ["PAGE_SIZES", "normalizePageSize"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -53526,7 +54245,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/config/runtimeUrls.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53633,13 +54352,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/config/runtimeUrls.ts"
-      ],
+      "sourcePaths": ["src/shared/config/runtimeUrls.ts"],
       "targetPath": "src/shared/config/runtimeUrls.ts",
-      "ownershipScope": [
-        "src/shared/config/runtimeUrls.ts"
-      ],
+      "ownershipScope": ["src/shared/config/runtimeUrls.ts"],
       "publicExports": [
         "API_BASE_URL",
         "AUTH_BASE_URL",
@@ -53657,7 +54372,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/config/timing.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53704,13 +54419,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/config/timing.ts"
-      ],
+      "sourcePaths": ["src/shared/config/timing.ts"],
       "targetPath": "src/shared/config/timing.ts",
-      "ownershipScope": [
-        "src/shared/config/timing.ts"
-      ],
+      "ownershipScope": ["src/shared/config/timing.ts"],
       "publicExports": [
         "EVENT_STREAM_RECONNECT_BACKOFF_FACTOR",
         "EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS",
@@ -53728,7 +54439,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/constants/contacts.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53750,16 +54461,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/constants/contacts.ts"
-      ],
+      "sourcePaths": ["src/shared/constants/contacts.ts"],
       "targetPath": "src/shared/constants/contacts.ts",
-      "ownershipScope": [
-        "src/shared/constants/contacts.ts"
-      ],
-      "publicExports": [
-        "SUPPORT_EMAIL"
-      ],
+      "ownershipScope": ["src/shared/constants/contacts.ts"],
+      "publicExports": ["SUPPORT_EMAIL"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -53767,7 +54472,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/constants/legalLinks.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53794,26 +54499,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/constants/legalLinks.ts"
-      ],
+      "sourcePaths": ["src/shared/constants/legalLinks.ts"],
       "targetPath": "src/shared/constants/legalLinks.ts",
-      "ownershipScope": [
-        "src/shared/constants/legalLinks.ts"
-      ],
-      "publicExports": [
-        "PUBLIC_LEGAL_LINKS"
-      ],
+      "ownershipScope": ["src/shared/constants/legalLinks.ts"],
+      "publicExports": ["PUBLIC_LEGAL_LINKS"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/constants/routePaths.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/constants/routePaths.ts"]
     },
     {
       "path": "src/shared/constants/media.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -53855,13 +54552,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/constants/media.ts"
-      ],
+      "sourcePaths": ["src/shared/constants/media.ts"],
       "targetPath": "src/shared/constants/media.ts",
-      "ownershipScope": [
-        "src/shared/constants/media.ts"
-      ],
+      "ownershipScope": ["src/shared/constants/media.ts"],
       "publicExports": [
         "DEFAULT_IMAGE_DOWNLOAD_NAME",
         "IMAGE_UPLOAD_ACCEPT",
@@ -53876,7 +54569,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/constants/routePaths.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "cross-feature",
@@ -54113,13 +54806,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "sourcePaths": ["src/shared/constants/routePaths.ts"],
       "targetPath": "src/shared/constants/routePaths.ts",
-      "ownershipScope": [
-        "src/shared/constants/routePaths.ts"
-      ],
+      "ownershipScope": ["src/shared/constants/routePaths.ts"],
       "publicExports": [
         "ACCEPTABLE_USE_PATH",
         "ADMIN_CREDITS_PATH",
@@ -54156,7 +54845,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/domain/externalImageProviders.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54233,13 +54922,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/domain/externalImageProviders.ts"
-      ],
+      "sourcePaths": ["src/shared/domain/externalImageProviders.ts"],
       "targetPath": "src/shared/domain/externalImageProviders.ts",
-      "ownershipScope": [
-        "src/shared/domain/externalImageProviders.ts"
-      ],
+      "ownershipScope": ["src/shared/domain/externalImageProviders.ts"],
       "publicExports": [
         "EXTERNAL_IMAGE_PROVIDERS",
         "EXTERNAL_IMAGE_PROVIDER_LABELS",
@@ -54254,7 +54939,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/domain/generationContract.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54396,13 +55081,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/domain/generationContract.ts"
-      ],
+      "sourcePaths": ["src/shared/domain/generationContract.ts"],
       "targetPath": "src/shared/domain/generationContract.ts",
-      "ownershipScope": [
-        "src/shared/domain/generationContract.ts"
-      ],
+      "ownershipScope": ["src/shared/domain/generationContract.ts"],
       "publicExports": [
         "GENERATION_PRIMITIVE",
         "GENERATION_PRIMITIVE_OPTIONS",
@@ -54431,7 +55112,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/domain/imageActions.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54478,26 +55159,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/domain/imageActions.ts"
-      ],
+      "sourcePaths": ["src/shared/domain/imageActions.ts"],
       "targetPath": "src/shared/domain/imageActions.ts",
-      "ownershipScope": [
-        "src/shared/domain/imageActions.ts"
-      ],
-      "publicExports": [
-        "IMAGE_NODE_ACTION"
-      ],
+      "ownershipScope": ["src/shared/domain/imageActions.ts"],
+      "publicExports": ["IMAGE_NODE_ACTION"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/domain/imageServices.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/domain/imageServices.ts"]
     },
     {
       "path": "src/shared/domain/imageServices.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54634,18 +55307,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/domain/imageServices.ts"
-      ],
+      "sourcePaths": ["src/shared/domain/imageServices.ts"],
       "targetPath": "src/shared/domain/imageServices.ts",
-      "ownershipScope": [
-        "src/shared/domain/imageServices.ts"
-      ],
-      "publicExports": [
-        "SERVICE",
-        "SERVICE_SLUGS",
-        "Service"
-      ],
+      "ownershipScope": ["src/shared/domain/imageServices.ts"],
+      "publicExports": ["SERVICE", "SERVICE_SLUGS", "Service"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [],
       "purity": "pure"
@@ -54654,7 +55319,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/domain/serviceIcons.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54686,16 +55351,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/domain/serviceIcons.ts"
-      ],
+      "sourcePaths": ["src/shared/domain/serviceIcons.ts"],
       "targetPath": "src/shared/domain/serviceIcons.ts",
-      "ownershipScope": [
-        "src/shared/domain/serviceIcons.ts"
-      ],
-      "publicExports": [
-        "getServiceIcon"
-      ],
+      "ownershipScope": ["src/shared/domain/serviceIcons.ts"],
+      "publicExports": ["getServiceIcon"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -54707,7 +55366,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/domain/serviceRegistry.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54749,13 +55408,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/domain/serviceRegistry.ts"
-      ],
+      "sourcePaths": ["src/shared/domain/serviceRegistry.ts"],
       "targetPath": "src/shared/domain/serviceRegistry.ts",
-      "ownershipScope": [
-        "src/shared/domain/serviceRegistry.ts"
-      ],
+      "ownershipScope": ["src/shared/domain/serviceRegistry.ts"],
       "publicExports": [
         "ServiceImageActionText",
         "ServicePromptVariable",
@@ -54774,7 +55429,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/errors/errorCatalog.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -54941,13 +55596,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/errors/errorCatalog.ts"
-      ],
+      "sourcePaths": ["src/shared/errors/errorCatalog.ts"],
       "targetPath": "src/shared/errors/errorCatalog.ts",
-      "ownershipScope": [
-        "src/shared/errors/errorCatalog.ts"
-      ],
+      "ownershipScope": ["src/shared/errors/errorCatalog.ts"],
       "publicExports": [
         "ErrorCodeCopyKeyMap",
         "readinessErrorCodeCopyKey",
@@ -54956,15 +55607,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "userFacingErrorCopy"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/i18n/index.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/i18n/index.ts"]
     },
     {
       "path": "src/shared/i18n/formatters.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55080,14 +55729,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/i18n/formatters.ts"
-      ],
+      "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/formatters.ts"],
       "targetPath": "src/shared/i18n/formatters.ts",
-      "ownershipScope": [
-        "src/shared/i18n/formatters.ts"
-      ],
+      "ownershipScope": ["src/shared/i18n/formatters.ts"],
       "publicExports": [
         "formatLocaleDate",
         "formatLocaleNumber",
@@ -55105,7 +55750,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55681,14 +56326,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "shared runtime singleton seam; 102 external importers across app, all features, test.",
-      "sourcePaths": [
-        "src/shared/i18n/index.ts"
-      ],
+      "notes": "shared runtime singleton seam; 102 external importers across app, all features, test. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/index.ts"],
       "targetPath": "src/shared/i18n/index.ts",
-      "ownershipScope": [
-        "src/shared/i18n/"
-      ],
+      "ownershipScope": ["src/shared/i18n/"],
       "publicExports": [
         "AppI18n",
         "SupportedLocale",
@@ -55711,7 +56352,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/localeCore.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55752,14 +56393,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "pure locale constants/types; the only shared/i18n module tool core/ may import (canvas-tool-core-no-i18n-runtime allowlist).",
-      "sourcePaths": [
-        "src/shared/i18n/localeCore.ts"
-      ],
+      "notes": "pure locale constants/types; the only shared/i18n module tool core/ may import (canvas-tool-core-no-i18n-runtime allowlist). Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/localeCore.ts"],
       "targetPath": "src/shared/i18n/localeCore.ts",
-      "ownershipScope": [
-        "src/shared/i18n/localeCore.ts"
-      ],
+      "ownershipScope": ["src/shared/i18n/localeCore.ts"],
       "publicExports": [
         "LocaleBundle",
         "LocaleLoader",
@@ -55775,7 +56412,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/locales/en/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55796,14 +56433,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "locale message bundle aggregated by i18nRuntime/localeManifest; not a public seam.",
-      "sourcePaths": [
-        "src/shared/i18n/locales/en/index.ts"
-      ],
+      "notes": "locale message bundle aggregated by i18nRuntime/localeManifest; not a public seam. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/locales/en/index.ts"],
       "targetPath": "src/shared/i18n/locales/en/index.ts",
-      "ownershipScope": [
-        "src/shared/i18n/locales/en/"
-      ],
+      "ownershipScope": ["src/shared/i18n/locales/en/"],
       "publicExports": [
         "account",
         "admin",
@@ -55824,7 +56457,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/locales/es/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55850,14 +56483,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "locale message bundle aggregated by localeManifest (lazy); not a public seam.",
-      "sourcePaths": [
-        "src/shared/i18n/locales/es/index.ts"
-      ],
+      "notes": "locale message bundle aggregated by localeManifest (lazy); not a public seam. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/locales/es/index.ts"],
       "targetPath": "src/shared/i18n/locales/es/index.ts",
-      "ownershipScope": [
-        "src/shared/i18n/locales/es/"
-      ],
+      "ownershipScope": ["src/shared/i18n/locales/es/"],
       "publicExports": [
         "account",
         "admin",
@@ -55878,7 +56507,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/locales/ko/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55904,14 +56533,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "locale message bundle aggregated by localeManifest (lazy); not a public seam.",
-      "sourcePaths": [
-        "src/shared/i18n/locales/ko/index.ts"
-      ],
+      "notes": "locale message bundle aggregated by localeManifest (lazy); not a public seam. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/locales/ko/index.ts"],
       "targetPath": "src/shared/i18n/locales/ko/index.ts",
-      "ownershipScope": [
-        "src/shared/i18n/locales/ko/"
-      ],
+      "ownershipScope": ["src/shared/i18n/locales/ko/"],
       "publicExports": [
         "account",
         "admin",
@@ -55932,7 +56557,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/locales/zh-CN/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -55958,14 +56583,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "locale message bundle aggregated by localeManifest (lazy); not a public seam.",
-      "sourcePaths": [
-        "src/shared/i18n/locales/zh-CN/index.ts"
-      ],
+      "notes": "locale message bundle aggregated by localeManifest (lazy); not a public seam. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/locales/zh-CN/index.ts"],
       "targetPath": "src/shared/i18n/locales/zh-CN/index.ts",
-      "ownershipScope": [
-        "src/shared/i18n/locales/zh-CN/"
-      ],
+      "ownershipScope": ["src/shared/i18n/locales/zh-CN/"],
       "publicExports": [
         "account",
         "admin",
@@ -55986,7 +56607,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/i18n/userIdeaCurrency.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56107,27 +56728,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/i18n/userIdeaCurrency.ts"
-      ],
+      "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/userIdeaCurrency.ts"],
       "targetPath": "src/shared/i18n/userIdeaCurrency.ts",
-      "ownershipScope": [
-        "src/shared/i18n/userIdeaCurrency.ts"
-      ],
-      "publicExports": [
-        "formatIdeaAmount"
-      ],
+      "ownershipScope": ["src/shared/i18n/userIdeaCurrency.ts"],
+      "publicExports": ["formatIdeaAmount"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/i18n/formatters.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/i18n/formatters.ts"]
     },
     {
       "path": "src/shared/i18n/userLocale.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56218,14 +56831,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/i18n/userLocale.ts"
-      ],
+      "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted. Retired by P1b-i18n 2026-10-10; superseded by the src/core/i18n destination.",
+      "sourcePaths": ["src/shared/i18n/userLocale.ts"],
       "targetPath": "src/shared/i18n/userLocale.ts",
-      "ownershipScope": [
-        "src/shared/i18n/userLocale.ts"
-      ],
+      "ownershipScope": ["src/shared/i18n/userLocale.ts"],
       "publicExports": [
         "SUPPORTED_LOCALES",
         "SupportedLocale",
@@ -56251,7 +56860,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/interaction/interactiveControlState.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56308,13 +56917,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/interaction/interactiveControlState.ts"
-      ],
+      "sourcePaths": ["src/shared/interaction/interactiveControlState.ts"],
       "targetPath": "src/shared/interaction/interactiveControlState.ts",
-      "ownershipScope": [
-        "src/shared/interaction/interactiveControlState.ts"
-      ],
+      "ownershipScope": ["src/shared/interaction/interactiveControlState.ts"],
       "publicExports": [
         "InteractiveControlState",
         "InteractiveControlStateAttrs",
@@ -56330,7 +56935,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/interaction/menuKeyboardNavigation.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56357,16 +56962,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/interaction/menuKeyboardNavigation.ts"
-      ],
+      "sourcePaths": ["src/shared/interaction/menuKeyboardNavigation.ts"],
       "targetPath": "src/shared/interaction/menuKeyboardNavigation.ts",
-      "ownershipScope": [
-        "src/shared/interaction/menuKeyboardNavigation.ts"
-      ],
-      "publicExports": [
-        "handleMenuKeyboardNavigation"
-      ],
+      "ownershipScope": ["src/shared/interaction/menuKeyboardNavigation.ts"],
+      "publicExports": ["handleMenuKeyboardNavigation"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -56374,7 +56973,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/lib/brandMark.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56411,17 +57010,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/lib/brandMark.ts"
-      ],
+      "sourcePaths": ["src/shared/lib/brandMark.ts"],
       "targetPath": "src/shared/lib/brandMark.ts",
-      "ownershipScope": [
-        "src/shared/lib/brandMark.ts"
-      ],
-      "publicExports": [
-        "brandMarkClasses",
-        "createBrandMarkClass"
-      ],
+      "ownershipScope": ["src/shared/lib/brandMark.ts"],
+      "publicExports": ["brandMarkClasses", "createBrandMarkClass"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -56429,7 +57021,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/lib/chartPrimitives.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56506,13 +57098,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/lib/chartPrimitives.ts"
-      ],
+      "sourcePaths": ["src/shared/lib/chartPrimitives.ts"],
       "targetPath": "src/shared/lib/chartPrimitives.ts",
-      "ownershipScope": [
-        "src/shared/lib/chartPrimitives.ts"
-      ],
+      "ownershipScope": ["src/shared/lib/chartPrimitives.ts"],
       "publicExports": [
         "ChartData",
         "ChartEmptyStatePluginInput",
@@ -56541,7 +57129,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/lib/chartTimeRange.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56573,13 +57161,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/lib/chartTimeRange.ts"
-      ],
+      "sourcePaths": ["src/shared/lib/chartTimeRange.ts"],
       "targetPath": "src/shared/lib/chartTimeRange.ts",
-      "ownershipScope": [
-        "src/shared/lib/chartTimeRange.ts"
-      ],
+      "ownershipScope": ["src/shared/lib/chartTimeRange.ts"],
       "publicExports": [
         "BuildChartTimeBucketsInput",
         "ChartTimeBucket",
@@ -56596,7 +57180,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/lib/pageChrome.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56628,13 +57212,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/lib/pageChrome.ts"
-      ],
+      "sourcePaths": ["src/shared/lib/pageChrome.ts"],
       "targetPath": "src/shared/lib/pageChrome.ts",
-      "ownershipScope": [
-        "src/shared/lib/pageChrome.ts"
-      ],
+      "ownershipScope": ["src/shared/lib/pageChrome.ts"],
       "publicExports": [
         "createPageChromeAccountRoundControlClass",
         "createPageChromeRoundControlClass",
@@ -56647,7 +57227,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/media/imageAssetPipeline.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56684,13 +57264,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/media/imageAssetPipeline.ts"
-      ],
+      "sourcePaths": ["src/shared/media/imageAssetPipeline.ts"],
       "targetPath": "src/shared/media/imageAssetPipeline.ts",
-      "ownershipScope": [
-        "src/shared/media/imageAssetPipeline.ts"
-      ],
+      "ownershipScope": ["src/shared/media/imageAssetPipeline.ts"],
       "publicExports": [
         "IMAGE_ASSET_PIPELINE_CONFIG",
         "ImageAssetCompressionPolicy",
@@ -56713,7 +57289,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/media/imageDimensions.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56750,13 +57326,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/media/imageDimensions.ts"
-      ],
+      "sourcePaths": ["src/shared/media/imageDimensions.ts"],
       "targetPath": "src/shared/media/imageDimensions.ts",
-      "ownershipScope": [
-        "src/shared/media/imageDimensions.ts"
-      ],
+      "ownershipScope": ["src/shared/media/imageDimensions.ts"],
       "publicExports": [
         "ImageNaturalSize",
         "clearImageDimensionCacheForTesting",
@@ -56770,7 +57342,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/media/mediaRef.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56847,13 +57419,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/media/mediaRef.ts"
-      ],
+      "sourcePaths": ["src/shared/media/mediaRef.ts"],
       "targetPath": "src/shared/media/mediaRef.ts",
-      "ownershipScope": [
-        "src/shared/media/mediaRef.ts"
-      ],
+      "ownershipScope": ["src/shared/media/mediaRef.ts"],
       "publicExports": [
         "MediaRef",
         "MediaRefDerivativeTier",
@@ -56862,15 +57430,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "mediaRefEquals"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/api/mediaAssetDelivery.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/api/mediaAssetDelivery.ts"]
     },
     {
       "path": "src/shared/media/preloadImage.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56897,16 +57463,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/media/preloadImage.ts"
-      ],
+      "sourcePaths": ["src/shared/media/preloadImage.ts"],
       "targetPath": "src/shared/media/preloadImage.ts",
-      "ownershipScope": [
-        "src/shared/media/preloadImage.ts"
-      ],
-      "publicExports": [
-        "preloadImage"
-      ],
+      "ownershipScope": ["src/shared/media/preloadImage.ts"],
+      "publicExports": ["preloadImage"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -56914,7 +57474,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/media/visionIngressPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -56961,13 +57521,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/media/visionIngressPolicy.ts"
-      ],
+      "sourcePaths": ["src/shared/media/visionIngressPolicy.ts"],
       "targetPath": "src/shared/media/visionIngressPolicy.ts",
-      "ownershipScope": [
-        "src/shared/media/visionIngressPolicy.ts"
-      ],
+      "ownershipScope": ["src/shared/media/visionIngressPolicy.ts"],
       "publicExports": [
         "VISION_HEIC_EXTENSIONS",
         "VISION_HEIC_MIME_TYPES",
@@ -56988,7 +57544,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/motion/chartMotion.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57020,16 +57576,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/motion/chartMotion.ts"
-      ],
+      "sourcePaths": ["src/shared/motion/chartMotion.ts"],
       "targetPath": "src/shared/motion/chartMotion.ts",
-      "ownershipScope": [
-        "src/shared/motion/chartMotion.ts"
-      ],
-      "publicExports": [
-        "resolveChartAnimation"
-      ],
+      "ownershipScope": ["src/shared/motion/chartMotion.ts"],
+      "publicExports": ["resolveChartAnimation"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/shared/lib/chartPrimitives.ts",
@@ -57040,7 +57590,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/motion/motionPolicy.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57082,13 +57632,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/motion/motionPolicy.ts"
-      ],
+      "sourcePaths": ["src/shared/motion/motionPolicy.ts"],
       "targetPath": "src/shared/motion/motionPolicy.ts",
-      "ownershipScope": [
-        "src/shared/motion/motionPolicy.ts"
-      ],
+      "ownershipScope": ["src/shared/motion/motionPolicy.ts"],
       "publicExports": [
         "MotionIntent",
         "MotionPreference",
@@ -57104,7 +57650,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/motion/popoverMotion.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57151,13 +57697,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/motion/popoverMotion.ts"
-      ],
+      "sourcePaths": ["src/shared/motion/popoverMotion.ts"],
       "targetPath": "src/shared/motion/popoverMotion.ts",
-      "ownershipScope": [
-        "src/shared/motion/popoverMotion.ts"
-      ],
+      "ownershipScope": ["src/shared/motion/popoverMotion.ts"],
       "publicExports": [
         "PopoverMotionTransition",
         "createPopoverMotionTransition",
@@ -57173,7 +57715,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/query/queryClient.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57215,17 +57757,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/query/queryClient.ts"
-      ],
+      "sourcePaths": ["src/shared/query/queryClient.ts"],
       "targetPath": "src/shared/query/queryClient.ts",
-      "ownershipScope": [
-        "src/shared/query/queryClient.ts"
-      ],
-      "publicExports": [
-        "clearAuthScopedQueryCache",
-        "queryClient"
-      ],
+      "ownershipScope": ["src/shared/query/queryClient.ts"],
+      "publicExports": ["clearAuthScopedQueryCache", "queryClient"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs"
@@ -57235,7 +57770,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/query/queryDefaults.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57332,13 +57867,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/query/queryDefaults.ts"
-      ],
+      "sourcePaths": ["src/shared/query/queryDefaults.ts"],
       "targetPath": "src/shared/query/queryDefaults.ts",
-      "ownershipScope": [
-        "src/shared/query/queryDefaults.ts"
-      ],
+      "ownershipScope": ["src/shared/query/queryDefaults.ts"],
       "publicExports": [
         "STALE_TIME_MS",
         "accountScoped",
@@ -57353,7 +57884,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/query/taskResult.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57410,13 +57941,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/query/taskResult.ts"
-      ],
+      "sourcePaths": ["src/shared/query/taskResult.ts"],
       "targetPath": "src/shared/query/taskResult.ts",
-      "ownershipScope": [
-        "src/shared/query/taskResult.ts"
-      ],
+      "ownershipScope": ["src/shared/query/taskResult.ts"],
       "publicExports": [
         "TaskImageResult",
         "TaskResultPayloadLike",
@@ -57425,15 +57952,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "normalizeTaskImageResults"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/media/mediaRef.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/media/mediaRef.ts"]
     },
     {
       "path": "src/shared/query/userCreditsInvalidation.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57480,13 +58005,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/query/userCreditsInvalidation.ts"
-      ],
+      "sourcePaths": ["src/shared/query/userCreditsInvalidation.ts"],
       "targetPath": "src/shared/query/userCreditsInvalidation.ts",
-      "ownershipScope": [
-        "src/shared/query/userCreditsInvalidation.ts"
-      ],
+      "ownershipScope": ["src/shared/query/userCreditsInvalidation.ts"],
       "publicExports": [
         "UserCreditsInvalidationEvent",
         "UserCreditsInvalidationListener",
@@ -57500,7 +58021,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/router/queryParams.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57587,28 +58108,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/router/queryParams.ts"
-      ],
+      "sourcePaths": ["src/shared/router/queryParams.ts"],
       "targetPath": "src/shared/router/queryParams.ts",
-      "ownershipScope": [
-        "src/shared/router/queryParams.ts"
-      ],
-      "publicExports": [
-        "RouteQueryParam",
-        "stringParam",
-        "stringParamWhere"
-      ],
+      "ownershipScope": ["src/shared/router/queryParams.ts"],
+      "publicExports": ["RouteQueryParam", "stringParam", "stringParamWhere"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-router/index.cjs"
-      ]
+      "targetFanOutTargets": ["node_modules/vue-router/index.cjs"]
     },
     {
       "path": "src/shared/seo/routeSeo.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -57645,13 +58156,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/seo/routeSeo.ts"
-      ],
+      "sourcePaths": ["src/shared/seo/routeSeo.ts"],
       "targetPath": "src/shared/seo/routeSeo.ts",
-      "ownershipScope": [
-        "src/shared/seo/routeSeo.ts"
-      ],
+      "ownershipScope": ["src/shared/seo/routeSeo.ts"],
       "publicExports": [
         "PUBLIC_SITE_ORIGIN",
         "ROUTE_SEO",
@@ -57673,7 +58180,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/theme/appOverlayMenu.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "design-system",
@@ -57725,13 +58232,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/theme/appOverlayMenu.ts"
-      ],
+      "sourcePaths": ["src/shared/theme/appOverlayMenu.ts"],
       "targetPath": "src/shared/theme/appOverlayMenu.ts",
-      "ownershipScope": [
-        "src/shared/theme/appOverlayMenu.ts"
-      ],
+      "ownershipScope": ["src/shared/theme/appOverlayMenu.ts"],
       "publicExports": [
         "appOverlayMenuDangerItemClass",
         "appOverlayMenuItemClass",
@@ -57746,7 +58249,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/theme/composables/useTheme.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "design-system",
@@ -57798,13 +58301,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/theme/composables/useTheme.ts"
-      ],
+      "sourcePaths": ["src/shared/theme/composables/useTheme.ts"],
       "targetPath": "src/shared/theme/composables/useTheme.ts",
-      "ownershipScope": [
-        "src/shared/theme/composables/useTheme.ts"
-      ],
+      "ownershipScope": ["src/shared/theme/composables/useTheme.ts"],
       "publicExports": [
         "THEME_STORAGE_KEY",
         "ThemeMode",
@@ -57822,7 +58321,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/theme/dialogMask.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "design-system",
@@ -57869,16 +58368,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/theme/dialogMask.ts"
-      ],
+      "sourcePaths": ["src/shared/theme/dialogMask.ts"],
       "targetPath": "src/shared/theme/dialogMask.ts",
-      "ownershipScope": [
-        "src/shared/theme/dialogMask.ts"
-      ],
-      "publicExports": [
-        "ibDialogMaskClass"
-      ],
+      "ownershipScope": ["src/shared/theme/dialogMask.ts"],
+      "publicExports": ["ibDialogMaskClass"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -57886,7 +58379,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/theme/formControls.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "design-system",
@@ -57953,13 +58446,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/theme/formControls.ts"
-      ],
+      "sourcePaths": ["src/shared/theme/formControls.ts"],
       "targetPath": "src/shared/theme/formControls.ts",
-      "ownershipScope": [
-        "src/shared/theme/formControls.ts"
-      ],
+      "ownershipScope": ["src/shared/theme/formControls.ts"],
       "publicExports": [
         "ibFormFieldClass",
         "ibFormInputClass",
@@ -57973,7 +58462,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/theme/lightboxScrim.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "design-system",
@@ -58005,13 +58494,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/shared/theme/lightboxScrim.ts"
-      ],
+      "sourcePaths": ["src/shared/theme/lightboxScrim.ts"],
       "targetPath": "src/shared/theme/lightboxScrim.ts",
-      "ownershipScope": [
-        "src/shared/theme/lightboxScrim.ts"
-      ],
+      "ownershipScope": ["src/shared/theme/lightboxScrim.ts"],
       "publicExports": [
         "lightboxScrimButtonBaseClass",
         "lightboxScrimIconButtonClass",
@@ -58024,7 +58509,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/auth.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58121,13 +58606,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/auth.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/auth.ts"],
       "targetPath": "src/shared/utils/auth.ts",
-      "ownershipScope": [
-        "src/shared/utils/auth.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/auth.ts"],
       "publicExports": [
         "AuthFailureAction",
         "SafeInternalRedirectPath",
@@ -58157,7 +58638,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/currency.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58184,13 +58665,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/currency.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/currency.ts"],
       "targetPath": "src/shared/utils/currency.ts",
-      "ownershipScope": [
-        "src/shared/utils/currency.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/currency.ts"],
       "publicExports": [
         "currencyFractionDigits",
         "formatMinorCurrencyValue",
@@ -58206,7 +58683,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/dateTime.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58253,13 +58730,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/dateTime.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/dateTime.ts"],
       "targetPath": "src/shared/utils/dateTime.ts",
-      "ownershipScope": [
-        "src/shared/utils/dateTime.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/dateTime.ts"],
       "publicExports": [
         "calcDurationSeconds",
         "formatAdminDateTime",
@@ -58277,7 +58750,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/errorMessages.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58349,13 +58822,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/errorMessages.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/errorMessages.ts"],
       "targetPath": "src/shared/utils/errorMessages.ts",
-      "ownershipScope": [
-        "src/shared/utils/errorMessages.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/errorMessages.ts"],
       "publicExports": [
         "extractSafeApiErrorMessage",
         "formatDisplayErrorMessage",
@@ -58369,7 +58838,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/formValidation.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58406,13 +58875,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/formValidation.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/formValidation.ts"],
       "targetPath": "src/shared/utils/formValidation.ts",
-      "ownershipScope": [
-        "src/shared/utils/formValidation.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/formValidation.ts"],
       "publicExports": [
         "displayErrorMessage",
         "isRequiredErrorMessage",
@@ -58425,7 +58890,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/ids.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58497,13 +58962,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/ids.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/ids.ts"],
       "targetPath": "src/shared/utils/ids.ts",
-      "ownershipScope": [
-        "src/shared/utils/ids.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/ids.ts"],
       "publicExports": [
         "createPrefixedId",
         "createUniqueId",
@@ -58516,7 +58977,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/imageUploadSupport.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58568,13 +59029,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/imageUploadSupport.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/imageUploadSupport.ts"],
       "targetPath": "src/shared/utils/imageUploadSupport.ts",
-      "ownershipScope": [
-        "src/shared/utils/imageUploadSupport.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/imageUploadSupport.ts"],
       "publicExports": [
         "getFileExtension",
         "isSupportedUploadImageFile",
@@ -58590,7 +59047,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/number.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58682,18 +59139,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/number.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/number.ts"],
       "targetPath": "src/shared/utils/number.ts",
-      "ownershipScope": [
-        "src/shared/utils/number.ts"
-      ],
-      "publicExports": [
-        "clamp",
-        "clampUnit",
-        "clampWithFallback"
-      ],
+      "ownershipScope": ["src/shared/utils/number.ts"],
+      "publicExports": ["clamp", "clampUnit", "clampWithFallback"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": []
     },
@@ -58701,7 +59150,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/opaqueIds.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58758,13 +59207,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/opaqueIds.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/opaqueIds.ts"],
       "targetPath": "src/shared/utils/opaqueIds.ts",
-      "ownershipScope": [
-        "src/shared/utils/opaqueIds.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/opaqueIds.ts"],
       "publicExports": [
         "OPAQUE_ID_SUFFIX_SOURCE",
         "assertOpaqueId",
@@ -58779,7 +59224,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/polling.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58816,13 +59261,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/polling.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/polling.ts"],
       "targetPath": "src/shared/utils/polling.ts",
-      "ownershipScope": [
-        "src/shared/utils/polling.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/polling.ts"],
       "publicExports": [
         "PollDelayIterator",
         "PollDelayPolicy",
@@ -58837,7 +59278,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/storage.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -58924,13 +59365,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/storage.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/storage.ts"],
       "targetPath": "src/shared/utils/storage.ts",
-      "ownershipScope": [
-        "src/shared/utils/storage.ts"
-      ],
+      "ownershipScope": ["src/shared/utils/storage.ts"],
       "publicExports": [
         "readLocalStorageItem",
         "readLocalStorageJson",
@@ -58948,7 +59385,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/shared/utils/workspaceId.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p1-lane",
       "activationPhase": "pre-P0",
       "scope": "shared-runtime",
@@ -59005,21 +59442,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Retained horizontal public subpath declared in Shared CONTEXT and consumed outside its source module; public exports verified by AST. Private/module-only files without external consumers are not promoted.",
-      "sourcePaths": [
-        "src/shared/utils/workspaceId.ts"
-      ],
+      "sourcePaths": ["src/shared/utils/workspaceId.ts"],
       "targetPath": "src/shared/utils/workspaceId.ts",
-      "ownershipScope": [
-        "src/shared/utils/workspaceId.ts"
-      ],
-      "publicExports": [
-        "assertWorkspaceId",
-        "requireWorkspaceId"
-      ],
+      "ownershipScope": ["src/shared/utils/workspaceId.ts"],
+      "publicExports": ["assertWorkspaceId", "requireWorkspaceId"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/utils/opaqueIds.ts"
-      ]
+      "targetFanOutTargets": ["src/shared/utils/opaqueIds.ts"]
     },
     {
       "path": "src/test/factories/index.ts",
@@ -59103,7 +59531,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 14,
+      "measuredFanIn": 15,
       "measuredFanOut": 1,
       "targetFanIn": 14,
       "targetFanOut": 1,
@@ -59112,13 +59540,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "test-only seam; ",
-      "sourcePaths": [
-        "src/test/factories/index.ts"
-      ],
+      "sourcePaths": ["src/test/factories/index.ts"],
       "targetPath": "src/test/factories/index.ts",
-      "ownershipScope": [
-        "src/test/factories/"
-      ],
+      "ownershipScope": ["src/test/factories/"],
       "publicExports": [
         "AdminCommandTargetOverrides",
         "AdminListItemOverrides",
@@ -59134,21 +59558,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "makeSessionUser"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/shared/api/sessionUserType.ts"
-      ]
+      "targetFanOutTargets": ["src/api/sessionUserType.ts"]
     },
     {
       "path": "src/theme/appOverlayMenu.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "design-system",
       "exportStyle": "explicit frozen source export mapping",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
+          "to": "src/theme/appOverlayMenu.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/theme/appOverlayMenu.ts",
@@ -59170,40 +59597,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/SupportChannelQr.vue",
+          "from": "src/shared/theme/appOverlayMenu.shim.ts",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/interaction/interactiveControlState.contract.spec.ts",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/theme/appOverlayMenu.unit.spec.ts",
+          "from": "src/theme/appOverlayMenu.unit.spec.ts",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
       "targetFanIn": 7,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/theme/appOverlayMenu.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/theme (§10.3). Single token source; Admin references it without independent declarations.",
-      "sourcePaths": [
-        "src/shared/theme/appOverlayMenu.ts"
-      ],
+      "sourcePaths": ["src/theme/appOverlayMenu.ts"],
       "targetPath": "src/theme/appOverlayMenu.ts",
-      "ownershipScope": [
-        "src/theme/appOverlayMenu.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/theme/appOverlayMenu.ts"
-      ],
+      "ownershipScope": ["src/theme/appOverlayMenu.ts"],
+      "sourceOwnershipScope": ["src/shared/theme/appOverlayMenu.ts"],
       "publicExports": [
         "appOverlayMenuDangerItemClass",
         "appOverlayMenuItemClass",
@@ -59242,10 +59658,110 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": []
     },
     {
+      "path": "src/theme/composables/themeKeyboard.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/shared/theme/composables/themeKeyboard.shim.ts",
+          "to": "src/theme/composables/themeKeyboard.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/composables/themeKeyboard.contract.spec.ts",
+          "to": "src/theme/composables/themeKeyboard.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": ["src/shared/theme/composables/themeKeyboard.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/theme/composables/themeKeyboard.ts"],
+      "targetPath": "src/theme/composables/themeKeyboard.ts",
+      "ownershipScope": ["src/theme/composables/themeKeyboard.ts"],
+      "publicExports": ["THEME_SEGMENT_MODES", "createThemeKeyboardHandler"],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/theme/composables/themeMode.ts"
+      ]
+    },
+    {
+      "path": "src/theme/composables/themeMode.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p1-lane",
+      "activationPhase": "P1b",
+      "scope": "P1 reviewed exact relocated legacy public subpath",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/shared/theme/composables/themeMode.shim.ts",
+          "to": "src/theme/composables/themeMode.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/composables/themeKeyboard.contract.spec.ts",
+          "to": "src/theme/composables/themeMode.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/theme/composables/themeKeyboard.ts",
+          "to": "src/theme/composables/themeMode.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/theme/composables/themeMode.unit.spec.ts",
+          "to": "src/theme/composables/themeMode.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/composables/useTheme.ts",
+          "to": "src/theme/composables/themeMode.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 0,
+      "targetFanIn": 5,
+      "targetFanOut": 0,
+      "shims": ["src/shared/theme/composables/themeMode.shim.ts"],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": "p1-lane",
+      "notes": "Reviewed P1 activation preserving exact legacy exports; no broad directory exemption.",
+      "sourcePaths": ["src/theme/composables/themeMode.ts"],
+      "targetPath": "src/theme/composables/themeMode.ts",
+      "ownershipScope": ["src/theme/composables/themeMode.ts"],
+      "publicExports": [
+        "StoredThemeMode",
+        "THEME_STORAGE_KEY",
+        "ThemeMode",
+        "isDarkThemeMode",
+        "normalizeThemeMode"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": []
+    },
+    {
       "path": "src/theme/composables/useTheme.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "design-system",
@@ -59283,30 +59799,34 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/composables/useTheme.unit.spec.ts",
+          "from": "src/shared/theme/composables/useTheme.shim.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/composables/useTheme.unit.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "measuredFanIn": 9,
+      "measuredFanOut": 3,
+      "targetFanIn": 9,
       "targetFanOut": 3,
-      "shims": [],
+      "shims": ["src/shared/theme/composables/useTheme.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/theme (§10.3). Single token source; Admin references it without independent declarations.",
-      "sourcePaths": [
-        "src/shared/theme/composables/useTheme.ts"
-      ],
+      "sourcePaths": ["src/theme/composables/useTheme.ts"],
       "targetPath": "src/theme/composables/useTheme.ts",
-      "ownershipScope": [
-        "src/theme/composables/useTheme.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/theme/composables/useTheme.ts"
-      ],
+      "ownershipScope": ["src/theme/composables/useTheme.ts"],
+      "sourceOwnershipScope": ["src/shared/theme/composables/useTheme.ts"],
       "publicExports": [
         "THEME_STORAGE_KEY",
         "ThemeMode",
@@ -59339,14 +59859,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vue/index.js",
-        "src/shared/theme/composables/themeMode.ts"
+        "src/theme/composables/themeMode.ts"
       ]
     },
     {
       "path": "src/theme/dialogMask.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "design-system",
@@ -59382,30 +59902,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/components/LibraryFolderDialogs.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/shared/theme/dialogMask.shim.ts",
+          "to": "src/theme/dialogMask.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/theme/dialogMask.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/theme (§10.3). Single token source; Admin references it without independent declarations.",
-      "sourcePaths": [
-        "src/shared/theme/dialogMask.ts"
-      ],
+      "sourcePaths": ["src/theme/dialogMask.ts"],
       "targetPath": "src/theme/dialogMask.ts",
-      "ownershipScope": [
-        "src/theme/dialogMask.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/theme/dialogMask.ts"
-      ],
-      "publicExports": [
-        "ibDialogMaskClass"
-      ],
+      "ownershipScope": ["src/theme/dialogMask.ts"],
+      "sourceOwnershipScope": ["src/shared/theme/dialogMask.ts"],
+      "publicExports": ["ibDialogMaskClass"],
       "exportMappings": [
         {
           "source": "src/shared/theme/dialogMask.ts",
@@ -59420,7 +59937,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/theme/formControls.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "design-system",
@@ -59468,35 +59985,34 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/interaction/interactiveControlState.contract.spec.ts",
+          "from": "src/shared/theme/formControls.shim.ts",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/formControls.contract.spec.ts",
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/theme/formControls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/formControls.contract.spec.ts",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 11,
       "measuredFanOut": 0,
-      "targetFanIn": 10,
+      "targetFanIn": 11,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/theme/formControls.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/theme (§10.3). Single token source; Admin references it without independent declarations.",
-      "sourcePaths": [
-        "src/shared/theme/formControls.ts"
-      ],
+      "sourcePaths": ["src/theme/formControls.ts"],
       "targetPath": "src/theme/formControls.ts",
-      "ownershipScope": [
-        "src/theme/formControls.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/theme/formControls.ts"
-      ],
+      "ownershipScope": ["src/theme/formControls.ts"],
+      "sourceOwnershipScope": ["src/shared/theme/formControls.ts"],
       "publicExports": [
         "ibFormFieldClass",
         "ibFormInputClass",
@@ -59532,7 +60048,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/theme/lightboxScrim.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "planned",
+      "status": "active",
       "owner": "p1-lane",
       "activationPhase": "P1",
       "scope": "design-system",
@@ -59550,30 +60066,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/lightboxScrim.unit.spec.ts",
+          "from": "src/shared/theme/lightboxScrim.shim.ts",
+          "to": "src/theme/lightboxScrim.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/theme/lightboxScrim.unit.spec.ts",
           "to": "src/theme/lightboxScrim.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": [],
+      "shims": ["src/shared/theme/lightboxScrim.shim.ts"],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p1-lane",
       "notes": "Destination of shared/theme (§10.3). Single token source; Admin references it without independent declarations.",
-      "sourcePaths": [
-        "src/shared/theme/lightboxScrim.ts"
-      ],
+      "sourcePaths": ["src/theme/lightboxScrim.ts"],
       "targetPath": "src/theme/lightboxScrim.ts",
-      "ownershipScope": [
-        "src/theme/lightboxScrim.ts"
-      ],
-      "sourceOwnershipScope": [
-        "src/shared/theme/lightboxScrim.ts"
-      ],
+      "ownershipScope": ["src/theme/lightboxScrim.ts"],
+      "sourceOwnershipScope": ["src/shared/theme/lightboxScrim.ts"],
       "publicExports": [
         "lightboxScrimButtonBaseClass",
         "lightboxScrimIconButtonClass",
@@ -59606,409 +60121,437 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 ## Generated Summary
 
 <!-- SEAM_TABLE_START -->
-| Entry | Kind | Status | Owner | Exports | Fan-in measured → target | Fan-out measured → target |
-|---|---|---|---|---|---|---|
-| `src/api/client.ts` | canonical | planned | p1-lane | 6 | 0 → 12 | 0 → 4 |
-| `src/api/contractKernel.ts` | canonical | planned | p1-lane | 24 | 0 → 40 | 0 → 2 |
-| `src/api/generated-query/control/control-billing/control-billing.ts` | canonical | planned | p1-lane | 56 | 0 → 3 | 0 → 4 |
-| `src/api/generated-query/control/control-credits/control-credits.ts` | canonical | planned | p1-lane | 145 | 0 → 4 | 0 → 4 |
-| `src/api/generated-query/control/control-payments/control-payments.ts` | canonical | planned | p1-lane | 39 | 0 → 3 | 0 → 4 |
-| `src/api/generated-query/control/control-platform/control-platform.ts` | canonical | planned | p1-lane | 402 | 0 → 14 | 0 → 4 |
-| `src/api/generated-query/control/control-tasks/control-tasks.ts` | canonical | planned | p1-lane | 22 | 0 → 2 | 0 → 4 |
-| `src/api/generated-query/control/control-users/control-users.ts` | canonical | planned | p1-lane | 80 | 0 → 4 | 0 → 4 |
-| `src/api/generated-query/control/index.ts` | cascading | planned | p1-lane | 784 | 0 → 0 | 0 → 3 |
-| `src/api/generated-query/control/model/controlMailConfigRequest.ts` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 0 |
-| `src/api/generated-query/control/model/controlOAuthProviderSummary.ts` | canonical | planned | p1-lane | 1 | 0 → 3 | 0 → 0 |
-| `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 0 |
-| `src/api/generated-query/control/model/controlStripeConfigRequest.ts` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 0 |
-| `src/api/generated-query/control/model/controlTaskEnvelope.ts` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 1 |
-| `src/api/generated-query/control/model/index.ts` | canonical | planned | p1-lane | 159 | 0 → 17 | 0 → 0 |
-| `src/api/generated-query/control/model/supportChannelKind.ts` | canonical | planned | p1-lane | 1 | 0 → 3 | 0 → 0 |
-| `src/api/generated-query/control/model/supportChannelsSetting.ts` | canonical | planned | p1-lane | 1 | 0 → 3 | 0 → 1 |
-| `src/api/generated-query/public/boards/boards.ts` | canonical | planned | p1-lane | 144 | 0 → 2 | 0 → 4 |
-| `src/api/generated-query/public/index.ts` | cascading | planned | p1-lane | 619 | 0 → 0 | 0 → 3 |
-| `src/api/generated-query/public/model/board.ts` | canonical | planned | p1-lane | 1 | 0 → 4 | 0 → 2 |
-| `src/api/generated-query/public/model/boardDocument.ts` | canonical | planned | p1-lane | 1 | 0 → 3 | 0 → 2 |
-| `src/api/generated-query/public/model/index.ts` | canonical | planned | p1-lane | 236 | 0 → 19 | 0 → 0 |
-| `src/api/generated-query/public/user/user.ts` | canonical | planned | p1-lane | 23 | 0 → 5 | 0 → 4 |
-| `src/api/generated-query/public/workspace-billing/workspace-billing.ts` | canonical | planned | p1-lane | 97 | 0 → 6 | 0 → 4 |
-| `src/api/generated-query/public/workspace-library/workspace-library.ts` | canonical | planned | p1-lane | 75 | 0 → 3 | 0 → 4 |
-| `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts` | canonical | planned | p1-lane | 16 | 0 → 2 | 0 → 4 |
-| `src/api/generated-query/public/workspace-search/workspace-search.ts` | canonical | planned | p1-lane | 16 | 0 → 3 | 0 → 4 |
-| `src/api/generated-query/public/workspaces/workspaces.ts` | canonical | planned | p1-lane | 40 | 0 → 2 | 0 → 4 |
-| `src/api/idempotencyKey.ts` | canonical | planned | p1-lane | 13 | 0 → 12 | 0 → 0 |
-| `src/api/mediaAssetDelivery.ts` | canonical | planned | p1-lane | 25 | 0 → 25 | 0 → 4 |
-| `src/api/mediaWorkspaceScope.ts` | canonical | planned | p1-lane | 3 | 0 → 6 | 0 → 0 |
-| `src/api/sessionUserType.ts` | canonical | planned | p1-lane | 1 | 0 → 13 | 0 → 0 |
-| `src/api/stripUndefined.ts` | canonical | planned | p1-lane | 2 | 0 → 11 | 0 → 0 |
-| `src/api/upload.ts` | canonical | planned | p1-lane | 22 | 0 → 10 | 0 → 7 |
-| `src/api/userSession.ts` | canonical | planned | p1-lane | 2 | 0 → 2 | 0 → 3 |
-| `src/api/workspaceEventStream.ts` | canonical | planned | p1-lane | 19 | 0 → 5 | 0 → 3 |
-| `src/api/workspaceTaskContract.ts` | canonical | planned | p1-lane | 14 | 0 → 5 | 0 → 2 |
-| `src/api/workspaceTaskTransport.ts` | canonical | planned | p1-lane | 7 | 0 → 7 | 0 → 5 |
-| `src/api/workspaceTaskWaiter.ts` | canonical | planned | p1-lane | 2 | 0 → 2 | 0 → 5 |
-| `src/api/workspaceTasks.ts` | canonical | planned | p1-lane | 23 | 0 → 3 | 0 → 3 |
-| `src/app/router/index.ts` | canonical | active | integrator | 1 | 1 → 1 | 13 → 13 |
-| `src/components/ui/avatar/index.ts` | canonical | active | design-system | 3 | 2 → 2 | 3 → 3 |
-| `src/components/ui/badge/index.ts` | canonical | active | design-system | 3 | 3 → 3 | 3 → 3 |
-| `src/components/ui/button/index.ts` | canonical | active | design-system | 10 | 24 → 24 | 6 → 6 |
-| `src/components/ui/card/index.ts` | canonical | active | design-system | 6 | 2 → 2 | 4 → 4 |
-| `src/components/ui/dialog/index.ts` | canonical | active | design-system | 12 | 6 → 6 | 4 → 4 |
-| `src/components/ui/dropdown-menu/index.ts` | canonical | active | design-system | 14 | 4 → 4 | 4 → 4 |
-| `src/components/ui/form/index.ts` | canonical | active | design-system | 15 | 6 → 6 | 5 → 5 |
-| `src/components/ui/input/index.ts` | canonical | active | design-system | 4 | 9 → 9 | 5 → 5 |
-| `src/components/ui/popover/index.ts` | canonical | active | design-system | 4 | 3 → 3 | 3 → 3 |
-| `src/components/ui/select/index.ts` | canonical | active | design-system | 14 | 2 → 2 | 6 → 6 |
-| `src/components/ui/skeleton/index.ts` | canonical | active | design-system | 1 | 6 → 6 | 2 → 2 |
-| `src/components/ui/spinner/index.ts` | canonical | active | design-system | 1 | 8 → 8 | 2 → 2 |
-| `src/core/auth/adminAccess.ts` | canonical | planned | p1-lane | 2 | 0 → 1 | 0 → 0 |
-| `src/core/auth/client.ts` | canonical | planned | p1-lane | 3 | 0 → 2 | 0 → 4 |
-| `src/core/auth/oauthProviders.ts` | canonical | planned | p1-lane | 2 | 0 → 6 | 0 → 0 |
-| `src/core/auth/passwordPolicy.ts` | canonical | planned | p1-lane | 8 | 0 → 5 | 0 → 1 |
-| `src/core/auth/sessionPolicy.ts` | canonical | planned | p1-lane | 8 | 0 → 5 | 0 → 1 |
-| `src/core/components/ActionButton.vue` | canonical | planned | p1-lane | 4 | 0 → 31 | 0 → 5 |
-| `src/core/components/ChartCard.vue` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 2 |
-| `src/core/components/ChartPanel.vue` | canonical | planned | p1-lane | 2 | 0 → 2 | 0 → 1 |
-| `src/core/components/ChartRenderer.vue` | canonical | planned | p1-lane | 1 | 0 → 3 | 0 → 3 |
-| `src/core/components/DataTableColumn.vue` | canonical | planned | p1-lane | 3 | 0 → 4 | 0 → 1 |
-| `src/core/components/DataTableFrame.vue` | canonical | planned | p1-lane | 2 | 0 → 4 | 0 → 3 |
-| `src/core/components/IbFormField.vue` | canonical | planned | p1-lane | 2 | 0 → 5 | 0 → 3 |
-| `src/core/components/RangedLineChartCard.vue` | canonical | planned | p1-lane | 2 | 0 → 2 | 0 → 7 |
-| `src/core/components/SiteBrandLogo.vue` | canonical | planned | p1-lane | 1 | 0 → 4 | 0 → 0 |
-| `src/core/components/StatusBadge.vue` | canonical | planned | p1-lane | 3 | 0 → 4 | 0 → 3 |
-| `src/core/components/StudioName.vue` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 1 |
-| `src/core/components/UserConfirmDialog.vue` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 6 |
-| `src/core/components/formFieldContract.ts` | canonical | planned | p1-lane | 2 | 0 → 2 | 0 → 0 |
-| `src/core/composables/useAppClipboard.ts` | canonical | planned | p1-lane | 1 | 0 → 5 | 0 → 0 |
-| `src/core/composables/useAppToast.ts` | canonical | planned | p1-lane | 2 | 0 → 17 | 0 → 1 |
-| `src/core/composables/useAsyncAction.ts` | canonical | planned | p1-lane | 3 | 0 → 16 | 0 → 1 |
-| `src/core/composables/useLogoutRedirect.ts` | canonical | planned | p1-lane | 1 | 0 → 6 | 0 → 1 |
-| `src/core/composables/useOverlayInteractionLifecycle.ts` | canonical | planned | p1-lane | 6 | 0 → 10 | 0 → 1 |
-| `src/core/composables/useSiteBranding.ts` | canonical | planned | p1-lane | 16 | 0 → 8 | 0 → 5 |
-| `src/core/composables/useSupportChannels.ts` | canonical | planned | p1-lane | 4 | 0 → 9 | 0 → 6 |
-| `src/core/composables/useUserConfirmDialog.ts` | canonical | planned | p1-lane | 2 | 0 → 3 | 0 → 1 |
-| `src/core/config/pagination.ts` | canonical | planned | p1-lane | 2 | 0 → 15 | 0 → 0 |
-| `src/core/config/runtimeUrls.ts` | canonical | planned | p1-lane | 8 | 0 → 18 | 0 → 0 |
-| `src/core/config/timing.ts` | canonical | planned | p1-lane | 8 | 0 → 6 | 0 → 0 |
-| `src/core/constants/legalLinks.ts` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 1 |
-| `src/core/constants/media.ts` | canonical | planned | p1-lane | 5 | 0 → 5 | 0 → 0 |
-| `src/core/contracts/externalImageProviders.ts` | canonical | planned | p1-lane | 4 | 0 → 12 | 0 → 0 |
-| `src/core/contracts/generationContract.ts` | canonical | planned | p1-lane | 18 | 0 → 23 | 0 → 0 |
-| `src/core/contracts/imageServices.ts` | canonical | planned | p1-lane | 3 | 0 → 24 | 0 → 0 |
-| `src/core/errors/errorCatalog.ts` | canonical | planned | p1-lane | 5 | 0 → 30 | 0 → 1 |
-| `src/core/i18n/formatters.ts` | canonical | planned | p1-lane | 5 | 0 → 20 | 0 → 2 |
-| `src/core/i18n/index.ts` | canonical | planned | p1-lane | 7 | 0 → 112 | 0 → 5 |
-| `src/core/i18n/localeCore.ts` | canonical | planned | p1-lane | 5 | 0 → 5 | 0 → 0 |
-| `src/core/i18n/userIdeaCurrency.ts` | canonical | planned | p1-lane | 1 | 0 → 21 | 0 → 1 |
-| `src/core/i18n/userLocale.ts` | canonical | planned | p1-lane | 9 | 0 → 15 | 0 → 6 |
-| `src/core/interaction/interactiveControlState.ts` | canonical | planned | p1-lane | 5 | 0 → 8 | 0 → 0 |
-| `src/core/interaction/menuKeyboardNavigation.ts` | canonical | planned | p1-lane | 1 | 0 → 2 | 0 → 0 |
-| `src/core/lib/brandMark.ts` | canonical | planned | p1-lane | 2 | 0 → 4 | 0 → 0 |
-| `src/core/lib/chartPrimitives.ts` | canonical | planned | p1-lane | 15 | 0 → 12 | 0 → 3 |
-| `src/core/lib/chartTimeRange.ts` | canonical | planned | p1-lane | 7 | 0 → 3 | 0 → 0 |
-| `src/core/lib/pageChrome.ts` | canonical | planned | p1-lane | 3 | 0 → 3 | 0 → 0 |
-| `src/core/media/imageAssetPipeline.ts` | canonical | planned | p1-lane | 6 | 0 → 4 | 0 → 6 |
-| `src/core/media/imageDimensions.ts` | canonical | planned | p1-lane | 4 | 0 → 4 | 0 → 0 |
-| `src/core/media/mediaRef.ts` | canonical | planned | p1-lane | 5 | 0 → 12 | 0 → 1 |
-| `src/core/media/visionIngressPolicy.ts` | canonical | planned | p1-lane | 8 | 0 → 6 | 0 → 2 |
-| `src/core/motion/chartMotion.ts` | canonical | planned | p1-lane | 1 | 0 → 3 | 0 → 2 |
-| `src/core/motion/motionPolicy.ts` | canonical | planned | p1-lane | 6 | 0 → 5 | 0 → 0 |
-| `src/core/motion/popoverMotion.ts` | canonical | planned | p1-lane | 3 | 0 → 6 | 0 → 2 |
-| `src/core/query/queryClient.ts` | canonical | planned | p1-lane | 2 | 0 → 5 | 0 → 1 |
-| `src/core/query/queryDefaults.ts` | canonical | planned | p1-lane | 5 | 0 → 16 | 0 → 0 |
-| `src/core/query/taskResult.ts` | canonical | planned | p1-lane | 5 | 0 → 8 | 0 → 1 |
-| `src/core/query/userCreditsInvalidation.ts` | canonical | planned | p1-lane | 4 | 0 → 6 | 0 → 0 |
-| `src/core/router/queryParams.ts` | canonical | planned | p1-lane | 3 | 0 → 14 | 0 → 1 |
-| `src/core/seo/routeSeo.ts` | canonical | planned | p1-lane | 12 | 0 → 4 | 0 → 0 |
-| `src/core/utils/auth.ts` | canonical | planned | p1-lane | 15 | 0 → 16 | 0 → 4 |
-| `src/core/utils/currency.ts` | canonical | planned | p1-lane | 3 | 0 → 2 | 0 → 2 |
-| `src/core/utils/dateTime.ts` | canonical | planned | p1-lane | 5 | 0 → 6 | 0 → 2 |
-| `src/core/utils/errorMessages.ts` | canonical | planned | p1-lane | 4 | 0 → 11 | 0 → 0 |
-| `src/core/utils/formValidation.ts` | canonical | planned | p1-lane | 3 | 0 → 4 | 0 → 0 |
-| `src/core/utils/ids.ts` | canonical | planned | p1-lane | 3 | 0 → 11 | 0 → 0 |
-| `src/core/utils/imageUploadSupport.ts` | canonical | planned | p1-lane | 3 | 0 → 7 | 0 → 2 |
-| `src/core/utils/number.ts` | canonical | planned | p1-lane | 3 | 0 → 15 | 0 → 0 |
-| `src/core/utils/opaqueIds.ts` | canonical | planned | p1-lane | 5 | 0 → 8 | 0 → 0 |
-| `src/core/utils/polling.ts` | canonical | planned | p1-lane | 5 | 0 → 4 | 0 → 0 |
-| `src/core/utils/storage.ts` | canonical | planned | p1-lane | 8 | 0 → 14 | 0 → 0 |
-| `src/core/utils/workspaceId.ts` | canonical | planned | p1-lane | 2 | 0 → 8 | 0 → 1 |
-| `src/features/account/application/index.ts` | cascading | active | p3-lane | 28 | 1 → 1 | 27 → 27 |
-| `src/features/account/domain/index.ts` | cascading | active | p3-lane | 23 | 16 → 16 | 9 → 9 |
-| `src/features/account/index.ts` | canonical | active | p3-lane | 130 | 4 → 4 | 72 → 72 |
-| `src/features/account/infrastructure/index.ts` | cascading | active | p3-lane | 56 | 22 → 22 | 11 → 11 |
-| `src/features/account/presentation/index.ts` | cascading | active | p3-lane | 23 | 1 → 1 | 57 → 57 |
-| `src/features/account/ui/chrome/index.ts` | canonical | planned | p3-lane | 5 | 0 → 8 | 0 → 13 |
-| `src/features/admin/credits/wallets/index.ts` | canonical | active | p4-lane | 1 | 1 → 1 | 31 → 31 |
-| `src/features/admin/routePaths.ts` | canonical | planned | p1-lane | 13 | 0 → 7 | 0 → 0 |
-| `src/features/admin/shared/components/AdminAlert.vue` | canonical | active | p4-lane | 2 | 20 → 20 | 2 → 2 |
-| `src/features/admin/shared/components/AdminBadge.vue` | canonical | active | p4-lane | 2 | 2 → 2 | 3 → 3 |
-| `src/features/admin/shared/components/AdminButton.vue` | canonical | active | p4-lane | 3 | 28 → 28 | 4 → 4 |
-| `src/features/admin/shared/components/AdminChartCard.vue` | canonical | active | p4-lane | 1 | 1 → 1 | 2 → 2 |
-| `src/features/admin/shared/components/AdminCollectionPageShell.vue` | canonical | active | p4-lane | 1 | 3 → 3 | 2 → 2 |
-| `src/features/admin/shared/components/AdminColumn.vue` | canonical | active | p4-lane | 1 | 15 → 15 | 0 → 0 |
-| `src/features/admin/shared/components/AdminConfirmDialog.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 3 → 3 |
-| `src/features/admin/shared/components/AdminDialogActions.vue` | canonical | active | p4-lane | 1 | 11 → 11 | 2 → 2 |
-| `src/features/admin/shared/components/AdminDialogShell.vue` | canonical | active | p4-lane | 3 | 18 → 18 | 5 → 5 |
-| `src/features/admin/shared/components/AdminDrawer.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 3 → 3 |
-| `src/features/admin/shared/components/AdminEditorActions.vue` | canonical | active | p4-lane | 1 | 7 → 7 | 1 → 1 |
-| `src/features/admin/shared/components/AdminEmptyState.vue` | canonical | active | p4-lane | 1 | 15 → 15 | 2 → 2 |
-| `src/features/admin/shared/components/AdminFilterPopover.vue` | canonical | active | p4-lane | 1 | 3 → 3 | 5 → 5 |
-| `src/features/admin/shared/components/AdminFormField.vue` | canonical | active | p4-lane | 2 | 13 → 13 | 2 → 2 |
-| `src/features/admin/shared/components/AdminInput.vue` | canonical | active | p4-lane | 1 | 18 → 18 | 5 → 5 |
-| `src/features/admin/shared/components/AdminLogoCropDialog.vue` | canonical | active | p4-lane | 1 | 1 → 1 | 8 → 8 |
-| `src/features/admin/shared/components/AdminLogoPickerPopover.vue` | canonical | active | p4-lane | 1 | 3 → 3 | 6 → 6 |
-| `src/features/admin/shared/components/AdminMono.vue` | canonical | active | p4-lane | 1 | 9 → 9 | 3 → 3 |
-| `src/features/admin/shared/components/AdminNumberInput.vue` | canonical | active | p4-lane | 1 | 5 → 5 | 3 → 3 |
-| `src/features/admin/shared/components/AdminOptionFilter.vue` | canonical | active | p4-lane | 2 | 4 → 4 | 2 → 2 |
-| `src/features/admin/shared/components/AdminPagerControls.vue` | canonical | active | p4-lane | 1 | 5 → 5 | 3 → 3 |
-| `src/features/admin/shared/components/AdminPopover.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 1 → 1 |
-| `src/features/admin/shared/components/AdminPopoverContent.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 3 → 3 |
-| `src/features/admin/shared/components/AdminPopoverTrigger.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 1 → 1 |
-| `src/features/admin/shared/components/AdminRangedLineChartCard.vue` | canonical | active | p4-lane | 1 | 1 → 1 | 1 → 1 |
-| `src/features/admin/shared/components/AdminRefreshButton.vue` | canonical | active | p4-lane | 1 | 4 → 4 | 1 → 1 |
-| `src/features/admin/shared/components/AdminResourceToolbar.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 2 → 2 |
-| `src/features/admin/shared/components/AdminRowActionsPopover.vue` | canonical | active | p4-lane | 2 | 3 → 3 | 2 → 2 |
-| `src/features/admin/shared/components/AdminSelect.vue` | canonical | active | p4-lane | 2 | 11 → 11 | 5 → 5 |
-| `src/features/admin/shared/components/AdminSettingsDialogFrame.vue` | canonical | active | p4-lane | 1 | 2 → 2 | 5 → 5 |
-| `src/features/admin/shared/components/AdminSpinner.vue` | canonical | active | p4-lane | 1 | 11 → 11 | 2 → 2 |
-| `src/features/admin/shared/components/AdminStatusPill.vue` | canonical | active | p4-lane | 2 | 24 → 24 | 1 → 1 |
-| `src/features/admin/shared/components/AdminSubNavigationLayout.vue` | canonical | active | p4-lane | 2 | 1 → 1 | 3 → 3 |
-| `src/features/admin/shared/components/AdminSummaryCard.vue` | canonical | active | p4-lane | 1 | 1 → 1 | 0 → 0 |
-| `src/features/admin/shared/components/AdminSwitch.vue` | canonical | active | p4-lane | 1 | 13 → 13 | 3 → 3 |
-| `src/features/admin/shared/components/AdminTable.vue` | canonical | active | p4-lane | 5 | 14 → 14 | 13 → 13 |
-| `src/features/admin/shared/components/AdminTablePanel.vue` | canonical | active | p4-lane | 1 | 3 → 3 | 2 → 2 |
-| `src/features/admin/shared/components/AdminTextarea.vue` | canonical | active | p4-lane | 1 | 4 → 4 | 3 → 3 |
-| `src/features/admin/shared/components/AdminToolbarSearch.vue` | canonical | active | p4-lane | 1 | 9 → 9 | 3 → 3 |
-| `src/features/admin/shared/components/SwitchRow.vue` | canonical | active | p4-lane | 2 | 4 → 4 | 2 → 2 |
-| `src/features/admin/shared/composables/useAdminCollectionQuery.ts` | canonical | active | p4-lane | 1 | 2 → 2 | 3 → 3 |
-| `src/features/admin/shared/composables/useAdminConfirm.ts` | canonical | active | p4-lane | 9 | 21 → 21 | 1 → 1 |
-| `src/features/admin/shared/composables/useAdminCursorCollection.ts` | canonical | active | p4-lane | 1 | 6 → 6 | 4 → 4 |
-| `src/features/admin/shared/composables/useAnomalyRadar.ts` | canonical | active | p4-lane | 1 | 1 → 1 | 5 → 5 |
-| `src/features/admin/shared/composables/useOptimisticToggle.ts` | canonical | active | p4-lane | 3 | 5 → 5 | 1 → 1 |
-| `src/features/admin/shared/composables/usePagePagination.ts` | canonical | active | p4-lane | 1 | 3 → 3 | 2 → 2 |
-| `src/features/admin/shared/composables/useQueryPolling.ts` | canonical | active | p4-lane | 1 | 3 → 3 | 2 → 2 |
-| `src/features/admin/shared/composables/useRefetchOnClose.ts` | canonical | active | p4-lane | 1 | 2 → 2 | 1 → 1 |
-| `src/features/admin/shared/index.ts` | canonical | planned | p4-lane | 131 | 0 → 125 | 0 → 56 |
-| `src/features/admin/shared/lib/anomalyRules.ts` | canonical | active | p4-lane | 4 | 3 → 3 | 3 → 3 |
-| `src/features/admin/shared/lib/cellClasses.ts` | canonical | active | p4-lane | 4 | 4 → 4 | 0 → 0 |
-| `src/features/admin/shared/lib/cellPlaceholders.ts` | canonical | active | p4-lane | 4 | 7 → 7 | 0 → 0 |
-| `src/features/admin/shared/lib/chart.ts` | canonical | active | p4-lane | 14 | 8 → 8 | 6 → 6 |
-| `src/features/admin/shared/lib/confirmSettingsSave.ts` | canonical | active | p4-lane | 7 | 11 → 11 | 2 → 2 |
-| `src/features/admin/shared/lib/controlCopy.ts` | canonical | active | p4-lane | 2 | 18 → 18 | 1 → 1 |
-| `src/features/admin/shared/lib/controlGuidance.ts` | canonical | active | p4-lane | 3 | 6 → 6 | 0 → 0 |
-| `src/features/admin/shared/lib/controlMutation.ts` | canonical | active | p4-lane | 10 | 23 → 23 | 1 → 1 |
-| `src/features/admin/shared/lib/controlResource.ts` | canonical | active | p4-lane | 2 | 5 → 5 | 3 → 3 |
-| `src/features/admin/shared/lib/reconcileStableRows.ts` | canonical | active | p4-lane | 1 | 4 → 4 | 0 → 0 |
-| `src/features/admin/shared/lib/secretSchema.ts` | canonical | active | p4-lane | 1 | 4 → 4 | 1 → 1 |
-| `src/features/admin/shared/lib/serviceAdminMeta.ts` | canonical | active | p4-lane | 6 | 3 → 3 | 1 → 1 |
-| `src/features/admin/shared/lib/tableColumns.ts` | canonical | active | p4-lane | 2 | 8 → 8 | 0 → 0 |
-| `src/features/admin/shared/lib/taskMetricTokens.ts` | canonical | active | p4-lane | 7 | 12 → 12 | 1 → 1 |
-| `src/features/admin/shared/lib/timeRange.ts` | canonical | active | p4-lane | 5 | 4 → 4 | 2 → 2 |
-| `src/features/admin/shared/lib/toast.ts` | canonical | active | p4-lane | 4 | 39 → 39 | 2 → 2 |
-| `src/features/admin/shared/lib/uiClasses.ts` | canonical | active | p4-lane | 38 | 36 → 36 | 0 → 0 |
-| `src/features/admin/shared/logos/brandLogos.ts` | canonical | active | p4-lane | 14 | 11 → 11 | 14 → 14 |
-| `src/features/admin/shared/logos/useBrandLogoOverrides.ts` | canonical | active | p4-lane | 1 | 1 → 1 | 5 → 5 |
-| `src/features/admin/shared/validation/actionReasonContract.ts` | canonical | active | p4-lane | 3 | 2 → 2 | 0 → 0 |
-| `src/features/auth/components/auth-fields/index.ts` | cascading | active | p2-lane | 10 | 3 → 3 | 11 → 11 |
-| `src/features/auth/index.ts` | canonical | active | p2-lane | 28 | 28 → 28 | 41 → 41 |
-| `src/features/board/application/catalog/index.ts` | cascading | active | p3-lane | 43 | 2 → 2 | 11 → 11 |
-| `src/features/board/application/collaboration/index.ts` | cascading | active | p3-lane | 2 | 1 → 1 | 6 → 6 |
-| `src/features/board/application/sync/index.ts` | cascading | active | p3-lane | 14 | 2 → 2 | 12 → 12 |
-| `src/features/board/domain/document/index.ts` | cascading | active | p3-lane | 87 | 1 → 1 | 6 → 6 |
-| `src/features/board/domain/index.ts` | cascading | active | p3-lane | 92 | 13 → 13 | 7 → 7 |
-| `src/features/board/domain/media/index.ts` | cascading | active | p3-lane | 1 | 1 → 1 | 3 → 3 |
-| `src/features/board/domain/schema/index.ts` | cascading | active | p3-lane | 4 | 1 → 1 | 9 → 9 |
-| `src/features/board/index.ts` | canonical | active | p3-lane | 182 | 48 → 48 | 42 → 42 |
-| `src/features/board/infrastructure/persistence/index.ts` | cascading | active | p3-lane | 13 | 7 → 7 | 5 → 5 |
-| `src/features/board/infrastructure/preview/index.ts` | cascading | active | p3-lane | 5 | 6 → 6 | 12 → 12 |
-| `src/features/board/ports/canvas.ts` | canonical | active | p3-lane | 83 | 95 → 95 | 42 → 42 |
-| `src/features/board/presentation/catalog/index.ts` | cascading | active | p3-lane | 14 | 1 → 1 | 27 → 27 |
-| `src/features/board/testing/index.ts` | canonical | active | p3-lane | 7 | 7 → 7 | 1 → 1 |
-| `src/features/canvas/application/board-session/index.ts` | canonical | active | p5-lane | 9 | 5 → 5 | 17 → 17 |
-| `src/features/canvas/application/editing/index.ts` | canonical | active | p5-lane | 10 | 5 → 5 | 40 → 40 |
-| `src/features/canvas/application/execution/board-attachment/index.ts` | canonical | active | p5-lane | 2 | 12 → 12 | 0 → 0 |
-| `src/features/canvas/application/execution/index.ts` | canonical | active | p5-lane | 54 | 21 → 21 | 54 → 54 |
-| `src/features/canvas/application/execution/pending-execution/index.ts` | cascading | active | p5-lane | 27 | 22 → 22 | 8 → 8 |
-| `src/features/canvas/application/execution/result-nodes/index.ts` | cascading | active | p5-lane | 16 | 4 → 4 | 23 → 23 |
-| `src/features/canvas/application/execution/task-lifecycle/index.ts` | canonical | active | p5-lane | 3 | 1 → 1 | 1 → 1 |
-| `src/features/canvas/application/image-workflow/index.ts` | canonical | active | p5-lane | 3 | 4 → 4 | 34 → 34 |
-| `src/features/canvas/application/workspace/index.ts` | canonical | active | p5-lane | 2 | 4 → 4 | 30 → 30 |
-| `src/features/canvas/domain/graph/index.ts` | canonical | active | p5-lane | 58 | 59 → 59 | 3 → 3 |
-| `src/features/canvas/index.ts` | canonical | planned | p5-lane | 2 | 0 → 2 | 0 → 79 |
-| `src/features/canvas/infrastructure/vue-flow-adapter/index.ts` | canonical | active | p5-lane | 20 | 20 → 20 | 27 → 27 |
-| `src/features/canvas/presentation/chrome/components/index.ts` | canonical | active | p5-lane | 6 | 1 → 1 | 12 → 12 |
-| `src/features/canvas/presentation/chrome/index.ts` | cascading | active | p5-lane | 6 | 1 → 1 | 21 → 21 |
-| `src/features/canvas/presentation/nodes/groups/index.ts` | canonical | active | p5-lane | 4 | 3 → 3 | 10 → 10 |
-| `src/features/canvas/presentation/nodes/index.ts` | canonical | active | p5-lane | 9 | 3 → 3 | 50 → 50 |
-| `src/features/canvas/presentation/nodes/primitives/index.ts` | canonical | active | p5-lane | 21 | 5 → 5 | 15 → 15 |
-| `src/features/canvas/presentation/nodes/workflows/index.ts` | canonical | active | p5-lane | 7 | 1 → 1 | 33 → 33 |
-| `src/features/canvas/presentation/overlays/index.ts` | canonical | active | p5-lane | 2 | 5 → 5 | 16 → 16 |
-| `src/features/canvas/presentation/pages/CanvasLandingPage.vue` | canonical | active | p5-lane | 1 | 2 → 2 | 10 → 10 |
-| `src/features/canvas/presentation/pages/CanvasPage.vue` | canonical | active | p5-lane | 1 | 2 → 2 | 4 → 4 |
-| `src/features/canvas/presentation/screens/index.ts` | canonical | active | p5-lane | 1 | 1 → 1 | 51 → 51 |
-| `src/features/canvas/tools/image-tools/index.ts` | canonical | active | p6-lane | 10 | 9 → 9 | 24 → 24 |
-| `src/features/canvas/tools/inpaint/index.ts` | canonical | active | p5-lane | 6 | 5 → 5 | 15 → 15 |
-| `src/features/canvas/tools/inpaint/session/fabric/index.ts` | canonical | active | p5-lane | 7 | 2 → 2 | 6 → 6 |
-| `src/features/canvas/tools/retouch/index.ts` | canonical | active | p5-lane | 34 | 13 → 13 | 27 → 27 |
-| `src/features/legal/index.ts` | canonical | active | p2-lane | 7 | 0 → 0 | 5 → 5 |
-| `src/features/legal/routePaths.ts` | canonical | planned | p1-lane | 4 | 0 → 3 | 0 → 0 |
-| `src/features/library/index.ts` | canonical | active | p2-lane | 69 | 23 → 23 | 37 → 37 |
-| `src/features/search/index.ts` | canonical | active | p3-lane | 21 | 2 → 2 | 40 → 40 |
-| `src/features/workspace/index.ts` | canonical | active | p2-lane | 32 | 16 → 16 | 48 → 48 |
-| `src/features/workspace/routePaths.ts` | canonical | planned | p1-lane | 5 | 0 → 13 | 0 → 0 |
-| `src/shared/api/client.ts` | canonical | active | p1-lane | 6 | 12 → 12 | 4 → 4 |
-| `src/shared/api/contractKernel.ts` | canonical | active | p1-lane | 24 | 40 → 40 | 2 → 2 |
-| `src/shared/api/generated-query/control/control-billing/control-billing.ts` | canonical | active | p1-lane | 56 | 3 → 3 | 4 → 4 |
-| `src/shared/api/generated-query/control/control-credits/control-credits.ts` | canonical | active | p1-lane | 145 | 4 → 4 | 4 → 4 |
-| `src/shared/api/generated-query/control/control-payments/control-payments.ts` | canonical | active | p1-lane | 39 | 3 → 3 | 4 → 4 |
-| `src/shared/api/generated-query/control/control-platform/control-platform.ts` | canonical | active | p1-lane | 402 | 14 → 14 | 4 → 4 |
-| `src/shared/api/generated-query/control/control-tasks/control-tasks.ts` | canonical | active | p1-lane | 22 | 2 → 2 | 4 → 4 |
-| `src/shared/api/generated-query/control/control-users/control-users.ts` | canonical | active | p1-lane | 80 | 4 → 4 | 4 → 4 |
-| `src/shared/api/generated-query/control/index.ts` | cascading | active | p1-lane | 784 | 0 → 0 | 3 → 3 |
-| `src/shared/api/generated-query/control/model/controlMailConfigRequest.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 0 → 0 |
-| `src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts` | canonical | active | p1-lane | 1 | 3 → 3 | 0 → 0 |
-| `src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 0 → 0 |
-| `src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 0 → 0 |
-| `src/shared/api/generated-query/control/model/controlTaskEnvelope.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 1 → 1 |
-| `src/shared/api/generated-query/control/model/index.ts` | canonical | active | p1-lane | 159 | 17 → 17 | 0 → 0 |
-| `src/shared/api/generated-query/control/model/supportChannelKind.ts` | canonical | active | p1-lane | 1 | 3 → 3 | 0 → 0 |
-| `src/shared/api/generated-query/control/model/supportChannelsSetting.ts` | canonical | active | p1-lane | 1 | 3 → 3 | 1 → 1 |
-| `src/shared/api/generated-query/public/boards/boards.ts` | canonical | active | p1-lane | 144 | 2 → 2 | 4 → 4 |
-| `src/shared/api/generated-query/public/index.ts` | cascading | active | p1-lane | 619 | 0 → 0 | 3 → 3 |
-| `src/shared/api/generated-query/public/model/board.ts` | canonical | active | p1-lane | 1 | 4 → 4 | 2 → 2 |
-| `src/shared/api/generated-query/public/model/boardDocument.ts` | canonical | active | p1-lane | 1 | 3 → 3 | 2 → 2 |
-| `src/shared/api/generated-query/public/model/index.ts` | canonical | active | p1-lane | 236 | 19 → 19 | 0 → 0 |
-| `src/shared/api/generated-query/public/user/user.ts` | canonical | active | p1-lane | 23 | 5 → 5 | 4 → 4 |
-| `src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts` | canonical | active | p1-lane | 97 | 6 → 6 | 4 → 4 |
-| `src/shared/api/generated-query/public/workspace-library/workspace-library.ts` | canonical | active | p1-lane | 75 | 3 → 3 | 4 → 4 |
-| `src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts` | canonical | active | p1-lane | 16 | 2 → 2 | 4 → 4 |
-| `src/shared/api/generated-query/public/workspace-search/workspace-search.ts` | canonical | active | p1-lane | 16 | 3 → 3 | 4 → 4 |
-| `src/shared/api/generated-query/public/workspaces/workspaces.ts` | canonical | active | p1-lane | 40 | 2 → 2 | 4 → 4 |
-| `src/shared/api/idempotencyKey.ts` | canonical | active | p1-lane | 13 | 12 → 12 | 0 → 0 |
-| `src/shared/api/mediaAssetDelivery.ts` | canonical | active | p1-lane | 25 | 25 → 25 | 4 → 4 |
-| `src/shared/api/mediaWorkspaceScope.ts` | canonical | active | p1-lane | 3 | 6 → 6 | 0 → 0 |
-| `src/shared/api/sessionUserType.ts` | canonical | active | p1-lane | 1 | 13 → 13 | 0 → 0 |
-| `src/shared/api/stripUndefined.ts` | canonical | active | p1-lane | 2 | 11 → 11 | 0 → 0 |
-| `src/shared/api/upload.ts` | canonical | active | p1-lane | 22 | 10 → 10 | 7 → 7 |
-| `src/shared/api/userSession.ts` | canonical | active | p1-lane | 2 | 2 → 2 | 3 → 3 |
-| `src/shared/api/workspaceEventStream.ts` | canonical | active | p1-lane | 19 | 5 → 5 | 3 → 3 |
-| `src/shared/api/workspaceTaskContract.ts` | canonical | active | p1-lane | 14 | 5 → 5 | 2 → 2 |
-| `src/shared/api/workspaceTaskTransport.ts` | canonical | active | p1-lane | 7 | 7 → 7 | 5 → 5 |
-| `src/shared/api/workspaceTaskWaiter.ts` | canonical | active | p1-lane | 2 | 2 → 2 | 5 → 5 |
-| `src/shared/api/workspaceTasks.ts` | canonical | active | p1-lane | 23 | 3 → 3 | 3 → 3 |
-| `src/shared/auth/adminAccess.ts` | canonical | active | p1-lane | 2 | 1 → 1 | 0 → 0 |
-| `src/shared/auth/client.ts` | canonical | active | p1-lane | 3 | 2 → 2 | 4 → 4 |
-| `src/shared/auth/oauthProviders.ts` | canonical | active | p1-lane | 2 | 6 → 6 | 0 → 0 |
-| `src/shared/auth/passwordPolicy.ts` | canonical | active | p1-lane | 8 | 5 → 5 | 1 → 1 |
-| `src/shared/auth/sessionPolicy.ts` | canonical | active | p1-lane | 8 | 5 → 5 | 1 → 1 |
-| `src/shared/components/ActionButton.vue` | canonical | active | p1-lane | 4 | 31 → 31 | 5 → 5 |
-| `src/shared/components/ChartCard.vue` | canonical | active | p1-lane | 1 | 2 → 2 | 2 → 2 |
-| `src/shared/components/ChartPanel.vue` | canonical | active | p1-lane | 2 | 2 → 2 | 1 → 1 |
-| `src/shared/components/ChartRenderer.vue` | canonical | active | p1-lane | 1 | 3 → 3 | 3 → 3 |
-| `src/shared/components/DataTableColumn.vue` | canonical | active | p1-lane | 3 | 4 → 4 | 1 → 1 |
-| `src/shared/components/DataTableFrame.vue` | canonical | active | p1-lane | 2 | 4 → 4 | 3 → 3 |
-| `src/shared/components/IbFormField.vue` | canonical | active | p1-lane | 2 | 5 → 5 | 3 → 3 |
-| `src/shared/components/RangedLineChartCard.vue` | canonical | active | p1-lane | 2 | 2 → 2 | 7 → 7 |
-| `src/shared/components/SiteBrandLogo.vue` | canonical | active | p1-lane | 1 | 4 → 4 | 0 → 0 |
-| `src/shared/components/StatusBadge.vue` | canonical | active | p1-lane | 3 | 4 → 4 | 3 → 3 |
-| `src/shared/components/StudioName.vue` | canonical | active | p1-lane | 1 | 2 → 2 | 1 → 1 |
-| `src/shared/components/UserAccountMenu.vue` | canonical | active | p3-lane | 1 | 5 → 5 | 14 → 14 |
-| `src/shared/components/UserConfirmDialog.vue` | canonical | active | p1-lane | 1 | 2 → 2 | 6 → 6 |
-| `src/shared/components/formFieldContract.ts` | canonical | active | p1-lane | 2 | 2 → 2 | 0 → 0 |
-| `src/shared/components/userAccountMenu.types.ts` | canonical | active | p3-lane | 4 | 6 → 6 | 0 → 0 |
-| `src/shared/composables/useAppClipboard.ts` | canonical | active | p1-lane | 1 | 5 → 5 | 0 → 0 |
-| `src/shared/composables/useAppToast.ts` | canonical | active | p1-lane | 2 | 17 → 17 | 1 → 1 |
-| `src/shared/composables/useAsyncAction.ts` | canonical | active | p1-lane | 3 | 16 → 16 | 1 → 1 |
-| `src/shared/composables/useLogoutRedirect.ts` | canonical | active | p1-lane | 1 | 6 → 6 | 1 → 1 |
-| `src/shared/composables/useOverlayInteractionLifecycle.ts` | canonical | active | p1-lane | 6 | 10 → 10 | 1 → 1 |
-| `src/shared/composables/useSiteBranding.ts` | canonical | active | p1-lane | 16 | 8 → 8 | 5 → 5 |
-| `src/shared/composables/useSupportChannels.ts` | canonical | active | p1-lane | 4 | 9 → 9 | 6 → 6 |
-| `src/shared/composables/useUserConfirmDialog.ts` | canonical | active | p1-lane | 2 | 3 → 3 | 1 → 1 |
-| `src/shared/config/pagination.ts` | canonical | active | p1-lane | 2 | 15 → 15 | 0 → 0 |
-| `src/shared/config/runtimeUrls.ts` | canonical | active | p1-lane | 8 | 18 → 18 | 0 → 0 |
-| `src/shared/config/timing.ts` | canonical | active | p1-lane | 8 | 6 → 6 | 0 → 0 |
-| `src/shared/constants/contacts.ts` | canonical | active | p1-lane | 1 | 1 → 1 | 0 → 0 |
-| `src/shared/constants/legalLinks.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 1 → 1 |
-| `src/shared/constants/media.ts` | canonical | active | p1-lane | 5 | 5 → 5 | 0 → 0 |
-| `src/shared/constants/routePaths.ts` | canonical | active | p1-lane | 27 | 44 → 44 | 0 → 0 |
-| `src/shared/domain/externalImageProviders.ts` | canonical | active | p1-lane | 4 | 12 → 12 | 0 → 0 |
-| `src/shared/domain/generationContract.ts` | canonical | active | p1-lane | 18 | 23 → 23 | 0 → 0 |
-| `src/shared/domain/imageActions.ts` | canonical | active | p1-lane | 1 | 6 → 6 | 1 → 1 |
-| `src/shared/domain/imageServices.ts` | canonical | active | p1-lane | 3 | 24 → 24 | 0 → 0 |
-| `src/shared/domain/serviceIcons.ts` | canonical | active | p1-lane | 1 | 3 → 3 | 3 → 3 |
-| `src/shared/domain/serviceRegistry.ts` | canonical | active | p1-lane | 6 | 4 → 4 | 2 → 2 |
-| `src/shared/errors/errorCatalog.ts` | canonical | active | p1-lane | 5 | 30 → 30 | 1 → 1 |
-| `src/shared/i18n/formatters.ts` | canonical | active | p1-lane | 5 | 20 → 20 | 2 → 2 |
-| `src/shared/i18n/index.ts` | canonical | active | p1-lane | 7 | 112 → 112 | 5 → 5 |
-| `src/shared/i18n/localeCore.ts` | canonical | active | p1-lane | 5 | 5 → 5 | 0 → 0 |
-| `src/shared/i18n/locales/en/index.ts` | cascading | active | p1-lane | 11 | 1 → 1 | 0 → 0 |
-| `src/shared/i18n/locales/es/index.ts` | cascading | active | p1-lane | 11 | 2 → 2 | 0 → 0 |
-| `src/shared/i18n/locales/ko/index.ts` | cascading | active | p1-lane | 11 | 2 → 2 | 0 → 0 |
-| `src/shared/i18n/locales/zh-CN/index.ts` | cascading | active | p1-lane | 11 | 2 → 2 | 0 → 0 |
-| `src/shared/i18n/userIdeaCurrency.ts` | canonical | active | p1-lane | 1 | 21 → 21 | 1 → 1 |
-| `src/shared/i18n/userLocale.ts` | canonical | active | p1-lane | 9 | 15 → 15 | 6 → 6 |
-| `src/shared/interaction/interactiveControlState.ts` | canonical | active | p1-lane | 5 | 8 → 8 | 0 → 0 |
-| `src/shared/interaction/menuKeyboardNavigation.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 0 → 0 |
-| `src/shared/lib/brandMark.ts` | canonical | active | p1-lane | 2 | 4 → 4 | 0 → 0 |
-| `src/shared/lib/chartPrimitives.ts` | canonical | active | p1-lane | 15 | 12 → 12 | 3 → 3 |
-| `src/shared/lib/chartTimeRange.ts` | canonical | active | p1-lane | 7 | 3 → 3 | 0 → 0 |
-| `src/shared/lib/pageChrome.ts` | canonical | active | p1-lane | 3 | 3 → 3 | 0 → 0 |
-| `src/shared/media/imageAssetPipeline.ts` | canonical | active | p1-lane | 6 | 4 → 4 | 6 → 6 |
-| `src/shared/media/imageDimensions.ts` | canonical | active | p1-lane | 4 | 4 → 4 | 0 → 0 |
-| `src/shared/media/mediaRef.ts` | canonical | active | p1-lane | 5 | 12 → 12 | 1 → 1 |
-| `src/shared/media/preloadImage.ts` | canonical | active | p1-lane | 1 | 2 → 2 | 0 → 0 |
-| `src/shared/media/visionIngressPolicy.ts` | canonical | active | p1-lane | 8 | 6 → 6 | 2 → 2 |
-| `src/shared/motion/chartMotion.ts` | canonical | active | p1-lane | 1 | 3 → 3 | 2 → 2 |
-| `src/shared/motion/motionPolicy.ts` | canonical | active | p1-lane | 6 | 5 → 5 | 0 → 0 |
-| `src/shared/motion/popoverMotion.ts` | canonical | active | p1-lane | 3 | 6 → 6 | 2 → 2 |
-| `src/shared/query/queryClient.ts` | canonical | active | p1-lane | 2 | 5 → 5 | 1 → 1 |
-| `src/shared/query/queryDefaults.ts` | canonical | active | p1-lane | 5 | 16 → 16 | 0 → 0 |
-| `src/shared/query/taskResult.ts` | canonical | active | p1-lane | 5 | 8 → 8 | 1 → 1 |
-| `src/shared/query/userCreditsInvalidation.ts` | canonical | active | p1-lane | 4 | 6 → 6 | 0 → 0 |
-| `src/shared/router/queryParams.ts` | canonical | active | p1-lane | 3 | 14 → 14 | 1 → 1 |
-| `src/shared/seo/routeSeo.ts` | canonical | active | p1-lane | 12 | 4 → 4 | 0 → 0 |
-| `src/shared/theme/appOverlayMenu.ts` | canonical | active | p1-lane | 5 | 7 → 7 | 0 → 0 |
-| `src/shared/theme/composables/useTheme.ts` | canonical | active | p1-lane | 4 | 7 → 7 | 3 → 3 |
-| `src/shared/theme/dialogMask.ts` | canonical | active | p1-lane | 1 | 6 → 6 | 0 → 0 |
-| `src/shared/theme/formControls.ts` | canonical | active | p1-lane | 4 | 10 → 10 | 0 → 0 |
-| `src/shared/theme/lightboxScrim.ts` | canonical | active | p1-lane | 3 | 3 → 3 | 0 → 0 |
-| `src/shared/utils/auth.ts` | canonical | active | p1-lane | 15 | 16 → 16 | 4 → 4 |
-| `src/shared/utils/currency.ts` | canonical | active | p1-lane | 3 | 2 → 2 | 2 → 2 |
-| `src/shared/utils/dateTime.ts` | canonical | active | p1-lane | 5 | 6 → 6 | 2 → 2 |
-| `src/shared/utils/errorMessages.ts` | canonical | active | p1-lane | 4 | 11 → 11 | 0 → 0 |
-| `src/shared/utils/formValidation.ts` | canonical | active | p1-lane | 3 | 4 → 4 | 0 → 0 |
-| `src/shared/utils/ids.ts` | canonical | active | p1-lane | 3 | 11 → 11 | 0 → 0 |
-| `src/shared/utils/imageUploadSupport.ts` | canonical | active | p1-lane | 3 | 7 → 7 | 2 → 2 |
-| `src/shared/utils/number.ts` | canonical | active | p1-lane | 3 | 15 → 15 | 0 → 0 |
-| `src/shared/utils/opaqueIds.ts` | canonical | active | p1-lane | 5 | 8 → 8 | 0 → 0 |
-| `src/shared/utils/polling.ts` | canonical | active | p1-lane | 5 | 4 → 4 | 0 → 0 |
-| `src/shared/utils/storage.ts` | canonical | active | p1-lane | 8 | 14 → 14 | 0 → 0 |
-| `src/shared/utils/workspaceId.ts` | canonical | active | p1-lane | 2 | 8 → 8 | 1 → 1 |
-| `src/test/factories/index.ts` | canonical | active | integrator | 12 | 14 → 14 | 1 → 1 |
-| `src/theme/appOverlayMenu.ts` | canonical | planned | p1-lane | 5 | 0 → 7 | 0 → 0 |
-| `src/theme/composables/useTheme.ts` | canonical | planned | p1-lane | 4 | 0 → 7 | 0 → 3 |
-| `src/theme/dialogMask.ts` | canonical | planned | p1-lane | 1 | 0 → 6 | 0 → 0 |
-| `src/theme/formControls.ts` | canonical | planned | p1-lane | 4 | 0 → 10 | 0 → 0 |
-| `src/theme/lightboxScrim.ts` | canonical | planned | p1-lane | 3 | 0 → 3 | 0 → 0 |
+
+| Entry                                                                               | Kind      | Status  | Owner         | Exports | Fan-in measured → target | Fan-out measured → target |
+| ----------------------------------------------------------------------------------- | --------- | ------- | ------------- | ------- | ------------------------ | ------------------------- |
+| `src/api/client.ts`                                                                 | canonical | active  | p1-lane       | 6       | 13 → 13                  | 4 → 4                     |
+| `src/api/contractKernel.ts`                                                         | canonical | active  | p1-lane       | 24      | 41 → 41                  | 2 → 2                     |
+| `src/api/generated-query/control/control-billing/control-billing.ts`                | canonical | active  | p1-lane       | 56      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/control/control-credits/control-credits.ts`                | canonical | active  | p1-lane       | 145     | 4 → 4                    | 4 → 4                     |
+| `src/api/generated-query/control/control-payments/control-payments.ts`              | canonical | active  | p1-lane       | 39      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/control/control-platform/control-platform.ts`              | canonical | active  | p1-lane       | 402     | 14 → 14                  | 4 → 4                     |
+| `src/api/generated-query/control/control-tasks/control-tasks.ts`                    | canonical | active  | p1-lane       | 22      | 2 → 2                    | 4 → 4                     |
+| `src/api/generated-query/control/control-users/control-users.ts`                    | canonical | active  | p1-lane       | 80      | 4 → 4                    | 4 → 4                     |
+| `src/api/generated-query/control/index.ts`                                          | cascading | active  | p1-lane       | 784     | 0 → 0                    | 7 → 7                     |
+| `src/api/generated-query/control/model/controlMailConfigRequest.ts`                 | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlOAuthProviderSummary.ts`              | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts`        | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlStripeConfigRequest.ts`               | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlTaskEnvelope.ts`                      | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/api/generated-query/control/model/index.ts`                                    | canonical | active  | p1-lane       | 159     | 17 → 17                  | 159 → 159                 |
+| `src/api/generated-query/control/model/supportChannelKind.ts`                       | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
+| `src/api/generated-query/control/model/supportChannelsSetting.ts`                   | canonical | active  | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
+| `src/api/generated-query/public/boards/boards.ts`                                   | canonical | active  | p1-lane       | 144     | 2 → 2                    | 4 → 4                     |
+| `src/api/generated-query/public/index.ts`                                           | cascading | active  | p1-lane       | 619     | 0 → 0                    | 11 → 11                   |
+| `src/api/generated-query/public/model/board.ts`                                     | canonical | active  | p1-lane       | 1       | 4 → 4                    | 2 → 2                     |
+| `src/api/generated-query/public/model/boardDocument.ts`                             | canonical | active  | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/api/generated-query/public/model/index.ts`                                     | canonical | active  | p1-lane       | 236     | 19 → 19                  | 236 → 236                 |
+| `src/api/generated-query/public/user/user.ts`                                       | canonical | active  | p1-lane       | 23      | 5 → 5                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-billing/workspace-billing.ts`             | canonical | active  | p1-lane       | 97      | 6 → 6                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-library/workspace-library.ts`             | canonical | active  | p1-lane       | 75      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts`             | canonical | active  | p1-lane       | 16      | 2 → 2                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-search/workspace-search.ts`               | canonical | active  | p1-lane       | 16      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/public/workspaces/workspaces.ts`                           | canonical | active  | p1-lane       | 40      | 2 → 2                    | 4 → 4                     |
+| `src/api/idempotencyKey.ts`                                                         | canonical | active  | p1-lane       | 13      | 13 → 13                  | 0 → 0                     |
+| `src/api/mediaAssetDelivery.ts`                                                     | canonical | active  | p1-lane       | 25      | 27 → 27                  | 4 → 4                     |
+| `src/api/mediaWorkspaceScope.ts`                                                    | canonical | active  | p1-lane       | 3       | 7 → 7                    | 0 → 0                     |
+| `src/api/sessionUserType.ts`                                                        | canonical | active  | p1-lane       | 1       | 15 → 15                  | 0 → 0                     |
+| `src/api/stripUndefined.ts`                                                         | canonical | active  | p1-lane       | 2       | 12 → 12                  | 0 → 0                     |
+| `src/api/upload.ts`                                                                 | canonical | active  | p1-lane       | 22      | 11 → 11                  | 7 → 7                     |
+| `src/api/userSession.ts`                                                            | canonical | active  | p1-lane       | 2       | 3 → 3                    | 3 → 3                     |
+| `src/api/workspaceEventStream.ts`                                                   | canonical | active  | p1-lane       | 20      | 8 → 8                    | 4 → 4                     |
+| `src/api/workspaceTaskContract.ts`                                                  | canonical | active  | p1-lane       | 14      | 6 → 6                    | 2 → 2                     |
+| `src/api/workspaceTaskTransport.ts`                                                 | canonical | active  | p1-lane       | 7       | 8 → 8                    | 5 → 5                     |
+| `src/api/workspaceTaskWaiter.ts`                                                    | canonical | active  | p1-lane       | 2       | 3 → 3                    | 5 → 5                     |
+| `src/api/workspaceTasks.ts`                                                         | canonical | active  | p1-lane       | 23      | 4 → 4                    | 3 → 3                     |
+| `src/app/router/index.ts`                                                           | canonical | active  | integrator    | 1       | 1 → 1                    | 14 → 13                   |
+| `src/components/ui/avatar/index.ts`                                                 | canonical | active  | design-system | 3       | 2 → 2                    | 3 → 3                     |
+| `src/components/ui/badge/index.ts`                                                  | canonical | active  | design-system | 3       | 3 → 3                    | 3 → 3                     |
+| `src/components/ui/button/index.ts`                                                 | canonical | active  | design-system | 10      | 24 → 24                  | 6 → 6                     |
+| `src/components/ui/card/index.ts`                                                   | canonical | active  | design-system | 6       | 2 → 2                    | 4 → 4                     |
+| `src/components/ui/dialog/index.ts`                                                 | canonical | active  | design-system | 12      | 6 → 6                    | 4 → 4                     |
+| `src/components/ui/dropdown-menu/index.ts`                                          | canonical | active  | design-system | 14      | 4 → 4                    | 4 → 4                     |
+| `src/components/ui/form/index.ts`                                                   | canonical | active  | design-system | 15      | 6 → 6                    | 5 → 5                     |
+| `src/components/ui/input/index.ts`                                                  | canonical | active  | design-system | 4       | 9 → 9                    | 5 → 5                     |
+| `src/components/ui/popover/index.ts`                                                | canonical | active  | design-system | 4       | 3 → 3                    | 3 → 3                     |
+| `src/components/ui/select/index.ts`                                                 | canonical | active  | design-system | 14      | 2 → 2                    | 6 → 6                     |
+| `src/components/ui/skeleton/index.ts`                                               | canonical | active  | design-system | 1       | 6 → 6                    | 2 → 2                     |
+| `src/components/ui/spinner/index.ts`                                                | canonical | active  | design-system | 1       | 8 → 8                    | 2 → 2                     |
+| `src/core/auth/adminAccess.ts`                                                      | canonical | active  | p1-lane       | 2       | 2 → 2                    | 0 → 0                     |
+| `src/core/auth/client.ts`                                                           | canonical | active  | p1-lane       | 3       | 3 → 3                    | 4 → 4                     |
+| `src/core/auth/oauthProviders.ts`                                                   | canonical | active  | p1-lane       | 2       | 7 → 7                    | 0 → 0                     |
+| `src/core/auth/passwordPolicy.ts`                                                   | canonical | active  | p1-lane       | 8       | 6 → 6                    | 1 → 1                     |
+| `src/core/auth/routePolicy.ts`                                                      | canonical | active  | p1-lane       | 9       | 3 → 3                    | 0 → 0                     |
+| `src/core/auth/sessionPolicy.ts`                                                    | canonical | active  | p1-lane       | 8       | 6 → 6                    | 1 → 1                     |
+| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane       | 4       | 33 → 33                  | 5 → 5                     |
+| `src/core/components/ChartCard.vue`                                                 | canonical | active  | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/core/components/ChartPanel.vue`                                                | canonical | active  | p1-lane       | 2       | 3 → 3                    | 1 → 1                     |
+| `src/core/components/ChartRenderer.vue`                                             | canonical | active  | p1-lane       | 1       | 4 → 4                    | 3 → 3                     |
+| `src/core/components/DataTableColumn.vue`                                           | canonical | active  | p1-lane       | 3       | 5 → 5                    | 1 → 1                     |
+| `src/core/components/DataTableFrame.vue`                                            | canonical | active  | p1-lane       | 2       | 5 → 5                    | 3 → 3                     |
+| `src/core/components/IbFormField.vue`                                               | canonical | active  | p1-lane       | 2       | 6 → 6                    | 3 → 3                     |
+| `src/core/components/RangedLineChartCard.vue`                                       | canonical | active  | p1-lane       | 2       | 3 → 3                    | 7 → 7                     |
+| `src/core/components/SiteBrandLogo.vue`                                             | canonical | active  | p1-lane       | 1       | 5 → 5                    | 0 → 0                     |
+| `src/core/components/StatusBadge.vue`                                               | canonical | active  | p1-lane       | 3       | 5 → 5                    | 3 → 3                     |
+| `src/core/components/StudioName.vue`                                                | canonical | active  | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
+| `src/core/components/UserConfirmDialog.vue`                                         | canonical | active  | p1-lane       | 1       | 4 → 4                    | 6 → 6                     |
+| `src/core/components/formFieldContract.ts`                                          | canonical | active  | p1-lane       | 2       | 3 → 3                    | 0 → 0                     |
+| `src/core/composables/useAppClipboard.ts`                                           | canonical | active  | p1-lane       | 1       | 6 → 6                    | 0 → 0                     |
+| `src/core/composables/useAppToast.ts`                                               | canonical | active  | p1-lane       | 2       | 18 → 18                  | 1 → 1                     |
+| `src/core/composables/useAsyncAction.ts`                                            | canonical | active  | p1-lane       | 3       | 17 → 17                  | 1 → 1                     |
+| `src/core/composables/useLogoutRedirect.ts`                                         | canonical | active  | p1-lane       | 1       | 7 → 7                    | 1 → 1                     |
+| `src/core/composables/useMenuTriggerFocusRestore.ts`                                | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/core/composables/useOverlayInteractionLifecycle.ts`                            | canonical | active  | p1-lane       | 6       | 11 → 11                  | 1 → 1                     |
+| `src/core/composables/useSiteBranding.ts`                                           | canonical | active  | p1-lane       | 16      | 9 → 9                    | 5 → 5                     |
+| `src/core/composables/useSupportChannels.ts`                                        | canonical | active  | p1-lane       | 4       | 10 → 10                  | 6 → 6                     |
+| `src/core/composables/useUserConfirmDialog.ts`                                      | canonical | active  | p1-lane       | 2       | 4 → 4                    | 1 → 1                     |
+| `src/core/config/pagination.ts`                                                     | canonical | active  | p1-lane       | 2       | 16 → 16                  | 0 → 0                     |
+| `src/core/config/runtimeUrls.ts`                                                    | canonical | active  | p1-lane       | 8       | 19 → 19                  | 0 → 0                     |
+| `src/core/config/timing.ts`                                                         | canonical | active  | p1-lane       | 8       | 7 → 7                    | 0 → 0                     |
+| `src/core/constants/media.ts`                                                       | canonical | active  | p1-lane       | 5       | 6 → 6                    | 0 → 0                     |
+| `src/core/contracts/externalImageProviders.ts`                                      | canonical | active  | p1-lane       | 4       | 13 → 13                  | 0 → 0                     |
+| `src/core/contracts/generationContract.ts`                                          | canonical | active  | p1-lane       | 18      | 24 → 24                  | 0 → 0                     |
+| `src/core/contracts/imageServices.ts`                                               | canonical | active  | p1-lane       | 3       | 30 → 30                  | 0 → 0                     |
+| `src/core/errors/errorCatalog.ts`                                                   | canonical | active  | p1-lane       | 5       | 31 → 31                  | 1 → 1                     |
+| `src/core/i18n/formatters.ts`                                                       | canonical | active  | p1-lane       | 5       | 22 → 22                  | 2 → 2                     |
+| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane       | 7       | 115 → 115                | 5 → 5                     |
+| `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane       | 5       | 6 → 6                    | 0 → 0                     |
+| `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane       | 2       | 5 → 5                    | 5 → 5                     |
+| `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane       | 11      | 4 → 4                    | 0 → 0                     |
+| `src/core/i18n/locales/es/index.ts`                                                 | canonical | active  | p1-lane       | 11      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/locales/ko/index.ts`                                                 | canonical | active  | p1-lane       | 11      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/locales/zh-CN/index.ts`                                              | canonical | active  | p1-lane       | 11      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/userIdeaCurrency.ts`                                                 | canonical | active  | p1-lane       | 1       | 22 → 22                  | 1 → 1                     |
+| `src/core/i18n/userLocale.ts`                                                       | canonical | active  | p1-lane       | 9       | 18 → 18                  | 6 → 6                     |
+| `src/core/interaction/interactiveControlState.ts`                                   | canonical | active  | p1-lane       | 5       | 10 → 10                  | 0 → 0                     |
+| `src/core/interaction/menuKeyboardNavigation.ts`                                    | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
+| `src/core/lib/brandMark.ts`                                                         | canonical | active  | p1-lane       | 2       | 5 → 5                    | 0 → 0                     |
+| `src/core/lib/chartPrimitives.ts`                                                   | canonical | active  | p1-lane       | 15      | 13 → 13                  | 3 → 3                     |
+| `src/core/lib/chartTimeRange.ts`                                                    | canonical | active  | p1-lane       | 7       | 4 → 4                    | 0 → 0                     |
+| `src/core/lib/pageChrome.ts`                                                        | canonical | active  | p1-lane       | 3       | 4 → 4                    | 0 → 0                     |
+| `src/core/media/imageAssetPipeline.ts`                                              | canonical | active  | p1-lane       | 6       | 5 → 5                    | 6 → 6                     |
+| `src/core/media/imageDimensions.ts`                                                 | canonical | active  | p1-lane       | 4       | 5 → 5                    | 0 → 0                     |
+| `src/core/media/mediaRef.ts`                                                        | canonical | active  | p1-lane       | 5       | 13 → 13                  | 1 → 1                     |
+| `src/core/media/visionIngressPolicy.ts`                                             | canonical | active  | p1-lane       | 8       | 7 → 7                    | 2 → 2                     |
+| `src/core/motion/chartMotion.ts`                                                    | canonical | active  | p1-lane       | 1       | 4 → 4                    | 2 → 2                     |
+| `src/core/motion/dialogMotion.ts`                                                   | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/core/motion/motionPolicy.ts`                                                   | canonical | active  | p1-lane       | 6       | 6 → 6                    | 0 → 0                     |
+| `src/core/motion/popoverMotion.ts`                                                  | canonical | active  | p1-lane       | 3       | 7 → 7                    | 2 → 2                     |
+| `src/core/query/queryClient.ts`                                                     | canonical | active  | p1-lane       | 2       | 7 → 7                    | 1 → 1                     |
+| `src/core/query/queryDefaults.ts`                                                   | canonical | active  | p1-lane       | 5       | 17 → 17                  | 0 → 0                     |
+| `src/core/query/taskResult.ts`                                                      | canonical | active  | p1-lane       | 5       | 9 → 9                    | 1 → 1                     |
+| `src/core/query/userCreditsInvalidation.ts`                                         | canonical | active  | p1-lane       | 4       | 7 → 7                    | 0 → 0                     |
+| `src/core/router/queryParams.ts`                                                    | canonical | active  | p1-lane       | 3       | 15 → 15                  | 1 → 1                     |
+| `src/core/seo/routeSeo.ts`                                                          | canonical | active  | p1-lane       | 12      | 5 → 5                    | 0 → 0                     |
+| `src/core/seo/seoStaticHtml.ts`                                                     | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane       | 16      | 20 → 20                  | 4 → 4                     |
+| `src/core/utils/currency.ts`                                                        | canonical | active  | p1-lane       | 3       | 3 → 3                    | 2 → 2                     |
+| `src/core/utils/dateTime.ts`                                                        | canonical | active  | p1-lane       | 5       | 7 → 7                    | 2 → 2                     |
+| `src/core/utils/errorMessages.ts`                                                   | canonical | active  | p1-lane       | 4       | 12 → 12                  | 0 → 0                     |
+| `src/core/utils/formValidation.ts`                                                  | canonical | active  | p1-lane       | 3       | 5 → 5                    | 0 → 0                     |
+| `src/core/utils/ids.ts`                                                             | canonical | active  | p1-lane       | 3       | 12 → 12                  | 0 → 0                     |
+| `src/core/utils/imageUploadSupport.ts`                                              | canonical | active  | p1-lane       | 3       | 8 → 8                    | 2 → 2                     |
+| `src/core/utils/number.ts`                                                          | canonical | active  | p1-lane       | 3       | 16 → 16                  | 0 → 0                     |
+| `src/core/utils/opaqueIds.ts`                                                       | canonical | active  | p1-lane       | 5       | 9 → 9                    | 0 → 0                     |
+| `src/core/utils/polling.ts`                                                         | canonical | active  | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
+| `src/core/utils/storage.ts`                                                         | canonical | active  | p1-lane       | 8       | 15 → 15                  | 0 → 0                     |
+| `src/core/utils/workspaceId.ts`                                                     | canonical | active  | p1-lane       | 2       | 9 → 9                    | 1 → 1                     |
+| `src/features/account/application/index.ts`                                         | cascading | active  | p3-lane       | 28      | 1 → 1                    | 28 → 27                   |
+| `src/features/account/domain/index.ts`                                              | cascading | active  | p3-lane       | 23      | 16 → 16                  | 9 → 9                     |
+| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane       | 130     | 4 → 4                    | 83 → 72                   |
+| `src/features/account/infrastructure/index.ts`                                      | cascading | active  | p3-lane       | 56      | 22 → 22                  | 11 → 11                   |
+| `src/features/account/presentation/index.ts`                                        | cascading | active  | p3-lane       | 23      | 1 → 1                    | 57 → 57                   |
+| `src/features/account/ui/chrome/SupportChannelQr.vue`                               | canonical | active  | p1-lane       | 1       | 2 → 2                    | 9 → 9                     |
+| `src/features/account/ui/chrome/UserAccountMenu.vue`                                | canonical | active  | p1-lane       | 1       | 7 → 7                    | 14 → 14                   |
+| `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                        | canonical | active  | p1-lane       | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane       | 5       | 0 → 8                    | 0 → 13                    |
+| `src/features/account/ui/chrome/userAccountMenu.types.ts`                           | canonical | active  | p1-lane       | 4       | 7 → 7                    | 0 → 0                     |
+| `src/features/admin/credits/wallets/index.ts`                                       | canonical | active  | p4-lane       | 1       | 1 → 1                    | 31 → 31                   |
+| `src/features/admin/prompts/core/promptVariables.ts`                                | canonical | active  | p1-lane       | 3       | 4 → 4                    | 1 → 1                     |
+| `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane       | 14      | 17 → 17                  | 1 → 1                     |
+| `src/features/admin/shared/components/AdminAlert.vue`                               | canonical | active  | p4-lane       | 2       | 20 → 20                  | 2 → 2                     |
+| `src/features/admin/shared/components/AdminBadge.vue`                               | canonical | active  | p4-lane       | 2       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminButton.vue`                              | canonical | active  | p4-lane       | 3       | 28 → 28                  | 4 → 4                     |
+| `src/features/admin/shared/components/AdminChartCard.vue`                           | canonical | active  | p4-lane       | 1       | 1 → 1                    | 2 → 2                     |
+| `src/features/admin/shared/components/AdminCollectionPageShell.vue`                 | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/components/AdminColumn.vue`                              | canonical | active  | p4-lane       | 1       | 15 → 15                  | 0 → 0                     |
+| `src/features/admin/shared/components/AdminConfirmDialog.vue`                       | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminDialogActions.vue`                       | canonical | active  | p4-lane       | 1       | 11 → 11                  | 2 → 2                     |
+| `src/features/admin/shared/components/AdminDialogShell.vue`                         | canonical | active  | p4-lane       | 3       | 18 → 18                  | 5 → 5                     |
+| `src/features/admin/shared/components/AdminDrawer.vue`                              | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminEditorActions.vue`                       | canonical | active  | p4-lane       | 1       | 7 → 7                    | 1 → 1                     |
+| `src/features/admin/shared/components/AdminEmptyState.vue`                          | canonical | active  | p4-lane       | 1       | 15 → 15                  | 2 → 2                     |
+| `src/features/admin/shared/components/AdminFilterPopover.vue`                       | canonical | active  | p4-lane       | 1       | 3 → 3                    | 5 → 5                     |
+| `src/features/admin/shared/components/AdminFormField.vue`                           | canonical | active  | p4-lane       | 2       | 13 → 13                  | 2 → 2                     |
+| `src/features/admin/shared/components/AdminInput.vue`                               | canonical | active  | p4-lane       | 1       | 18 → 18                  | 5 → 5                     |
+| `src/features/admin/shared/components/AdminLogoCropDialog.vue`                      | canonical | active  | p4-lane       | 1       | 1 → 1                    | 8 → 8                     |
+| `src/features/admin/shared/components/AdminLogoPickerPopover.vue`                   | canonical | active  | p4-lane       | 1       | 3 → 3                    | 6 → 6                     |
+| `src/features/admin/shared/components/AdminMono.vue`                                | canonical | active  | p4-lane       | 1       | 9 → 9                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminNumberInput.vue`                         | canonical | active  | p4-lane       | 1       | 5 → 5                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminOptionFilter.vue`                        | canonical | active  | p4-lane       | 2       | 4 → 4                    | 2 → 2                     |
+| `src/features/admin/shared/components/AdminPagerControls.vue`                       | canonical | active  | p4-lane       | 1       | 5 → 5                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminPopover.vue`                             | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/components/AdminPopoverContent.vue`                      | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminPopoverTrigger.vue`                      | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/components/AdminRangedLineChartCard.vue`                 | canonical | active  | p4-lane       | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/admin/shared/components/AdminRefreshButton.vue`                       | canonical | active  | p4-lane       | 1       | 4 → 4                    | 1 → 1                     |
+| `src/features/admin/shared/components/AdminResourceToolbar.vue`                     | canonical | active  | p4-lane       | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/components/AdminRowActionsPopover.vue`                   | canonical | active  | p4-lane       | 2       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/components/AdminSelect.vue`                              | canonical | active  | p4-lane       | 2       | 11 → 11                  | 5 → 5                     |
+| `src/features/admin/shared/components/AdminSettingsDialogFrame.vue`                 | canonical | active  | p4-lane       | 1       | 2 → 2                    | 5 → 5                     |
+| `src/features/admin/shared/components/AdminSpinner.vue`                             | canonical | active  | p4-lane       | 1       | 11 → 11                  | 2 → 2                     |
+| `src/features/admin/shared/components/AdminStatusPill.vue`                          | canonical | active  | p4-lane       | 2       | 24 → 24                  | 1 → 1                     |
+| `src/features/admin/shared/components/AdminSubNavigationLayout.vue`                 | canonical | active  | p4-lane       | 2       | 1 → 1                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminSummaryCard.vue`                         | canonical | active  | p4-lane       | 1       | 1 → 1                    | 0 → 0                     |
+| `src/features/admin/shared/components/AdminSwitch.vue`                              | canonical | active  | p4-lane       | 1       | 13 → 13                  | 3 → 3                     |
+| `src/features/admin/shared/components/AdminTable.vue`                               | canonical | active  | p4-lane       | 5       | 14 → 14                  | 13 → 13                   |
+| `src/features/admin/shared/components/AdminTablePanel.vue`                          | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/components/AdminTextarea.vue`                            | canonical | active  | p4-lane       | 1       | 4 → 4                    | 3 → 3                     |
+| `src/features/admin/shared/components/AdminToolbarSearch.vue`                       | canonical | active  | p4-lane       | 1       | 9 → 9                    | 3 → 3                     |
+| `src/features/admin/shared/components/SwitchRow.vue`                                | canonical | active  | p4-lane       | 2       | 4 → 4                    | 2 → 2                     |
+| `src/features/admin/shared/composables/useAdminCollectionQuery.ts`                  | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/composables/useAdminConfirm.ts`                          | canonical | active  | p4-lane       | 9       | 21 → 21                  | 1 → 1                     |
+| `src/features/admin/shared/composables/useAdminCursorCollection.ts`                 | canonical | active  | p4-lane       | 1       | 6 → 6                    | 4 → 4                     |
+| `src/features/admin/shared/composables/useAnomalyRadar.ts`                          | canonical | active  | p4-lane       | 1       | 1 → 1                    | 5 → 5                     |
+| `src/features/admin/shared/composables/useOptimisticToggle.ts`                      | canonical | active  | p4-lane       | 3       | 5 → 5                    | 1 → 1                     |
+| `src/features/admin/shared/composables/usePagePagination.ts`                        | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/composables/useQueryPolling.ts`                          | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/composables/useRefetchOnClose.ts`                        | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/index.ts`                                                | canonical | planned | p4-lane       | 131     | 0 → 125                  | 0 → 56                    |
+| `src/features/admin/shared/lib/anomalyRules.ts`                                     | canonical | active  | p4-lane       | 4       | 3 → 3                    | 3 → 3                     |
+| `src/features/admin/shared/lib/cellClasses.ts`                                      | canonical | active  | p4-lane       | 4       | 4 → 4                    | 0 → 0                     |
+| `src/features/admin/shared/lib/cellPlaceholders.ts`                                 | canonical | active  | p4-lane       | 4       | 7 → 7                    | 0 → 0                     |
+| `src/features/admin/shared/lib/chart.ts`                                            | canonical | active  | p4-lane       | 14      | 8 → 8                    | 6 → 6                     |
+| `src/features/admin/shared/lib/confirmSettingsSave.ts`                              | canonical | active  | p4-lane       | 7       | 11 → 11                  | 2 → 2                     |
+| `src/features/admin/shared/lib/controlCopy.ts`                                      | canonical | active  | p4-lane       | 2       | 18 → 18                  | 1 → 1                     |
+| `src/features/admin/shared/lib/controlGuidance.ts`                                  | canonical | active  | p4-lane       | 3       | 6 → 6                    | 0 → 0                     |
+| `src/features/admin/shared/lib/controlMutation.ts`                                  | canonical | active  | p4-lane       | 10      | 23 → 23                  | 1 → 1                     |
+| `src/features/admin/shared/lib/controlResource.ts`                                  | canonical | active  | p4-lane       | 2       | 5 → 5                    | 3 → 3                     |
+| `src/features/admin/shared/lib/reconcileStableRows.ts`                              | canonical | active  | p4-lane       | 1       | 4 → 4                    | 0 → 0                     |
+| `src/features/admin/shared/lib/secretSchema.ts`                                     | canonical | active  | p4-lane       | 1       | 4 → 4                    | 1 → 1                     |
+| `src/features/admin/shared/lib/serviceAdminMeta.ts`                                 | canonical | active  | p4-lane       | 6       | 3 → 3                    | 1 → 1                     |
+| `src/features/admin/shared/lib/tableColumns.ts`                                     | canonical | active  | p4-lane       | 2       | 8 → 8                    | 0 → 0                     |
+| `src/features/admin/shared/lib/taskMetricTokens.ts`                                 | canonical | active  | p4-lane       | 7       | 12 → 12                  | 1 → 1                     |
+| `src/features/admin/shared/lib/timeRange.ts`                                        | canonical | active  | p4-lane       | 5       | 4 → 4                    | 2 → 2                     |
+| `src/features/admin/shared/lib/toast.ts`                                            | canonical | active  | p4-lane       | 4       | 39 → 39                  | 2 → 2                     |
+| `src/features/admin/shared/lib/uiClasses.ts`                                        | canonical | active  | p4-lane       | 38      | 36 → 36                  | 0 → 0                     |
+| `src/features/admin/shared/logos/brandLogos.ts`                                     | canonical | active  | p4-lane       | 14      | 11 → 11                  | 14 → 14                   |
+| `src/features/admin/shared/logos/useBrandLogoOverrides.ts`                          | canonical | active  | p4-lane       | 1       | 1 → 1                    | 5 → 5                     |
+| `src/features/admin/shared/ui/serviceIcons.ts`                                      | canonical | active  | p1-lane       | 1       | 4 → 4                    | 3 → 3                     |
+| `src/features/admin/shared/validation/actionReasonContract.ts`                      | canonical | active  | p4-lane       | 3       | 2 → 2                    | 0 → 0                     |
+| `src/features/auth/components/auth-fields/index.ts`                                 | cascading | active  | p2-lane       | 10      | 3 → 3                    | 11 → 11                   |
+| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane       | 28      | 28 → 28                  | 45 → 41                   |
+| `src/features/board/application/catalog/index.ts`                                   | cascading | active  | p3-lane       | 43      | 2 → 2                    | 11 → 11                   |
+| `src/features/board/application/collaboration/index.ts`                             | cascading | active  | p3-lane       | 2       | 1 → 1                    | 6 → 6                     |
+| `src/features/board/application/sync/index.ts`                                      | cascading | active  | p3-lane       | 14      | 2 → 2                    | 12 → 12                   |
+| `src/features/board/domain/document/index.ts`                                       | cascading | active  | p3-lane       | 87      | 1 → 1                    | 6 → 6                     |
+| `src/features/board/domain/index.ts`                                                | cascading | active  | p3-lane       | 92      | 13 → 13                  | 7 → 7                     |
+| `src/features/board/domain/media/index.ts`                                          | cascading | active  | p3-lane       | 1       | 1 → 1                    | 3 → 3                     |
+| `src/features/board/domain/schema/index.ts`                                         | cascading | active  | p3-lane       | 4       | 1 → 1                    | 9 → 9                     |
+| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane       | 182     | 48 → 48                  | 42 → 42                   |
+| `src/features/board/infrastructure/persistence/index.ts`                            | cascading | active  | p3-lane       | 13      | 7 → 7                    | 5 → 5                     |
+| `src/features/board/infrastructure/preview/index.ts`                                | cascading | active  | p3-lane       | 5       | 6 → 6                    | 12 → 12                   |
+| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane       | 83      | 95 → 95                  | 42 → 42                   |
+| `src/features/board/presentation/catalog/index.ts`                                  | cascading | active  | p3-lane       | 14      | 1 → 1                    | 27 → 27                   |
+| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane       | 7       | 7 → 7                    | 1 → 1                     |
+| `src/features/canvas/application/board-session/index.ts`                            | canonical | active  | p5-lane       | 9       | 5 → 5                    | 17 → 17                   |
+| `src/features/canvas/application/editing/index.ts`                                  | canonical | active  | p5-lane       | 10      | 5 → 5                    | 40 → 40                   |
+| `src/features/canvas/application/execution/board-attachment/index.ts`               | canonical | active  | p5-lane       | 2       | 12 → 12                  | 0 → 0                     |
+| `src/features/canvas/application/execution/index.ts`                                | canonical | active  | p5-lane       | 54      | 21 → 21                  | 54 → 54                   |
+| `src/features/canvas/application/execution/pending-execution/index.ts`              | cascading | active  | p5-lane       | 27      | 22 → 22                  | 8 → 8                     |
+| `src/features/canvas/application/execution/result-nodes/index.ts`                   | cascading | active  | p5-lane       | 16      | 4 → 4                    | 23 → 23                   |
+| `src/features/canvas/application/execution/task-lifecycle/index.ts`                 | canonical | active  | p5-lane       | 3       | 1 → 1                    | 1 → 1                     |
+| `src/features/canvas/application/image-workflow/index.ts`                           | canonical | active  | p5-lane       | 3       | 4 → 4                    | 34 → 34                   |
+| `src/features/canvas/application/workspace/index.ts`                                | canonical | active  | p5-lane       | 2       | 4 → 4                    | 30 → 30                   |
+| `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane       | 1       | 7 → 7                    | 1 → 1                     |
+| `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane       | 1       | 5 → 5                    | 1 → 1                     |
+| `src/features/canvas/domain/graph/index.ts`                                         | canonical | active  | p5-lane       | 58      | 59 → 59                  | 3 → 3                     |
+| `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane       | 2       | 0 → 2                    | 0 → 79                    |
+| `src/features/canvas/infrastructure/vue-flow-adapter/index.ts`                      | canonical | active  | p5-lane       | 20      | 20 → 20                  | 27 → 27                   |
+| `src/features/canvas/presentation/chrome/components/index.ts`                       | canonical | active  | p5-lane       | 6       | 1 → 1                    | 12 → 12                   |
+| `src/features/canvas/presentation/chrome/index.ts`                                  | cascading | active  | p5-lane       | 6       | 1 → 1                    | 21 → 21                   |
+| `src/features/canvas/presentation/nodes/groups/index.ts`                            | canonical | active  | p5-lane       | 4       | 3 → 3                    | 10 → 10                   |
+| `src/features/canvas/presentation/nodes/index.ts`                                   | canonical | active  | p5-lane       | 9       | 3 → 3                    | 50 → 50                   |
+| `src/features/canvas/presentation/nodes/primitives/index.ts`                        | canonical | active  | p5-lane       | 21      | 5 → 5                    | 15 → 15                   |
+| `src/features/canvas/presentation/nodes/workflows/index.ts`                         | canonical | active  | p5-lane       | 7       | 1 → 1                    | 33 → 33                   |
+| `src/features/canvas/presentation/overlays/index.ts`                                | canonical | active  | p5-lane       | 2       | 5 → 5                    | 16 → 16                   |
+| `src/features/canvas/presentation/pages/CanvasLandingPage.vue`                      | canonical | active  | p5-lane       | 1       | 2 → 2                    | 10 → 10                   |
+| `src/features/canvas/presentation/pages/CanvasPage.vue`                             | canonical | active  | p5-lane       | 1       | 2 → 2                    | 4 → 4                     |
+| `src/features/canvas/presentation/screens/index.ts`                                 | canonical | active  | p5-lane       | 1       | 1 → 1                    | 51 → 51                   |
+| `src/features/canvas/session/media/preloadImage.ts`                                 | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
+| `src/features/canvas/session/serviceImageActionText.ts`                             | canonical | active  | p1-lane       | 2       | 3 → 3                    | 3 → 3                     |
+| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane       | 10      | 9 → 9                    | 24 → 24                   |
+| `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane       | 6       | 5 → 5                    | 15 → 15                   |
+| `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane       | 7       | 2 → 2                    | 6 → 6                     |
+| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane       | 34      | 13 → 13                  | 27 → 27                   |
+| `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane       | 7       | 0 → 0                    | 3 → 5                     |
+| `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
+| `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane       | 4       | 4 → 4                    | 0 → 0                     |
+| `src/features/library/index.ts`                                                     | canonical | active  | p2-lane       | 69      | 23 → 23                  | 37 → 37                   |
+| `src/features/search/index.ts`                                                      | canonical | active  | p3-lane       | 21      | 2 → 2                    | 40 → 40                   |
+| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 32      | 16 → 16                  | 50 → 48                   |
+| `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane       | 9       | 34 → 34                  | 1 → 1                     |
+| `src/shared/api/client.ts`                                                          | canonical | retired | p1-lane       | 6       | 12 → 12                  | 4 → 4                     |
+| `src/shared/api/contractKernel.ts`                                                  | canonical | retired | p1-lane       | 24      | 40 → 40                  | 2 → 2                     |
+| `src/shared/api/generated-query/control/control-billing/control-billing.ts`         | canonical | retired | p1-lane       | 56      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-credits/control-credits.ts`         | canonical | retired | p1-lane       | 145     | 4 → 4                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-payments/control-payments.ts`       | canonical | retired | p1-lane       | 39      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-platform/control-platform.ts`       | canonical | retired | p1-lane       | 402     | 14 → 14                  | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-tasks/control-tasks.ts`             | canonical | retired | p1-lane       | 22      | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-users/control-users.ts`             | canonical | retired | p1-lane       | 80      | 4 → 4                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/index.ts`                                   | cascading | retired | p1-lane       | 784     | 0 → 0                    | 3 → 3                     |
+| `src/shared/api/generated-query/control/model/controlMailConfigRequest.ts`          | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts`       | canonical | retired | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts`        | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlTaskEnvelope.ts`               | canonical | retired | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/shared/api/generated-query/control/model/index.ts`                             | canonical | retired | p1-lane       | 159     | 17 → 17                  | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/supportChannelKind.ts`                | canonical | retired | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/supportChannelsSetting.ts`            | canonical | retired | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
+| `src/shared/api/generated-query/public/boards/boards.ts`                            | canonical | retired | p1-lane       | 144     | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/index.ts`                                    | cascading | retired | p1-lane       | 619     | 0 → 0                    | 3 → 3                     |
+| `src/shared/api/generated-query/public/model/board.ts`                              | canonical | retired | p1-lane       | 1       | 4 → 4                    | 2 → 2                     |
+| `src/shared/api/generated-query/public/model/boardDocument.ts`                      | canonical | retired | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/shared/api/generated-query/public/model/index.ts`                              | canonical | retired | p1-lane       | 236     | 19 → 19                  | 0 → 0                     |
+| `src/shared/api/generated-query/public/user/user.ts`                                | canonical | retired | p1-lane       | 23      | 5 → 5                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts`      | canonical | retired | p1-lane       | 97      | 6 → 6                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-library/workspace-library.ts`      | canonical | retired | p1-lane       | 75      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts`      | canonical | retired | p1-lane       | 16      | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-search/workspace-search.ts`        | canonical | retired | p1-lane       | 16      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspaces/workspaces.ts`                    | canonical | retired | p1-lane       | 40      | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/idempotencyKey.ts`                                                  | canonical | retired | p1-lane       | 13      | 12 → 12                  | 0 → 0                     |
+| `src/shared/api/mediaAssetDelivery.ts`                                              | canonical | retired | p1-lane       | 25      | 25 → 25                  | 4 → 4                     |
+| `src/shared/api/mediaWorkspaceScope.ts`                                             | canonical | retired | p1-lane       | 3       | 6 → 6                    | 0 → 0                     |
+| `src/shared/api/sessionUserType.ts`                                                 | canonical | retired | p1-lane       | 1       | 13 → 13                  | 0 → 0                     |
+| `src/shared/api/stripUndefined.ts`                                                  | canonical | retired | p1-lane       | 2       | 11 → 11                  | 0 → 0                     |
+| `src/shared/api/upload.ts`                                                          | canonical | retired | p1-lane       | 22      | 10 → 10                  | 7 → 7                     |
+| `src/shared/api/userSession.ts`                                                     | canonical | retired | p1-lane       | 2       | 2 → 2                    | 3 → 3                     |
+| `src/shared/api/workspaceEventStream.ts`                                            | canonical | retired | p1-lane       | 19      | 5 → 5                    | 3 → 3                     |
+| `src/shared/api/workspaceTaskContract.ts`                                           | canonical | retired | p1-lane       | 14      | 5 → 5                    | 2 → 2                     |
+| `src/shared/api/workspaceTaskTransport.ts`                                          | canonical | retired | p1-lane       | 7       | 7 → 7                    | 5 → 5                     |
+| `src/shared/api/workspaceTaskWaiter.ts`                                             | canonical | retired | p1-lane       | 2       | 2 → 2                    | 5 → 5                     |
+| `src/shared/api/workspaceTasks.ts`                                                  | canonical | retired | p1-lane       | 23      | 3 → 3                    | 3 → 3                     |
+| `src/shared/auth/adminAccess.ts`                                                    | canonical | retired | p1-lane       | 2       | 1 → 1                    | 0 → 0                     |
+| `src/shared/auth/client.ts`                                                         | canonical | retired | p1-lane       | 3       | 2 → 2                    | 4 → 4                     |
+| `src/shared/auth/oauthProviders.ts`                                                 | canonical | retired | p1-lane       | 2       | 6 → 6                    | 0 → 0                     |
+| `src/shared/auth/passwordPolicy.ts`                                                 | canonical | retired | p1-lane       | 8       | 5 → 5                    | 1 → 1                     |
+| `src/shared/auth/sessionPolicy.ts`                                                  | canonical | retired | p1-lane       | 8       | 5 → 5                    | 1 → 1                     |
+| `src/shared/components/ActionButton.vue`                                            | canonical | retired | p1-lane       | 4       | 31 → 31                  | 5 → 5                     |
+| `src/shared/components/ChartCard.vue`                                               | canonical | retired | p1-lane       | 1       | 2 → 2                    | 2 → 2                     |
+| `src/shared/components/ChartPanel.vue`                                              | canonical | retired | p1-lane       | 2       | 2 → 2                    | 1 → 1                     |
+| `src/shared/components/ChartRenderer.vue`                                           | canonical | retired | p1-lane       | 1       | 3 → 3                    | 3 → 3                     |
+| `src/shared/components/DataTableColumn.vue`                                         | canonical | retired | p1-lane       | 3       | 4 → 4                    | 1 → 1                     |
+| `src/shared/components/DataTableFrame.vue`                                          | canonical | retired | p1-lane       | 2       | 4 → 4                    | 3 → 3                     |
+| `src/shared/components/IbFormField.vue`                                             | canonical | retired | p1-lane       | 2       | 5 → 5                    | 3 → 3                     |
+| `src/shared/components/RangedLineChartCard.vue`                                     | canonical | retired | p1-lane       | 2       | 2 → 2                    | 7 → 7                     |
+| `src/shared/components/SiteBrandLogo.vue`                                           | canonical | retired | p1-lane       | 1       | 4 → 4                    | 0 → 0                     |
+| `src/shared/components/StatusBadge.vue`                                             | canonical | retired | p1-lane       | 3       | 4 → 4                    | 3 → 3                     |
+| `src/shared/components/StudioName.vue`                                              | canonical | retired | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/shared/components/UserAccountMenu.vue`                                         | canonical | retired | p3-lane       | 1       | 5 → 5                    | 14 → 14                   |
+| `src/shared/components/UserConfirmDialog.vue`                                       | canonical | retired | p1-lane       | 1       | 2 → 2                    | 6 → 6                     |
+| `src/shared/components/formFieldContract.ts`                                        | canonical | retired | p1-lane       | 2       | 2 → 2                    | 0 → 0                     |
+| `src/shared/components/userAccountMenu.types.ts`                                    | canonical | retired | p3-lane       | 4       | 6 → 6                    | 0 → 0                     |
+| `src/shared/composables/useAppClipboard.ts`                                         | canonical | retired | p1-lane       | 1       | 5 → 5                    | 0 → 0                     |
+| `src/shared/composables/useAppToast.ts`                                             | canonical | retired | p1-lane       | 2       | 17 → 17                  | 1 → 1                     |
+| `src/shared/composables/useAsyncAction.ts`                                          | canonical | retired | p1-lane       | 3       | 16 → 16                  | 1 → 1                     |
+| `src/shared/composables/useLogoutRedirect.ts`                                       | canonical | retired | p1-lane       | 1       | 6 → 6                    | 1 → 1                     |
+| `src/shared/composables/useOverlayInteractionLifecycle.ts`                          | canonical | retired | p1-lane       | 6       | 10 → 10                  | 1 → 1                     |
+| `src/shared/composables/useSiteBranding.ts`                                         | canonical | retired | p1-lane       | 16      | 8 → 8                    | 5 → 5                     |
+| `src/shared/composables/useSupportChannels.ts`                                      | canonical | retired | p1-lane       | 4       | 9 → 9                    | 6 → 6                     |
+| `src/shared/composables/useUserConfirmDialog.ts`                                    | canonical | retired | p1-lane       | 2       | 3 → 3                    | 1 → 1                     |
+| `src/shared/config/pagination.ts`                                                   | canonical | retired | p1-lane       | 2       | 15 → 15                  | 0 → 0                     |
+| `src/shared/config/runtimeUrls.ts`                                                  | canonical | retired | p1-lane       | 8       | 18 → 18                  | 0 → 0                     |
+| `src/shared/config/timing.ts`                                                       | canonical | retired | p1-lane       | 8       | 6 → 6                    | 0 → 0                     |
+| `src/shared/constants/contacts.ts`                                                  | canonical | retired | p1-lane       | 1       | 1 → 1                    | 0 → 0                     |
+| `src/shared/constants/legalLinks.ts`                                                | canonical | retired | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
+| `src/shared/constants/media.ts`                                                     | canonical | retired | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
+| `src/shared/constants/routePaths.ts`                                                | canonical | retired | p1-lane       | 27      | 44 → 44                  | 0 → 0                     |
+| `src/shared/domain/externalImageProviders.ts`                                       | canonical | retired | p1-lane       | 4       | 12 → 12                  | 0 → 0                     |
+| `src/shared/domain/generationContract.ts`                                           | canonical | retired | p1-lane       | 18      | 23 → 23                  | 0 → 0                     |
+| `src/shared/domain/imageActions.ts`                                                 | canonical | retired | p1-lane       | 1       | 6 → 6                    | 1 → 1                     |
+| `src/shared/domain/imageServices.ts`                                                | canonical | retired | p1-lane       | 3       | 24 → 24                  | 0 → 0                     |
+| `src/shared/domain/serviceIcons.ts`                                                 | canonical | retired | p1-lane       | 1       | 3 → 3                    | 3 → 3                     |
+| `src/shared/domain/serviceRegistry.ts`                                              | canonical | retired | p1-lane       | 6       | 4 → 4                    | 2 → 2                     |
+| `src/shared/errors/errorCatalog.ts`                                                 | canonical | retired | p1-lane       | 5       | 30 → 30                  | 1 → 1                     |
+| `src/shared/i18n/formatters.ts`                                                     | canonical | retired | p1-lane       | 5       | 20 → 20                  | 2 → 2                     |
+| `src/shared/i18n/index.ts`                                                          | canonical | retired | p1-lane       | 7       | 112 → 112                | 5 → 5                     |
+| `src/shared/i18n/localeCore.ts`                                                     | canonical | retired | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
+| `src/shared/i18n/locales/en/index.ts`                                               | cascading | retired | p1-lane       | 11      | 1 → 1                    | 0 → 0                     |
+| `src/shared/i18n/locales/es/index.ts`                                               | cascading | retired | p1-lane       | 11      | 2 → 2                    | 0 → 0                     |
+| `src/shared/i18n/locales/ko/index.ts`                                               | cascading | retired | p1-lane       | 11      | 2 → 2                    | 0 → 0                     |
+| `src/shared/i18n/locales/zh-CN/index.ts`                                            | cascading | retired | p1-lane       | 11      | 2 → 2                    | 0 → 0                     |
+| `src/shared/i18n/userIdeaCurrency.ts`                                               | canonical | retired | p1-lane       | 1       | 21 → 21                  | 1 → 1                     |
+| `src/shared/i18n/userLocale.ts`                                                     | canonical | retired | p1-lane       | 9       | 15 → 15                  | 6 → 6                     |
+| `src/shared/interaction/interactiveControlState.ts`                                 | canonical | retired | p1-lane       | 5       | 8 → 8                    | 0 → 0                     |
+| `src/shared/interaction/menuKeyboardNavigation.ts`                                  | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/lib/brandMark.ts`                                                       | canonical | retired | p1-lane       | 2       | 4 → 4                    | 0 → 0                     |
+| `src/shared/lib/chartPrimitives.ts`                                                 | canonical | retired | p1-lane       | 15      | 12 → 12                  | 3 → 3                     |
+| `src/shared/lib/chartTimeRange.ts`                                                  | canonical | retired | p1-lane       | 7       | 3 → 3                    | 0 → 0                     |
+| `src/shared/lib/pageChrome.ts`                                                      | canonical | retired | p1-lane       | 3       | 3 → 3                    | 0 → 0                     |
+| `src/shared/media/imageAssetPipeline.ts`                                            | canonical | retired | p1-lane       | 6       | 4 → 4                    | 6 → 6                     |
+| `src/shared/media/imageDimensions.ts`                                               | canonical | retired | p1-lane       | 4       | 4 → 4                    | 0 → 0                     |
+| `src/shared/media/mediaRef.ts`                                                      | canonical | retired | p1-lane       | 5       | 12 → 12                  | 1 → 1                     |
+| `src/shared/media/preloadImage.ts`                                                  | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/media/visionIngressPolicy.ts`                                           | canonical | retired | p1-lane       | 8       | 6 → 6                    | 2 → 2                     |
+| `src/shared/motion/chartMotion.ts`                                                  | canonical | retired | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
+| `src/shared/motion/motionPolicy.ts`                                                 | canonical | retired | p1-lane       | 6       | 5 → 5                    | 0 → 0                     |
+| `src/shared/motion/popoverMotion.ts`                                                | canonical | retired | p1-lane       | 3       | 6 → 6                    | 2 → 2                     |
+| `src/shared/query/queryClient.ts`                                                   | canonical | retired | p1-lane       | 2       | 5 → 5                    | 1 → 1                     |
+| `src/shared/query/queryDefaults.ts`                                                 | canonical | retired | p1-lane       | 5       | 16 → 16                  | 0 → 0                     |
+| `src/shared/query/taskResult.ts`                                                    | canonical | retired | p1-lane       | 5       | 8 → 8                    | 1 → 1                     |
+| `src/shared/query/userCreditsInvalidation.ts`                                       | canonical | retired | p1-lane       | 4       | 6 → 6                    | 0 → 0                     |
+| `src/shared/router/queryParams.ts`                                                  | canonical | retired | p1-lane       | 3       | 14 → 14                  | 1 → 1                     |
+| `src/shared/seo/routeSeo.ts`                                                        | canonical | retired | p1-lane       | 12      | 4 → 4                    | 0 → 0                     |
+| `src/shared/theme/appOverlayMenu.ts`                                                | canonical | retired | p1-lane       | 5       | 7 → 7                    | 0 → 0                     |
+| `src/shared/theme/composables/useTheme.ts`                                          | canonical | retired | p1-lane       | 4       | 7 → 7                    | 3 → 3                     |
+| `src/shared/theme/dialogMask.ts`                                                    | canonical | retired | p1-lane       | 1       | 6 → 6                    | 0 → 0                     |
+| `src/shared/theme/formControls.ts`                                                  | canonical | retired | p1-lane       | 4       | 10 → 10                  | 0 → 0                     |
+| `src/shared/theme/lightboxScrim.ts`                                                 | canonical | retired | p1-lane       | 3       | 3 → 3                    | 0 → 0                     |
+| `src/shared/utils/auth.ts`                                                          | canonical | retired | p1-lane       | 15      | 16 → 16                  | 4 → 4                     |
+| `src/shared/utils/currency.ts`                                                      | canonical | retired | p1-lane       | 3       | 2 → 2                    | 2 → 2                     |
+| `src/shared/utils/dateTime.ts`                                                      | canonical | retired | p1-lane       | 5       | 6 → 6                    | 2 → 2                     |
+| `src/shared/utils/errorMessages.ts`                                                 | canonical | retired | p1-lane       | 4       | 11 → 11                  | 0 → 0                     |
+| `src/shared/utils/formValidation.ts`                                                | canonical | retired | p1-lane       | 3       | 4 → 4                    | 0 → 0                     |
+| `src/shared/utils/ids.ts`                                                           | canonical | retired | p1-lane       | 3       | 11 → 11                  | 0 → 0                     |
+| `src/shared/utils/imageUploadSupport.ts`                                            | canonical | retired | p1-lane       | 3       | 7 → 7                    | 2 → 2                     |
+| `src/shared/utils/number.ts`                                                        | canonical | retired | p1-lane       | 3       | 15 → 15                  | 0 → 0                     |
+| `src/shared/utils/opaqueIds.ts`                                                     | canonical | retired | p1-lane       | 5       | 8 → 8                    | 0 → 0                     |
+| `src/shared/utils/polling.ts`                                                       | canonical | retired | p1-lane       | 5       | 4 → 4                    | 0 → 0                     |
+| `src/shared/utils/storage.ts`                                                       | canonical | retired | p1-lane       | 8       | 14 → 14                  | 0 → 0                     |
+| `src/shared/utils/workspaceId.ts`                                                   | canonical | retired | p1-lane       | 2       | 8 → 8                    | 1 → 1                     |
+| `src/test/factories/index.ts`                                                       | canonical | active  | integrator    | 12      | 15 → 14                  | 1 → 1                     |
+| `src/theme/appOverlayMenu.ts`                                                       | canonical | active  | p1-lane       | 5       | 7 → 7                    | 0 → 0                     |
+| `src/theme/composables/themeKeyboard.ts`                                            | canonical | active  | p1-lane       | 2       | 2 → 2                    | 2 → 2                     |
+| `src/theme/composables/themeMode.ts`                                                | canonical | active  | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
+| `src/theme/composables/useTheme.ts`                                                 | canonical | active  | p1-lane       | 4       | 9 → 9                    | 3 → 3                     |
+| `src/theme/dialogMask.ts`                                                           | canonical | active  | p1-lane       | 1       | 7 → 7                    | 0 → 0                     |
+| `src/theme/formControls.ts`                                                         | canonical | active  | p1-lane       | 4       | 11 → 11                  | 0 → 0                     |
+| `src/theme/lightboxScrim.ts`                                                        | canonical | active  | p1-lane       | 3       | 4 → 4                    | 0 → 0                     |
+
 <!-- SEAM_TABLE_END -->
 
 ## Appendix A. Settled verification baseline (2026-10-10)
 
-| Command (from `apps/web`) | Wall time | Notes |
-|---|---|---|
-| `npm run build` | 22.40s | exit 0; vue-tsc -b + vite build + bundle:size:check. JS 163 files 4625.1KB (gzip 1360.7KB); CSS 12 files 305.6KB; initial JS 785.5KB. |
-| `npm run test:run` | 132.08s | exit 0; Vitest 131.31s, 526 files / 3503 tests passed. Spec inventory is 537 files; executable suite count is a different metric. |
-| `npm run lint` | 104.44s | exit 0; ESLint 0 errors / 131 warnings; existing gates, P0 governance fixtures, migration ledger, boundary fixtures, scoped Knip and surface check passed. |
+| Command (from `apps/web`) | Wall time | Notes                                                                                                                                                      |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build`           | 22.40s    | exit 0; vue-tsc -b + vite build + bundle:size:check. JS 163 files 4625.1KB (gzip 1360.7KB); CSS 12 files 305.6KB; initial JS 785.5KB.                      |
+| `npm run test:run`        | 132.08s   | exit 0; Vitest 131.31s, 526 files / 3503 tests passed. Spec inventory is 537 files; executable suite count is a different metric.                          |
+| `npm run lint`            | 104.44s   | exit 0; ESLint 0 errors / 131 warnings; existing gates, P0 governance fixtures, migration ledger, boundary fixtures, scoped Knip and surface check passed. |
 
 Final targeted checks (same checkout):
 
-| Command | Result |
-|---|---|
-| `npm run lint:dependencies` (cruiser + fixtures + fan report) | exit 0; 4 positive / 25 negative boundary fixtures and old/new pure-runtime fixtures pass. Report covers 260 active and 122 planned records; 258 deep-edge advisories and 11 planned projection differences remain visible. Planned entries are not accepted. |
-| `npm run api:surface:check` / surface self-test | exit 0; 237 entries / 3261 symbols; 12 fixtures include missing exports, named cycles and Vue named exports. |
-| `npm run test:typecheck` / `tsc -p tsconfig.node.json --noEmit` | exit 0. |
-| `npm run lint:p0-governance` / migration ledger fixtures | exit 0; typed bindings/barrels and 12 schema/AST cases pass. Ledger has 494 constraints, R=403, frozen i18n=18, B=57; pending replacements/scenarios are not migration acceptance. |
-| `npm run audit:knip-ledger` | exit 0; 2316 issues match the ledger. Full normal remains red with 253 types; production strict remains red with 38 files / 1074 exports / 950 types / 1 duplicate. Scoped CI Knip passes. |
-| `npm run format:check` | exit 1 on 14 pre-existing, untouched source files. All modified Web files pass targeted Prettier; generated JSON uses repository Prettier config. |
+| Command                                                         | Result                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint:dependencies` (cruiser + fixtures + fan report)   | exit 0; 4 positive / 25 negative boundary fixtures and old/new pure-runtime fixtures pass. Report covers 260 active and 122 planned records; 258 deep-edge advisories and 11 planned projection differences remain visible. Planned entries are not accepted. |
+| `npm run api:surface:check` / surface self-test                 | exit 0; 237 entries / 3261 symbols; 12 fixtures include missing exports, named cycles and Vue named exports.                                                                                                                                                  |
+| `npm run test:typecheck` / `tsc -p tsconfig.node.json --noEmit` | exit 0.                                                                                                                                                                                                                                                       |
+| `npm run lint:p0-governance` / migration ledger fixtures        | exit 0; typed bindings/barrels and 12 schema/AST cases pass. Ledger has 494 constraints, R=403, frozen i18n=18, B=57; pending replacements/scenarios are not migration acceptance.                                                                            |
+| `npm run audit:knip-ledger`                                     | exit 0; 2316 issues match the ledger. Full normal remains red with 253 types; production strict remains red with 38 files / 1074 exports / 950 types / 1 duplicate. Scoped CI Knip passes.                                                                    |
+| `npm run format:check`                                          | exit 1 on 14 pre-existing, untouched source files. All modified Web files pass targeted Prettier; generated JSON uses repository Prettier config.                                                                                                             |
 
 _Machine: darwin/arm64, Node v22.23.2; checkpoint `70e5758eddad32b588eaf641d1a470848283b0d4` plus uncommitted P0 fixes. Build, test and lint were timed as separate commands after implementation settled; targeted read-only checks may overlap. These are local single-run baselines, not CI timing or a green immutable rollback checkpoint. No P1 migration, commit or push was performed._
+
+## P1 最终本地验证（2026-10-11）
+
+Strict surface 保留 254 entries / 3330 symbols；109 compatibility shims 的 TTL 与 deletion owner 已验证。完整命令结果、测试数量与独立复核结论见 [PLANS.md 的 P1 验收记录](../PLANS.md#p1-剩余验收项处理2026-10-10)，frozen quota 与 replacement evidence 见 [frontend contract inventory](architecture/frontend-contract-inventory.md)。这些记录是本地 working-tree 验证；CI/checkpoint evidence 仍 unset，phase marker 仍为 P1。历史 P0 报告保留供追溯。

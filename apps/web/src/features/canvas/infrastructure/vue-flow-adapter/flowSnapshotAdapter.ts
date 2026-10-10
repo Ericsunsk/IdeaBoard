@@ -1,5 +1,5 @@
 import { toRaw } from 'vue'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   CANVAS_NODE_REGISTRY_LIST,
   createEmptyBoardSnapshot,
@@ -41,9 +41,9 @@ export interface FlowAdapterEdge {
   data?: unknown
 }
 
-export type FlowSnapshotProjection = 'persistable' | 'runtime'
+type FlowSnapshotProjection = 'persistable' | 'runtime'
 
-export type FlowToBoardSnapshotOptions = {
+type FlowToBoardSnapshotOptions = {
   projection?: FlowSnapshotProjection
 }
 

@@ -7,7 +7,7 @@ import {
   type MaybeRefOrGetter,
   type Ref,
 } from 'vue'
-import { normalizePageSize } from '../../../../shared/config/pagination'
+import { normalizePageSize } from '../../../../core/config/pagination'
 
 type AdminPagePaginationOptions = {
   currentPage: Ref<number>

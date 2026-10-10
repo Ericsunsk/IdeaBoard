@@ -43,7 +43,7 @@ export type CanvasTaskRequestData = {
   params?: CanvasTaskParams
 }
 
-export type SubmitTaskReadinessBilling = {
+type SubmitTaskReadinessBilling = {
   sufficient: boolean
   unit_credits: number
   total_credits: number
@@ -66,5 +66,3 @@ export type SubmitTaskReadinessData = {
 export type SubmitTaskReadinessMatrixRequest = {
   requests: CanvasTaskRequestData[]
 }
-
-export type SubmitTaskReadinessMatrixItem = SubmitTaskReadinessData

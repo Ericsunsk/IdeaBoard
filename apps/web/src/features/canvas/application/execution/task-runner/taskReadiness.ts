@@ -2,8 +2,8 @@ import type {
   SubmitTaskReadinessData,
   CanvasTaskRequestData,
 } from '../../../domain/execution-contracts/canvasTaskRequest'
-import { sanitizeApiErrorMessage } from '../../../../../shared/utils/errorMessages'
-import { i18n } from '../../../../../shared/i18n'
+import { sanitizeApiErrorMessage } from '../../../../../core/utils/errorMessages'
+import { i18n } from '../../../../../core/i18n'
 import { publishCanvasTaskReadiness } from '../billing/taskReadinessEvents'
 import {
   insufficientCreditsPreflightError,

@@ -1,4 +1,4 @@
-import { clampWithFallback } from '../../../../../../shared/utils/number'
+import { clampWithFallback } from '../../../../../../core/utils/number'
 import type { RetouchSharpenParams } from '../model.ts'
 import type { ImageRetouchNumberRange } from '../numberRange.ts'
 

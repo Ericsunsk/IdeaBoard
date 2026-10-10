@@ -1,5 +1,5 @@
 import type { RetouchEffectLayer } from './model.ts'
-import { clamp, clampWithFallback } from '../../../../../shared/utils/number'
+import { clamp, clampWithFallback } from '../../../../../core/utils/number'
 import {
   isNeutralImageRetouch,
   normalizeImageEffectLayers,

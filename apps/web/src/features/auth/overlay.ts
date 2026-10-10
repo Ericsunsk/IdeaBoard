@@ -1,10 +1,10 @@
 import { computed, inject, provide, readonly, ref, type InjectionKey } from 'vue'
-import { normalizeSafeInternalRedirectPath } from '../../shared/auth/sessionPolicy'
+import { normalizeSafeInternalRedirectPath } from '../../core/auth/sessionPolicy'
 import {
   readSessionStorageItem,
   removeSessionStorageItem,
   writeSessionStorageItem,
-} from '../../shared/utils/storage'
+} from '../../core/utils/storage'
 
 export type AuthOverlayMode = 'login' | 'register'
 

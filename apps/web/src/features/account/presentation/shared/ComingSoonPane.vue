@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { useI18n } from 'vue-i18n'
-import StatusBadge from '../../../../shared/components/StatusBadge.vue'
+import StatusBadge from '../../../../core/components/StatusBadge.vue'
 import AccountPane from './AccountPane.vue'
 
 defineProps<{

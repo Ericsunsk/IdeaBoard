@@ -1,6 +1,6 @@
-import { uploadApi } from '../../../../shared/api/upload'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { i18n } from '../../../../shared/i18n'
+import { uploadApi } from '../../../../api/upload'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
+import { i18n } from '../../../../core/i18n'
 import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board/ports/canvas'
 import {
   fetchImageBlobFromUrl,
@@ -10,8 +10,8 @@ import {
   isStableBoardUploadUrl,
   resolveFetchUrl,
 } from '../../infrastructure/media/canvasMediaIo.ts'
-import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
-import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/mediaRef'
+import { prepareImageAssetForUpload } from '../../../../core/media/imageAssetPipeline'
+import { buildMediaBrowserURL, type MediaRef } from '../../../../core/media/mediaRef'
 import { measureCanvasPerfAsync } from '../../infrastructure/browser/canvasPerfProbe.ts'
 
 interface StableRef {

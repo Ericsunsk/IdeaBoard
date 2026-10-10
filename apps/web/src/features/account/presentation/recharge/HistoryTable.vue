@@ -137,10 +137,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import DataTableColumn from '../../../../shared/components/DataTableColumn.vue'
+import DataTableColumn from '../../../../core/components/DataTableColumn.vue'
 import { Skeleton } from '@/components/ui/skeleton'
-import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
+import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
+import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { formatAccountRechargeDateTime, formatCurrencyMinor } from '../../domain'
 import type { RechargeHistoryItem } from '../../infrastructure'
 

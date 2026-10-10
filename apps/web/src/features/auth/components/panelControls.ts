@@ -1,8 +1,8 @@
 import { computed, readonly } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../session/userSession'
-import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
+import { useAsyncAction } from '../../../core/composables/useAsyncAction'
+import { resolveInteractiveControlState } from '../../../core/interaction/interactiveControlState'
 import { useAuthFeedback } from '../useAuthFeedback'
 
 /**

@@ -10,10 +10,10 @@ import {
   type Ref,
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAppToast } from '../../../shared/composables/useAppToast'
-import { stringParam } from '../../../shared/router/queryParams'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
-import { i18n } from '../../../shared/i18n'
+import { useAppToast } from '../../../core/composables/useAppToast'
+import { stringParam } from '../../../core/router/queryParams'
+import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
+import { i18n } from '../../../core/i18n'
 import {
   assertLibraryFolderId,
   requireWorkspaceId,

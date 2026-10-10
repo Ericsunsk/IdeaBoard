@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import StatusBadge from '@/shared/components/StatusBadge.vue'
+import StatusBadge from '@/core/components/StatusBadge.vue'
 
 export type AdminStatusPillVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 

@@ -1,4 +1,4 @@
-import { resolveAssetUrl } from '../../../../shared/config/runtimeUrls'
+import { resolveAssetUrl } from '../../../../core/config/runtimeUrls'
 
 const HTTP_URL_RE = /^https?:\/\//i
 const UPLOAD_ASSET_PATH_PREFIX = '/uploads/'

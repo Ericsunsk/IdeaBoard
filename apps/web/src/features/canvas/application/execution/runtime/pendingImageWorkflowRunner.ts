@@ -3,7 +3,7 @@ import {
   TaskCancelledError,
   TaskResultPendingError,
 } from '../task-runner/taskResultErrors'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import type {
   ImageExecutionInput,
@@ -41,7 +41,7 @@ export type PendingImageWorkflowTaskTransport = Readonly<{
   ) => Promise<ResolvedTaskImageResult>
 }>
 
-export type PendingImageWorkflowIntent = {
+type PendingImageWorkflowIntent = {
   source: ImageExecutionInput
   sourceNodeId: string
   attachment: BoardAttachment

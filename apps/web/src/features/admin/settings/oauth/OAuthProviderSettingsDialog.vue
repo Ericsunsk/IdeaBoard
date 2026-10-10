@@ -205,17 +205,14 @@ import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialo
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoPickerPopover from '../../shared/components/AdminLogoPickerPopover.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
-import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
+import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
 import { secretField } from '../../shared/lib/secretSchema'
 import {
   createOAuthProviderSettingsResource,
   type OAuthProviderSettingsResource,
   type OAuthProviderSettingsSummary,
 } from './resource'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '../../../../shared/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../../core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 

@@ -6,7 +6,7 @@ import { mockAppToast } from '../../../../test/toast'
 import { SETTINGS_MESSAGES } from '../pages/messages'
 import AdminUploadConcurrencyFooter from './AdminUploadConcurrencyFooter.vue'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminUploadConcurrencyFooter', () => {
   beforeEach(() => {

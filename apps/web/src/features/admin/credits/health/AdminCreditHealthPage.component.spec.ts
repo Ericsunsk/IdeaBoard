@@ -21,7 +21,7 @@ vi.mock('vue-router', async (importOriginal) => {
   return { ...original, useRouter: () => ({ push: pushMock }) }
 })
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminCreditHealthPage', () => {
   let findingRequests: Array<{ status: string | null; beforeId: string | null }>

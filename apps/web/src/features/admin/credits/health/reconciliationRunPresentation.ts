@@ -1,4 +1,4 @@
-import { calcDurationSeconds } from '../../../../shared/utils/dateTime'
+import { calcDurationSeconds } from '../../../../core/utils/dateTime'
 import type { AdminCreditRun } from './runHistoryResource'
 
 export function formatReconciliationRunDuration(run: AdminCreditRun): string {

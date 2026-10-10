@@ -25,20 +25,20 @@ import {
   createWorkspace,
   getListWorkspacesQueryKey,
   listWorkspaces,
-} from '../../../shared/api/generated-query/public/workspaces/workspaces'
-import { getGetUserQueryKey, getUser } from '../../../shared/api/generated-query/public/user/user'
-import type { ListWorkspacesParams } from '../../../shared/api/generated-query/public/model'
+} from '../../../api/generated-query/public/workspaces/workspaces'
+import { getGetUserQueryKey, getUser } from '../../../api/generated-query/public/user/user'
+import type { ListWorkspacesParams } from '../../../api/generated-query/public/model'
 import {
   buildContractRequestHeaders,
   isOpaqueId,
   newRequestId,
   opaqueIdPrefix,
   parseContractEnvelope,
-} from '../../../shared/api/contractKernel'
-import { workspaceCreationIdempotencyKey } from '../../../shared/api/idempotencyKey'
-import { normalizePageSize, PAGE_SIZES } from '../../../shared/config/pagination'
-import type { AuthFailureMode } from '../../../shared/api/client'
-import { resolveApiUrl } from '../../../shared/config/runtimeUrls'
+} from '../../../api/contractKernel'
+import { workspaceCreationIdempotencyKey } from '../../../api/idempotencyKey'
+import { normalizePageSize, PAGE_SIZES } from '../../../core/config/pagination'
+import type { AuthFailureMode } from '../../../api/client'
+import { resolveApiUrl } from '../../../core/config/runtimeUrls'
 
 export type WorkspaceSummary = {
   publicId: string

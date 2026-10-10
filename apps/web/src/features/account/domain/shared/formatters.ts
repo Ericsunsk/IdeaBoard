@@ -1,4 +1,4 @@
-import { formatLocaleDate } from '../../../../shared/i18n/formatters'
+import { formatLocaleDate } from '../../../../core/i18n/formatters'
 
 const localDateTimeOptions = {
   year: 'numeric',

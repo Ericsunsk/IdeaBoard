@@ -12,14 +12,14 @@ import type { DismissTransientCanvasUi } from '../../screens/useFlowTransientUiD
 import { useCanvasCustomLayerOverlay } from '../../overlays'
 import { useCanvasGroupPointerInteraction } from './useCanvasGroupPointerInteraction'
 
-export type CanvasGroupPresentationDragControls = {
+type CanvasGroupPresentationDragControls = {
   begin: (point: CanvasPoint) => boolean
   move: (point: CanvasPoint) => boolean
   commit: () => boolean
   cancel: () => boolean
 }
 
-export type CanvasGroupPresentationResizeControls = {
+type CanvasGroupPresentationResizeControls = {
   begin: (
     groupId: CanvasGraphGroupId,
     handle: CanvasGroupResizeHandle,
@@ -30,14 +30,14 @@ export type CanvasGroupPresentationResizeControls = {
   cancel: () => boolean
 }
 
-export type CanvasGroupPresentationCanvas = {
+type CanvasGroupPresentationCanvas = {
   host: Ref<HTMLElement | null>
   nodes: Ref<Node[]>
   viewport: ComputedRef<CanvasFlowViewportTransform> | Ref<CanvasFlowViewportTransform>
   isInteractionEnabled: ComputedRef<boolean>
 }
 
-export type CanvasGroupPresentationGrouping = {
+type CanvasGroupPresentationGrouping = {
   frames: ComputedRef<CanvasGroupFrame[]>
   action: ComputedRef<CanvasSelectionGroupAction | null>
   selectAtPoint: (point: CanvasPoint) => boolean
@@ -46,7 +46,7 @@ export type CanvasGroupPresentationGrouping = {
   onAction: () => void
 }
 
-export type CanvasGroupPresentationPane = {
+type CanvasGroupPresentationPane = {
   toFlowPoint: (point: CanvasPoint) => CanvasPoint
   onPointerDownCapture: (event: PointerEvent) => void
   dismiss: (options: Parameters<DismissTransientCanvasUi>[0]) => void

@@ -1,8 +1,6 @@
 import type { Elements, Node } from '@vue-flow/core'
 
-export type CanvasSelectionPhase = 'idle' | 'marquee'
-
-export type CanvasSelectionController = ReturnType<typeof createCanvasSelectionController>
+type CanvasSelectionPhase = 'idle' | 'marquee'
 
 type SelectionControllerOptions = {
   readElements: () => Elements

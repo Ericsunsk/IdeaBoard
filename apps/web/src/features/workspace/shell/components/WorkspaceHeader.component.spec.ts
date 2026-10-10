@@ -2,13 +2,13 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { renderWithUser } from '../../../../test/render'
-import type { User } from '../../../../shared/api/sessionUserType'
-import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
+import type { User } from '../../../../api/sessionUserType'
+import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../routePaths'
 import { createAuthOverlay, provideAuthOverlay } from '../../../auth'
 import { createAccountOverlay, provideAccountOverlay } from '../../../account'
 import WorkspaceHeader from './WorkspaceHeader.vue'
 
-vi.mock('../../../../shared/composables/useSupportChannels', () => ({
+vi.mock('../../../../core/composables/useSupportChannels', () => ({
   useSupportChannels: () => ({ channels: [] }),
 }))
 

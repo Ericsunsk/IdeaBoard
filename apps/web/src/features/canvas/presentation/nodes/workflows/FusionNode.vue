@@ -58,14 +58,14 @@ import { computed, ref, watch } from 'vue'
 import { Keyframes } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type FusionNodeItem } from '../../../../board/ports/canvas'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../board/ports/canvas'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import type { NodeUiState } from '../../../domain/nodes/canvasNodeUi.ts'
 import type { FusionBlendPoint } from '../../../../board/ports/canvas'
 import FusionStage from './FusionStage.vue'
 import NodeShell from '../primitives/NodeShell.vue'
 import NodePromptComposer from '../primitives/NodePromptComposer.vue'
 import NodeFloatingControls from '../primitives/NodeFloatingControls.vue'
-import { SERVICE } from '../../../../../shared/domain/imageServices'
+import { SERVICE } from '../../../../../core/contracts/imageServices'
 import {
   buildFusionBillingReadinessRequest,
   useCanvasBillingQuote,

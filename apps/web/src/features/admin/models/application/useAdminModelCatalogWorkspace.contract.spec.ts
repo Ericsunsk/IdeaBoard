@@ -22,7 +22,7 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
 
 const clipboardCopyText = vi.hoisted(() => ({ current: vi.fn() }))
 
-vi.mock('../../../../shared/composables/useAppClipboard', () => ({
+vi.mock('../../../../core/composables/useAppClipboard', () => ({
   useAppClipboard: () => ({ copyText: clipboardCopyText.current }),
 }))
 

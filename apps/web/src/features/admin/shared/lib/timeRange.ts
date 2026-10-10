@@ -8,7 +8,7 @@ import {
   shouldShowChartTimeTick,
   type ChartTimeBucket,
   type ChartTimeTickDensity,
-} from '../../../../shared/lib/chartTimeRange'
+} from '../../../../core/lib/chartTimeRange'
 
 export type AdminTimeRangeOption = {
   label: string

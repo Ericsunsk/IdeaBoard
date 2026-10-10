@@ -6,7 +6,7 @@ export type CanvasVueFlowGraph = {
   edges: Edge[]
 }
 
-export type CanvasVueFlowGraphCommandName =
+type CanvasVueFlowGraphCommandName =
   | 'replaceGraph'
   | 'replaceNodes'
   | 'replaceEdges'
@@ -19,7 +19,7 @@ export type CanvasVueFlowGraphCommandName =
   | 'applyNodeChanges'
   | 'applyEdgeChanges'
 
-export type CanvasVueFlowGraphCommandContext = {
+type CanvasVueFlowGraphCommandContext = {
   command: CanvasVueFlowGraphCommandName
   before: CanvasVueFlowGraph
   next: CanvasVueFlowGraph

@@ -13,7 +13,7 @@ import {
 // stays (defaults render when nothing is stored). The models.dev logo
 // proxy URLs in `brandLogos.ts` are a separate backend gap (images fall
 // back to placeholders via onError). See the stream report.
-export type AdminBrandLogoOverrideDto = {
+type AdminBrandLogoOverrideDto = {
   scope: AdminBrandLogoScope
   target_key: string
   logo_key: AdminBrandLogoKey

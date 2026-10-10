@@ -1,6 +1,6 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
-import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
-import { formatAdminDateTime } from '../../../../shared/utils/dateTime'
+import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
+import { formatAdminDateTime } from '../../../../core/utils/dateTime'
 import type { AdminTaskResultFeedback } from './useAdminMonitorFeedback'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'
 import {

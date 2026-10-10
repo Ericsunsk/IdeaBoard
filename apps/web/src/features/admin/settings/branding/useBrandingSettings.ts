@@ -4,8 +4,8 @@ import { computed } from 'vue'
 import {
   getControlBrandingSetting,
   updateControlBrandingSetting,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
 import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
 import type { AdminBrandingSettingsFeedback } from '../shared/useSettingsFeedback'
 import {
@@ -17,7 +17,7 @@ import {
   validateSiteBrandingSetting,
   writeSiteBrandingQueryCache,
   type BrandingSetting,
-} from '../../../../shared/composables/useSiteBranding'
+} from '../../../../core/composables/useSiteBranding'
 import { useSettingsLifecycle } from '../shared/useSettingsLifecycle'
 import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
 import { withControlCopy } from '../../shared/lib/controlCopy'

@@ -18,16 +18,13 @@ import {
   WEBP_PREVIEW_MIME_TYPE,
   WEBP_PREVIEW_QUALITY,
 } from '../../infrastructure/media/displayImagePreviewEncoding.ts'
-import {
-  canonicalizeRuntimeUploadRef,
-  resolveAssetUrl,
-} from '../../../../shared/config/runtimeUrls'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../core/config/runtimeUrls'
 import {
   normalizeMediaAssetId,
   useMediaAssetDelivery,
   type MediaAssetDeliveryTier,
   type MediaAssetId,
-} from '../../../../shared/api/mediaAssetDelivery'
+} from '../../../../api/mediaAssetDelivery'
 
 interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>

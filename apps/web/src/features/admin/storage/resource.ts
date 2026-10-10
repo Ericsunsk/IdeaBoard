@@ -1,4 +1,4 @@
-import { requireContractData } from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../api/contractKernel'
 import {
   buildControlMutationHeaders,
   buildRoutineControlMutationHeaders,
@@ -14,7 +14,7 @@ import {
   listControlStorageProviders,
   testControlStorageProfile,
   updateControlStorageProfile,
-} from '../../../shared/api/generated-query/control/control-platform/control-platform'
+} from '../../../api/generated-query/control/control-platform/control-platform'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 import { withControlCopy } from '../shared/lib/controlCopy'
 
@@ -27,7 +27,7 @@ import { withControlCopy } from '../shared/lib/controlCopy'
 // with a required reason. Every mutation carries a header-only
 // Idempotency-Key. The deleted `/api/admin/storage/*` routes are gone; this
 // module is the single transport.
-export type GeneratedStorageProviderMeta = {
+type GeneratedStorageProviderMeta = {
   provider: string
   label: string
   description: string
@@ -46,7 +46,7 @@ export type GeneratedStorageProviderMeta = {
   }>
 }
 
-export type GeneratedStorageProfile = {
+type GeneratedStorageProfile = {
   id: string
   name: string
   provider: string
@@ -54,13 +54,6 @@ export type GeneratedStorageProfile = {
   is_current: boolean
   builtin: boolean
   secret_configured?: boolean
-  config: Record<string, unknown>
-}
-
-export type GeneratedStorageProfilePayload = {
-  name: string
-  provider: string
-  enabled: boolean
   config: Record<string, unknown>
 }
 
@@ -74,7 +67,7 @@ export type SaveStorageProfileInput =
       payload: StorageProfilePayload
     }
 
-export type StorageProfileMutationOptions = ControlMutationOptions
+type StorageProfileMutationOptions = ControlMutationOptions
 
 export type StorageProfileCommandResult = {
   profile: StorageProfile

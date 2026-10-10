@@ -5,7 +5,7 @@ import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import AdminRegistrationRateLimitEditor from './AdminRegistrationRateLimitEditor.vue'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminRegistrationRateLimitEditor', () => {
   const registrationPuts: Array<{ body: unknown; operatorReason: string | null }> = []

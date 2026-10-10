@@ -3,7 +3,7 @@ import type { CanvasNodePresentationIntent } from '.'
 import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
 import type { OutpaintDragAnchor } from '../../application/image-workflow/useImageOutpaintOverlay.ts'
 
-export type FlowCanvasNodePromptSnapshot = {
+type FlowCanvasNodePromptSnapshot = {
   readonly text: string
   readonly outputCount?: number | undefined
   readonly aspectRatio?: PromptAspectRatio | undefined

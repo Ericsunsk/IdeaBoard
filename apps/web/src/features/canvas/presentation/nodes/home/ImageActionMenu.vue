@@ -59,8 +59,8 @@
 <script setup lang="ts">
 import { computed, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { SERVICE_SLUGS, SERVICE, type Service } from '../../../../../shared/domain/imageServices'
-import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
+import { SERVICE_SLUGS, SERVICE, type Service } from '../../../../../core/contracts/imageServices'
+import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
 import {
   getImageActionMenuItems,
   IMAGE_NODE_ACTION,
@@ -78,10 +78,10 @@ import {
   buildImageActionReadinessRequest,
   buildInpaintReadinessRequest,
 } from '../../../application/execution/commands/imageTaskRequests.ts'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import { NodeToolIconButton } from '../../nodes/primitives'
-import { createPopoverMotionTransition } from '../../../../../shared/motion/popoverMotion'
+import { createPopoverMotionTransition } from '../../../../../core/motion/popoverMotion'
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>

@@ -90,7 +90,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Plus } from '@iconoir/vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminLogoPickerPopover from '../../shared/components/AdminLogoPickerPopover.vue'
 import { vendorPresetCatalog } from '../meta'
 import { STORAGE_MESSAGES } from './messages'

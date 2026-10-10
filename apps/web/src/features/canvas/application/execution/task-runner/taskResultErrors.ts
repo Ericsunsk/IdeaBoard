@@ -1,5 +1,5 @@
-import { sanitizeApiErrorMessage } from '../../../../../shared/utils/errorMessages'
-import { i18n } from '../../../../../shared/i18n'
+import { sanitizeApiErrorMessage } from '../../../../../core/utils/errorMessages'
+import { i18n } from '../../../../../core/i18n'
 
 export type TaskWaitFailureKind = 'pending' | 'timeout'
 

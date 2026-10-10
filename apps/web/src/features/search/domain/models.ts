@@ -1,4 +1,4 @@
-import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 export type SearchCatalogProvider = ExternalImageProvider
 
 /** Search owns this model; generated transport types stay inside its adapter. */

@@ -1,5 +1,5 @@
-import { clamp } from '../../../../shared/utils/number'
-import { readLocalStorageItem, writeLocalStorageItem } from '../../../../shared/utils/storage'
+import { clamp } from '../../../../core/utils/number'
+import { readLocalStorageItem, writeLocalStorageItem } from '../../../../core/utils/storage'
 
 export type CanvasFlowViewportState = {
   x: number

@@ -92,9 +92,9 @@
 import { useI18n } from 'vue-i18n'
 import { Minus, Plus, WarningTriangle } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
-import ActionButton from '../../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../../core/components/ActionButton.vue'
 import AdminStatusPill from '../../../shared/components/AdminStatusPill.vue'
-import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
 
 type WalletRestriction = {
   restriction_id: string

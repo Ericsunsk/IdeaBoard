@@ -5,7 +5,7 @@ import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import AdminLoginLockoutEditor from './AdminLoginLockoutEditor.vue'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminLoginLockoutEditor', () => {
   const lockoutPuts: Array<{ body: unknown; operatorReason: string | null }> = []

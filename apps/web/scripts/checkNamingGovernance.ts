@@ -60,7 +60,7 @@ import ts from 'typescript'
  *     coverage is rule 14. Deeper role-keyword checks (e.g. `resource.ts`
  *     must export `*Resource`) are intentionally out of scope: query-key
  *     helpers and DTOs colocate in `resource.ts` by established
- *     architecture (see shared/CONTEXT.md API Boundary and the contract
+ *     architecture (see core/CONTEXT.md API Boundary and the contract
  *     inventory), so keyword matching would flag legitimate seams.
  * 13. Stale internal vocabulary: `User[A-Z]*` basenames under
  *    `features/user/`, `features/user-shell/`, or `features/workspace/` belong to the Workspace
@@ -155,7 +155,9 @@ const legacyAllowances: Record<string, string> = {}
 /** Permanent documented keeps: src-relative dir path -> ownership reason. */
 const keptGenericOwnership: Record<string, string> = {
   // Cross-cutting client helpers (auth identity, errors, date, form, upload).
-  'shared/utils': 'shared: cross-cutting client helpers (see shared/CONTEXT.md)',
+  'core/utils': 'core: cross-cutting client helpers (see core/CONTEXT.md)',
+  // P1b shim-only directory; delete after P1 with the TTL shims.
+  'shared/utils': 'shared: P1b compatibility shims only (see core/CONTEXT.md)',
   // Official shadcn-vue helper boundary (`components.json` standard utils location)
   'lib/utils.ts': 'shadcn: official standard helper entry (cn, cleanProps)',
   'lib/utils.unit.spec.ts': 'shadcn: test for official standard helper entry',
@@ -175,8 +177,8 @@ const keptRoleSuffixOwnership: Record<string, string> = {
 
 /** Permanent documented keeps: pre-existing `image/avatar` URL fields (rule 16, warn-only). */
 const keptLegacyUrlFields = new Set([
-  'shared/api/sessionUserType.ts:User.avatar',
-  'shared/api/upload.ts:UploadAvatarMetadata.avatar',
+  'api/sessionUserType.ts:User.avatar',
+  'api/upload.ts:UploadAvatarMetadata.avatar',
   'features/workspace/infrastructure/workspaceResource.ts:PrincipalSummary.avatar',
   'features/admin/users/resource.ts:AdminUserListItem.avatar',
   'test/factories/admin.ts:AdminListItemOverrides.avatar',
@@ -222,6 +224,9 @@ function checkTsModule(
   absoluteDir: string,
   fileName: string,
 ): Violation | null {
+  // P1b compatibility shims are the only sanctioned alias kind; they carry
+  // the moved module's stem plus `.shim` and re-export only.
+  if (fileName.endsWith('.shim.ts')) return null
   const stem = fileName.slice(0, -'.ts'.length)
   const specMatch = stem.match(/^(.*)\.(unit|contract|component|browser)\.spec$/)
   const base = specMatch ? (specMatch[1] ?? stem) : stem
@@ -711,6 +716,7 @@ function checkSymbolAlignmentSource(
   fileName: string,
   source: string,
 ): Violation | null {
+  if (fileName.endsWith('.shim.ts')) return null
   if (!/^use[A-Z]/.test(fileName) || fileName.endsWith('.spec.ts')) return null
   if (Object.hasOwn(keptComposableFamilies, relativePath)) return null
   const stem = fileName.split('.')[0] ?? ''
@@ -946,7 +952,7 @@ function runSelfTest(): void {
     ],
     [
       'generic-locale-exempt',
-      checkGenericName('shared/i18n/locales/en/common.ts', 'common.ts', false),
+      checkGenericName('core/i18n/locales/en/common.ts', 'common.ts', false),
       null,
     ],
     ['acronym-api', checkAcronym('features/x/providerAPI.ts', 'providerAPI.ts')?.kind, 'acronym'],
@@ -957,14 +963,10 @@ function runSelfTest(): void {
       checkVueName('features/x/Content.vue', 'Content.vue')?.kind,
       'vue-name',
     ],
-    [
-      'style-kebab-ok',
-      checkStyleAsset('shared/motion/dialog-motion.css', 'dialog-motion.css'),
-      null,
-    ],
+    ['style-kebab-ok', checkStyleAsset('core/motion/dialog-motion.css', 'dialog-motion.css'), null],
     [
       'style-camel-bad',
-      checkStyleAsset('shared/motion/dialogMotion.css', 'dialogMotion.css')?.kind,
+      checkStyleAsset('core/motion/dialogMotion.css', 'dialogMotion.css')?.kind,
       'style-asset',
     ],
     [
@@ -1012,7 +1014,7 @@ function runSelfTest(): void {
     ],
     [
       'role-suffix-metadata-out-of-scope',
-      checkRoleSuffix('shared/api/mediaAssetMetadata.ts', 'mediaAssetMetadata.ts'),
+      checkRoleSuffix('api/mediaAssetMetadata.ts', 'mediaAssetMetadata.ts'),
       null,
     ],
     [
@@ -1263,9 +1265,9 @@ function runSelfTest(): void {
       3,
     ],
     [
-      'url-suffix-shared-api-boundary-warns',
+      'url-suffix-api-boundary-warns',
       collectUrlSuffixWarnings(
-        'shared/api/newUser.ts',
+        'api/newUser.ts',
         'newUser.ts',
         'export interface User { image: string; avatar: string; imageUrl?: string }',
       ).length,
@@ -1382,7 +1384,7 @@ function runSelfTest(): void {
     [
       'url-suffix-generated-exclusion',
       collectUrlSuffixWarnings(
-        'shared/api/generated-query/model/user.ts',
+        'api/generated-query/model/user.ts',
         'user.ts',
         'interface User { avatar: string }',
       ),

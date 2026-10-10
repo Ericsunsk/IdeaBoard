@@ -1,4 +1,4 @@
-import { readImageNaturalSize } from '../../../../../shared/media/imageDimensions.ts'
+import { readImageNaturalSize } from '../../../../../core/media/imageDimensions.ts'
 
 /**
  * Canvas-local alias kept for existing execution callers.

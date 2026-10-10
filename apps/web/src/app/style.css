@@ -1,12 +1,12 @@
 @import 'tailwindcss';
-@import '../shared/theme/atoms/interactive-control-state.css';
-@import '../shared/theme/atoms/touch-target.css';
-@import '../shared/theme/atoms/brand-mark.css';
-@import '../shared/theme/atoms/board-page-background.css';
-@import '../shared/theme/atoms/round-control.css';
-@import '../shared/theme/atoms/page-chrome.css';
-@import '../shared/theme/atoms/user-avatar-button.css';
-@import '../shared/theme/tokens/index.css';
+@import '../theme/atoms/interactive-control-state.css';
+@import '../theme/atoms/touch-target.css';
+@import '../theme/atoms/brand-mark.css';
+@import '../theme/atoms/board-page-background.css';
+@import '../theme/atoms/round-control.css';
+@import '../theme/atoms/page-chrome.css';
+@import '../theme/atoms/user-avatar-button.css';
+@import '../theme/tokens/index.css';
 
 @theme {
   /* ── Primitive Light Elevation Palette Scale (Linear/Vercel standard) ── */

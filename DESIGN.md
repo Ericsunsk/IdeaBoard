@@ -62,16 +62,16 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 
 支持的 workflow feature slug 必须在前端 execution contract、OpenAPI、Go validation、prompt 配置和 Admin 展示中保持一致。
 
-| Feature      | 语义     |
-| ------------ | -------- |
+| Feature      | 语义                                        |
+| ------------ | ------------------------------------------- |
 | `generation` | Prompt 生图（纯文本指令 + 最多 4 张参考图） |
-| `render`     | 草图成图 |
-| `variations` | 风格延展 |
-| `inpaint`    | 局部重绘 |
-| `cutout`     | 抠图     |
-| `fusion`     | 多图融合 |
-| `upscale`    | 放大     |
-| `outpaint`   | 扩图     |
+| `render`     | 草图成图                                    |
+| `variations` | 风格延展                                    |
+| `inpaint`    | 局部重绘                                    |
+| `cutout`     | 抠图                                        |
+| `fusion`     | 多图融合                                    |
+| `upscale`    | 放大                                        |
+| `outpaint`   | 扩图                                        |
 
 Contract rules:
 
@@ -141,21 +141,21 @@ Media context 拥有 object storage provider/profile、upload serving、upload a
 
 Admin route pages 不直接依赖 generated API。每个 Admin vertical context 自己拥有 resource access、view model、command sequencing、cache invalidation 和 side effect handling。垂直划分以 [navigationMeta.ts](./apps/web/src/features/admin/app/navigationMeta.ts) 的 navigation key 为准；`storage` 与 `payments` 作为独立 context 存在，分别内嵌在 `settings` 与 `credits` 布局下。
 
-| Frontend context            | Backend context                                                          | Ownership                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `features/admin/users`      | `internal/identity/users`                                                | 用户列表、角色/status、会话、伪装登录、受控注销                                                        |
-| `features/admin/models`     | `internal/aigateway`                                                     | 网关连接、模型目录、映射规则、route preview 与连通性探测（Service Model Pool 归 Generation）          |
-| `features/admin/prompts`    | `internal/prompts`, `internal/workflow`                                  | 当前 workflow feature 的 prompt template；变量和 merge policy 由代码维护                              |
-| `features/admin/storage`    | `internal/media/storage`                                                 | storage provider/profile、secret masking、bucket test/apply                                           |
-| `features/admin/monitor`    | `internal/tasking`                                                       | task list/detail/cancel、runtime monitor、stream/poll fallback                                          |
-| `features/admin/statistics` | `internal/tasking/application/statistics`                                 | statistics aggregation、backfill status、range contract                                                 |
-| `features/admin/credits`    | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/generation` | Registry-backed 功能定价 Catalog、Service Model Pool 版本与 Admin 写入、Wallet/Ledger operations、Credit Health、RewardCode 运营 |
-| `features/admin/payments`   | `internal/payments`                                                      | 支付订单查询/退款/争议、Stripe 配置                                                                    |
-| `features/admin/settings`   | `internal/platform/settings`, `internal/searchcatalog`                   | 网站 branding/access/mediaUpload、限流、typed Outbound Policy、搜索 provider key；邮件配置经 Go Control Plane 转发到 Auth Service |
+| Frontend context            | Backend context                                                                   | Ownership                                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `features/admin/users`      | `internal/identity/users`                                                         | 用户列表、角色/status、会话、伪装登录、受控注销                                                                                   |
+| `features/admin/models`     | `internal/aigateway`                                                              | 网关连接、模型目录、映射规则、route preview 与连通性探测（Service Model Pool 归 Generation）                                      |
+| `features/admin/prompts`    | `internal/prompts`, `internal/workflow`                                           | 当前 workflow feature 的 prompt template；变量和 merge policy 由代码维护                                                          |
+| `features/admin/storage`    | `internal/media/storage`                                                          | storage provider/profile、secret masking、bucket test/apply                                                                       |
+| `features/admin/monitor`    | `internal/tasking`                                                                | task list/detail/cancel、runtime monitor、stream/poll fallback                                                                    |
+| `features/admin/statistics` | `internal/tasking/application/statistics`                                         | statistics aggregation、backfill status、range contract                                                                           |
+| `features/admin/credits`    | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/generation` | Registry-backed 功能定价 Catalog、Service Model Pool 版本与 Admin 写入、Wallet/Ledger operations、Credit Health、RewardCode 运营  |
+| `features/admin/payments`   | `internal/payments`                                                               | 支付订单查询/退款/争议、Stripe 配置                                                                                               |
+| `features/admin/settings`   | `internal/platform/settings`, `internal/searchcatalog`                            | 网站 branding/access/mediaUpload、限流、typed Outbound Policy、搜索 provider key；邮件配置经 Go Control Plane 转发到 Auth Service |
 
 ### 9. Generated code 是边界，不是业务模型
 
-`apps/web/src/shared/api/generated-query` 是 Orval generated code，不手动编辑。Vue route pages 和 components 不直接依赖 generated API；依赖必须收口到 feature context、shared composable 或明确的 API adapter。
+`apps/web/src/api/generated-query` 是 Orval generated code，不手动编辑。Vue route pages 和 components 不直接依赖 generated API；依赖必须收口到 feature context、core composable 或明确的 API adapter。
 
 Backend generated sqlc code 不手动编辑。修改 SQL queries/schema 后运行 `go tool sqlc generate`，让 generated code 跟随事实源更新。
 
@@ -174,27 +174,27 @@ API schema source 以 domain fragments 和显式 manifest 组织，`schema.sql` 
 
 Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.md)。
 
-| Context                                             | Directories                                           | Responsibility                                                                                                                             |
-| --------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Runtime                                             | `internal/runtime`, `cmd`                             | 进程启动生命周期、`internal/runtime/composition` 唯一装配根、HTTP/Worker interface adapters、后台 job adapters、embedded frontend dist             |
-| Platform                                            | `internal/platform`, `internal/db`, `internal/events` | config、system settings、database、response helpers、safe HTTP、event bus、sqlc                                                             |
-| Tasking                                             | `internal/tasking`                                    | task model、submission、queueing、runtime state、task billing、statistics                                                                  |
-| Identity                                            | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                            |
-| Tenancy                                             | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、workspace billing account 绑定；不拥有账务写入                                      |
-| AccountPool（已退役，见 ADR-0009）                   | —                                                     | Account/endpoint rows remain for historical references; credential material is purged. AI egress belongs to Cloudflare AI Gateway          |
-| [AI Gateway](./apps/api/internal/aigateway/CONTEXT.md) | `internal/aigateway`                                | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
-| Boards                                              | `internal/boards`                                     | board ownership、access checks、board management API                                                                                       |
-| Media                                               | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                         |
-| Library                                             | `internal/library`                                    | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata                                                   |
-| [SearchCatalog](./apps/api/internal/searchcatalog/CONTEXT.md) | `internal/searchcatalog`                  | 图片搜索：Unsplash/Pexels provider key 生命周期与 Vision Search（独立计费）；Vision 模型只来自 AI Gateway vision mapping                   |
-| Workflow/Prompts                                    | `internal/workflow`, `internal/prompts`               | executable feature contract、task params、prompt templates、prompt assembly；只做 feature 编译与参数 shaping，从不选 Model                          |
-| Generation                                          | `internal/generation`                                 | Service Model Pool 的 `routing`（纯领域：eligibility、确定性选型、retry candidate、`RoutingSnapshot`）与 `catalog`（pool 持久化、快照 save/load）    |
-| Billing                                             | `internal/billing`                                    | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot                                                          |
-| Billing Records                                     | `internal/billingrecords`                             | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入                                    |
-| Credits                                             | `internal/credits`                                    | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands                                          |
-| Rewards                                             | `internal/rewards`                                    | RewardCode、Redemption、用户 history 与 Credits Grant 编排                                                                                 |
-| [Payments](./apps/api/internal/payments/CONTEXT.md) | `internal/payments`                                   | Stripe 配置、签名 Webhook Inbox 与支付生命周期；Idea 余额和 Ledger 写入仍由 Credits 独占                                                   |
-| Usage                                               | `internal/usage`                                      | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入 |
+| Context                                                       | Directories                                           | Responsibility                                                                                                                                    |
+| ------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime                                                       | `internal/runtime`, `cmd`                             | 进程启动生命周期、`internal/runtime/composition` 唯一装配根、HTTP/Worker interface adapters、后台 job adapters、embedded frontend dist            |
+| Platform                                                      | `internal/platform`, `internal/db`, `internal/events` | config、system settings、database、response helpers、safe HTTP、event bus、sqlc                                                                   |
+| Tasking                                                       | `internal/tasking`                                    | task model、submission、queueing、runtime state、task billing、statistics                                                                         |
+| Identity                                                      | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                                   |
+| Tenancy                                                       | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、workspace billing account 绑定；不拥有账务写入                                          |
+| AccountPool（已退役，见 ADR-0009）                            | —                                                     | Account/endpoint rows remain for historical references; credential material is purged. AI egress belongs to Cloudflare AI Gateway                 |
+| [AI Gateway](./apps/api/internal/aigateway/CONTEXT.md)        | `internal/aigateway`                                  | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
+| Boards                                                        | `internal/boards`                                     | board ownership、access checks、board management API                                                                                              |
+| Media                                                         | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                                 |
+| Library                                                       | `internal/library`                                    | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata                                                          |
+| [SearchCatalog](./apps/api/internal/searchcatalog/CONTEXT.md) | `internal/searchcatalog`                              | 图片搜索：Unsplash/Pexels provider key 生命周期与 Vision Search（独立计费）；Vision 模型只来自 AI Gateway vision mapping                          |
+| Workflow/Prompts                                              | `internal/workflow`, `internal/prompts`               | executable feature contract、task params、prompt templates、prompt assembly；只做 feature 编译与参数 shaping，从不选 Model                        |
+| Generation                                                    | `internal/generation`                                 | Service Model Pool 的 `routing`（纯领域：eligibility、确定性选型、retry candidate、`RoutingSnapshot`）与 `catalog`（pool 持久化、快照 save/load） |
+| Billing                                                       | `internal/billing`                                    | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot                                                                 |
+| Billing Records                                               | `internal/billingrecords`                             | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入                                           |
+| Credits                                                       | `internal/credits`                                    | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands                                                 |
+| Rewards                                                       | `internal/rewards`                                    | RewardCode、Redemption、用户 history 与 Credits Grant 编排                                                                                        |
+| [Payments](./apps/api/internal/payments/CONTEXT.md)           | `internal/payments`                                   | Stripe 配置、签名 Webhook Inbox 与支付生命周期；Idea 余额和 Ledger 写入仍由 Credits 独占                                                          |
+| Usage                                                         | `internal/usage`                                      | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入        |
 
 Dependency direction:
 
@@ -216,17 +216,17 @@ Dependency direction:
 
 前端业务逻辑收敛于 `apps/web/src/features`。目录命名反映真实业务所有权，不为了死板套用模板而臆造 `entities` 或 `widgets`。
 
-| Context / Feature   | Directory                     | Business Ownership                                                                                                | Key Models & State Machines                                               |
-| ------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Canvas Workspace    | `features/canvas`             | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                         | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner |
-| Board               | `features/board`              | 看板全生命周期事实源：持久化文档模型、快照 Schema、媒体引用提取、看板 CRUD 与画廊列表、协作加入、revision/乐观锁同步、持久化与预览适配器 | `BoardState`, Valibot `stateSchema`, `boardRepository`, `boardSync`, `previewSerializer` |
-| Account             | `features/account`            | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                         | Wallet balance, Recharge session state machine, Redemption, Usage trend   |
-| Admin Verticals     | `features/admin`              | 管理端独立垂直子域（用户管理、积分运营、数据仪表盘、任务监控、模型管理、系统提示词、系统设置）             | Vertical context view models, Admin resources, Policy inspection          |
-| Auth & Identity     | `features/auth`               | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                | Session state, Auth token lifecycle, Login/Register workflows             |
-| Library             | `features/library`            | 外部灵感素材收藏、分类文件夹、媒体引用与拖拽入画布交互                                                            | Library item model, Folder taxonomy, cursor pagination                    |
-| Workspace           | `features/workspace`          | 工作区外壳与路由承载：应用全局外壳布局、顶栏导航、工作区路由与协作加入（保留外部 /user/* URL 契约）              | Shell layout state, navigation triggers, workspace routes, share-join      |
-| Search              | `features/search`             | 灵感素材搜索、Vision Search、素材引用与搜索结果持久化                                                             | Search query state, vision reference state                                |
-| Legal               | `features/legal`              | 服务条款、隐私政策协议与合规展示                                                                                  | Terms, Privacy Policy documents                                           |
+| Context / Feature | Directory            | Business Ownership                                                                                                                       | Key Models & State Machines                                                              |
+| ----------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Canvas Workspace  | `features/canvas`    | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                                                | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner                |
+| Board             | `features/board`     | 看板全生命周期事实源：持久化文档模型、快照 Schema、媒体引用提取、看板 CRUD 与画廊列表、协作加入、revision/乐观锁同步、持久化与预览适配器 | `BoardState`, Valibot `stateSchema`, `boardRepository`, `boardSync`, `previewSerializer` |
+| Account           | `features/account`   | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                                                | Wallet balance, Recharge session state machine, Redemption, Usage trend                  |
+| Admin Verticals   | `features/admin`     | 管理端独立垂直子域（用户管理、积分运营、数据仪表盘、任务监控、模型管理、系统提示词、系统设置）                                           | Vertical context view models, Admin resources, Policy inspection                         |
+| Auth & Identity   | `features/auth`      | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                                       | Session state, Auth token lifecycle, Login/Register workflows                            |
+| Library           | `features/library`   | 外部灵感素材收藏、分类文件夹、媒体引用与拖拽入画布交互                                                                                   | Library item model, Folder taxonomy, cursor pagination                                   |
+| Workspace         | `features/workspace` | 工作区外壳与路由承载：应用全局外壳布局、顶栏导航、工作区路由与协作加入（保留外部 /user/* URL 契约）                                      | Shell layout state, navigation triggers, workspace routes, share-join                    |
+| Search            | `features/search`    | 灵感素材搜索、Vision Search、素材引用与搜索结果持久化                                                                                    | Search query state, vision reference state                                               |
+| Legal             | `features/legal`     | 服务条款、隐私政策协议与合规展示                                                                                                         | Terms, Privacy Policy documents                                                          |
 
 匿名公开落地页不是独立 context：`/` 路由直接渲染 `features/canvas/presentation/pages/CanvasLandingPage.vue`，公开访问与 SEO 由 router meta 表达（见 [router/index.ts](./apps/web/src/app/router/index.ts)）。新增公开页面属于 Canvas presentation 层，不要为此新建 `public-site` 之类的平行 vertical。
 
@@ -278,12 +278,12 @@ Global store     -> 明确跨页面共享的纯客户端状态 (Shared client-on
 Vue UI -> application use case -> resource/adapter -> generated API
 ```
 
-- Vue 组件、路由页面与 app composition 层严禁直接调用 `apps/web/src/shared/api/generated-query` 生成代码。
-- Generated API 仅允许在各 feature 的 resource/adapter 或 shared API adapter 中被封装调用。
+- Vue 组件、路由页面与 app composition 层严禁直接调用 `apps/web/src/api/generated-query` 生成代码。
+- Generated API 仅允许在各 feature 的 resource/adapter 或 API adapter 中被封装调用。
 - 绝不手工编辑生成的 API 代码。
 - 领域层代码严禁接触网络传输层 DTO。
 - 跨特性协作必须通过明确声明的 public entrypoint 或 public subpath（例如特性根目录 `index.ts` 或稳定的领域子路径）进行；禁止访问另一特性的 `internal`/private implementation。
-- `apps/web/src/shared` 仅包含跨特性通用辅助函数、基础类型与公共资产，严禁反向依赖 concrete feature modules。
+- `apps/web/src/core`、`api`、`theme`、`lib`、`components` 是 horizontal roots，严禁 runtime 或 type-only 反向依赖 concrete feature modules。`shared` 仅保留待清理资产、contract specs 和有明确 TTL 的兼容 shims。
 - Canvas 内部子模块跨边界协作必须经由各自子目录的 `index.ts` public seam。
 
 ### 5. 特性重构完成标准 (Feature Completion Contract)
@@ -315,12 +315,12 @@ Vue UI -> application use case -> resource/adapter -> generated API
 3. **消除前缀冗余守则 (Anti-Stuttering Rule)**：
    - **严禁在子文件/子目录内重复父级目录名前缀**。
    - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`features/board/catalog/boardCatalog.ts`。
-    - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/core/kinds/curves.ts`、`features/board/presentation/catalog/contract.ts`。
+   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/core/kinds/curves.ts`、`features/board/presentation/catalog/contract.ts`。
    - **防命名冲突机制**：跨模块向外暴露能力时，必须通过特性的根 `index.ts` 进行语义清晰的 Named Export（例如 `export { createLibraryResource } from './resource'`），在消费方上下文保证语义清晰，无需在内部文件名冗余堆叠前缀。
 
 4. **公共 API 出口与边界隔离 (Public API Seams & Boundary Enforcement)**：
    - 需要向其他 Feature 暴露公共 API 的 Feature 必须在根目录提供 `index.ts` 作为唯一合法出口；仅由路由或父 Feature 装配的内部 Feature 可保留显式内部入口。
-    - **禁止穿透导入**：外部特性严禁跨边界通过深层相对路径导入另一特性的内部私有实现（禁止 `import ... from '../canvas/application/workspace/internal/...'` 或 `import ... from '../library/components/LibraryFloatingIsland.vue'`）。
+   - **禁止穿透导入**：外部特性严禁跨边界通过深层相对路径导入另一特性的内部私有实现（禁止 `import ... from '../canvas/application/workspace/internal/...'` 或 `import ... from '../library/components/LibraryFloatingIsland.vue'`）。
    - 模块依赖关系由 `dependency-cruiser` 做自动化门禁拦截。
 
 5. **渐进收敛治理推进策略 (Ratchet Governance Pattern)**：

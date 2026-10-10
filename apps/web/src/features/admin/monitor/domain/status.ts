@@ -1,7 +1,7 @@
 import { TaskStatus, type TaskStatus as TaskStatusValue } from '../../shared/lib/taskMetricTokens'
 
 // Pill 直连：与 AdminStatusPillVariant 同构，domain 内自有定义以免反向依赖组件层。
-export type TaskStatusPillVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
+type TaskStatusPillVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 
 export interface TaskStatusDefinition {
   variant: TaskStatusPillVariant

@@ -14,7 +14,7 @@ const controlMocks = vi.hoisted(() => ({
 }))
 
 vi.mock(
-  '../../../../shared/api/generated-query/control/control-credits/control-credits',
+  '../../../../api/generated-query/control/control-credits/control-credits',
   () => controlMocks,
 )
 

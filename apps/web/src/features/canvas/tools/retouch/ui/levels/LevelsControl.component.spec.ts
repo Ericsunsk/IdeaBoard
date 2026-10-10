@@ -1,7 +1,7 @@
 import { defineComponent, h, nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../../../../test/render'
-import { setUserLocale } from '../../../../../../shared/i18n'
+import { setUserLocale } from '../../../../../../core/i18n'
 import type { RetouchLevelsParams } from '../../core/model.ts'
 import RetouchLevelsControl from './LevelsControl.vue'
 

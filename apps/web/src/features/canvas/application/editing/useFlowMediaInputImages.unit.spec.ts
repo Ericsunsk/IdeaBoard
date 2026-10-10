@@ -13,7 +13,7 @@ import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { CanvasGraphSession } from '../../domain/graph'
 import { flowConnectionToCanvasConnection } from '../../infrastructure/vue-flow-adapter/flowConnectionAdapter.ts'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
-import type { MediaRef } from '../../../../shared/media/mediaRef'
+import type { MediaRef } from '../../../../core/media/mediaRef'
 
 function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {

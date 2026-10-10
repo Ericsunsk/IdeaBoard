@@ -9,7 +9,7 @@ import {
   Wallet,
 } from '@iconoir/vue'
 import { ADMIN_DEFAULT_PATH, adminNavigationRouteDefs } from './navigationMeta'
-import { isPathUnderRoute } from '../../../shared/constants/routePaths'
+import { isPathUnderRoute } from '../routePaths'
 import type { AdminNavigationKey, AdminNavigationRouteDef } from './navigationMeta'
 
 export { ADMIN_DEFAULT_PATH }

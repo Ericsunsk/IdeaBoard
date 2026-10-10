@@ -67,32 +67,10 @@ const owner = (file: string) =>
             : file.startsWith('src/components/')
               ? 'design-system'
               : 'p1-lane'
-const fileDecisions: Record<string, [string, string]> = {
-  'src/shared/assets/eric-studio-logo.svg.d.ts': [
-    'delete-candidate',
-    '与 shared/types/asset-modules.d.ts SVG 声明比较，P1 确认后删除',
-  ],
-  'src/shared/theme/composables/themeKeyboard.ts': [
-    'delete-candidate',
-    'production 图不可达；P1 复核 keyboard 场景后决定',
-  ],
-  'src/shared/api/workspaceTasks.ts': [
-    'compatibility-review',
-    'stable port barrel；未伪造 shim TTL，P1 复核公共导出',
-  ],
-  'src/shared/i18n/locales/en/index.ts': [
-    'tool-review',
-    'parity bundle entry；i18n 选型完成前保留',
-  ],
-  'src/features/legal/index.ts': [
-    'retain-public-entry',
-    'canonical inventory + surface；P2 收敛 route chunk direct import',
-  ],
-}
 
 for (const [mode, args] of [
-  ['normal', ['--config', 'knip.jsonc']],
-  ['production', ['--config', 'knip.production.jsonc', '--production', '--strict']],
+  ['normal', ['--config', 'knip.config.ts']],
+  ['production', ['--config', 'knip.production.config.ts', '--production', '--strict']],
 ] as const) {
   const result = spawnSync(
     process.execPath,
@@ -152,15 +130,9 @@ for (const [mode, args] of [
           disposition = 'retain-public-export'
           reason = `inventory ${seam.path} 同一 symbol + surface baseline；只保留该已声明公共导出`
         }
-        if (record.file.startsWith('src/shared/api/generated-query/')) {
+        if (record.file.startsWith('src/api/generated-query/')) {
           disposition = 'generator-review'
           reason = 'Orval 生成 symbol；保留至 owner 审查 generator/client 消费，禁止手改'
-        }
-        if (category === 'files' && fileDecisions[record.file])
-          [disposition, reason] = fileDecisions[record.file]!
-        if (category === 'duplicates') {
-          disposition = 'compatibility-review'
-          reason = 'named api 与 default 指向同一实例；P1 复核 default 公共契约后决定'
         }
         rows.push({
           mode,

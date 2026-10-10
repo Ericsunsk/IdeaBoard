@@ -1,14 +1,14 @@
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
-} from '../../../../shared/utils/imageUploadSupport'
+} from '../../../../core/utils/imageUploadSupport'
 import {
   CANVAS_LIBRARY_IMPORT_MIME,
   readCanvasLibraryImportTransfer,
   type CanvasLibraryImportDescriptor,
 } from '../../../library'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
-import { i18n } from '../../../../shared/i18n'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
+import { i18n } from '../../../../core/i18n'
 import type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'
 
 type UseFlowCanvasDropOptions = {

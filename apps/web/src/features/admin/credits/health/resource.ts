@@ -2,7 +2,7 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { CreditHealth, CreditReconciliationRequest } from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
-import { adminPolling } from '../../../../shared/query/queryDefaults'
+import { adminPolling } from '../../../../core/query/queryDefaults'
 
 const adminCreditHealthQueryKey = ['admin', 'credits', 'health'] as const
 

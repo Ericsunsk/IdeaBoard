@@ -1,4 +1,4 @@
-import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { useAsyncAction } from '../../../core/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import type { AdminStorageResource } from './resource'
 import { createAdminStorageWorkspace } from './workspace'

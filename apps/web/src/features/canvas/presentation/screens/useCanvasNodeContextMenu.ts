@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import type { CanvasCreatableNodeKind } from '../../../board/ports/canvas'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { getCanvasNodeKindMenuItems } from '../../domain/nodes/canvasNodeRegistry.ts'
 
 type CanvasNodeContextMenuSnapshot = {

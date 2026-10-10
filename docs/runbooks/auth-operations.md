@@ -41,7 +41,7 @@
 
 1. **Auth Service 权限收窄。** `apps/auth/src/application/auth.ts` 用 better-auth 的 `roles` 覆盖 admin plugin 默认角色，`admin` 角色只保留 `user:["impersonate"]`，其余 `user`/`session` 权限全部拒绝（`impersonate-admins` 也不授予，因此伪装管理员仍被拒）。回归测试见 `authConfig.test.ts` 的 `admin plugin permissions are narrowed to the one endpoint Go needs`。
 2. **反代兜底。** `deploy/templates/nginx/ideaboard.conf.template` 中 `location ~ ^/api/auth/admin/(?!stop-impersonating$)` 直接 `return 403`，浏览器只能访问 `stop-impersonating`。Go API 走内网 `AUTH_SERVICE_BASE_URL`（`http://auth:6001`）直连 Auth Service，不经过该反代，因此服务端口编排不受影响。
-3. **前端不注册 admin client。** `apps/web/src/shared/auth/client.ts` 不再注册 `adminClient()`，因此不存在 `authClient.admin.removeUser` 这类可编译的调用入口。退出伪装改为直接 `POST /api/auth/admin/stop-impersonating`。
+3. **前端不注册 admin client。** `apps/web/src/core/auth/client.ts` 不再注册 `adminClient()`，因此不存在 `authClient.admin.removeUser` 这类可编译的调用入口。退出伪装改为直接 `POST /api/auth/admin/stop-impersonating`。
 
 > [!IMPORTANT]
 > `impersonate` 是唯一保留的权限，因为 Go Control Plane 通过 `POST /api/auth/admin/impersonate-user` 发起伪装（`apps/api/internal/identity/auth/service_client.go`，转发浏览器 Cookie）。若日后要收紧该权限，必须先给 Go 侧补一条 internal-key 认证的发起通道，否则会破坏伪装登录。其余高危动作在 Auth Service 已有 internal-key 认证的 `/internal/users/*`（`ensure`、`emails`、`{id}`、`{id}/role`、`ban`、`unban`、`revoke-sessions`），因此收窄权限不影响服务端编排。
@@ -106,10 +106,10 @@
 
 为每个启用的 Provider 创建独立 OAuth Client。Google 在 Google Cloud Console 创建 `Web application` Client，Discord 在 Discord Developer Portal 创建 Application。每个环境登记的 Authorized redirect URI 必须与 Admin 只读显示的 callback URL 完全一致：
 
-| 环境       | Client policy                                      | Callback URI pattern                                      |
-| Production  | 独立 Production Client，不与其他环境共享           | `${PRODUCTION_PUBLIC_ORIGIN}/api/auth/callback/{provider}` |
-| Staging     | 独立 Staging Client，不使用 Production credentials | `${STAGING_PUBLIC_ORIGIN}/api/auth/callback/{provider}`    |
-| Local       | 复用 Staging Client，仅供授权开发人员              | 默认 `http://localhost:5173/api/auth/callback/{provider}`    |
+| 环境 | Client policy | Callback URI pattern |
+| Production | 独立 Production Client，不与其他环境共享 | `${PRODUCTION_PUBLIC_ORIGIN}/api/auth/callback/{provider}` |
+| Staging | 独立 Staging Client，不使用 Production credentials | `${STAGING_PUBLIC_ORIGIN}/api/auth/callback/{provider}` |
+| Local | 复用 Staging Client，仅供授权开发人员 | 默认 `http://localhost:5173/api/auth/callback/{provider}` |
 
 Local 复用方法：把本地 `PUBLIC_ORIGIN` 对应的 callback URL 加入对应 **Staging Client** 的 Authorized redirect URIs，通过团队 Secret Manager 获取 Staging Client ID/Secret，再在本地 Admin 保存。默认开发基准 URL 是 `http://localhost:5173`。不要把 localhost URI 或 Staging Secret 加入 Production Client、仓库、Issue、日志或截图。
 

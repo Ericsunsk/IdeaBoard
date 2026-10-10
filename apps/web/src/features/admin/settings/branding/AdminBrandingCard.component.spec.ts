@@ -5,7 +5,7 @@ import { renderWithUser, screen } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import AdminBrandingCard from './AdminBrandingCard.vue'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminBrandingCard', () => {
   let queryClient: QueryClient

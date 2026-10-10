@@ -315,14 +315,14 @@ import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminMono from '../../shared/components/AdminMono.vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminDrawer from '../../shared/components/AdminDrawer.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import { useAdminCursorCollection } from '../../shared/composables/useAdminCursorCollection'
-import { adminPolling } from '../../../../shared/query/queryDefaults'
+import { adminPolling } from '../../../../core/query/queryDefaults'
 import {
   adminFramedIconButtonClass,
   adminTableCardClass,

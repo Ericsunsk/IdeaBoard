@@ -99,10 +99,10 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Camera } from '@iconoir/vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import StatusBadge, { type AppStatusTone } from '../../../../shared/components/StatusBadge.vue'
+import StatusBadge, { type AppStatusTone } from '../../../../core/components/StatusBadge.vue'
 import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
-import { formatDottedIsoDate } from '../../../../shared/utils/dateTime'
+import { formatDottedIsoDate } from '../../../../core/utils/dateTime'
 import AccountPane from '../shared/AccountPane.vue'
 
 type ProfileField = {

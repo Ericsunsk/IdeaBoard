@@ -10,7 +10,14 @@ const cli = path.join(webRoot, 'node_modules/knip/bin/knip.js')
 type Issue = { name: string }
 type Report = {
   files?: string[]
-  issues: Array<{ file: string; files?: Issue[]; dependencies?: Issue[]; unlisted?: Issue[] }>
+  issues: Array<{
+    file: string
+    files?: Issue[]
+    dependencies?: Issue[]
+    unlisted?: Issue[]
+    exports?: Issue[]
+    types?: Issue[]
+  }>
 }
 
 function runtimeIssues(report: Report) {
@@ -38,12 +45,10 @@ function run(workspace: string, isProduction: boolean) {
     [
       cli,
       '--config',
-      isProduction ? 'knip.production.jsonc' : 'knip.jsonc',
+      isProduction ? 'knip.production.config.ts' : 'knip.config.ts',
       '--reporter',
       'json',
       '--no-progress',
-      '--include',
-      'files,dependencies,unlisted',
       ...(isProduction ? ['--production', '--strict'] : []),
     ],
     { cwd: workspace, encoding: 'utf8', timeout: 20_000 },
@@ -57,6 +62,16 @@ function withWorkspace(check: (workspace: string) => void) {
   try {
     for (const file of ['knip.jsonc', 'knip.production.jsonc'])
       fs.copyFileSync(path.join(webRoot, file), path.join(workspace, file))
+    for (const [wrapper, config] of [
+      ['knip.config.ts', 'knip.jsonc'],
+      ['knip.production.config.ts', 'knip.production.jsonc'],
+    ]) {
+      write(
+        workspace,
+        wrapper!,
+        `import { createGovernanceConfig } from ${JSON.stringify(path.join(webRoot, 'scripts/knipGovernanceConfig.ts'))}\nexport default createGovernanceConfig(${JSON.stringify(config)}, ${JSON.stringify(workspace)}, { version: 1, generated: {}, symbols: {}, files: {} })\n`,
+      )
+    }
     write(
       workspace,
       'package.json',
@@ -103,6 +118,87 @@ function withWorkspace(check: (workspace: string) => void) {
 }
 
 describe('Knip runtime and test graphs', () => {
+  test(
+    'normal and production gates report unused private exports and types without category filters',
+    () =>
+      withWorkspace((workspace) => {
+        write(
+          workspace,
+          'src/features/demo/privateModule.ts',
+          'export const usedValue = 1; export const unusedPrivateExport = 2; export type UnusedPrivateType = { id: string };\n',
+        )
+        write(
+          workspace,
+          'src/app/main.ts',
+          'import { value } from "runtime-package"; import { usedValue } from "../features/demo/privateModule"; console.log(value, usedValue)\n',
+        )
+        write(
+          workspace,
+          'src/example.unit.spec.ts',
+          'import { value } from "test-package"; import { usedValue } from "./features/demo/privateModule"; console.log(value, usedValue)\n',
+        )
+        for (const isProduction of [false, true]) {
+          const result = run(workspace, isProduction)
+          expect(result.status).toBe(1)
+          expect(
+            result.report.issues.flatMap((row) => row.exports ?? []).map((row) => row.name),
+          ).toContain('unusedPrivateExport')
+          expect(
+            result.report.issues.flatMap((row) => row.types ?? []).map((row) => row.name),
+          ).toContain('UnusedPrivateType')
+        }
+      }),
+    30_000,
+  )
+
+  test(
+    'combined gate runs production after a normal failure and returns a failing exit code',
+    () =>
+      withWorkspace((workspace) => {
+        const manifestPath = path.join(workspace, 'package.json')
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        delete manifest.devDependencies['test-package']
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest))
+        const result = spawnSync(
+          process.execPath,
+          ['--experimental-strip-types', path.join(webRoot, 'scripts/checkKnipGate.ts')],
+          { cwd: workspace, encoding: 'utf8', timeout: 30_000 },
+        )
+        if (result.error) throw result.error
+        expect(result.status).toBe(1)
+        expect(result.stdout).toContain('[knip-gate] normal')
+        expect(result.stdout).toContain('[knip-gate] production')
+        expect(result.stdout).toContain('test-package')
+
+        const temporaryCli = path.join(workspace, 'node_modules/knip/bin/knip.js')
+        write(
+          workspace,
+          'scripts/checkKnipGate.ts',
+          fs.readFileSync(path.join(webRoot, 'scripts/checkKnipGate.ts'), 'utf8'),
+        )
+        write(workspace, 'node_modules/knip/bin/knip.js', 'throw new Error("tool fixture crash")\n')
+        const crashed = spawnSync(
+          process.execPath,
+          ['--experimental-strip-types', path.join(workspace, 'scripts/checkKnipGate.ts')],
+          { cwd: workspace, encoding: 'utf8', timeout: 30_000 },
+        )
+        if (crashed.error) throw crashed.error
+        expect(crashed.status).toBe(1)
+        expect(crashed.stdout).toContain('[knip-gate] production')
+        expect(crashed.stderr).toContain('tool fixture crash')
+        fs.unlinkSync(temporaryCli)
+        const missing = spawnSync(
+          process.execPath,
+          ['--experimental-strip-types', path.join(workspace, 'scripts/checkKnipGate.ts')],
+          { cwd: workspace, encoding: 'utf8', timeout: 30_000 },
+        )
+        if (missing.error) throw missing.error
+        expect(missing.status).toBe(1)
+        expect(missing.stdout).toContain('[knip-gate] production')
+      }),
+    30_000,
+  )
+
   test(
     'actual production config tracks runtime dependency and excludes the test dependency graph',
     () =>
@@ -156,8 +252,8 @@ describe('Knip runtime and test graphs', () => {
           'src/features/demo/testing.ts',
           'src/features/demo/testing/adapter.ts',
           'src/test/helper.ts',
-          'src/shared/i18n/localeParity.ts',
-          'src/shared/seo/seoStaticHtml.ts',
+          'src/core/i18n/localeParity.ts',
+          'src/core/seo/seoStaticHtml.ts',
         ]) {
           write(
             workspace,

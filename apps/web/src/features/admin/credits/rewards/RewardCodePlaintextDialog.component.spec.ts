@@ -11,7 +11,7 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
   useAdminToast: () => toast,
 }))
 
-vi.mock('../../../../shared/composables/useAppClipboard', () => ({
+vi.mock('../../../../core/composables/useAppClipboard', () => ({
   useAppClipboard: () => clipboard,
 }))
 

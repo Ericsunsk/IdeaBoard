@@ -65,7 +65,7 @@ import {
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
-} from '../../../../shared/composables/useOverlayInteractionLifecycle'
+} from '../../../../core/composables/useOverlayInteractionLifecycle'
 
 // 右侧抽屉与居中弹窗是两种 overlay 形态（定位/滑入动画/chrome 不同），
 // 独立成组件而不是给 AdminDialogShell 加 drawer 变体，避免分叉其尺寸与

@@ -7,7 +7,7 @@ import {
 } from './layers/layerEffects'
 import { cloneImageData } from './imageDataUtils'
 
-export type RetouchHistogramSourceCacheKey = {
+type RetouchHistogramSourceCacheKey = {
   sourceImageData: ImageData
   targetLayerId: string
   upstreamLayers: readonly RetouchEffectLayer[]

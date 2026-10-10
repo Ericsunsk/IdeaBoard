@@ -57,13 +57,9 @@ import {
   useAuthSession,
   useUserStore,
 } from '../../auth'
-import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import {
-  ADMIN_USERS_PATH,
-  USER_LOGIN_PATH,
-  USER_REGISTER_PATH,
-  USER_CANVAS_PATH,
-} from '../../../shared/constants/routePaths'
+import { useAsyncAction } from '../../../core/composables/useAsyncAction'
+import { ADMIN_USERS_PATH } from '../../admin/routePaths'
+import { USER_LOGIN_PATH, USER_REGISTER_PATH, USER_CANVAS_PATH } from '../routePaths'
 import { clearPendingSearchAuthAction } from '../../search'
 import { AccountDialogHost, createAccountOverlay, provideAccountOverlay } from '../../account'
 

@@ -20,7 +20,7 @@ vi.mock('../../../auth', async (importOriginal) => ({
   useUserStore: () => mockUserStore,
 }))
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
+vi.mock('../../../../core/composables/useAppToast', () => ({
   useAppToast: () => mockToast,
 }))
 

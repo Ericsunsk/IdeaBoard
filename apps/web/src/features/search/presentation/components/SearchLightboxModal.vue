@@ -83,7 +83,7 @@ import { Xmark } from '@iconoir/vue'
 import {
   lightboxScrimIconButtonClass,
   lightboxScrimLinkClass,
-} from '../../../../shared/theme/lightboxScrim'
+} from '../../../../theme/lightboxScrim'
 import type { SearchResult } from '../../domain/models'
 
 const props = defineProps<{

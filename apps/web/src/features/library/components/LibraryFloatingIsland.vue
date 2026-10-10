@@ -223,21 +223,21 @@ import { useLibraryWorkspace, type LibraryFolderTab } from '../application/useLi
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../application/folderFacts'
 import type { LibraryAssetView } from '../domain/transfer'
 import type { CanvasLibraryImportDescriptor } from '../domain/transfer'
-import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
-import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
+import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
+import { useUserConfirmDialog } from '../../../core/composables/useUserConfirmDialog'
 import {
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
   appOverlayMenuSurfaceClass,
-} from '../../../shared/theme/appOverlayMenu'
+} from '../../../theme/appOverlayMenu'
 import { deleteFolderConfirmation, removeAssetConfirmation } from './confirmations'
 import LibraryAssetGallery from './LibraryAssetGallery.vue'
 import LibraryAssetLightbox from './LibraryAssetLightbox.vue'
 import LibraryFolderDialogs from './LibraryFolderDialogs.vue'
 import LibraryFolderContextMenu from './LibraryFolderContextMenu.vue'
 import { useLibraryIslandDnD } from './useLibraryIslandDnD'
-import { useAppToast } from '../../../shared/composables/useAppToast'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { useAppToast } from '../../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 
 const props = defineProps<{
   open: boolean

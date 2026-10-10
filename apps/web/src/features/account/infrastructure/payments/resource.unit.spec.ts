@@ -5,13 +5,13 @@ import {
   paymentsResource,
   subscribeToPaymentEvents,
 } from './resource'
-import { resetWorkspaceEventStreamsForTests } from '../../../../shared/api/workspaceEventStream'
+import { resetWorkspaceEventStreamsForTests } from '../../../../api/workspaceEventStream'
 
 const transport = vi.hoisted(() => ({
   request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/client', () => ({
+vi.mock('../../../../api/client', () => ({
   api: { request: transport.request },
 }))
 

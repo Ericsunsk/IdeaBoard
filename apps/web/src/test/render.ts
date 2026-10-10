@@ -9,7 +9,7 @@ import {
 import userEvent from '@testing-library/user-event'
 import { cloneVNode, defineComponent, h, isVNode } from 'vue'
 import { IconoirProvider } from '@iconoir/vue'
-import { i18n } from '../shared/i18n'
+import { i18n } from '../core/i18n'
 
 export type RenderedWithUser = RenderResult & {
   user: ReturnType<typeof userEvent.setup>

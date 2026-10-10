@@ -24,7 +24,7 @@
 <script setup lang="ts" generic="TRange extends string">
 import RangedLineChartCard, {
   type RangedLineChartProps,
-} from '../../../../shared/components/RangedLineChartCard.vue'
+} from '../../../../core/components/RangedLineChartCard.vue'
 
 // Admin skin adapter for the neutral shared ranged chart primitive (#863).
 // Visual styling stays here so Admin route pages never copy chart skin and

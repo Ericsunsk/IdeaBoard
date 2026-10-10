@@ -7,18 +7,18 @@ import {
   getWorkspacePurchaseOptions,
   listWorkspacePendingOrders,
   listWorkspaceRecharges,
-} from '../../../../shared/api/generated-query/public/workspace-billing/workspace-billing'
+} from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type {
   WorkspaceCheckoutSession,
   WorkspacePendingOrder,
   WorkspacePendingOrderList,
   WorkspacePurchaseOptions,
   WorkspaceRechargeHistoryItem,
-} from '../../../../shared/api/generated-query/public/model'
-import { buildContractRequestHeaders, newRequestId } from '../../../../shared/api/contractKernel'
-import { workspaceBillingPendingOrderIdempotencyKey } from '../../../../shared/api/idempotencyKey'
-import { i18n } from '../../../../shared/i18n'
-import { subscribeWorkspaceEvent } from '../../../../shared/api/workspaceEventStream'
+} from '../../../../api/generated-query/public/model'
+import { buildContractRequestHeaders, newRequestId } from '../../../../api/contractKernel'
+import { workspaceBillingPendingOrderIdempotencyKey } from '../../../../api/idempotencyKey'
+import { i18n } from '../../../../core/i18n'
+import { subscribeWorkspaceEvent } from '../../../../api/workspaceEventStream'
 import {
   readContractListBody,
   requireAccountWorkspaceId,

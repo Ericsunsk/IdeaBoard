@@ -34,7 +34,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usePointerDragSession } from '../../../../infrastructure/browser/interaction/usePointerDragSession.ts'
-import { clampWithFallback, clampUnit } from '../../../../../../shared/utils/number'
+import { clampWithFallback, clampUnit } from '../../../../../../core/utils/number'
 import { resolveKeyboardDelta } from './keyboardDelta.ts'
 import { useInstrumentRefs } from './useInstrumentRefs.ts'
 

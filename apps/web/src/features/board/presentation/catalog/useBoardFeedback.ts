@@ -1,5 +1,5 @@
-import { useAppToast } from '../../../../shared/composables/useAppToast'
-import { i18n } from '../../../../shared/i18n'
+import { useAppToast } from '../../../../core/composables/useAppToast'
+import { i18n } from '../../../../core/i18n'
 import type {
   BoardCreateResult,
   BoardDeleteResult,

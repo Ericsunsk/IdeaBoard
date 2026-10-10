@@ -11,7 +11,7 @@ const storageMocks = vi.hoisted(() => ({
   saveProfile: vi.fn(),
   testProfile: vi.fn(),
 }))
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),

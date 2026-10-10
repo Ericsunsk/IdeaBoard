@@ -1,5 +1,5 @@
-import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import type { Service } from '../../../../shared/domain/imageServices'
+import { IMAGE_NODE_ACTION } from '../../core/nodes/imageActions'
+import type { Service } from '../../../../core/contracts/imageServices'
 import { EXECUTION_META, type ExecutionService } from './executionContract'
 
 export const IMAGE_EXECUTION_MODE = {
@@ -8,7 +8,7 @@ export const IMAGE_EXECUTION_MODE = {
   outpaint: 'outpaint',
 } as const
 
-export type ImageExecutionMode = (typeof IMAGE_EXECUTION_MODE)[keyof typeof IMAGE_EXECUTION_MODE]
+type ImageExecutionMode = (typeof IMAGE_EXECUTION_MODE)[keyof typeof IMAGE_EXECUTION_MODE]
 
 export const DEFAULT_IMAGE_ACTION_STRENGTH = 50
 
@@ -21,10 +21,10 @@ export const IMAGE_DIRECT_TASK_ACTIONS = [
 export type ImageDirectTaskAction = (typeof IMAGE_DIRECT_TASK_ACTIONS)[number]
 
 export const IMAGE_UPSCALE_ACTION = IMAGE_NODE_ACTION.upscale
-export type ImageUpscaleTaskAction = typeof IMAGE_UPSCALE_ACTION
+type ImageUpscaleTaskAction = typeof IMAGE_UPSCALE_ACTION
 
 export const IMAGE_OUTPAINT_ACTION = IMAGE_NODE_ACTION.outpaint
-export type ImageOutpaintAction = typeof IMAGE_OUTPAINT_ACTION
+type ImageOutpaintAction = typeof IMAGE_OUTPAINT_ACTION
 
 export type ImageTaskAction = ImageDirectTaskAction | ImageUpscaleTaskAction
 export type ImageExecutionAction = ImageTaskAction | ImageOutpaintAction
@@ -105,7 +105,7 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
   }),
 ] as const satisfies readonly ImageActionExecutionConfig[]
 
-export type ImageActionExecutionRegistry = {
+type ImageActionExecutionRegistry = {
   readonly [TAction in ImageExecutionAction]: Extract<
     (typeof IMAGE_ACTION_EXECUTION_REGISTRY_LIST)[number],
     { action: TAction }

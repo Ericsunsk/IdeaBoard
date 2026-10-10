@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../../test/render'
 import { expectDomOrder } from '../../../../test/domOrder'
-import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import { stripUndefined } from '../../../../api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from '../domain/status'
 import type {

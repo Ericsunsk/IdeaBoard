@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
-import { stringParam } from '../../../../../shared/router/queryParams'
+import { stringParam } from '../../../../../core/router/queryParams'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CanvasConnectionPort } from '../../../../board/ports/canvas'
 import { useCanvasKeyboardShortcuts } from '../useCanvasKeyboardShortcuts'

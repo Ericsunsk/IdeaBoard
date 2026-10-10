@@ -17,7 +17,7 @@ import {
   type CanvasRect,
 } from '../../domain/graph/canvasGroupGeometry.ts'
 
-export type ActiveGroupResize = {
+type ActiveGroupResize = {
   store: CanvasGraphStore
   transaction: CanvasGraphTransaction
   groupId: CanvasGraphGroupId

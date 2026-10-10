@@ -2,13 +2,13 @@ import {
   normalizeTaskImageResult,
   normalizeTaskImageResults,
   type TaskImageResult,
-} from '../../../../../shared/query/taskResult'
-import { getMediaAssetMetadata } from '../../../../../shared/api/mediaAssetDelivery'
-import { i18n } from '../../../../../shared/i18n'
+} from '../../../../../core/query/taskResult'
+import { getMediaAssetMetadata } from '../../../../../api/mediaAssetDelivery'
+import { i18n } from '../../../../../core/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
-import { buildMediaBrowserURL, type MediaRef } from '../../../../../shared/media/mediaRef'
-import { normalizeNaturalSize } from '../../../../../shared/media/imageDimensions'
-import { sleep } from '../../../../../shared/utils/polling'
+import { buildMediaBrowserURL, type MediaRef } from '../../../../../core/media/mediaRef'
+import { normalizeNaturalSize } from '../../../../../core/media/imageDimensions'
+import { sleep } from '../../../../../core/utils/polling'
 
 export type ImageSize = {
   width: number

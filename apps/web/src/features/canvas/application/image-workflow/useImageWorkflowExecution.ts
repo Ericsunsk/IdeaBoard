@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, type Ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   createImageExecutionPlanner,
   createImageWorkflowCommands,
@@ -15,7 +15,7 @@ import type { BoardSnapshot } from '../../../board/ports/canvas'
 import type { CanvasGraphStore } from '../../domain/graph'
 import type { CanvasRendererMetricsPort } from '../../infrastructure/vue-flow-adapter'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
-import type { TaskImageResult } from '../../../../shared/query/taskResult'
+import type { TaskImageResult } from '../../../../core/query/taskResult'
 import { waitExistingOrLiveTaskImageResults } from '../execution/task-runner/imageDirectActionExecutor'
 import { CANVAS_WORKSPACE_REQUIRED_MESSAGE } from '../execution/workspace/canvasWorkspaceTaskAdapter'
 import { getWorkspaceSelectionStore } from '../../../workspace'

@@ -5,7 +5,7 @@ type ValueRef<T> = {
   readonly value: T
 }
 
-export type ImageToolInpaintState = RetouchModeState & { mode: 'inpaint' }
+type ImageToolInpaintState = RetouchModeState & { mode: 'inpaint' }
 
 export function createImageToolMaskOverlayState(retouchState: ValueRef<RetouchModeState | null>) {
   return computed(() => {

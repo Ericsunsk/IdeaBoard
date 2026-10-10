@@ -28,11 +28,11 @@ import {
   getRenameWorkspaceLibraryFolderUrl,
   getResolveWorkspaceLibraryAssetsUrl,
   getSaveWorkspaceLibraryAssetUrl,
-} from '../../shared/api/generated-query/public/workspace-library/workspace-library'
-import { getWorkspaceMediaAssetMetadata } from '../../shared/api/mediaAssetDelivery'
+} from '../../api/generated-query/public/workspace-library/workspace-library'
+import { getWorkspaceMediaAssetMetadata } from '../../api/mediaAssetDelivery'
 
-vi.mock('../../shared/api/mediaAssetDelivery', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../shared/api/mediaAssetDelivery')>()
+vi.mock('../../api/mediaAssetDelivery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/mediaAssetDelivery')>()
   return {
     ...actual,
     getWorkspaceMediaAssetMetadata: vi.fn(async () => ({

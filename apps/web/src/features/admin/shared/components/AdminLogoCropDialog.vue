@@ -121,7 +121,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
 import AdminButton from './AdminButton.vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminDialogShell from './AdminDialogShell.vue'
 import { adminDialogTitleClass, adminTextButtonClass } from '../lib/uiClasses'
 

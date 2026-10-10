@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { createApp, defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { notifyUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
+import { notifyUserCreditsInvalidation } from '../../../../core/query/userCreditsInvalidation'
 import { useCreditsSync } from './useCreditsSync'
 import { billingRecordsQueryKeys, creditsQueryKeys } from '../../infrastructure'
 

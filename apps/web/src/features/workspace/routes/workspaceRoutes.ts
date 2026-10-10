@@ -3,12 +3,14 @@ import {
   ACCEPTABLE_USE_PATH,
   PRIVACY_POLICY_PATH,
   REFUND_POLICY_PATH,
+  TERMS_PATH,
+} from '../../legal/routePaths'
+import {
   SHARE_JOIN_PATH,
   USER_AUTH_CALLBACK_PATH,
-  TERMS_PATH,
   USER_BOARDS_PATH,
   USER_ROOT_PATH,
-} from '../../../shared/constants/routePaths'
+} from '../routePaths'
 
 export const WORKSPACE_DEFAULT_PATH = USER_BOARDS_PATH
 

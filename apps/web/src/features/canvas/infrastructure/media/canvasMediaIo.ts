@@ -3,8 +3,8 @@ import {
   API_BASE_URL,
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,
-} from '../../../../shared/config/runtimeUrls'
-import { createUniqueSuffix } from '../../../../shared/utils/ids'
+} from '../../../../core/config/runtimeUrls'
+import { createUniqueSuffix } from '../../../../core/utils/ids'
 
 /**
  * Returns true if the value is a data: URL.

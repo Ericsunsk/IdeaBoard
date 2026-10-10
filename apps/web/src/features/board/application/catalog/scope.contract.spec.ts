@@ -6,7 +6,7 @@ import {
   forgetStoredAuthScope,
   getAuthStorageUserScope,
   setStoredAuth,
-} from '../../../../shared/utils/auth'
+} from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { listBoards, replaceBoards } from './boards'
 import { createBoardRepository } from './repository'

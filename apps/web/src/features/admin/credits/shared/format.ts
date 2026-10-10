@@ -1,10 +1,10 @@
 import type { CreditReconciliationRun } from './api'
-import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
+import { sanitizeApiErrorMessage } from '../../../../core/utils/errorMessages'
 
 // Ledger command vocabulary (issue #809). The legacy generated
 // `CreditLedgerTransaction` model is gone; the control ledger types the
 // command as a plain string, so this module owns the known command set.
-export type CreditLedgerCommandType =
+type CreditLedgerCommandType =
   'grant' | 'deduction' | 'hold' | 'capture' | 'release' | 'refund' | 'correction'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {

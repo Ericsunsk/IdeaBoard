@@ -13,8 +13,8 @@ import {
   type WorkspaceBoardDocument,
   type WorkspaceBoardMeta,
 } from '../../infrastructure/api/boardsResource'
-import { userErrorCode } from '../../../../shared/errors/errorCatalog'
-import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import { userErrorCode } from '../../../../core/errors/errorCatalog'
+import { stripUndefined } from '../../../../api/stripUndefined'
 import {
   boardScopeKey,
   getBoardScope,
@@ -46,7 +46,7 @@ import {
   type BoardStateValidationErrorContext,
   type BoardState,
 } from '../../domain'
-import { queryClient } from '../../../../shared/query/queryClient'
+import { queryClient } from '../../../../core/query/queryClient'
 import { workspaceQueryKeys } from '../../../workspace'
 
 export type HydrateBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }

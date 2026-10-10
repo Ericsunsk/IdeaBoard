@@ -12,7 +12,7 @@
 import { computed } from 'vue'
 import { Search } from '@iconoir/vue'
 import AdminMono from '../../shared/components/AdminMono.vue'
-import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
+import { getServiceIcon } from '../../shared/ui/serviceIcons'
 import { getAdminServiceGroupMeta, getAdminServiceMeta } from '../../shared/lib/serviceAdminMeta'
 import { serviceOfSku } from './skuFeature'
 

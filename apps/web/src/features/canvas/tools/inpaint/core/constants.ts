@@ -1,4 +1,4 @@
-import { clamp } from '../../../../../shared/utils/number.ts'
+import { clamp } from '../../../../../core/utils/number.ts'
 
 export const MASK_PAINTING_RGB = {
   r: 122,

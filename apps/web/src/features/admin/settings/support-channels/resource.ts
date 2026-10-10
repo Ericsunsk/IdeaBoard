@@ -1,14 +1,14 @@
 import {
   getControlSupportChannels,
   updateControlSupportChannels,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { SupportChannelKind } from '../../../../shared/api/generated-query/control/model/supportChannelKind'
-import type { SupportChannelsSetting } from '../../../../shared/api/generated-query/control/model/supportChannelsSetting'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { SupportChannelKind } from '../../../../api/generated-query/control/model/supportChannelKind'
+import type { SupportChannelsSetting } from '../../../../api/generated-query/control/model/supportChannelsSetting'
+import { requireContractData } from '../../../../api/contractKernel'
 import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMutation'
 import { loadControlSetting } from '../../shared/lib/controlResource'
 import { withControlCopy } from '../../shared/lib/controlCopy'
-export type { SupportChannelsSetting } from '../../../../shared/api/generated-query/control/model/supportChannelsSetting'
+export type { SupportChannelsSetting } from '../../../../api/generated-query/control/model/supportChannelsSetting'
 
 export const supportChannelsQueryKey = ['admin', 'settings', 'support-channels'] as const
 export const supportChannelKinds = Object.values(SupportChannelKind)

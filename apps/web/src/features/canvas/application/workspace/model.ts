@@ -46,7 +46,7 @@ type CanvasWorkspaceHistory = {
   redo: () => void
 }
 
-export type CanvasWorkspaceRuntimeViewModel = {
+type CanvasWorkspaceRuntimeViewModel = {
   boardChrome: {
     currentBoardId: ComputedRef<string | null>
     isBoardMenuOpen: Ref<boolean>
@@ -80,7 +80,7 @@ export type CanvasWorkspaceRuntimeViewModel = {
   imageWorkflow: CanvasImageWorkflow['viewModel']
 }
 
-export type CanvasWorkspaceRuntimeCommands = {
+type CanvasWorkspaceRuntimeCommands = {
   boardSession: {
     setBoardNameInputRef: (element: HTMLElement | null) => void
     toggleBoardMenu: () => void

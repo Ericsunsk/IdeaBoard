@@ -2,18 +2,18 @@ import { isCanvasPerfProbeEnabled } from './canvasPerfProbe'
 
 export type CanvasFrameProbeScene = 'pan' | 'zoom' | 'node-drag' | 'load-hydrate' | (string & {})
 
-export type CanvasFrameProbeMetadata = Record<string, string | number | boolean | null | undefined>
+type CanvasFrameProbeMetadata = Record<string, string | number | boolean | null | undefined>
 
 export type CanvasFrameProbeMetadataInput =
   CanvasFrameProbeMetadata | (() => CanvasFrameProbeMetadata)
 
-export type CanvasFrameProbeMark = {
+type CanvasFrameProbeMark = {
   name: string
   atMs: number
   metadata?: CanvasFrameProbeMetadata
 }
 
-export type CanvasFrameProbeSummary = {
+type CanvasFrameProbeSummary = {
   scene: CanvasFrameProbeScene
   durationMs: number
   avgFrameMs: number

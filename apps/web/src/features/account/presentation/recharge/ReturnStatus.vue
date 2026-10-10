@@ -69,7 +69,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import type { PaymentReturnSource } from '../../domain'
 import type { PaymentOrderReturnStatus } from '../../infrastructure'
 

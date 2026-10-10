@@ -6,15 +6,15 @@ import {
   createControlPaymentRefund,
   getControlPaymentOrder,
   listControlPaymentOrders,
-} from '../../../../shared/api/generated-query/control/control-payments/control-payments'
-import type { ListControlPaymentOrdersParams } from '../../../../shared/api/generated-query/control/model'
-import { requireContractData } from '../../../../shared/api/contractKernel'
-import { stripUndefined } from '../../../../shared/api/stripUndefined'
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
+} from '../../../../api/generated-query/control/control-payments/control-payments'
+import type { ListControlPaymentOrdersParams } from '../../../../api/generated-query/control/model'
+import { requireContractData } from '../../../../api/contractKernel'
+import { stripUndefined } from '../../../../api/stripUndefined'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
-export type PaymentOrderApiUser = {
+type PaymentOrderApiUser = {
   public_id: string
   display_name: string
 }
@@ -37,7 +37,7 @@ export type PaymentOrderApiSummary = {
   anomalous_at?: string
 }
 
-export type PaymentOrderApiPage = {
+type PaymentOrderApiPage = {
   orders: PaymentOrderApiSummary[]
   total: number
   next_cursor?: string

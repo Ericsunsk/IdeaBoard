@@ -1,4 +1,4 @@
-import { clampWithFallback } from '../../../../../../shared/utils/number'
+import { clampWithFallback } from '../../../../../../core/utils/number'
 import type { RetouchLevelsParams } from '../model.ts'
 import {
   RETOUCH_CHANNEL_MAX,

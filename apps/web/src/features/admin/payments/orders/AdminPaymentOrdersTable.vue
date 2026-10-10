@@ -153,7 +153,7 @@ import {
   adminTableRowActionButtonClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
-import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
+import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import {
   formatPaymentDateTime,
   formatPaymentMoney,

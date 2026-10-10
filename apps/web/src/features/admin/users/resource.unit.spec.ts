@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildListControlUsersParams, mapControlUserToListItem } from './resource'
-import type { ControlUser } from '../../../shared/api/generated-query/control/model'
+import type { ControlUser } from '../../../api/generated-query/control/model'
 
 describe('admin users control resource mapping', () => {
   it('maps control users onto the legacy row shape with usr_ identity', () => {

@@ -3,7 +3,7 @@ import { createVisionReferenceCollection, MAX_REFERENCE_COUNT } from './visionRe
 import {
   VISION_REFERENCE_MAX_BYTES,
   VISION_REFERENCE_MAX_COUNT,
-} from '../../../shared/media/visionIngressPolicy'
+} from '../../../core/media/visionIngressPolicy'
 import { MAX_REFERENCE_BYTES } from '../domain/visionReferencePolicy'
 
 function reference(key: string, file?: File) {

@@ -8,11 +8,11 @@ import {
   type ComputedRef,
   type InjectionKey,
 } from 'vue'
-import { SERVICE_SLUGS, type Service } from '../../../../../shared/domain/imageServices'
+import { SERVICE_SLUGS, type Service } from '../../../../../core/contracts/imageServices'
 import type { SubmitTaskReadinessData } from '../../../domain/execution-contracts/canvasTaskRequest'
-import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
-import { i18n } from '../../../../../shared/i18n'
-import { readinessErrorCopy } from '../../../../../shared/errors/errorCatalog'
+import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
+import { i18n } from '../../../../../core/i18n'
+import { readinessErrorCopy } from '../../../../../core/errors/errorCatalog'
 import {
   fetchCanvasBillingReadiness,
   fetchCanvasBillingReadinessMatrix,

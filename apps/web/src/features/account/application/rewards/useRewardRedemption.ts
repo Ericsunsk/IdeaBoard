@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/vue-query'
 import { useAccountWorkspace } from '../accountWorkspace'
 import { invalidateUserMoney } from '../invalidateUserMoney'

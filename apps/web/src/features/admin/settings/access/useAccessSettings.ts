@@ -8,8 +8,8 @@ import {
   updateControlLoginLockoutSetting,
   updateControlRateLimitSetting,
   updateControlRegistrationSetting,
-} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../api/contractKernel'
 import type { AdminAccessSettingsFeedback } from '../shared/useSettingsFeedback'
 import { useSettingsLifecycle } from '../shared/useSettingsLifecycle'
 import { withControlCopy } from '../../shared/lib/controlCopy'
@@ -22,21 +22,19 @@ import { buildRoutineControlMutationHeaders } from '../../shared/lib/controlMuta
 // skip the confirm dialog and audit an empty reason. The deleted
 // `/api/admin/settings/*` routes are gone; this module is the single
 // transport.
-export type RateLimitSetting = {
+type RateLimitSetting = {
   window_seconds: number
   max_requests: number
 }
 
-export type RegistrationSettingData = {
+type RegistrationSettingData = {
   enabled: boolean
 }
 
-export type LoginLockoutSetting = {
+type LoginLockoutSetting = {
   threshold: number
   duration_seconds: number
 }
-
-export type ApiResponseRegistrationSettingData = RegistrationSettingData
 
 const ADMIN_RATE_LIMIT_QUERY_KEY = ['admin', 'settings', 'rate-limit'] as const
 const ADMIN_REGISTRATION_QUERY_KEY = ['admin', 'settings', 'registration'] as const
@@ -50,12 +48,12 @@ export const LOGIN_LOCKOUT_MAX_THRESHOLD = 100
 export const LOGIN_LOCKOUT_MIN_DURATION_SECONDS = 60
 export const LOGIN_LOCKOUT_MAX_DURATION_SECONDS = 86_400
 
-export type AdminAccessRateLimitForm = {
+type AdminAccessRateLimitForm = {
   window_seconds: number | null
   max_requests: number | null
 }
 
-export type AdminAccessLoginLockoutForm = {
+type AdminAccessLoginLockoutForm = {
   threshold: number | null
   duration_seconds: number | null
 }

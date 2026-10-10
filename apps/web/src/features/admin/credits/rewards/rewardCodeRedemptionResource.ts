@@ -1,14 +1,14 @@
 import {
   getControlRewardRedemption,
   listControlRewardRedemptions,
-} from '../../../../shared/api/generated-query/control/control-credits/control-credits'
-import { requireContractData } from '../../../../shared/api/contractKernel'
+} from '../../../../api/generated-query/control/control-credits/control-credits'
+import { requireContractData } from '../../../../api/contractKernel'
 import { createControlError } from '../../shared/lib/controlMutation'
 import type {
   ControlAdminRedemption,
   ControlAdminRedemptionDetail,
   ControlAdminRedemptionPage,
-} from '../../../../shared/api/generated-query/control/model'
+} from '../../../../api/generated-query/control/model'
 
 // Admin reward redemption boundary (W2 transports). List/get ride the
 // Control Plane redemption operations
@@ -18,25 +18,6 @@ import type {
 // `/api/admin/rewards/codes/:id/redemptions*` routes are gone; this
 // module is the single transport. View types and normalizers keep their
 // shapes so the UI and specs keep working.
-export type GeneratedRedemption = {
-  id: number
-  reward_code_id: number
-  user_public_id: string
-  display_name: string
-  credited_amount: number
-  redeemed_at: string
-}
-
-export type GeneratedRedemptionDetail = GeneratedRedemption & {
-  credit_transaction_id: string
-  masked_code_hint: string
-}
-
-export type GeneratedRedemptionPage = {
-  redemptions: GeneratedRedemption[]
-  next_before_id?: number
-}
-
 export type RewardCodeRedemption = {
   id: number
   rewardCodeId: number
@@ -51,7 +32,7 @@ export type RewardCodeRedemptionDetail = RewardCodeRedemption & {
   maskedCodeHint: string
 }
 
-export type RewardCodeRedemptionPage = {
+type RewardCodeRedemptionPage = {
   redemptions: RewardCodeRedemption[]
   nextBeforeId?: number | undefined
 }

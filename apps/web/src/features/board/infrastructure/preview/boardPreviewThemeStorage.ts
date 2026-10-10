@@ -1,4 +1,4 @@
-import { readLocalStorageJson, writeLocalStorageJson } from '../../../../shared/utils/storage'
+import { readLocalStorageJson, writeLocalStorageJson } from '../../../../core/utils/storage'
 
 const PREVIEW_THEME_STORAGE_KEY = 'ideaboard.boardPreviewThemeMap'
 

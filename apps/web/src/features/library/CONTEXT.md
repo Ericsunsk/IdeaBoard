@@ -27,7 +27,7 @@ It does NOT own Canvas graph state, Search feed state, or gallery rendering in c
 - `deleteFolderConfirmation` / `removeAssetConfirmation` — danger confirmations to `UserConfirmRequest` in `components/confirmations.ts`; copy and intent checks live here, not in callers.
 - `LibraryFloatingIsland.vue` — island display: open/expanded, reference selection, add-to-canvas; props `{open/workspaceId/folderFacts/mutationPublisher/referenceKeys?/presentation}` plus emits; lazy-loaded via `loadLibraryFloatingIsland`.
 
-Provider IDs and recognition share the pure `shared/domain/externalImageProviders` vocabulary with Admin; payload mapping and validation errors remain feature-owned.
+Provider IDs and recognition share the pure `core/contracts/externalImageProviders` vocabulary with Admin; payload mapping and validation errors remain feature-owned.
 
 ## Invariants
 

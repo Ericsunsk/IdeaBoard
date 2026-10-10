@@ -1,6 +1,6 @@
 import type { Edge } from '@vue-flow/core'
 
-export type CanvasSemanticEdge = Omit<Edge, 'animated'>
+type CanvasSemanticEdge = Omit<Edge, 'animated'>
 
 export function toCanvasSemanticEdge(edge: Edge): CanvasSemanticEdge {
   if (!Object.prototype.hasOwnProperty.call(edge, 'animated')) return edge

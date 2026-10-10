@@ -1,6 +1,6 @@
 import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/navigationMeta'
 import { isSessionFresh } from '../../features/auth'
-import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
+import { buildLoginRedirectPath } from '../../core/auth/sessionPolicy'
 import { WORKSPACE_DEFAULT_PATH } from '../../features/workspace/routes/workspaceRoutes'
 
 export type AuthSessionRefreshDecision = {

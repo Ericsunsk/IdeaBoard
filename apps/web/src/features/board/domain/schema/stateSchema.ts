@@ -1,6 +1,6 @@
 import * as v from 'valibot'
-import { opaqueIdPattern } from '../../../../shared/utils/opaqueIds'
-import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
+import { opaqueIdPattern } from '../../../../core/utils/opaqueIds'
+import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../core/contracts/generationContract'
 import {
   DEFAULT_FUSION_BLEND_POINT,
   DEFAULT_FUSION_NODE_OUTPUT_COUNT,

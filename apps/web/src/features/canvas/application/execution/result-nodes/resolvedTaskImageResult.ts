@@ -1,6 +1,6 @@
 export type ResolvedTaskImageResult = {
   url: string
-  mediaRef?: import('../../../../../shared/media/mediaRef').MediaRef
+  mediaRef?: import('../../../../../core/media/mediaRef').MediaRef
   ratio: number
   width?: number
   height?: number

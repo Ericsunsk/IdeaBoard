@@ -8,14 +8,14 @@ import {
   getParsedY,
   type ChartData,
   type ChartOptions,
-} from '../../../../shared/lib/chartPrimitives'
+} from '../../../../core/lib/chartPrimitives'
 import {
   resolveChartTimeTickDensity,
   shouldShowChartTimeTick,
-} from '../../../../shared/lib/chartTimeRange'
-import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
-import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
-import { i18n } from '../../../../shared/i18n'
+} from '../../../../core/lib/chartTimeRange'
+import { resolveChartAnimation } from '../../../../core/motion/chartMotion'
+import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
+import { i18n } from '../../../../core/i18n'
 
 export type UsageTrendPoint = {
   date: string

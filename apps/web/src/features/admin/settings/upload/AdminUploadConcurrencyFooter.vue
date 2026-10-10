@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import { SETTINGS_MESSAGES } from '../pages/messages'
 import {

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { USER_LOGIN_PATH } from '../../../../shared/constants/routePaths'
-import { PASSWORD_LENGTH_LIMIT } from '../../../../shared/auth/passwordPolicy'
-import { i18n } from '../../../../shared/i18n'
-import { markRequiredError } from '../../../../shared/utils/formValidation'
+import { USER_LOGIN_PATH } from '../../../workspace/routePaths'
+import { PASSWORD_LENGTH_LIMIT } from '../../../../core/auth/passwordPolicy'
+import { i18n } from '../../../../core/i18n'
+import { markRequiredError } from '../../../../core/utils/formValidation'
 import { usePasswordChange, type PasswordChangeDependencies } from './usePasswordChange'
 
 function passwordLengthMessage() {

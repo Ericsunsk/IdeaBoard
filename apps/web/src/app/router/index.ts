@@ -1,17 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../../features/auth'
-import { dismissAppToasts, useAppToast } from '../../shared/composables/useAppToast'
-import { i18n } from '../../shared/i18n'
+import { dismissAppToasts, useAppToast } from '../../core/composables/useAppToast'
+import { i18n } from '../../core/i18n'
 import { adminRoutes } from '../../features/admin/app/routes'
 import { workspaceRoutes } from '../../features/workspace/routes/workspaceRoutes'
-import { ADMIN_ROOT_PATH, HOME_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
-import { applyRouteSeo } from '../../shared/seo/routeSeo'
+import { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../features/admin/routePaths'
+import { HOME_PATH } from '../../features/workspace/routePaths'
+import { applyRouteSeo } from '../../core/seo/routeSeo'
 import {
   readSessionStorageItem,
   removeSessionStorageItem,
   writeSessionStorageItem,
-} from '../../shared/utils/storage'
+} from '../../core/utils/storage'
 import { CHUNK_RELOAD_GUARD_KEY, isChunkLoadFailure, resolveScrollPosition } from './routeRecovery'
 import { resolveAuthGateRedirect, resolveAuthSessionRefresh } from './authGate'
 

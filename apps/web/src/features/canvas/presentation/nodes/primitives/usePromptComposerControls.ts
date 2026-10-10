@@ -4,8 +4,8 @@ import { normalizePromptAspectRatio } from '../../../../board/ports/canvas'
 import { requireImageNodeOutputCount } from '../../../../board/ports/canvas'
 import { useAutoResizeTextarea } from './useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
-import { normalizeOutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../../core/contracts/generationContract'
+import { normalizeOutputResolution } from '../../../../../core/contracts/generationContract'
 
 export type PromptComposerResizePayload = {
   naturalHeight: number

@@ -15,7 +15,7 @@ It does NOT own the server-side ledger, the Stripe gateway itself, or pricing po
 
 ## Public Seams
 
-- `domain/index.ts` pure math, `centsToDollars`, `createUsageChartConfig`, `accountTabs`; display via `formatIdeaAmount` in `shared/i18n/userIdeaCurrency.ts`.
+- `domain/index.ts` pure math, `centsToDollars`, `createUsageChartConfig`, `accountTabs`; display via `formatIdeaAmount` in `core/i18n/userIdeaCurrency.ts`.
 - `infrastructure/index.ts` unified export for `credits`, `payments`, `rewards`, `usage`, `billing` transport resources.
 - `application/index.ts` use-case hooks: `useRecharge`, `useCreditWallet`, `useCreditsSync`, `useRewardRedemption`, `useUsage`, `useAvatarUpload`, `accountOverlay`.
 - `presentation/index.ts` view layer: `RechargePane`, `UsagePane`, `RewardsPane`, `SecurityPane`, `BillingPane`, and `AccountDialogHost`.

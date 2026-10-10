@@ -56,10 +56,10 @@
 </template>
 
 <script setup lang="ts">
-import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import { i18n } from '../../../shared/i18n'
-import { HOME_PATH } from '../../../shared/constants/routePaths'
-import { PUBLIC_LEGAL_LINKS } from '../../../shared/constants/legalLinks'
+import { useSiteBranding } from '../../../core/composables/useSiteBranding'
+import { i18n } from '../../../core/i18n'
+import { HOME_PATH } from '../../workspace/routePaths'
+import { PUBLIC_LEGAL_LINKS } from '../legalLinks'
 
 defineProps<{ title: string; version: string }>()
 

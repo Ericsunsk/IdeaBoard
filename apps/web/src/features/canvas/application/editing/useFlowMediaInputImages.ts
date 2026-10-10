@@ -1,8 +1,8 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { watch } from 'vue'
-import { i18n } from '../../../../shared/i18n'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { i18n } from '../../../../core/i18n'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import type {
   CanvasNodeItem,
   FusionNodeItem,
@@ -17,8 +17,8 @@ import {
   type CanvasGraphReadPort,
   type CanvasGraphStore,
 } from '../../domain/graph'
-import type { MediaRef } from '../../../../shared/media/mediaRef'
-import { createPrefixedId } from '../../../../shared/utils/ids'
+import type { MediaRef } from '../../../../core/media/mediaRef'
+import { createPrefixedId } from '../../../../core/utils/ids'
 import { resolveWritableCanvasGraphStore } from '../canvasGraphStoreWriter'
 
 export type MediaInputImage = {

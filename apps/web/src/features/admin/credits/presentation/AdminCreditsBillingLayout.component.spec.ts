@@ -11,7 +11,7 @@ import {
   ADMIN_CREDIT_PRICING_PATH,
   ADMIN_PAYMENT_ORDERS_PATH,
   ADMIN_REWARD_CODES_PATH,
-} from '../../../../shared/constants/routePaths'
+} from '../../routePaths'
 import AdminCreditsBillingLayout from './AdminCreditsBillingLayout.vue'
 
 const routerMocks = vi.hoisted(() => ({

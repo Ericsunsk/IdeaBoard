@@ -12,7 +12,7 @@ import type { ImageStrengthAction } from '../../application/execution'
 import type { ImageToolSession } from './session'
 import type { ZeroCopyStageHandle } from '../retouch'
 
-export type ImageToolAnchorRect = {
+type ImageToolAnchorRect = {
   top: number
   left: number
   width: number
@@ -32,11 +32,6 @@ export type ImageToolStageBinding = {
 }
 
 import type { ImageActionStrengthControlHandlers } from './model.ts'
-
-export type {
-  ImageActionStrengthControlHandlers,
-  ImageActionStrengthControlSource,
-} from './model.ts'
 
 export type ImageActionStrengthControl = ImageActionStrengthControlHandlers & {
   visible: boolean

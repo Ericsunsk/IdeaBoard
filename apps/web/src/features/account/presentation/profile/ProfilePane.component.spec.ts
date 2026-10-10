@@ -2,12 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { renderWithUser, screen } from '../../../../test/render'
 import { makeSessionUser } from '../../../../test/factories'
-import type { User } from '../../../../shared/api/sessionUserType'
+import type { User } from '../../../../api/sessionUserType'
 import ProfilePane from './ProfilePane.vue'
 
-const mockUser = ref<User>(
-  makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' }),
-)
+const mockUser = ref<User>(makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' }))
 
 vi.mock('../../../auth', () => ({
   useUserStore: () => ({ user: mockUser.value }),

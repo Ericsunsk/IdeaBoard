@@ -28,8 +28,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
-import { stringParam } from '../../../shared/router/queryParams'
+import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../routePaths'
+import { stringParam } from '../../../core/router/queryParams'
 import { joinSharedBoardByToken } from '../../board'
 
 const { t } = useI18n()

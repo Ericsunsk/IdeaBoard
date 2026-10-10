@@ -7,7 +7,7 @@ import { createDeferred } from '../../../../test/deferred'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import { useUserStore } from '../../../auth'
 import { makeSessionUser } from '../../../../test/factories'
-import { HOME_PATH } from '../../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../workspace/routePaths'
 import { accountTabRegistry, type AccountTab } from '../shared/tabRegistry'
 import AccountDialogContent from './AccountDialogContent.vue'
 
@@ -16,7 +16,7 @@ const useAvatarUploadMock = vi.hoisted(() => vi.fn())
 
 let toast: AppToastMocks
 
-vi.mock('../../../../shared/composables/useSiteBranding', () => ({
+vi.mock('../../../../core/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
     fallbackText: 'IB',
     logoURL: '',
@@ -24,13 +24,13 @@ vi.mock('../../../../shared/composables/useSiteBranding', () => ({
   }),
 }))
 
-vi.mock('../../../../shared/composables/useLogoutRedirect', () => ({
+vi.mock('../../../../core/composables/useLogoutRedirect', () => ({
   useLogoutRedirect: () => ({
     logoutAndRedirect: logoutAndRedirectMock,
   }),
 }))
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 vi.mock('../../application/profile/useAvatarUpload', () => ({
   useAvatarUpload: useAvatarUploadMock,
@@ -114,10 +114,10 @@ const TestProviders = defineComponent({
 
 // Resolve expected visible labels through the same locale the component uses.
 const enAccountMessages = (
-  (await import('../../../../shared/i18n/locales/en/account')) as {
-    default: { tabs: Record<string, string> }
+  (await import('../../../../core/i18n/locales/en/index')) as {
+    account: { tabs: Record<string, string> }
   }
-).default
+).account
 
 const accountTabCases: Array<{ key: AccountTab; label: string }> = accountTabRegistry.flatMap(
   ({ tabs }) =>

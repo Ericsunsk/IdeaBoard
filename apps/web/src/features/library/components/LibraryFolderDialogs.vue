@@ -142,10 +142,10 @@ import {
 } from '@/components/ui/dialog'
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
-import IbFormField from '../../../shared/components/IbFormField.vue'
-import { ibFormInputClass, ibFormInputErrorClass } from '../../../shared/theme/formControls'
-import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
-import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import IbFormField from '../../../core/components/IbFormField.vue'
+import { ibFormInputClass, ibFormInputErrorClass } from '../../../theme/formControls'
+import { ibDialogMaskClass } from '../../../theme/dialogMask'
+import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 
 const props = defineProps<{
   createOpen: boolean

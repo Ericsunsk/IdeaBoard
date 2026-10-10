@@ -1,8 +1,8 @@
 import type { CreditHealthStatus } from '../shared/api'
 
-export type CreditHealthTone = 'neutral' | 'success' | 'warning' | 'danger'
+type CreditHealthTone = 'neutral' | 'success' | 'warning' | 'danger'
 
-export type CreditHealthPresentation = {
+type CreditHealthPresentation = {
   label: string
   summary: string
   badgeLabel: string | null

@@ -389,6 +389,7 @@ function runSelfTests(): void {
     },
     (value) => {
       value.seams[0]!.shims = ['src/a.shim.ts']
+      value.seams[0]!.deletionOwner = null
     },
     (value) => {
       value.seams.push(value.seams[0]!)

@@ -43,10 +43,10 @@
 import { computed, ref } from 'vue'
 import { NodePromptComposer } from '../../../presentation/nodes/primitives'
 import { OUTPAINT_DRAG_ANCHORS, type OutpaintDragAnchor } from '../useImageOutpaintOverlay'
-import { SERVICE } from '../../../../../shared/domain/imageServices'
+import { SERVICE } from '../../../../../core/contracts/imageServices'
 import { useCanvasBillingQuote } from '../../execution'
 import { buildOutpaintReadinessRequest } from '../../execution/commands/imageTaskRequests'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 
 const props = defineProps<{
   overlayStyle: Record<string, string>

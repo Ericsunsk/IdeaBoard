@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
+import { IMAGE_NODE_ACTION } from '../../core/nodes/imageActions'
 import { useFlowImageActionStrengthControl } from './imageActionStrengthControl'
 import type { ImageStrengthAction } from '../execution'
 

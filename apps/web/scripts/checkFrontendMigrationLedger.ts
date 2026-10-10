@@ -9,6 +9,7 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const inventoryPath = path.join(webRoot, '../../docs/architecture/frontend-contract-inventory.md')
 const phases = ['P1a', 'P1b', 'P2', 'P2.5', 'P3', 'P4', 'P5', 'P6', 'P7']
 const dispositions = ['retire', 'retain-behavior', 'retain-fixture', 'frozen-i18n-candidate']
+const frozenConstraintIdsSha256 = '4b7319de4da664fb6db10248129013a8ae521415650001773df48eba78391627'
 type Assertion = {
   id: string
   source: string
@@ -31,8 +32,11 @@ type Constraint = Assertion & {
     kind: string
     requirement: string
     status: string
+    evidence?: Array<Omit<Assertion, 'id' | 'occurrence'>>
+    verifiedRun?: string
   }
   reviewRequired: boolean
+  currentAssertion?: { assertion: string; reason: string }
 }
 type Behavior = {
   id: string
@@ -124,6 +128,7 @@ type Ledger = {
     requirement: string
     status: string
   }>
+  supplementalConstraints?: Constraint[]
 }
 function requireCondition(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Migration ledger: ${message}`)
@@ -162,7 +167,17 @@ function validateLedger(value: Ledger): Ledger {
   )
   uniqueIds(value.constraints, 'constraints')
   uniqueIds(value.behaviors, 'behaviors')
-  for (const row of value.constraints) {
+  const frozenIdsHash = createHash('sha256')
+    .update(
+      value.constraints
+        .map((row) => row.id)
+        .sort()
+        .join('\n'),
+    )
+    .digest('hex')
+  requireCondition(frozenIdsHash === frozenConstraintIdsSha256, 'P0 frozen constraint IDs changed')
+  uniqueIds([...value.constraints, ...(value.supplementalConstraints ?? [])], 'all constraints')
+  for (const row of [...value.constraints, ...(value.supplementalConstraints ?? [])]) {
     requireCondition(dispositions.includes(row.disposition), `${row.id}: disposition`)
     requireCondition(
       nonempty(row.source) &&
@@ -175,6 +190,7 @@ function validateLedger(value: Ledger): Ledger {
     requireCondition(
       /^[a-f\d]{16}$/.test(row.fingerprint) &&
         row.id === `source-${row.fingerprint}-${row.occurrence}` &&
+        row.fingerprint === hash(`${row.source}\n${row.scenario}\n${row.assertion}`) &&
         Number.isInteger(row.occurrence) &&
         row.occurrence > 0 &&
         Number.isInteger(row.line) &&
@@ -197,6 +213,11 @@ function validateLedger(value: Ledger): Ledger {
       `${row.id}: replacement mapping`,
     )
     requireCondition(row.reviewRequired === false, `${row.id}: unreviewed classification`)
+    if (row.currentAssertion)
+      requireCondition(
+        nonempty(row.currentAssertion.assertion) && nonempty(row.currentAssertion.reason),
+        `${row.id}: reviewed current assertion mapping`,
+      )
   }
   for (const row of value.behaviors) {
     requireCondition(
@@ -260,6 +281,11 @@ function validateLedger(value: Ledger): Ledger {
         value.constraints.filter((row) => row.disposition === disposition).length,
       `${disposition}: measured count mismatch`,
     )
+  requireCondition(value.counts.retire === 403, 'P0 retirement denominator must remain 403')
+  requireCondition(
+    value.quotas.find((row) => row.phase === 'P1b')?.R_p === 149,
+    'P1b frozen retirement quota must remain 149',
+  )
   requireCondition(
     sameStrings(value.method.sourceFiles, [...new Set(value.constraints.map((row) => row.source))]),
     'source file inventory',
@@ -291,7 +317,9 @@ function validateLedger(value: Ledger): Ledger {
   requireCondition(
     value.generatedMapping.sourcePattern === 'src/shared/api/generated-query/**' &&
       value.generatedMapping.targetPattern === 'src/api/generated-query/**' &&
-      /^[a-f\d]{64}$/.test(value.generatedMapping.sourcePathSha256),
+      value.generatedMapping.measuredFileCount === 417 &&
+      value.generatedMapping.sourcePathSha256 ===
+        '883c1869b262fd82359e8c7a76be0ebf4aa445206a8a0dc80a8bd037f0fdb711',
     'generated carve-out',
   )
   requireCondition(
@@ -381,64 +409,119 @@ function listFiles(directory: string): string[] {
     })
     .sort()
 }
-function checkCurrentSources(ledger: Ledger): string[] {
+function mappedAssertionId(row: Constraint): string {
+  const assertion = row.currentAssertion?.assertion ?? row.assertion
+  return `source-${hash(`${row.source}\n${row.scenario}\n${assertion}`)}-${row.occurrence}`
+}
+function canonicalSource(file: string, ledger: Ledger): string {
+  const exact = ledger.sharedFileMappings.find(
+    (row) => row.disposition !== 'retired-effective-replacement' && row.targets.includes(file),
+  )
+  return exact?.source ?? file
+}
+function projectGeneratedFiles(files: string[], mapping: Ledger['generatedMapping']): string[] {
+  const sourceRoot = mapping.sourcePattern.slice(0, -2)
+  const targetRoot = mapping.targetPattern.slice(0, -2)
+  return files
+    .map((file) =>
+      file.startsWith(targetRoot) ? `${sourceRoot}${file.slice(targetRoot.length)}` : file,
+    )
+    .sort()
+}
+function generatedInventoryMatches(files: string[], mapping: Ledger['generatedMapping']): boolean {
+  const projected = projectGeneratedFiles(files, mapping)
+  return (
+    projected.length === mapping.measuredFileCount &&
+    createHash('sha256').update(projected.join('\n')).digest('hex') === mapping.sourcePathSha256
+  )
+}
+function checkFileMappings(ledger: Ledger): string[] {
   const warnings: string[] = []
+  const sourceRoot = ledger.generatedMapping.sourcePattern.slice(0, -3)
+  const targetRoot = ledger.generatedMapping.targetPattern.slice(0, -3)
+  const generatedRoot = fs.existsSync(path.join(webRoot, targetRoot)) ? targetRoot : sourceRoot
+  const generated = fs.existsSync(path.join(webRoot, generatedRoot))
+    ? listFiles(path.join(webRoot, generatedRoot))
+    : []
+  if (
+    generatedRoot === targetRoot &&
+    fs.existsSync(path.join(webRoot, sourceRoot)) &&
+    listFiles(path.join(webRoot, sourceRoot)).length > 0
+  )
+    warnings.push('Generated-query files remain at both source and relocation target')
+  if (!generatedInventoryMatches(generated, ledger.generatedMapping))
+    warnings.push(
+      'Generated-query file inventory changed; run generated drift and review parent-path carve-out',
+    )
+  for (const row of ledger.sharedFileMappings)
+    for (const target of row.targets)
+      if (!fs.existsSync(path.join(webRoot, target)))
+        warnings.push(`${row.source}: mapped destination missing ${target}`)
+  const sharedRoot = path.join(webRoot, 'src/shared')
+  const ordinary = (fs.existsSync(sharedRoot) ? listFiles(sharedRoot) : []).filter(
+    (file) => !file.includes('/generated-query/') && !file.endsWith('.shim.ts'),
+  )
+  for (const file of ordinary)
+    if (!ledger.sharedFileMappings.some((row) => row.source === file || row.targets.includes(file)))
+      warnings.push(`${file}: ordinary shared source has no exact ownership mapping`)
+  return warnings
+}
+function hasAssertionEvidence(evidence: Omit<Assertion, 'id' | 'occurrence'>): boolean {
+  const sourcePath = path.join(webRoot, evidence.source)
+  return (
+    fs.existsSync(sourcePath) &&
+    collectAssertions(evidence.source, fs.readFileSync(sourcePath, 'utf8')).some(
+      (row) => row.fingerprint === evidence.fingerprint,
+    )
+  )
+}
+function collectCurrentSources(ledger: Ledger): Map<string, Assertion[]> {
   const sources = new Map<string, Assertion[]>()
+  const inventoriedSources = new Set([
+    ...ledger.method.sourceFiles,
+    ...(ledger.supplementalConstraints ?? []).map((row) => row.source),
+  ])
   for (const file of listFiles(path.join(webRoot, 'src')).filter((file) =>
     file.endsWith('.spec.ts'),
   )) {
     const source = fs.readFileSync(path.join(webRoot, file), 'utf8')
-    if (!/readFileSync|readFile\(|\?raw/.test(source)) continue
-    sources.set(file, collectAssertions(file, source))
+    const canonical = canonicalSource(file, ledger)
+    if (!/readFileSync|readFile\(|\?raw/.test(source) && !inventoriedSources.has(canonical))
+      continue
+    sources.set(canonical, collectAssertions(canonical, source))
   }
+  return sources
+}
+function checkCurrentSources(ledger: Ledger, sources: Map<string, Assertion[]>): string[] {
+  const warnings = checkFileMappings(ledger)
+  const constraints = [...ledger.constraints, ...(ledger.supplementalConstraints ?? [])]
   for (const [file, rows] of sources) {
-    if (!ledger.method.sourceFiles.includes(file))
+    if (!constraints.some((row) => row.source === file))
       warnings.push(
         `${file}: new direct-source candidate file; classify every matcher before accepting migration`,
       )
     else
       for (const row of rows)
-        if (!ledger.constraints.some((constraint) => constraint.id === row.id))
+        if (!constraints.some((constraint) => mappedAssertionId(constraint) === row.id))
           warnings.push(
             `${row.id} ${file}:${row.line}: new/changed matcher requires reviewed inventory update`,
           )
   }
-  for (const row of ledger.constraints)
-    if (!sources.get(row.source)?.some((current) => current.id === row.id))
+  for (const row of constraints)
+    if (
+      row.retirementStatus !== 'retired' &&
+      !sources.get(row.source)?.some((current) => current.id === mappedAssertionId(row))
+    )
       warnings.push(
         `${row.id} ${row.source}:${row.line}: frozen matcher is missing/changed; preserve denominator and supply reviewed replacement/relocation evidence`,
       )
   for (const behavior of ledger.behaviors)
     for (const evidence of behavior.evidence) {
-      const sourcePath = path.join(webRoot, evidence.source)
-      if (
-        !fs.existsSync(sourcePath) ||
-        !collectAssertions(evidence.source, fs.readFileSync(sourcePath, 'utf8')).some(
-          (row) => row.fingerprint === evidence.fingerprint,
-        )
-      )
+      if (!hasAssertionEvidence(evidence))
         warnings.push(
           `${behavior.id}: mapped behavior assertion missing/changed in ${evidence.source}`,
         )
     }
-  const sharedFiles = listFiles(path.join(webRoot, 'src/shared'))
-  const generated = sharedFiles.filter((file) => file.includes('/generated-query/'))
-  const generatedHash = createHash('sha256').update(generated.join('\n')).digest('hex')
-  if (
-    generated.length !== ledger.generatedMapping.measuredFileCount ||
-    generatedHash !== ledger.generatedMapping.sourcePathSha256
-  )
-    warnings.push(
-      'Generated-query file inventory changed; run generated drift and review parent-path carve-out',
-    )
-  const ordinary = sharedFiles.filter((file) => !file.includes('/generated-query/'))
-  if (
-    !sameStrings(
-      ordinary,
-      ledger.sharedFileMappings.map((row) => row.source),
-    )
-  )
-    warnings.push('Shared source/target mapping does not cover current ordinary files exactly')
   const seams = loadSeamInventory().seams
   for (const row of ledger.sharedFileMappings) {
     if (row.consumerEvidence.kind === 'seam-inventory')
@@ -456,6 +539,35 @@ function checkCurrentSources(ledger: Ledger): string[] {
     }
   }
   return warnings
+}
+function phaseAcceptanceFailures(
+  ledger: Ledger,
+  sources = collectCurrentSources(ledger),
+): string[] {
+  const failures: string[] = []
+  for (const row of [...ledger.constraints, ...(ledger.supplementalConstraints ?? [])].filter(
+    (row) => row.disposition === 'retire' && ['P1a', 'P1b'].includes(row.phase ?? ''),
+  )) {
+    if (row.retirementStatus !== 'retired') failures.push(`${row.id}: retirement pending`)
+    if (
+      row.replacement.status !== 'verified' ||
+      !nonempty(row.replacement.verifiedRun) ||
+      !row.replacement.evidence?.length ||
+      !row.replacement.evidence.every(hasAssertionEvidence)
+    )
+      failures.push(`${row.id}: effective replacement evidence pending`)
+    if (sources.get(row.source)?.some((current) => current.id === mappedAssertionId(row)))
+      failures.push(`${row.id}: original implementation-source matcher still present`)
+  }
+  for (const row of ledger.behaviors.filter((row) => ['P1a', 'P1b'].includes(row.phase)))
+    if (
+      row.status !== 'verified' ||
+      !nonempty(row.verifiedRun) ||
+      !row.evidence.length ||
+      !row.evidence.every(hasAssertionEvidence)
+    )
+      failures.push(`${row.id}: mandatory behavior verification pending`)
+  return failures
 }
 function runFixtures(ledger: Ledger): void {
   const valid = () => structuredClone(ledger)
@@ -517,6 +629,34 @@ function runFixtures(ledger: Ledger): void {
         value.sharedFileMappings[0]!.targets = []
       },
     ],
+    [
+      'frozen ID rehash',
+      (value) => {
+        value.constraints[0]!.id = 'source-0000000000000000-1'
+        value.constraints[0]!.fingerprint = '0000000000000000'
+      },
+    ],
+    [
+      'retirement rescope',
+      (value) => {
+        const row = value.constraints.find(
+          (row) => row.phase === 'P1b' && row.disposition === 'retire',
+        )!
+        row.disposition = 'retain-behavior'
+        value.counts.retire! -= 1
+        value.counts['retain-behavior']! += 1
+        const quota = value.quotas.find((row) => row.phase === 'P1b')!
+        quota.R_p -= 1
+        quota.retirementIds = quota.retirementIds.filter((id) => id !== row.id)
+      },
+    ],
+    [
+      'empty old generated source rebaseline',
+      (value) => {
+        value.generatedMapping.measuredFileCount = 0
+        value.generatedMapping.sourcePathSha256 = createHash('sha256').update('').digest('hex')
+      },
+    ],
   ]
   for (const [name, mutate] of invalid) {
     const value = valid()
@@ -542,7 +682,113 @@ function runFixtures(ledger: Ledger): void {
     'it.each([1])(`case ${value}`, () => { expect(source).toContain("a") })',
   )
   requireCondition(template[0]!.scenario === '`case ${value}`', 'AST template title fixture')
-  console.log(`Frontend migration ledger fixtures passed (${invalid.length + 3} cases).`)
+  const mapping = {
+    ...ledger.generatedMapping,
+    measuredFileCount: 1,
+    sourcePathSha256: createHash('sha256')
+      .update('src/shared/api/generated-query/example.ts')
+      .digest('hex'),
+  }
+  requireCondition(
+    generatedInventoryMatches(['src/api/generated-query/example.ts'], mapping),
+    'generated relocated target preserves source-path hash',
+  )
+  requireCondition(
+    !generatedInventoryMatches([], mapping),
+    'empty old generated source cannot pass',
+  )
+  requireCondition(
+    !generatedInventoryMatches(['src/api/generated-query/changed.ts'], mapping),
+    'changed generated target rejects frozen path hash',
+  )
+  requireCondition(
+    canonicalSource('src/core/example.spec.ts', {
+      ...ledger,
+      sharedFileMappings: [
+        {
+          ...ledger.sharedFileMappings[0]!,
+          source: 'src/shared/example.spec.ts',
+          targets: ['src/core/example.spec.ts'],
+        },
+      ],
+    }) === 'src/shared/example.spec.ts',
+    'exact relocated matcher keeps canonical source identity',
+  )
+  const retiredMapping = {
+    ...ledger.sharedFileMappings[0]!,
+    source: 'src/shared/retired.spec.ts',
+    targets: ['src/test/replacement.browser.spec.ts'],
+    disposition: 'retired-effective-replacement',
+  }
+  requireCondition(
+    canonicalSource('src/test/replacement.browser.spec.ts', {
+      ...ledger,
+      sharedFileMappings: [retiredMapping],
+    }) === 'src/test/replacement.browser.spec.ts',
+    'replacement evidence keeps its own identity after source retirement',
+  )
+  requireCondition(
+    canonicalSource('src/test/replacement.browser.spec.ts', {
+      ...ledger,
+      sharedFileMappings: [{ ...retiredMapping, disposition: 'relocated' }],
+    }) === 'src/shared/retired.spec.ts',
+    'ordinary relocation must still project the original matcher identity',
+  )
+  const pending = valid()
+  const pendingRetirement = pending.constraints.find(
+    (row) => row.disposition === 'retire' && row.phase === 'P1b',
+  )!
+  pendingRetirement.retirementStatus = 'not-started'
+  pendingRetirement.replacement.status = 'not-implemented'
+  const pendingBehavior = pending.behaviors.find((row) => row.phase === 'P1a')!
+  pendingBehavior.status = 'pending'
+  const pendingSources = new Map([
+    [
+      pendingRetirement.source,
+      [{ ...pendingRetirement, id: mappedAssertionId(pendingRetirement) }],
+    ],
+  ])
+  const acceptance = phaseAcceptanceFailures(pending, pendingSources)
+  requireCondition(
+    acceptance.some((message) => message.includes('retirement pending')),
+    'P1 rejects pending retirement',
+  )
+  requireCondition(
+    acceptance.some((message) => message.includes('replacement evidence pending')),
+    'P1 rejects unverified replacement',
+  )
+  requireCondition(
+    acceptance.some((message) => message.includes('matcher still present')),
+    'P1 rejects relocated source matchers still present',
+  )
+  requireCondition(
+    acceptance.some((message) => message.includes('behavior verification pending')),
+    'P1 rejects pending mandatory behavior',
+  )
+  const completed = valid()
+  const existingEvidence = ledger.behaviors.find(
+    (row) => row.status === 'verified' && row.evidence.every(hasAssertionEvidence),
+  )!.evidence
+  for (const row of [...completed.constraints, ...(completed.supplementalConstraints ?? [])]) {
+    if (row.disposition !== 'retire' || !['P1a', 'P1b'].includes(row.phase ?? '')) continue
+    row.retirementStatus = 'retired'
+    row.replacement = {
+      ...row.replacement,
+      status: 'verified',
+      evidence: existingEvidence,
+      verifiedRun: 'synthetic phase-gate positive fixture',
+    }
+  }
+  for (const row of completed.behaviors.filter((row) => ['P1a', 'P1b'].includes(row.phase))) {
+    row.status = 'verified'
+    row.evidence = existingEvidence
+    row.verifiedRun = 'synthetic phase-gate positive fixture'
+  }
+  requireCondition(
+    phaseAcceptanceFailures(completed, new Map()).length === 0,
+    'P1 completed retirement/replacement/behavior positive fixture',
+  )
+  console.log(`Frontend migration ledger fixtures passed (${invalid.length + 14} cases).`)
 }
 function main(): void {
   const markdown = fs.readFileSync(inventoryPath, 'utf8')
@@ -551,19 +797,32 @@ function main(): void {
   const ledger = validateLedger(JSON.parse(block[1]!))
   runFixtures(ledger)
   if (process.argv.includes('--self-test')) return
-  const warnings = checkCurrentSources(ledger)
+  const sources = collectCurrentSources(ledger)
+  const warnings = checkCurrentSources(ledger, sources)
   for (const warning of warnings) console.warn(`[migration-ledger:review] ${warning}`)
   const retire = ledger.constraints.filter((row) => row.disposition === 'retire').length
   const frozen = ledger.constraints.filter(
     (row) => row.disposition === 'frozen-i18n-candidate',
   ).length
   console.log(
-    `Frontend migration ledger: ${ledger.constraints.length} constraints; R=${retire}, frozen i18n=${frozen}; B=${ledger.behaviors.length}; ${ledger.sharedFileMappings.length} ordinary + ${ledger.generatedMapping.measuredFileCount} generated files mapped; ${warnings.length} review warnings.`,
+    `Frontend migration ledger: ${ledger.constraints.length} frozen constraints; R=${retire}, frozen i18n=${frozen}; B=${ledger.behaviors.length}; ${ledger.sharedFileMappings.length} ordinary + ${ledger.generatedMapping.measuredFileCount} generated files mapped; ${ledger.supplementalConstraints?.length ?? 0} supplemental constraints; ${warnings.length} review warnings.`,
   )
   console.log(
-    'P0 ledger integrity is not migration acceptance: planned replacements/scenarios remain pending; P1 is not authorized.',
+    'Ledger consistency is not phase acceptance. Use --phase=P1 to require completed P1a/P1b retirements, effective replacements and mandatory behaviors.',
   )
-  if (process.argv.includes('--strict') && warnings.length > 0) process.exitCode = 1
+  const phase = process.argv.find((argument) => argument.startsWith('--phase='))
+  requireCondition(
+    phase === undefined || phase === '--phase=P1',
+    'supported acceptance phase is P1',
+  )
+  if (phase) {
+    const failures = phaseAcceptanceFailures(ledger, sources)
+    for (const failure of failures) console.error(`[migration-ledger:acceptance] ${failure}`)
+    console.log(`P1 acceptance: ${failures.length} unmet requirements.`)
+    if (failures.length > 0) process.exitCode = 1
+  }
+  if ((process.argv.includes('--strict') || phase !== undefined) && warnings.length > 0)
+    process.exitCode = 1
 }
 try {
   main()

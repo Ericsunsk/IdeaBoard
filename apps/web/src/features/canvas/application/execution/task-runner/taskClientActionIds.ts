@@ -1,5 +1,5 @@
 import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
-import { createUniqueId } from '../../../../../shared/utils/ids'
+import { createUniqueId } from '../../../../../core/utils/ids'
 
 export type ClientActionIdFactory = () => string
 

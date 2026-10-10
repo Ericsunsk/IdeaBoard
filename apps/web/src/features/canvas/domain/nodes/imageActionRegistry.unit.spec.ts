@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   getImageActionMenuItems,
   IMAGE_ACTION_MODE,

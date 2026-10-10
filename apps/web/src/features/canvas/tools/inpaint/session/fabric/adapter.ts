@@ -1,5 +1,5 @@
 import { Canvas, FabricImage, PencilBrush, Point } from 'fabric'
-import { clamp } from '../../../../../../shared/utils/number.ts'
+import { clamp } from '../../../../../../core/utils/number.ts'
 import { buildMaskCommitResult } from '../maskPaintingCanvas.ts'
 import {
   clampMaskBrushSize,

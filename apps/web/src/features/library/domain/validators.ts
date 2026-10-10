@@ -1,7 +1,7 @@
 import {
   isExternalImageProvider,
   type ExternalImageProvider,
-} from '../../../shared/domain/externalImageProviders'
+} from '../../../core/contracts/externalImageProviders'
 // Workspace-scoped library domain (issue #844; split from `../workspace`).
 //
 // Pure opaque-id asserts, snake_case -> camelCase mappers, and save-input
@@ -21,8 +21,8 @@ import {
 import {
   assertWorkspaceId as assertSharedWorkspaceId,
   requireWorkspaceId as requireSharedWorkspaceId,
-} from '../../../shared/utils/workspaceId'
-import { opaqueIdPattern } from '../../../shared/utils/opaqueIds'
+} from '../../../core/utils/workspaceId'
+import { opaqueIdPattern } from '../../../core/utils/opaqueIds'
 
 const LIBRARY_ID_RE = opaqueIdPattern(['lfolder', 'lasset'])
 

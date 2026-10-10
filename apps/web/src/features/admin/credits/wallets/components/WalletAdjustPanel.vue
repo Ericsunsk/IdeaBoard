@@ -108,11 +108,11 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import ActionButton from '../../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../../core/components/ActionButton.vue'
 import AdminFormField from '../../../shared/components/AdminFormField.vue'
 import AdminNumberInput from '../../../shared/components/AdminNumberInput.vue'
 import AdminActionReasonField from '../../shared/AdminActionReasonField.vue'
-import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../resource'
 import type { CreditCommandValidation } from '../creditCommandContract'
 

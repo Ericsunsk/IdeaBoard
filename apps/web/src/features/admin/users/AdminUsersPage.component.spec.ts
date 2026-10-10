@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { i18n } from '../../../shared/i18n'
-import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
+import { i18n } from '../../../core/i18n'
+import { loadLocaleMessages } from '../../../core/i18n/userLocale'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { makeControlUserPayload } from '../../../test/factories'
 import { mockAppToast, type AppToastMocks } from '../../../test/toast'
@@ -19,7 +19,7 @@ vi.mock('../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ confirm: confirmMock }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
 describe('AdminUsersPage', () => {
   beforeAll(async () => {

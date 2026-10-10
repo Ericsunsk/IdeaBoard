@@ -87,7 +87,7 @@ import {
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
-} from '../../../../shared/composables/useOverlayInteractionLifecycle'
+} from '../../../../core/composables/useOverlayInteractionLifecycle'
 import {
   adminDialogChromeClass,
   adminDialogChromeCloseClass,

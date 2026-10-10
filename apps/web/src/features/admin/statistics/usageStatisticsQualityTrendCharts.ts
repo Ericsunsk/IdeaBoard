@@ -5,7 +5,7 @@ import {
   type ChartData,
   type ChartOptions,
   withAlpha,
-} from '../../../shared/lib/chartPrimitives'
+} from '../../../core/lib/chartPrimitives'
 import type { AdminStatistics, GetAdminStatisticsRangeValue } from './resource'
 import {
   adminChartStrokeWidth,

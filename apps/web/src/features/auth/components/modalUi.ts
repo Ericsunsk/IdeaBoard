@@ -2,7 +2,7 @@ import {
   ibFormInputClass,
   ibFormInputErrorClass,
   ibFormInputIconClass,
-} from '../../../shared/theme/formControls'
+} from '../../../theme/formControls'
 import './auth-modal-motion.css'
 
 // Dialog 以 :class/cn() 组合造型：mask 沿用 Dialog 内置 ibDialogMaskClass，

@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
+import { getServiceIcon } from '../../shared/ui/serviceIcons'
 import type { TaskMetricDefinition } from '../../shared/lib/taskMetricTokens'
 import { getTaskMetricByStatus } from '../../shared/lib/taskMetricTokens'
 import { ADMIN_IDENTITY_EMPTY } from '../../shared/lib/cellPlaceholders'
@@ -55,7 +55,7 @@ export function getTaskServiceResolution(row: AdminMonitorListItemModel) {
   return row.requested_resolution || ''
 }
 
-// Service 列图标单源已上移 shared/domain：此处保留别名，调用方不动。
+// Service 列图标单源已迁移 features/admin/shared/ui：此处保留别名，调用方不动。
 export const getTaskServiceIcon = getServiceIcon
 
 // Message 列展示上限：超出截断加省略号，完整原文由调用方放 title。

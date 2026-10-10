@@ -11,8 +11,8 @@ export default defineConfig({
       target: '../api/openapi.public.yaml',
     },
     output: {
-      target: 'src/shared/api/generated-query/public/',
-      schemas: 'src/shared/api/generated-query/public/model',
+      target: 'src/api/generated-query/public/',
+      schemas: 'src/api/generated-query/public/model',
       mode: 'tags-split',
       client: 'vue-query',
       httpClient: 'fetch',
@@ -26,7 +26,7 @@ export default defineConfig({
         // prefixes every generated Public path with `/v1`; see controlQuery
         // below for the Control analogue.
         mutator: {
-          path: './src/shared/api/publicMutator.ts',
+          path: './src/api/publicMutator.ts',
           name: 'publicMutator',
         },
         fetch: {
@@ -50,8 +50,8 @@ export default defineConfig({
       target: '../api/openapi.control.yaml',
     },
     output: {
-      target: 'src/shared/api/generated-query/control/',
-      schemas: 'src/shared/api/generated-query/control/model',
+      target: 'src/api/generated-query/control/',
+      schemas: 'src/api/generated-query/control/model',
       mode: 'tags-split',
       client: 'vue-query',
       httpClient: 'fetch',
@@ -60,7 +60,7 @@ export default defineConfig({
       urlEncodeParameters: true,
       override: {
         mutator: {
-          path: './src/shared/api/controlMutator.ts',
+          path: './src/api/controlMutator.ts',
           name: 'controlMutator',
         },
         fetch: {

@@ -1,18 +1,15 @@
 import {
   isExternalImageProvider,
   type ExternalImageProvider,
-} from '../../../shared/domain/externalImageProviders'
+} from '../../../core/contracts/externalImageProviders'
 import {
   createWorkspaceVisionQuery as createWorkspaceVisionQueryTransport,
   searchWorkspace as searchWorkspaceTransport,
-} from '../../../shared/api/generated-query/public/workspace-search/workspace-search'
-import {
-  buildContractRequestHeaders,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
-import { i18n } from '../../../shared/i18n'
-import { assertWorkspaceId } from '../../../shared/utils/workspaceId'
-import { assertOpaqueId, isOpaqueIdWithPrefix } from '../../../shared/utils/opaqueIds'
+} from '../../../api/generated-query/public/workspace-search/workspace-search'
+import { buildContractRequestHeaders, requireContractData } from '../../../api/contractKernel'
+import { i18n } from '../../../core/i18n'
+import { assertWorkspaceId } from '../../../core/utils/workspaceId'
+import { assertOpaqueId, isOpaqueIdWithPrefix } from '../../../core/utils/opaqueIds'
 import { normalizeSearchQuery } from '../domain/queryPolicy'
 
 // Workspace-scoped search resource (issue #806).

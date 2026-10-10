@@ -7,7 +7,7 @@ import {
   makeBoardState,
   type MockWorkspaceBoardApiState,
 } from '../../testing'
-import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
+import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import {
   BoardPayloadError,
@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => {
   return { request }
 })
 
-vi.mock('../../../../shared/api/client', () => ({
+vi.mock('../../../../api/client', () => ({
   api: {
     request: mocks.request,
   },
@@ -201,7 +201,13 @@ describe('boardSync', () => {
 
   it('drops a local-only board with revision deleted elsewhere (meta and draft cleared)', async () => {
     replaceBoards([
-      { id: 'deleted-elsewhere', name: 'Deleted Elsewhere', createdAt: 100, updatedAt: 3_000, revision: 5 },
+      {
+        id: 'deleted-elsewhere',
+        name: 'Deleted Elsewhere',
+        createdAt: 100,
+        updatedAt: 3_000,
+        revision: 5,
+      },
     ])
     replaceBoardStateMap({ 'deleted-elsewhere': makeState(3_000, 'stale-local-edit') })
     addRemoteBoard({

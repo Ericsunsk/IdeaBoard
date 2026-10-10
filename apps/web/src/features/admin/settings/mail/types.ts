@@ -1,4 +1,4 @@
-export type MailReadiness = 'not_configured' | 'not_tested' | 'ready' | 'unavailable'
+type MailReadiness = 'not_configured' | 'not_tested' | 'ready' | 'unavailable'
 
 export type MailConfigSummary = {
   configured: boolean

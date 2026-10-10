@@ -9,7 +9,7 @@ import {
 
 const DEFAULT_LONG_PRESS_MS = 260
 
-export type StrengthRangeRefTarget = Element | ComponentPublicInstance | null
+type StrengthRangeRefTarget = Element | ComponentPublicInstance | null
 
 type StrengthRangeEditSession<TKey> = {
   activeKey: Ref<TKey | null>

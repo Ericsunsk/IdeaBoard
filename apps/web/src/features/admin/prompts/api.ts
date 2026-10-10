@@ -1,9 +1,9 @@
-import { requireContractData } from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../api/contractKernel'
 import { buildRoutineControlMutationHeaders } from '../shared/lib/controlMutation'
 import {
   listControlFeaturePrompts,
   saveControlFeaturePrompt,
-} from '../../../shared/api/generated-query/control/control-platform/control-platform'
+} from '../../../api/generated-query/control/control-platform/control-platform'
 import { withControlCopy } from '../shared/lib/controlCopy'
 
 // Admin feature prompt boundary (W2 transports). The list read rides the
@@ -21,7 +21,7 @@ export type FeaturePrompt = {
   updated_at?: string | null
 }
 
-export type SetAdminFeaturePromptBody = {
+type SetAdminFeaturePromptBody = {
   prompt: string
 }
 

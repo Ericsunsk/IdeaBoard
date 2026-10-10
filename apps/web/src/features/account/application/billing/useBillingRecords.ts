@@ -2,8 +2,8 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useInfiniteQuery } from '@tanstack/vue-query'
 import { useCreditsSync } from '../recharge/useCreditsSync'
 import { billingRecordsQueryKeys, fetchBillingRecords } from '../../infrastructure/billing/resource'
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
-import { noRetry } from '../../../../shared/query/queryDefaults'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
+import { noRetry } from '../../../../core/query/queryDefaults'
 import { useAccountWorkspace } from '../accountWorkspace'
 
 const pageSize = PAGE_SIZES.standard

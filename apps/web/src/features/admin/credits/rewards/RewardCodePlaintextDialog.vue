@@ -29,10 +29,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { useAdminToast } from '../../shared/lib/toast'
-import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
+import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
 import { REWARD_CODES_MESSAGES } from './messages'
 
 const props = withDefaults(

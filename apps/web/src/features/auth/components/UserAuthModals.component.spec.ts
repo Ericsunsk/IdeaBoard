@@ -13,11 +13,11 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }))
 
-vi.mock('../../../shared/composables/useSiteBranding', () => ({
+vi.mock('../../../core/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({ projectName: 'IdeaBoard' }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
 const TransitioningDialogRootStub = defineComponent({
   props: {

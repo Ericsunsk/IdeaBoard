@@ -1,6 +1,6 @@
 import { onScopeDispose } from 'vue'
 import { useQueryClient, type QueryClient } from '@tanstack/vue-query'
-import { subscribeUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
+import { subscribeUserCreditsInvalidation } from '../../../../core/query/userCreditsInvalidation'
 import { invalidateUserMoney } from '../invalidateUserMoney'
 
 type CreditsSyncSubscription = {

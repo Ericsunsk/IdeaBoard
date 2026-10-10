@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { page } from 'vitest/browser'
 import { renderWithUser, screen, waitFor } from './render'
-import { i18n } from '../shared/i18n'
-import UserAccountMenu from '../shared/components/UserAccountMenu.vue'
+import { i18n } from '../core/i18n'
+import UserAccountMenu from '../features/account/ui/chrome/UserAccountMenu.vue'
 import '../app/style.css'
 
 describe('Support QR browser interaction', () => {

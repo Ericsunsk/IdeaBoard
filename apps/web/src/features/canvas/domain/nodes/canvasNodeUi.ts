@@ -3,19 +3,17 @@ import type {
   WorkflowNodeOutputStatus,
 } from '../../../board/ports/canvas'
 
-export type NodePrimaryActionState = {
+type NodePrimaryActionState = {
   label: string
   disabled: boolean
 }
 
-export type NodeConnectionMap<TPort extends string = string> = Partial<
-  Record<TPort, boolean | undefined>
->
-export type NodeConnectionSourceMap<TPort extends string = string> = Partial<
+type NodeConnectionMap<TPort extends string = string> = Partial<Record<TPort, boolean | undefined>>
+type NodeConnectionSourceMap<TPort extends string = string> = Partial<
   Record<TPort, CanvasConnectionNodeType | undefined>
 >
 
-export type NodeConnectionState<TPort extends string = string> = {
+type NodeConnectionState<TPort extends string = string> = {
   hasAnyConnection?: boolean
   connected?: NodeConnectionMap<TPort>
   pending?: NodeConnectionMap<TPort>

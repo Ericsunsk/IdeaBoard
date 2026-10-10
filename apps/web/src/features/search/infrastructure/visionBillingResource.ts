@@ -1,5 +1,5 @@
-import { createWorkspaceBillingQuote } from '../../../shared/api/generated-query/public/workspace-billing/workspace-billing'
-import { i18n } from '../../../shared/i18n'
+import { createWorkspaceBillingQuote } from '../../../api/generated-query/public/workspace-billing/workspace-billing'
+import { i18n } from '../../../core/i18n'
 
 // Vision search pricing boundary (issue #809).
 //

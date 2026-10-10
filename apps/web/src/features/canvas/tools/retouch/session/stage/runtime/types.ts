@@ -80,12 +80,12 @@ function isImageProcessingErrorCode(code: unknown): code is ImageProcessingError
   )
 }
 
-export type ImageProcessingSource = {
+type ImageProcessingSource = {
   url: string
   title?: string
 }
 
-export type ImageProcessingPlan = ImageRetouchPlan
+type ImageProcessingPlan = ImageRetouchPlan
 
 export type ImageProcessingProgress = {
   phase: 'queued' | 'decode' | 'render' | 'encode' | 'complete'
@@ -98,7 +98,7 @@ export type ImageProcessingOutputEncoding = {
   quality?: number
 }
 
-export type ImageProcessingOutputPolicyInput = {
+type ImageProcessingOutputPolicyInput = {
   sourceMimeType: string
   hasTransparentPixels: boolean | null
 }
@@ -127,7 +127,7 @@ export type RenderFinalInput = {
   onProgress?: ((progress: ImageProcessingProgress) => void) | undefined
 }
 
-export type ImageProcessingPreviewSizeStrategy = {
+type ImageProcessingPreviewSizeStrategy = {
   maxSide: number
 }
 
@@ -154,21 +154,21 @@ export type RenderFinalOutput = {
   mimeType?: string
 }
 
-export type ImageProcessingCompletedResult<TOutput> = {
+type ImageProcessingCompletedResult<TOutput> = {
   status: 'completed'
   taskId: string
   revision: number
   output: TOutput
 }
 
-export type ImageProcessingSkippedResult = {
+type ImageProcessingSkippedResult = {
   status: 'cancelled' | 'stale'
   taskId: string
   revision: number
   error: ImageProcessingError
 }
 
-export type ImageProcessingFailedResult = {
+type ImageProcessingFailedResult = {
   status: 'failed'
   taskId: string
   revision: number

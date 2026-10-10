@@ -35,7 +35,9 @@ import {
   moveLevelsHandle,
   type RetouchLevelsInputHandleId,
 } from '../../core/kinds/levels.ts'
-import RetouchHistogramPlot, { type RetouchHistogramPlotMarker } from '../histogram/HistogramPlot.vue'
+import RetouchHistogramPlot, {
+  type RetouchHistogramPlotMarker,
+} from '../histogram/HistogramPlot.vue'
 import RetouchLevelsFields from './LevelsFields.vue'
 import RetouchLevelsOutputControl from './LevelsOutputControl.vue'
 import {

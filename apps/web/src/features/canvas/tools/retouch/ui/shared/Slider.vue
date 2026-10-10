@@ -34,7 +34,7 @@ import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import NumberField from './NumberField.vue'
 import { readFiniteNumberInputValue } from './readFiniteNumberInputValue.ts'
-import { clamp } from '../../../../../../shared/utils/number'
+import { clamp } from '../../../../../../core/utils/number'
 
 const props = defineProps<{
   label: string

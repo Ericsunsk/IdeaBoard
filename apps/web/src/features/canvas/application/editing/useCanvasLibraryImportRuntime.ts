@@ -1,8 +1,8 @@
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../board/ports/canvas'
-import { i18n } from '../../../../shared/i18n'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { i18n } from '../../../../core/i18n'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import type { BoardAttachment } from '../execution/board-attachment'
 import {
   createPendingLibraryImportFact,
@@ -17,7 +17,7 @@ import type { CanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-ad
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import type { CanvasLibraryImportDescriptor } from '../../../library'
 import type { LibraryAssetMaterializer } from '../../../library'
-import { preloadImage } from '../../../../shared/media/preloadImage'
+import { preloadImage } from '../../session/media/preloadImage'
 
 type UseCanvasLibraryImportRuntimeOptions = {
   nodes: Ref<Node[]>

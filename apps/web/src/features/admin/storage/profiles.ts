@@ -1,5 +1,5 @@
 export type StorageProvider = string
-export type StorageFieldType = string
+type StorageFieldType = string
 
 export interface StorageProviderField {
   key: string

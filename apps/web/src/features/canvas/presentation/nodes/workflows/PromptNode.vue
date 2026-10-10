@@ -91,7 +91,7 @@ import NodeStageFrame from '../primitives/NodeStageFrame.vue'
 import PromptTextComposer from '../primitives/PromptTextComposer.vue'
 import { useImageInputSlots } from '../primitives/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../board/ports/canvas'
-import { SERVICE } from '../../../../../shared/domain/imageServices'
+import { SERVICE } from '../../../../../core/contracts/imageServices'
 import { useCanvasBillingQuote } from '../../../application/execution'
 import { buildGenerationTaskRequest } from '../../../application/execution/commands/imageTaskRequests.ts'
 
@@ -114,7 +114,7 @@ const emit = defineEmits<{
   (e: 'update:output-count', value: number): void
   (
     e: 'update:output-resolution',
-    value: import('../../../../../shared/domain/generationContract').OutputResolution,
+    value: import('../../../../../core/contracts/generationContract').OutputResolution,
   ): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'update:input-images', value: PromptNodeItem['inputImages']): void

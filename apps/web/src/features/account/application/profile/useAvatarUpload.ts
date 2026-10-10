@@ -1,10 +1,10 @@
 import { ref, type Ref } from 'vue'
 import { useUserStore } from '../../../auth'
-import { uploadApi } from '../../../../shared/api/upload'
+import { uploadApi } from '../../../../api/upload'
 import {
   type AsyncActionFeedback,
   useAsyncAction,
-} from '../../../../shared/composables/useAsyncAction'
+} from '../../../../core/composables/useAsyncAction'
 import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
 
 type RunAsyncAction = <T>(

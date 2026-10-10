@@ -71,11 +71,7 @@ import {
   findAdminNavigationItemByPath,
   resolveAdminPageTitle,
 } from './navigation'
-import {
-  ADMIN_CREDITS_PATH,
-  ADMIN_LOGIN_PATH,
-  isPathUnderRoute,
-} from '../../../shared/constants/routePaths'
+import { ADMIN_CREDITS_PATH, ADMIN_LOGIN_PATH, isPathUnderRoute } from '../routePaths'
 import { useBrandLogoOverrides } from '../shared/logos/useBrandLogoOverrides'
 import { useAdminStickyTitle } from './useAdminStickyTitle'
 

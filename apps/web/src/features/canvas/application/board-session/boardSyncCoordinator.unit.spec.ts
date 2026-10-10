@@ -229,9 +229,7 @@ describe('Board Sync Coordinator', () => {
         'Save failed: user session is missing. Please sign in and try again.',
       )
       expect(harness.onWarning).not.toHaveBeenCalled()
-      expect(infoSpy).toHaveBeenCalledWith(
-        '[canvas] save skipped remote sync: auth unavailable',
-      )
+      expect(infoSpy).toHaveBeenCalledWith('[canvas] save skipped remote sync: auth unavailable')
     } finally {
       infoSpy.mockRestore()
     }

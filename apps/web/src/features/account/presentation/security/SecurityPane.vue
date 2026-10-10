@@ -129,7 +129,7 @@ import {
   ibFormFieldClass,
   ibFormInputClass,
   ibFormInputErrorClass,
-} from '../../../../shared/theme/formControls'
+} from '../../../../theme/formControls'
 import {
   EmailField,
   OtpField,
@@ -140,9 +140,9 @@ import {
   useAuthForm,
   useUserStore,
 } from '../../../auth'
-import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { useAsyncAction } from '../../../../core/composables/useAsyncAction'
+import { useAppToast } from '../../../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { usePasswordChange } from '../../application/security/usePasswordChange'
 import AccountPane from '../shared/AccountPane.vue'

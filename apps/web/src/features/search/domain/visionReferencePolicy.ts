@@ -2,7 +2,7 @@ import type { VisionReference } from './models'
 import {
   VISION_REFERENCE_MAX_BYTES,
   VISION_REFERENCE_MAX_COUNT,
-} from '../../../shared/media/visionIngressPolicy'
+} from '../../../core/media/visionIngressPolicy'
 
 export const MAX_REFERENCE_COUNT = VISION_REFERENCE_MAX_COUNT
 export const MAX_REFERENCE_BYTES = VISION_REFERENCE_MAX_BYTES

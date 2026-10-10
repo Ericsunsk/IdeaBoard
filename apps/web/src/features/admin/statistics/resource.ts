@@ -1,9 +1,9 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { requireContractData } from '../../../shared/api/contractKernel'
-import { keepPrevious, STALE_TIME_MS } from '../../../shared/query/queryDefaults'
-import { getControlStatistics } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import type { GetControlStatisticsParams } from '../../../shared/api/generated-query/control/model'
+import { requireContractData } from '../../../api/contractKernel'
+import { keepPrevious, STALE_TIME_MS } from '../../../core/query/queryDefaults'
+import { getControlStatistics } from '../../../api/generated-query/control/control-platform/control-platform'
+import type { GetControlStatisticsParams } from '../../../api/generated-query/control/model'
 
 // Admin statistics boundary (final cut: Control Plane read). The legacy
 // `GET /api/admin/statistics` route group is deleted; the same handler now
@@ -28,7 +28,7 @@ export type GetAdminStatisticsParams = {
   range?: GetAdminStatisticsRange
 }
 
-export type AdminStatisticsSummary = {
+type AdminStatisticsSummary = {
   total_calls: number
   today_calls: number
   today_success: number
@@ -47,12 +47,12 @@ export type AdminStatisticsSummary = {
   cancelled: number
 }
 
-export type AdminStatisticsTrendSegment = {
+type AdminStatisticsTrendSegment = {
   label: string
   value: number
 }
 
-export type AdminStatisticsTrendItem = {
+type AdminStatisticsTrendItem = {
   date: string
   label: string
   total: number
@@ -60,7 +60,7 @@ export type AdminStatisticsTrendItem = {
   segments: AdminStatisticsTrendSegment[]
 }
 
-export type AdminStatisticsModelHealthItem = {
+type AdminStatisticsModelHealthItem = {
   name: string
   total: number
   completed: number
@@ -69,7 +69,7 @@ export type AdminStatisticsModelHealthItem = {
   avg_seconds: number
 }
 
-export type AdminStatisticsQualityTrendItem = {
+type AdminStatisticsQualityTrendItem = {
   date: string
   label: string
   total: number
@@ -78,14 +78,14 @@ export type AdminStatisticsQualityTrendItem = {
   success_rate: number
 }
 
-export type AdminStatisticsSlowModelsItem = {
+type AdminStatisticsSlowModelsItem = {
   name: string
   avg_seconds: number
   p95_seconds: number
   samples: number
 }
 
-export type AdminStatisticsBottleneckSourcesItem = {
+type AdminStatisticsBottleneckSourcesItem = {
   source: string
   label: string
   total: number
@@ -93,14 +93,14 @@ export type AdminStatisticsBottleneckSourcesItem = {
   avg_latency_ms: number
 }
 
-export type AdminStatisticsFailureCategoriesItem = {
+type AdminStatisticsFailureCategoriesItem = {
   category: string
   label: string
   total: number
   avg_latency_ms: number
 }
 
-export type AdminStatisticsBackfillStatus = {
+type AdminStatisticsBackfillStatus = {
   range_start: string
   range_end: string
   missing_days: number

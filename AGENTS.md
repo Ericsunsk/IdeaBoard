@@ -31,7 +31,7 @@ Do not create a new doc if an existing canonical doc can answer the same questio
 ## Hard Constraints
 
 - Keep changes small, reversible, and within scope.
-- Never hand-edit generated frontend API wrappers in `apps/web/src/shared/api/generated-query`.
+- Never hand-edit generated frontend API wrappers in `apps/web/src/api/generated-query`.
 - Never hand-edit generated sqlc files in `apps/api/internal/db/sqlc`.
 - Backend migrations live in `apps/api/internal/db/migrations`.
 - Task submission must stay transactional: insert the task and enqueue the River job in the same PostgreSQL transaction.

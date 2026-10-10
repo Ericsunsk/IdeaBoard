@@ -9,7 +9,7 @@ import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
 import { isBoardSyncConflictError, syncBoardToServer } from '../../application/sync/boardSync'
 import type { BoardMeta } from '../../application/catalog/boards'
-import { isDarkModeActive } from '../../../../shared/theme/composables/useTheme'
+import { isDarkModeActive } from '../../../../theme/composables/useTheme'
 import { getStoredPreviewTheme, setStoredPreviewTheme } from './boardPreviewThemeStorage'
 
 export interface BoardPreviewRefreshQueueDependencies {

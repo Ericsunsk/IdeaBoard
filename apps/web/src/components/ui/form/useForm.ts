@@ -80,7 +80,7 @@ async function extractIssues(schema: FormSchema, data: unknown): Promise<Record<
   return extractValibotDirectIssues(resolved, data)
 }
 
-export function cloneFormValue<T>(value: T): T {
+function cloneFormValue<T>(value: T): T {
   if (value === null || typeof value !== 'object') {
     return value
   }
@@ -103,7 +103,7 @@ export function cloneFormValue<T>(value: T): T {
   return cloned as T
 }
 
-export function areFormValuesEqual(a: unknown, b: unknown): boolean {
+function areFormValuesEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime()
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false

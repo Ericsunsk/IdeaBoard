@@ -1,5 +1,5 @@
 import 'vue-router'
-import type { RouteSeoKey } from '../../shared/seo/routeSeo'
+import type { RouteSeoKey } from '../../core/seo/routeSeo'
 
 declare module 'vue-router' {
   interface RouteMeta {

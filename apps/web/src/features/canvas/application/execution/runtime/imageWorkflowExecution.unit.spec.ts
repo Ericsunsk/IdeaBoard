@@ -29,7 +29,7 @@ vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
     requireCanvasWorkspaceId: vi.fn(() => 'ws_test123'),
   }
 })
-vi.mock('../../../../../shared/api/mediaAssetDelivery', () => ({
+vi.mock('../../../../../api/mediaAssetDelivery', () => ({
   resolveMediaAssetProcessingURL: vi.fn(
     async (assetId: number) => `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
   ),

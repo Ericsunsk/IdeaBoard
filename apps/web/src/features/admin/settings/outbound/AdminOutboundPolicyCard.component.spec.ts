@@ -6,7 +6,7 @@ import { mockAppToast } from '../../../../test/toast'
 import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../shared/testing'
 import AdminOutboundPolicyCard from './AdminOutboundPolicyCard.vue'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 describe('AdminOutboundPolicyCard', () => {
   let updateRequests: Array<{ body: unknown; operatorReason: string | null }>

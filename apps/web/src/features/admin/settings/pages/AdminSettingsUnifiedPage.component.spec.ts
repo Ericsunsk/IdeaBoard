@@ -11,7 +11,7 @@ import { STORAGE_MESSAGES } from '../../storage/pages/messages'
 import AdminSettingsUnifiedPage from './AdminSettingsUnifiedPage.vue'
 import * as searchProviderResource from '../image-library/searchProviderResource'
 
-vi.mock('../../../../shared/composables/useAppToast')
+vi.mock('../../../../core/composables/useAppToast')
 
 // The real table intentionally hides background loading once rows exist. Expose
 // the page's prop for the stale-finally regression while keeping real controls.

@@ -24,8 +24,8 @@ const SHADOW_NONE_ALLOWED_FILES = ['components/ui/card/Card.vue'] as const
 
 const CARD_SURFACE_FILES = [
   'components/ui/card/Card.vue',
-  'shared/components/ChartCard.vue',
-  'shared/components/RangedLineChartCard.vue',
+  'core/components/ChartCard.vue',
+  'core/components/RangedLineChartCard.vue',
   'features/admin/shared/components/AdminChartCard.vue',
   'features/admin/shared/components/AdminRangedLineChartCard.vue',
   'features/workspace/pages/WorkspaceShareJoinPage.vue',

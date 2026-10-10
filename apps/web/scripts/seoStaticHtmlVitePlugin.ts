@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Plugin } from 'vite'
-import { ROUTE_SEO } from '../src/shared/seo/routeSeo.ts'
-import { renderStaticSeoDocument } from '../src/shared/seo/seoStaticHtml.ts'
+import { ROUTE_SEO } from '../src/core/seo/routeSeo.ts'
+import { renderStaticSeoDocument } from '../src/core/seo/seoStaticHtml.ts'
 
 const STATIC_PUBLIC_PATHS = ['terms', 'privacy', 'refund', 'acceptable-use'] as const
 

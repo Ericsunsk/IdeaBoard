@@ -1,4 +1,4 @@
-export type StripeConfigurationMode = 'test' | 'live'
+type StripeConfigurationMode = 'test' | 'live'
 
 export type StripeConfigurationSummary = {
   configured: boolean
@@ -15,7 +15,7 @@ export type StripeConfigurationSummary = {
   updatedAt?: string | undefined
 }
 
-export type SaveStripeConfigurationInput = {
+type SaveStripeConfigurationInput = {
   apiKey?: string
   paymentMethodConfigurationId: string
   productTaxCode: string

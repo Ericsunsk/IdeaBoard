@@ -3,13 +3,13 @@ import {
   listControlBillingCatalog,
   publishControlCatalogPrices,
   setControlCatalogAvailability,
-} from '../../../../shared/api/generated-query/control/control-billing/control-billing'
-import { requireContractData } from '../../../../shared/api/contractKernel'
-import { stripUndefined } from '../../../../shared/api/stripUndefined'
+} from '../../../../api/generated-query/control/control-billing/control-billing'
+import { requireContractData } from '../../../../api/contractKernel'
+import { stripUndefined } from '../../../../api/stripUndefined'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
-} from '../../../../shared/domain/generationContract'
+} from '../../../../core/contracts/generationContract'
 import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,
@@ -38,7 +38,7 @@ const BILLABLE_ITEM_CONTROL_MESSAGES = {
 // into the body `reason` field where the schema accepts it) and emits a
 // control audit record. The deleted `/api/admin/billing/catalog/*` routes
 // are gone; this module is the single transport.
-export type BillableItemCatalogCard = {
+type BillableItemCatalogCard = {
   sku: string
   namespace: string
   product_kind: string
@@ -51,7 +51,7 @@ export type BillableItemCatalogCard = {
   updated_at?: string
 }
 
-export type BillingPrice = {
+type BillingPrice = {
   output_resolution: PricingVariant
   price_version_id: number
   version: number
@@ -59,13 +59,13 @@ export type BillingPrice = {
   created_at: string
 }
 
-export type BillableItemAvailability = {
+type BillableItemAvailability = {
   sku: string
   status: 'active' | 'disabled'
   updated_at: string
 }
 
-export type BillableCatalogMutationOptions = ControlMutationOptions
+type BillableCatalogMutationOptions = ControlMutationOptions
 
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>

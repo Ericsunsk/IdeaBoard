@@ -23,13 +23,13 @@ import {
   readLocalStorageItem,
   removeLocalStorageItem,
   writeLocalStorageItem,
-} from '../../../shared/utils/storage'
-import { isOpaqueId, opaqueIdPrefix } from '../../../shared/api/contractKernel'
-import type { AuthFailureMode } from '../../../shared/api/client'
-import { getStoredUser } from '../../../shared/utils/auth'
-import { stringParam } from '../../../shared/router/queryParams'
-import { accountScoped } from '../../../shared/query/queryDefaults'
-import { setMediaWorkspaceIdResolver } from '../../../shared/api/mediaWorkspaceScope'
+} from '../../../core/utils/storage'
+import { isOpaqueId, opaqueIdPrefix } from '../../../api/contractKernel'
+import type { AuthFailureMode } from '../../../api/client'
+import { getStoredUser } from '../../../core/utils/auth'
+import { stringParam } from '../../../core/router/queryParams'
+import { accountScoped } from '../../../core/query/queryDefaults'
+import { setMediaWorkspaceIdResolver } from '../../../api/mediaWorkspaceScope'
 
 export const WORKSPACE_URL_PARAM = 'workspace'
 export const WORKSPACE_SELECTION_STORAGE_KEY = 'ideaboard.workspace.selected.v1'
@@ -101,7 +101,7 @@ export function toWorkspaceSelectionStatus(input: {
   return 'ready'
 }
 
-export type WorkspaceSelectionPersist = {
+type WorkspaceSelectionPersist = {
   readSelectedId: () => string | null
   writeSelectedId: (id: string | null) => void
 }
@@ -138,7 +138,7 @@ export type ProvisionWorkspaceInput = {
   organizationId?: string | undefined
 }
 
-export type WorkspaceProvisionFn = (
+type WorkspaceProvisionFn = (
   input: ProvisionWorkspaceInput,
   request?: { idempotencyKey?: string | undefined; requestId?: string | undefined },
 ) => Promise<WorkspaceSummary>

@@ -8,8 +8,8 @@ import {
   syncRestoreBoardToServer,
 } from '../../../board/ports/canvas'
 import { useBoardRepository, type BoardRepository } from '../../../board/ports/canvas'
-import { USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
-import { i18n } from '../../../../shared/i18n'
+import { USER_CANVAS_PATH } from '../../../workspace/routePaths'
+import { i18n } from '../../../../core/i18n'
 
 type UseBoardHeaderActionsOptions = {
   currentBoardId: Ref<string | null | undefined>

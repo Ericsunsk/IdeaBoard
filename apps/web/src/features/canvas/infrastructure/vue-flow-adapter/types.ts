@@ -7,7 +7,7 @@ type ValueRef<T> = {
   readonly value: T
 }
 
-export type CanvasVueFlowGraphActions = Partial<
+type CanvasVueFlowGraphActions = Partial<
   Pick<
     Actions,
     | 'setNodes'

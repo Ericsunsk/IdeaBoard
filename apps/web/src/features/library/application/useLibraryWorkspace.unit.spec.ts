@@ -26,7 +26,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
 vi.mock('./libraryUseCases', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./libraryUseCases')>()

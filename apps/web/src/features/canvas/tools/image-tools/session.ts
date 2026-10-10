@@ -66,7 +66,7 @@ export type UseCanvasImageToolsOptions = {
   feedback: CanvasImageToolsFeedback
 } & CanvasFlowViewportControls
 
-export type ImageToolSessionBoardCapabilities = Pick<
+type ImageToolSessionBoardCapabilities = Pick<
   UseCanvasImageToolsOptions,
   | 'currentBoardId'
   | 'getImageNodeDisplayPayload'
@@ -80,12 +80,12 @@ export type ImageToolSessionBoardCapabilities = Pick<
   connectIntent: CanvasVueFlowConnectionAdapter['connectIntent']
 }
 
-export type ImageToolSessionExecutionCapabilities = Pick<
+type ImageToolSessionExecutionCapabilities = Pick<
   UseCanvasImageToolsOptions,
   'isNodeExecutionActive' | 'runInpaintAction'
 >
 
-export type ImageToolSessionUiCapabilities = Pick<
+type ImageToolSessionUiCapabilities = Pick<
   UseCanvasImageToolsOptions,
   | 'clearActiveNodePanel'
   | 'hideStrengthControl'
@@ -94,7 +94,7 @@ export type ImageToolSessionUiCapabilities = Pick<
   | 'strengthControl'
 >
 
-export type ImageToolSessionCapabilities = {
+type ImageToolSessionCapabilities = {
   board: ImageToolSessionBoardCapabilities
   execution: ImageToolSessionExecutionCapabilities
   ui: ImageToolSessionUiCapabilities

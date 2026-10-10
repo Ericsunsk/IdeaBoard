@@ -1,4 +1,4 @@
-import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../../library'
 import type {
   WorkspaceLibraryAsset,

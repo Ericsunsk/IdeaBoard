@@ -31,11 +31,11 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import StudioName from '../../../../shared/components/StudioName.vue'
-import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
-import { useSupportChannels } from '../../../../shared/composables/useSupportChannels'
-import { HOME_PATH } from '../../../../shared/constants/routePaths'
-import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
+import StudioName from '../../../../core/components/StudioName.vue'
+import UserAccountMenu from '../../../account/ui/chrome/UserAccountMenu.vue'
+import { useSupportChannels } from '../../../../core/composables/useSupportChannels'
+import { HOME_PATH } from '../../routePaths'
+import { useLogoutRedirect } from '../../../../core/composables/useLogoutRedirect'
 import { useUserStore } from '../../../auth'
 import WorkspaceNavigation from './WorkspaceNavigation.vue'
 import {

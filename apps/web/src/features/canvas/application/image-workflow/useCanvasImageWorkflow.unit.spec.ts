@@ -1,4 +1,4 @@
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../domain/nodes/imageActionRegistry.ts'
@@ -6,7 +6,7 @@ import type { MediaInputImage } from '../editing/useFlowMediaInputImages.ts'
 import { createPendingImageExecutionCore } from '../execution/pending-execution'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
-import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
+import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
   const plan = {

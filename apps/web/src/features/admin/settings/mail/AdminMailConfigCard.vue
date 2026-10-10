@@ -165,7 +165,7 @@
 import { computed, onMounted, ref, type HTMLAttributes } from 'vue'
 import * as v from 'valibot'
 import { useForm, firstFormError } from '@/components/ui/form'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminEditorActions from '../../shared/components/AdminEditorActions.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'

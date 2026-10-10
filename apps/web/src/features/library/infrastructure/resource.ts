@@ -1,4 +1,4 @@
-import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 // Workspace-scoped library transport (issue #844; split from `../workspace`).
 //
 // Talks to the v1 endpoints under `/api/v1/workspaces/{id}/library`
@@ -31,14 +31,11 @@ import {
   renameWorkspaceLibraryFolder as renameWorkspaceLibraryFolderTransport,
   resolveWorkspaceLibraryAssets as resolveWorkspaceLibraryAssetsTransport,
   saveWorkspaceLibraryAsset as saveWorkspaceLibraryAssetTransport,
-} from '../../../shared/api/generated-query/public/workspace-library/workspace-library'
-import {
-  buildContractRequestHeaders,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
-import type { AuthFailureMode } from '../../../shared/api/client'
-import { createUniqueId } from '../../../shared/utils/ids'
-import { i18n } from '../../../shared/i18n'
+} from '../../../api/generated-query/public/workspace-library/workspace-library'
+import { buildContractRequestHeaders, requireContractData } from '../../../api/contractKernel'
+import type { AuthFailureMode } from '../../../api/client'
+import { createUniqueId } from '../../../core/utils/ids'
+import { i18n } from '../../../core/i18n'
 import {
   assertLibraryAssetId,
   assertLibraryFolderId,

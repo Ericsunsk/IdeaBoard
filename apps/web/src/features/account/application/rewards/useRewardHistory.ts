@@ -5,8 +5,8 @@ import {
   rewardRedemptionsQueryKeys,
 } from '../../infrastructure/rewards/resource'
 import { useAccountWorkspace } from '../accountWorkspace'
-import { PAGE_SIZES } from '../../../../shared/config/pagination'
-import { noRetry } from '../../../../shared/query/queryDefaults'
+import { PAGE_SIZES } from '../../../../core/config/pagination'
+import { noRetry } from '../../../../core/query/queryDefaults'
 
 const pageSize = PAGE_SIZES.standard
 

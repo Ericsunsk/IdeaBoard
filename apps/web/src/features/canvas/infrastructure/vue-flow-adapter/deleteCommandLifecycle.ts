@@ -1,5 +1,5 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   commitCanvasGraphDeleteIntent,
   isCanvasGraphNodeId,

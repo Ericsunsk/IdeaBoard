@@ -192,11 +192,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
-import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
-import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
+import googleLogoUrl from '../../../core/assets/oauth/google.svg'
+import discordLogoUrl from '../../../core/assets/oauth/discord.svg'
 import { authTransport } from '../session/transport'
-import { PASSWORD_LENGTH_LIMIT } from '../../../shared/auth/passwordPolicy'
-import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
+import { PASSWORD_LENGTH_LIMIT } from '../../../core/auth/passwordPolicy'
+import { resolveInteractiveControlState } from '../../../core/interaction/interactiveControlState'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
   EmailField,
@@ -209,7 +209,7 @@ import {
   useAuthForm,
 } from './auth-fields'
 import { useAuthPanelControls } from './panelControls'
-import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../core/auth/oauthProviders'
 import {
   authFieldClass,
   authFooterClass,

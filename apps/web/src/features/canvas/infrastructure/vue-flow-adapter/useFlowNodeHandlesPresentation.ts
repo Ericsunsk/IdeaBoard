@@ -1,6 +1,6 @@
 import { computed, type CSSProperties, type MaybeRefOrGetter } from 'vue'
 import { Position } from '@vue-flow/core'
-import { i18n } from '../../../../shared/i18n'
+import { i18n } from '../../../../core/i18n'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,

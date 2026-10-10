@@ -12,7 +12,7 @@ import {
   keepPrevious,
   noRetry,
   STALE_TIME_MS,
-} from '../../../../shared/query/queryDefaults'
+} from '../../../../core/query/queryDefaults'
 
 type SuccessfulUsage = {
   range: UsageRange

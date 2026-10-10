@@ -1,4 +1,4 @@
-import { formatLocaleDate } from '../../../../shared/i18n/formatters'
+import { formatLocaleDate } from '../../../../core/i18n/formatters'
 
 export function formatCatalogDate(timestamp: number): string {
   if (!Number.isFinite(timestamp)) return '-'

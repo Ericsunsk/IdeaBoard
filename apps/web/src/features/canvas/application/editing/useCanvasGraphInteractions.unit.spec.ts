@@ -2,15 +2,15 @@ import type { Edge, Elements, Node } from '@vue-flow/core'
 import { shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../board'
-import { i18n } from '../../../../shared/i18n'
-import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
+import { i18n } from '../../../../core/i18n'
+import { loadLocaleMessages } from '../../../../core/i18n/userLocale'
 import { CanvasGraphSession } from '../../domain/graph'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../shared/api/mediaAssetDelivery'
+} from '../../../../api/mediaAssetDelivery'
 
 beforeEach(() => {
   setMediaWorkspaceIdResolver(() => 'ws_test123')

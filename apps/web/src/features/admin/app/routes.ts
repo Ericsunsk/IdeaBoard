@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { adminNavigationRouteDefs, ADMIN_DEFAULT_PATH } from './navigationMeta'
 import type { AdminNavigationKey } from './navigationMeta'
-import { ADMIN_CREDIT_PRICING_PATH, ADMIN_ROOT_PATH } from '../../../shared/constants/routePaths'
+import { ADMIN_CREDIT_PRICING_PATH, ADMIN_ROOT_PATH } from '../routePaths'
 
 const adminPageComponents = {
   users: () => import('../users/AdminUsersPage.vue'),

@@ -19,8 +19,7 @@ export function useAdminCursorCollection<TPage, TCursor extends AdminCursorValue
   getNextCursor: (page: TPage) => TCursor | undefined
   enabled?: MaybeRefOrGetter<boolean>
   refetchInterval?:
-    | MaybeRefOrGetter<number | false>
-    | ((query: Query<TPage>) => number | false | undefined)
+    MaybeRefOrGetter<number | false> | ((query: Query<TPage>) => number | false | undefined)
 }) {
   // Pagination is created before the query because the key reads the cursor
   // during setup; the explicit annotation breaks the inference cycle with the

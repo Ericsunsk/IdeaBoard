@@ -22,7 +22,7 @@ import { join } from 'node:path'
  *
  * The floor is `--spacing-touch-target-min` (32px). Controls that are
  * visually small by design carry `.hit-target-32` / `.hit-target-32-inline`
- * from `shared/theme/touch-target.css`, which grows the hit area past the visual
+ * from `theme/touch-target.css`, which grows the hit area past the visual
  * box without inflating the design. Controls that can afford it set a real
  * `min-h-8` / `!size-8`.
  *
@@ -163,7 +163,7 @@ const RULES: Rule[] = [
   {
     kind: 'opt-in',
     label: 'chart range segment',
-    rel: 'shared/components/RangedLineChartCard.vue',
+    rel: 'core/components/RangedLineChartCard.vue',
     pattern: /\bpy-1\b/,
     fix: 'carry `hit-target-32-inline` on the segment button so the row keeps its rhythm',
   },
@@ -355,7 +355,7 @@ function main(): void {
   }
 
   // 2. The hit-area utility must be imported, or no control can opt in.
-  if (!styles.includes("@import '../shared/theme/atoms/touch-target.css'")) {
+  if (!styles.includes("@import '../theme/atoms/touch-target.css'")) {
     violations.push(
       'app/style.css: `touch-target.css` is not imported, so `.hit-target-32` does nothing.',
     )

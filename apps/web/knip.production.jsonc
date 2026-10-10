@@ -10,15 +10,18 @@
   // per-issue dispositions and real CLI fixture evidence.
   //
   // Target commands (from apps/web):
-  //   knip --config knip.jsonc
-  //   knip --config knip.production.jsonc --production --strict
+  //   knip --config knip.config.ts
+  //   knip --config knip.production.config.ts --production --strict
+  // Wrappers retain these roots and validate exact reviewed public/test/
+  // generated contracts before annotating Knip's analysis input.
   //
   // Production semantics (https://knip.dev/features/production-mode):
   // every production pattern carries a trailing `!`; test-only exclusions
   // use `!` on both ends. `--production` already drops plugin-known test
   // entries and devDependencies. Helpers stay in the project: a runtime
   // import must make even testing.ts, src/test and lint/build helpers visible.
-  // Unreachable helper files remain real ledger issues rather than ignores.
+  // Only manifest-listed files with validated retention evidence are exempt
+  // from unused-files; their dependencies and private exports stay checked.
   "entry": [
     // Vite runtime roots: index.html loads src/app/main.ts (confirmed via
     // `knip --production --strict --debug`: `entry:src/app/main.ts` from the
@@ -33,6 +36,14 @@
     "src/**/*.{ts,vue,css}!",
     // Vitest spec entries are excluded; helper paths are deliberately tracked.
     "!src/**/*.spec.ts!",
+    // TTL shims are excluded from the production graph by design (plan v4:
+    // knip must NOT enforce shim expiry; docs/frontend-seam-inventory.md sets
+    // the default TTL to 1 phase with a named deletion owner). Expiry is
+    // enforced by the dedicated `lint:shim-ttl` governance check against
+    // docs/architecture/phase-marker.json instead, so shims stay invisible to
+    // both the unused-files and the unused-exports production reports until
+    // the lint retires them at end of TTL.
+    "!src/**/*.shim.ts!",
   ],
   // Build-time CSS import: src/app/style.css `@import "tailwindcss"` is
   // processed by @tailwindcss/vite at build time, never shipped as a runtime

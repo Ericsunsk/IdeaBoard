@@ -9,7 +9,7 @@ import type {
 import {
   normalizeOutputResolution,
   type OutputResolution,
-} from '../../../../shared/domain/generationContract'
+} from '../../../../core/contracts/generationContract'
 import {
   areFusionBlendPointsEqual,
   requireImageNodeOutputCount,

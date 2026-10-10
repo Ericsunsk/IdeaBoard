@@ -13,7 +13,7 @@ type FileDiff = {
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = path.resolve(webRoot, '../..')
-const generatedDir = path.join(webRoot, 'src/shared/api/generated-query')
+const generatedDir = path.join(webRoot, 'src/api/generated-query')
 const maxDiffsToPrint = 30
 
 async function listFiles(dir: string, baseDir = dir): Promise<string[]> {
@@ -47,7 +47,7 @@ function resolveOrvalCommand(): { command: string; args: string[] } {
 async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
   const tempWebRoot = path.join(tempRoot, 'apps/web')
   const tempApiRoot = path.join(tempRoot, 'apps/api')
-  const tempApiSourceRoot = path.join(tempWebRoot, 'src/shared/api')
+  const tempApiSourceRoot = path.join(tempWebRoot, 'src/api')
 
   await Promise.all([
     mkdir(tempApiRoot, { recursive: true }),
@@ -78,19 +78,19 @@ async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
       path.join(tempWebRoot, 'prettier.config.js'),
     ),
     copyFile(
-      path.join(webRoot, 'src/shared/api/orvalMutator.ts'),
+      path.join(webRoot, 'src/api/orvalMutator.ts'),
       path.join(tempApiSourceRoot, 'orvalMutator.ts'),
     ),
     // Issue #808: the Control client resolves through its own transport
     // mutator (control/v1 prefix); the drift workspace needs it too.
     copyFile(
-      path.join(webRoot, 'src/shared/api/controlMutator.ts'),
+      path.join(webRoot, 'src/api/controlMutator.ts'),
       path.join(tempApiSourceRoot, 'controlMutator.ts'),
     ),
     // The Public client resolves through its own transport mutator
     // (v1 prefix); the drift workspace needs it too.
     copyFile(
-      path.join(webRoot, 'src/shared/api/publicMutator.ts'),
+      path.join(webRoot, 'src/api/publicMutator.ts'),
       path.join(tempApiSourceRoot, 'publicMutator.ts'),
     ),
     symlink(path.join(webRoot, 'node_modules'), path.join(tempWebRoot, 'node_modules'), 'dir'),
@@ -178,7 +178,7 @@ async function main() {
 
   try {
     const tempWebRoot = await prepareGenerationWorkspace(tempRoot)
-    const expectedDir = path.join(tempWebRoot, 'src/shared/api/generated-query')
+    const expectedDir = path.join(tempWebRoot, 'src/api/generated-query')
     generateIn(tempWebRoot)
 
     const diffs = await compareGenerated(generatedDir, expectedDir)

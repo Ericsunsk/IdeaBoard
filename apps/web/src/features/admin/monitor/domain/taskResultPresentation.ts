@@ -1,9 +1,9 @@
-import { calcDurationSeconds, formatDurationSeconds } from '../../../../shared/utils/dateTime'
+import { calcDurationSeconds, formatDurationSeconds } from '../../../../core/utils/dateTime'
 import {
   sanitizeApiErrorMessage,
   sanitizeTaskErrorMessage,
-} from '../../../../shared/utils/errorMessages'
-import { i18n } from '../../../../shared/i18n'
+} from '../../../../core/utils/errorMessages'
+import { i18n } from '../../../../core/i18n'
 import { adminTaskStatuses } from './status'
 import { getSafeTaskResultImageUrl, getSafeTaskResultImageUrls } from './taskResultImages'
 import type { AdminMonitorDetailModel, AdminMonitorListItemModel } from '../infrastructure/resource'
@@ -15,8 +15,8 @@ const RESULT_ARRAY_PREVIEW_LENGTH = 5
 const SENSITIVE_KEY_PATTERN =
   /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
-export type TaskDurationTone = 'success' | 'warning' | 'danger'
-export type TaskDurationInfo = {
+type TaskDurationTone = 'success' | 'warning' | 'danger'
+type TaskDurationInfo = {
   seconds: number
   tone: TaskDurationTone
 }

@@ -143,7 +143,7 @@ import {
 } from '../core/constants'
 import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
 import { NodeToolIconButton, PromptTextComposer } from '../../../presentation/nodes/primitives'
-import { SERVICE } from '../../../../../shared/domain/imageServices'
+import { SERVICE } from '../../../../../core/contracts/imageServices'
 import { useCanvasBillingQuote } from '../../../application/execution'
 
 defineProps<{

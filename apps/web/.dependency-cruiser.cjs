@@ -33,12 +33,27 @@ module.exports = {
     {
       name: 'shared-not-to-features',
       severity: 'error',
-      comment: 'Shared modules must not depend on concrete feature modules.',
+      comment:
+        'Shared modules must not depend on concrete features or app. Only the enumerated P1 compatibility shims have a one-phase exception.',
       from: {
-        path: '^src/shared',
+        path: '^src/shared(?:/|$)',
+        pathNot:
+          '^src/shared/(?:components/(?:UserAccountMenu|UserCreditBalanceButton|userAccountMenu\\.types|SupportChannelQr)|constants/(?:contacts|routePaths|legalLinks)|domain/(?:imageActions|serviceIcons|serviceRegistry)|media/preloadImage)\\.shim\\.ts$',
       },
       to: {
-        path: '^src/(features|app)',
+        path: '^src/(?:features|app)(?:/|$)',
+      },
+    },
+    {
+      name: 'horizontal-not-to-features',
+      severity: 'error',
+      comment:
+        'Horizontal modules must not depend on concrete features or app, including type-only and re-export edges.',
+      from: {
+        path: '^src/(?:core|api|theme|lib|components)(?:/|$)',
+      },
+      to: {
+        path: '^src/(?:features|app)(?:/|$)',
       },
     },
     {
@@ -67,7 +82,7 @@ module.exports = {
         path: '^src/app/|src/.*(?:Page|Layout)\\.vue$',
       },
       to: {
-        path: '^src/shared/api/generated-query',
+        path: '^src/api/generated-query',
       },
     },
     {
@@ -79,7 +94,7 @@ module.exports = {
         path: '^src/features/admin',
       },
       to: {
-        path: '^src/shared/api/generated-query/public',
+        path: '^src/api/generated-query/public',
       },
     },
     {
@@ -92,7 +107,7 @@ module.exports = {
         pathNot: '^src/features/admin',
       },
       to: {
-        path: '^src/shared/api/generated-query/control',
+        path: '^src/api/generated-query/control',
       },
     },
     {
@@ -126,7 +141,7 @@ module.exports = {
       name: 'no-cross-feature-deep-imports',
       severity: 'error',
       comment:
-        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting); shell, infrastructure, layout, and pages modules are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
+        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting; routePaths.ts stays public for cross-feature path constants); shell, infrastructure, layout, and pages modules are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
       from: {
         path: '^src/(?:app|features/[^/]+)(?:/|$)',
         pathNot:
@@ -134,7 +149,7 @@ module.exports = {
       },
       to: {
         path: '^src/features/workspace/',
-        pathNot: '^src/features/workspace/(?:index\\.ts$|routes/)',
+        pathNot: '^src/features/workspace/(?:index\\.ts$|routes/|routePaths\\.ts$)',
       },
     },
     {
@@ -174,20 +189,20 @@ module.exports = {
         path: '^src/features/canvas/tools/[^/]+/core(?:/|$)',
       },
       to: {
-        path: '^src/features/canvas/tools/[^/]+/(?:session|ui)(?:/|$)|^src/features/canvas/tools/image-tools(?:/|$)|^src/features/canvas/(?:application|infrastructure|presentation)(?:/|$)|^src/features/(?:library|search)(?:/|$)|^src/shared/api/generated-query(?:/|$)',
+        path: '^src/features/canvas/tools/[^/]+/(?:session|ui)(?:/|$)|^src/features/canvas/tools/image-tools(?:/|$)|^src/features/canvas/(?:application|infrastructure|presentation)(?:/|$)|^src/features/(?:library|search)(?:/|$)|^src/api/generated-query(?:/|$)',
       },
     },
     {
       name: 'canvas-tool-core-no-i18n-runtime',
       severity: 'error',
       comment:
-        'ADR-0013: core sources carry locale-free label keys; only the pure localeCore constants/types may be imported from shared/i18n. Colocated specs may verify display-copy parity.',
+        'ADR-0013: core sources carry locale-free label keys; only the pure localeCore constants/types may be imported from core/i18n. Colocated specs may verify display-copy parity. The retired shared/i18n TTL shims are covered too.',
       from: {
         path: '^src/features/canvas/tools/[^/]+/core(?:/|$)',
         pathNot: '\\.spec\\.ts$',
       },
       to: {
-        path: '^src/shared/i18n(?:$|/(?!localeCore\\.ts$))',
+        path: '^src/(?:shared|core)/i18n(?:$|/(?!localeCore\\.ts$))',
       },
     },
     {

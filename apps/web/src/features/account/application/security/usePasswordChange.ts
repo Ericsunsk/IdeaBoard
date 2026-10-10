@@ -5,14 +5,11 @@ import { useUserStore } from '../../../auth'
 import {
   type AsyncActionFeedback,
   useAsyncAction,
-} from '../../../../shared/composables/useAsyncAction'
-import {
-  getPasswordLengthError,
-  PASSWORD_LENGTH_LIMIT,
-} from '../../../../shared/auth/passwordPolicy'
-import { USER_LOGIN_PATH } from '../../../../shared/constants/routePaths'
-import { markRequiredError } from '../../../../shared/utils/formValidation'
-import { i18n } from '../../../../shared/i18n'
+} from '../../../../core/composables/useAsyncAction'
+import { getPasswordLengthError, PASSWORD_LENGTH_LIMIT } from '../../../../core/auth/passwordPolicy'
+import { USER_LOGIN_PATH } from '../../../workspace/routePaths'
+import { markRequiredError } from '../../../../core/utils/formValidation'
+import { i18n } from '../../../../core/i18n'
 import { type ProfileFeedback, useProfileFeedback } from '../profile/useProfileFeedback'
 
 export type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'

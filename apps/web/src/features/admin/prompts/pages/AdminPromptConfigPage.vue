@@ -234,7 +234,7 @@ import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../usePromptConfigFeedback'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
@@ -251,7 +251,7 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
-import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
+import { getServiceIcon } from '../../shared/ui/serviceIcons'
 import { useAdminPromptConfigWorkspace } from '../workspace'
 import type { FeaturePromptVariable } from '../workspace'
 import {

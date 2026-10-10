@@ -4,7 +4,7 @@ import { useTaskResultDetail } from './useTaskResultDetail'
 import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from '../domain/taskResultImages'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'
 
-vi.mock('../../../../shared/composables/useAppClipboard', () => ({
+vi.mock('../../../../core/composables/useAppClipboard', () => ({
   useAppClipboard: () => ({
     copyText: (text: string) => {
       const clipboard = (

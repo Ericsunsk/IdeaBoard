@@ -44,7 +44,7 @@ vi.mock('../session/transport', () => ({
   },
 }))
 
-vi.mock('../../../shared/composables/useSiteBranding', () => ({
+vi.mock('../../../core/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
     fallbackText: 'IB',
     logoURL: ref(''),
@@ -52,7 +52,7 @@ vi.mock('../../../shared/composables/useSiteBranding', () => ({
   }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast')
+vi.mock('../../../core/composables/useAppToast')
 
 vi.mock('../../admin/pages/login/useAdminLoginFeedback', () => ({
   useAdminLoginFeedback: () => ({
@@ -63,7 +63,7 @@ vi.mock('../../admin/pages/login/useAdminLoginFeedback', () => ({
   }),
 }))
 
-vi.mock('../../../shared/composables/useLogoutRedirect', () => ({
+vi.mock('../../../core/composables/useLogoutRedirect', () => ({
   useLogoutRedirect: () => ({ logoutAndRedirect: vi.fn() }),
 }))
 

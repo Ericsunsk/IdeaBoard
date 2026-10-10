@@ -1,11 +1,10 @@
-import type { OutputResolution as CatalogResolution } from '../../../../shared/domain/generationContract'
+import type { OutputResolution as CatalogResolution } from '../../../../core/contracts/generationContract'
 
 export type AdminBillableItemStatus = 'unpriced' | 'active' | 'disabled' | 'archived'
 // Pricing and pool resolutions are the shared catalog values (1k/2k/4k):
 // this module aliases the single source instead of declaring a competing
 // enum. Never add a "default" variant here.
 export type PricingVariant = CatalogResolution
-export type OutputResolution = PricingVariant
 
 export interface AdminBillableItemPrice {
   priceVersionId: number

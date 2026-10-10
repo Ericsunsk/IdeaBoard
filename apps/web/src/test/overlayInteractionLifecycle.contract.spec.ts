@@ -4,7 +4,7 @@ import { useCanvasCustomLayerOverlay } from '../features/canvas/presentation/ove
 import {
   useOverlayInteractionLifecycle,
   type OverlayDismissal,
-} from '../shared/composables/useOverlayInteractionLifecycle'
+} from '../core/composables/useOverlayInteractionLifecycle'
 
 describe('overlay interaction lifecycle contract', () => {
   it('blocks shared lifecycle dismissal while busy and resets every reopen', () => {

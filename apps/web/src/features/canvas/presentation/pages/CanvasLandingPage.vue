@@ -108,10 +108,10 @@ import bootsAsset from '../../assets/home/boots.svg'
 import portraitAsset from '../../assets/home/portrait.svg'
 import socksAsset from '../../assets/home/socks.svg'
 import starburstAsset from '../../assets/home/starburst.svg'
-import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
-import StudioName from '../../../../shared/components/StudioName.vue'
-import { USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
-import { PUBLIC_LEGAL_LINKS } from '../../../../shared/constants/legalLinks'
+import { useSiteBranding } from '../../../../core/composables/useSiteBranding'
+import StudioName from '../../../../core/components/StudioName.vue'
+import { USER_SEARCH_PATH } from '../../../workspace/routePaths'
+import { PUBLIC_LEGAL_LINKS } from '../../../legal/legalLinks'
 
 const router = useRouter()
 const { t } = useI18n()

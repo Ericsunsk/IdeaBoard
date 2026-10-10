@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
   return { hydrateBoardsFromServer, request }
 })
 
-vi.mock('../../../../shared/api/client', () => ({
+vi.mock('../../../../api/client', () => ({
   api: {
     request: mocks.request,
   },

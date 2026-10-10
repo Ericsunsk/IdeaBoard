@@ -1,9 +1,9 @@
-import type { AsyncActionFeedback } from '../../../../shared/composables/useAsyncAction'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
-import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import type { AsyncActionFeedback } from '../../../../core/composables/useAsyncAction'
+import { useAppToast } from '../../../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
-import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
-import { i18n } from '../../../../shared/i18n'
+import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
+import { i18n } from '../../../../core/i18n'
 
 type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'info' | 'warning' | 'error'>
 

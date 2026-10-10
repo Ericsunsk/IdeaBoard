@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BoardSnapshot, BoardState } from '../../../board'
-import { userErrorCode } from '../../../../shared/errors/errorCatalog'
+import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import type { BoardSessionPreviewRenderer } from './preview'
 import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
@@ -230,9 +230,7 @@ describe('useBoardSession', () => {
     expect(result.remoteSync.ok).toBe(false)
     if (!result.remoteSync.ok) {
       expect(result.remoteSync.reason).toBe('sync-failed')
-      expect(userErrorCode(result.remoteSync.error)).toBe(
-        BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
-      )
+      expect(userErrorCode(result.remoteSync.error)).toBe(BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE)
     }
     expect((workspaceError as { code?: unknown }).code).toBe(
       BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,

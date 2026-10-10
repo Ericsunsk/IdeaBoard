@@ -1,7 +1,7 @@
 import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
-import type { TaskImageResult } from '../../../../../shared/query/taskResult'
+import type { TaskImageResult } from '../../../../../core/query/taskResult'
 import { mapCanvasBillingRequestError } from './canvasBillingPreflight'
-import { i18n } from '../../../../../shared/i18n'
+import { i18n } from '../../../../../core/i18n'
 import {
   submitCanvasWorkspaceTask,
   waitCanvasWorkspaceTaskImageResults,

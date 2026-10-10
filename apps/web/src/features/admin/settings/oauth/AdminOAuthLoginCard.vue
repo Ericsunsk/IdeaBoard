@@ -59,15 +59,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import ActionButton from '../../../../core/components/ActionButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { createOAuthProviderSettingsResource, type OAuthProviderSettingsResource } from './resource'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '../../../../shared/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../../core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 import { SETTINGS_MESSAGES as M } from '../pages/messages'

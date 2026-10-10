@@ -4,7 +4,7 @@ import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollec
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
-import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
+import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
 import {
   createAdminGatewayResource,
   type AdminGatewayCatalog,

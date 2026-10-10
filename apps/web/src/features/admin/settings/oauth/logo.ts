@@ -1,7 +1,7 @@
-import googleLogoUrl from '../../../../shared/assets/oauth/google.svg'
-import discordLogoUrl from '../../../../shared/assets/oauth/discord.svg'
+import googleLogoUrl from '../../../../core/assets/oauth/google.svg'
+import discordLogoUrl from '../../../../core/assets/oauth/discord.svg'
 import { adminBrandLogoMap, getAdminBrandLogoOverride } from '../../shared/logos/brandLogos'
-import type { OAuthProviderCode } from '../../../../shared/auth/oauthProviders'
+import type { OAuthProviderCode } from '../../../../core/auth/oauthProviders'
 
 // 登录源 logo 必须精确解析：模糊匹配会把 'google' 命中到 AI 模型的
 // google 品牌（models.dev 通用星星占位图），故只认 scope override，

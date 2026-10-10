@@ -2,12 +2,12 @@ import {
   authClient,
   resolveBetterAuthErrorMessage,
   normalizeCanonicalEmail,
-} from '../../../shared/auth/client'
-import { resolveAuthUrl } from '../../../shared/config/runtimeUrls'
-import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
-import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
-import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
-import { i18n } from '../../../shared/i18n'
+} from '../../../core/auth/client'
+import { resolveAuthUrl } from '../../../core/config/runtimeUrls'
+import { USER_AUTH_CALLBACK_PATH } from '../../workspace/routePaths'
+import { isSafeInternalRedirectPath } from '../../../core/utils/auth'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../core/auth/oauthProviders'
+import { i18n } from '../../../core/i18n'
 
 async function requestAuthEndpoint(
   path: string,

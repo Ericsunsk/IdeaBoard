@@ -7,7 +7,7 @@ import {
 } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUserStore } from '../../../auth'
-import { userErrorCode } from '../../../../shared/errors/errorCatalog'
+import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { makeSessionUser } from '../../../../test/factories'
 import { render } from '../../../../test/render'
 import type { BoardSnapshot } from '../../../board/ports/canvas'

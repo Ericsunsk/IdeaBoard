@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
-import { IMAGE_NODE_ACTION } from '../../../../../shared/domain/imageActions'
+import { IMAGE_NODE_ACTION } from '../../../core/nodes/imageActions'
 import {
   IMAGE_OUTPAINT_ACTION,
   IMAGE_UPSCALE_ACTION,
