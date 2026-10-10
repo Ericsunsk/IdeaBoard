@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "e44d29308b78e7f51dc455edd77666b81d8a2f4d",
+  "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict P1 current batch; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -5320,12 +5320,22 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/shared/api/workspaceEventStream.shim.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 10,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
@@ -5359,7 +5369,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 8,
+      "targetFanIn": 10,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12733,7 +12743,22 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         },
@@ -12743,7 +12768,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 10,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/@tanstack/vue-query/build/legacy/index.cjs"],
       "outboundEdges": [
@@ -12757,7 +12782,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 7,
+      "targetFanIn": 10,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12848,6 +12873,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
@@ -12858,7 +12893,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 17,
+      "fanIn": 19,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -12866,7 +12901,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 17,
+      "targetFanIn": 19,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13277,7 +13312,37 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -13302,7 +13367,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 20,
+      "fanIn": 26,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/sessionUserType.ts",
@@ -13337,7 +13402,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 20,
+      "targetFanIn": 26,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -25796,6 +25861,36 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/application/catalog/repository.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/application/catalog/scope.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
           "to": "src/features/board/application/catalog/boards.ts",
           "kind": "runtime"
@@ -25961,22 +26056,284 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 12,
+      "fanOut": 24,
       "fanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
         "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/features/board/application/catalog/boards.ts",
+        "src/features/board/application/catalog/repository.ts",
         "src/features/board/application/catalog/scope.ts",
         "src/features/board/domain/index.ts",
         "src/features/board/infrastructure/api/boardsResource.ts",
         "src/features/board/infrastructure/persistence/index.ts",
+        "src/features/board/infrastructure/preview/index.ts",
+        "src/features/board/presentation/catalog/galleryController.ts",
+        "src/features/board/testing/factories.ts",
         "src/features/board/testing/index.ts",
+        "src/features/board/testing/syncDesignHarness.ts",
+        "src/features/board/testing/syncFixtures.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts"
       ],
       "outboundEdges": [
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/features/board/testing/factories.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/features/board/testing/syncDesignHarness.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/application/catalog/repository.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/infrastructure/preview/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/presentation/catalog/galleryController.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/autosavePolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/useBoardAutosave.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/application/catalog/boards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/application/catalog/scope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/infrastructure/api/boardsResource.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/factories.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/syncDesignHarness.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/factories.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/syncDesignHarness.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
@@ -26094,7 +26451,7 @@
       ],
       "activationPhase": "pre-P0",
       "targetFanIn": 2,
-      "targetFanOut": 12,
+      "targetFanOut": 24,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -26295,9 +26652,14 @@
           "from": "src/features/board/testing/factories.ts",
           "to": "src/features/board/domain/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/board/domain/index.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 13,
+      "fanIn": 14,
       "fanOut": 7,
       "fanOutTargets": [
         "node_modules/valibot/dist/index.mjs",
@@ -26389,7 +26751,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 13,
+      "targetFanIn": 14,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -26831,9 +27193,10 @@
         }
       ],
       "fanIn": 48,
-      "fanOut": 42,
+      "fanOut": 47,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -26844,6 +27207,7 @@
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/idempotencyKey.ts",
         "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -26861,12 +27225,15 @@
         "src/core/lib/chartPrimitives.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -26950,6 +27317,121 @@
         {
           "from": "src/features/board/application/collaboration/joinSharedBoardWorkflow.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/autosavePolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/useBoardAutosave.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
@@ -27326,6 +27808,36 @@
           "from": "src/features/board/presentation/catalog/useCatalog.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
@@ -27333,7 +27845,7 @@
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
       "targetFanIn": 48,
-      "targetFanOut": 42,
+      "targetFanOut": 47,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -27354,6 +27866,26 @@
         },
         {
           "from": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
           "to": "src/features/board/infrastructure/persistence/index.ts",
           "kind": "runtime"
         },
@@ -27383,7 +27915,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 11,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -27433,7 +27965,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 7,
+      "targetFanIn": 11,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -27448,6 +27980,11 @@
     },
     "src/features/board/infrastructure/preview/index.ts": {
       "consumerEdges": [
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/infrastructure/preview/index.ts",
+          "kind": "type-only"
+        },
         {
           "from": "src/features/board/index.ts",
           "to": "src/features/board/infrastructure/preview/index.ts",
@@ -27479,7 +28016,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 12,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -27601,7 +28138,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 12,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -28123,9 +28660,10 @@
         }
       ],
       "fanIn": 95,
-      "fanOut": 42,
+      "fanOut": 47,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -28136,6 +28674,7 @@
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/idempotencyKey.ts",
         "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -28153,12 +28692,15 @@
         "src/core/lib/chartPrimitives.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -28242,6 +28784,121 @@
         {
           "from": "src/features/board/application/collaboration/joinSharedBoardWorkflow.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/autosavePolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/useBoardAutosave.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
@@ -28618,6 +29275,36 @@
           "from": "src/features/board/presentation/catalog/useCatalog.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
@@ -28625,7 +29312,7 @@
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
       "targetFanIn": 95,
-      "targetFanOut": 42,
+      "targetFanOut": 47,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -28920,7 +29607,13 @@
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
-      "undeclaredDeepImports": [],
+      "undeclaredDeepImports": [
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/presentation/catalog/galleryController.ts",
+          "kind": "runtime"
+        }
+      ],
       "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 27,
@@ -28939,6 +29632,21 @@
       "consumerEdges": [
         {
           "from": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         },
@@ -28973,22 +29681,127 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
-      "fanOut": 1,
-      "fanOutTargets": ["src/features/board/domain/index.ts"],
+      "fanIn": 10,
+      "fanOut": 8,
+      "fanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "src/api/workspaceEventStream.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/utils/auth.ts",
+        "src/features/board/domain/index.ts",
+        "src/features/board/infrastructure/api/boardsResource.ts",
+        "src/features/workspace/index.ts"
+      ],
       "outboundEdges": [
         {
           "from": "src/features/board/testing/factories.ts",
           "to": "src/features/board/domain/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/features/board/infrastructure/api/boardsResource.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/board/domain/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
-      "undeclaredDeepImports": [],
+      "undeclaredDeepImports": [
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/features/board/testing/factories.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/features/board/testing/syncDesignHarness.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/factories.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/syncDesignHarness.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/factories.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/syncDesignHarness.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/syncFixtures.ts",
+          "kind": "runtime"
+        }
+      ],
       "activationPhase": "pre-P0",
-      "targetFanIn": 7,
-      "targetFanOut": 1,
+      "targetFanIn": 10,
+      "targetFanOut": 8,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -29269,6 +30082,16 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/autosavePolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/application/board-session/useBoardAutosave.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/application/editing/useFlowImageUploadActions.ts",
           "to": "src/features/canvas/application/board-session/currentBoardId.ts",
@@ -42106,6 +42929,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
@@ -42122,6 +42955,11 @@
         },
         {
           "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
@@ -42171,7 +43009,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 16,
+      "fanIn": 19,
       "fanOut": 50,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -42747,7 +43585,7 @@
         }
       ],
       "activationPhase": "pre-P0",
-      "targetFanIn": 16,
+      "targetFanIn": 19,
       "targetFanOut": 48,
       "advisories": {
         "fanInTargetMismatch": false,

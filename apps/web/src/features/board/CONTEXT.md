@@ -35,6 +35,29 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `board/index.ts` — public entry for non-Canvas consumers and route composition; Canvas uses the narrow port below.
 - `board/ports/canvas.ts` — narrow BoardCanvas port for Canvas callers (issue #861): snapshot facts, local persistence, revision-gated sync, preview rendering, and media-ref extraction only; Canvas production code must use this subpath, never the full barrel.
 
+## Sync / Query Ownership (proposed P2.5 design, ADR-0014; production migration is P3)
+
+Current production server catalog/document state remains in `application/catalog`, `application/sync`, and persistence stores. The ownership below is the P3 target, pending independent plan-owner acceptance and merge of the P2.5 design/specs. `testing/syncDesignHarness.ts` is a private test-only executable design harness; it is neither a production integration nor a public export. Local design verification, review, plan-owner acceptance, merge, CI, and P3 production red/green evidence are separate milestones in the canonical `docs/architecture/frontend-contract-inventory.md` ledger (`behaviors` and `syncDesign`).
+
+| Concern                     | Owner                                                |
+| --------------------------- | ---------------------------------------------------- |
+| Server snapshot (P3 target) | TanStack Query (catalog list + per-board document)   |
+| Draft / optimistic          | Feature-owned store (`application/catalog` + states) |
+| Scope                       | Selection port (`features/workspace` selection)      |
+| SSE                         | Invalidation signal only, never snapshot transport   |
+| Task fact                   | River + PostgreSQL                                   |
+| Event transport             | NATS JetStream                                       |
+
+- Query key shapes: `['boards', workspaceId, 'list']` for the catalog list; `['boards', workspaceId, 'board', boardId, 'document']` for each board document. No other board key roots.
+- Freshness: list rides `accountScoped` (stale 15s); document uses the global default (stale 5s); `gcTime` 10m and `retry 1` stay on the global `queryClient` defaults.
+- Focus: `refetchOnWindowFocus` stays `false`; explicit visible-invalidate is throttled to 5s; hidden visibility flushes the pending save and does not fetch.
+- SSE mapping: `board.document_replaced` invalidates the document (500ms coalesce; frames at or below the local revision are dropped; draft-dirty boards are marked stale without refetch or draft overwrite); `board.member_changed` invalidates the list; `board.share_revoked` invalidates the list and removes the document query; a stream gap invalidates only `['boards', workspaceId]`, leaving other workspace and task caches unchanged. SSE never calls `setQueryData` on document content; optimistic `setQueryData` is limited to create/rename local write-back.
+- Revision rules: document saves send the observed revision as `If-Match`; 409 keeps the draft and surfaces the conflict status until an explicit reload converges; archived writes stay on the banner path, never the conflict path; renames are PATCH-only (no document write) and adopt the server-advanced revision. ADR-0006 is deprecated; only its optimistic concurrency invariant remains current. `apps/api/openapi.public.yaml`, `DESIGN.md`, and the Board API adapter own the current `If-Match`/409 wire contract.
+- 404 rules: document PUT 404 never creates/upserts and preserves the draft/base revision; document GET 404 fails the whole hydrate and preserves existing drafts/revisions. Only absence in a successfully completed catalog list removes previously synced boards; never-synced offline creations remain.
+- Draft precedence (3-layer): local-newer drafts win over older remote snapshots; explicit rollback (or `preserveLocalNewer: false`) converges to the remote snapshot; never-synced offline creations are kept while deleted-elsewhere boards are dropped. The overlay is frozen to the captured scope: a workspace switch drops the late response.
+- P3 preserves the exact race/broadcast/conflict trio in ADR-0014: bind the scenarios to the production Query boundary, record a real pre-implementation red and post-implementation green. Design-harness green does not satisfy production migration.
+- Dual-view semantics: canvas renders the draft-overlay view (local draft over the server snapshot); gallery renders the Query snapshot view (catalog list only, never full board states for thumbnails).
+
 ## Invariants
 
 - `domain` stays pure: no Vue reactivity, no browser DOM; pure functions only.

@@ -21454,14 +21454,24 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/shared/api/workspaceEventStream.shim.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 10,
       "measuredFanOut": 4,
-      "targetFanIn": 8,
+      "targetFanIn": 10,
       "targetFanOut": 4,
       "shims": ["src/shared/api/workspaceEventStream.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -29634,7 +29644,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         },
@@ -29644,9 +29669,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 10,
       "measuredFanOut": 1,
-      "targetFanIn": 7,
+      "targetFanIn": 10,
       "targetFanOut": 1,
       "shims": ["src/shared/query/queryClient.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -29762,6 +29787,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
@@ -29772,9 +29807,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 17,
+      "measuredFanIn": 19,
       "measuredFanOut": 0,
-      "targetFanIn": 17,
+      "targetFanIn": 19,
       "targetFanOut": 0,
       "shims": ["src/shared/query/queryDefaults.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -30395,7 +30430,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -30420,9 +30485,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 20,
+      "measuredFanIn": 26,
       "measuredFanOut": 4,
-      "targetFanIn": 20,
+      "targetFanIn": 26,
       "targetFanOut": 4,
       "shims": ["src/shared/utils/auth.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -40572,9 +40637,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 12,
+      "measuredFanOut": 24,
       "targetFanIn": 2,
-      "targetFanOut": 12,
+      "targetFanOut": 24,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40601,17 +40666,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
         "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/features/board/application/catalog/boards.ts",
+        "src/features/board/application/catalog/repository.ts",
         "src/features/board/application/catalog/scope.ts",
         "src/features/board/domain/index.ts",
         "src/features/board/infrastructure/api/boardsResource.ts",
         "src/features/board/infrastructure/persistence/index.ts",
+        "src/features/board/infrastructure/preview/index.ts",
+        "src/features/board/presentation/catalog/galleryController.ts",
+        "src/features/board/testing/factories.ts",
         "src/features/board/testing/index.ts",
+        "src/features/board/testing/syncDesignHarness.ts",
+        "src/features/board/testing/syncFixtures.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts"
       ]
     },
@@ -40828,11 +40905,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/board/testing/factories.ts",
           "to": "src/features/board/domain/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/board/domain/index.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 14,
       "measuredFanOut": 7,
-      "targetFanIn": 13,
+      "targetFanIn": 14,
       "targetFanOut": 7,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -41295,9 +41377,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 48,
-      "measuredFanOut": 42,
+      "measuredFanOut": 47,
       "targetFanIn": 48,
-      "targetFanOut": 42,
+      "targetFanOut": 47,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -41493,6 +41575,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -41503,6 +41586,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/idempotencyKey.ts",
         "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -41520,12 +41604,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/lib/chartPrimitives.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -41558,6 +41645,26 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/infrastructure/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
           "to": "src/features/board/infrastructure/persistence/index.ts",
           "kind": "runtime"
@@ -41583,9 +41690,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 11,
       "measuredFanOut": 5,
-      "targetFanIn": 7,
+      "targetFanIn": 11,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -41631,6 +41738,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [
         {
+          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/infrastructure/preview/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/board/index.ts",
           "to": "src/features/board/infrastructure/preview/index.ts",
           "kind": "runtime"
@@ -41661,9 +41773,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 7,
       "measuredFanOut": 12,
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 12,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -42214,9 +42326,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 95,
-      "measuredFanOut": 42,
+      "measuredFanOut": 47,
       "targetFanIn": 95,
-      "targetFanOut": 42,
+      "targetFanOut": 47,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42313,6 +42425,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -42323,6 +42436,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/idempotencyKey.ts",
         "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -42340,12 +42454,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/lib/chartPrimitives.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -42449,6 +42566,21 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -42479,10 +42611,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
-      "measuredFanOut": 1,
-      "targetFanIn": 7,
-      "targetFanOut": 1,
+      "measuredFanIn": 10,
+      "measuredFanOut": 8,
+      "targetFanIn": 10,
+      "targetFanOut": 8,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42501,7 +42633,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "makePendingImageNodeSnapshot"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["src/features/board/domain/index.ts"]
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "src/api/workspaceEventStream.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/utils/auth.ts",
+        "src/features/board/domain/index.ts",
+        "src/features/board/infrastructure/api/boardsResource.ts",
+        "src/features/workspace/index.ts"
+      ]
     },
     {
       "path": "src/features/canvas/application/board-session/index.ts",
@@ -46141,6 +46282,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
@@ -46157,6 +46308,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/syncFixtures.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
@@ -46206,9 +46362,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 19,
       "measuredFanOut": 50,
-      "targetFanIn": 16,
+      "targetFanIn": 19,
       "targetFanOut": 48,
       "shims": [
         "src/features/workspace/infrastructure/workspaceContext.shim.ts"
@@ -60358,7 +60514,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/api/stripUndefined.ts`                                                         | canonical | active  | p1-lane       | 2       | 12 → 12                  | 0 → 0                     |
 | `src/api/upload.ts`                                                                 | canonical | active  | p1-lane       | 22      | 11 → 11                  | 7 → 7                     |
 | `src/api/userSession.ts`                                                            | canonical | active  | p1-lane       | 2       | 3 → 3                    | 3 → 3                     |
-| `src/api/workspaceEventStream.ts`                                                   | canonical | active  | p1-lane       | 20      | 8 → 8                    | 4 → 4                     |
+| `src/api/workspaceEventStream.ts`                                                   | canonical | active  | p1-lane       | 20      | 10 → 10                  | 4 → 4                     |
 | `src/api/workspaceTaskContract.ts`                                                  | canonical | active  | p1-lane       | 14      | 6 → 6                    | 2 → 2                     |
 | `src/api/workspaceTaskTransport.ts`                                                 | canonical | active  | p1-lane       | 7       | 8 → 8                    | 5 → 5                     |
 | `src/api/workspaceTaskWaiter.ts`                                                    | canonical | active  | p1-lane       | 2       | 3 → 3                    | 5 → 5                     |
@@ -60436,14 +60592,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/core/motion/dialogMotion.ts`                                                   | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
 | `src/core/motion/motionPolicy.ts`                                                   | canonical | active  | p1-lane       | 6       | 6 → 6                    | 0 → 0                     |
 | `src/core/motion/popoverMotion.ts`                                                  | canonical | active  | p1-lane       | 3       | 7 → 7                    | 2 → 2                     |
-| `src/core/query/queryClient.ts`                                                     | canonical | active  | p1-lane       | 2       | 7 → 7                    | 1 → 1                     |
-| `src/core/query/queryDefaults.ts`                                                   | canonical | active  | p1-lane       | 5       | 17 → 17                  | 0 → 0                     |
+| `src/core/query/queryClient.ts`                                                     | canonical | active  | p1-lane       | 2       | 10 → 10                  | 1 → 1                     |
+| `src/core/query/queryDefaults.ts`                                                   | canonical | active  | p1-lane       | 5       | 19 → 19                  | 0 → 0                     |
 | `src/core/query/taskResult.ts`                                                      | canonical | active  | p1-lane       | 5       | 9 → 9                    | 1 → 1                     |
 | `src/core/query/userCreditsInvalidation.ts`                                         | canonical | active  | p1-lane       | 4       | 7 → 7                    | 0 → 0                     |
 | `src/core/router/queryParams.ts`                                                    | canonical | active  | p1-lane       | 3       | 15 → 15                  | 1 → 1                     |
 | `src/core/seo/routeSeo.ts`                                                          | canonical | active  | p1-lane       | 12      | 5 → 5                    | 0 → 0                     |
 | `src/core/seo/seoStaticHtml.ts`                                                     | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane       | 16      | 20 → 20                  | 4 → 4                     |
+| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane       | 16      | 26 → 26                  | 4 → 4                     |
 | `src/core/utils/currency.ts`                                                        | canonical | active  | p1-lane       | 3       | 3 → 3                    | 2 → 2                     |
 | `src/core/utils/dateTime.ts`                                                        | canonical | active  | p1-lane       | 5       | 7 → 7                    | 2 → 2                     |
 | `src/core/utils/errorMessages.ts`                                                   | canonical | active  | p1-lane       | 4       | 12 → 12                  | 0 → 0                     |
@@ -60542,17 +60698,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane       | 28      | 28 → 28                  | 45 → 41                   |
 | `src/features/board/application/catalog/index.ts`                                   | cascading | active  | p3-lane       | 43      | 2 → 2                    | 11 → 11                   |
 | `src/features/board/application/collaboration/index.ts`                             | cascading | active  | p3-lane       | 2       | 1 → 1                    | 6 → 6                     |
-| `src/features/board/application/sync/index.ts`                                      | cascading | active  | p3-lane       | 14      | 2 → 2                    | 12 → 12                   |
+| `src/features/board/application/sync/index.ts`                                      | cascading | active  | p3-lane       | 14      | 2 → 2                    | 24 → 24                   |
 | `src/features/board/domain/document/index.ts`                                       | cascading | active  | p3-lane       | 87      | 1 → 1                    | 6 → 6                     |
-| `src/features/board/domain/index.ts`                                                | cascading | active  | p3-lane       | 92      | 13 → 13                  | 7 → 7                     |
+| `src/features/board/domain/index.ts`                                                | cascading | active  | p3-lane       | 92      | 14 → 14                  | 7 → 7                     |
 | `src/features/board/domain/media/index.ts`                                          | cascading | active  | p3-lane       | 1       | 1 → 1                    | 3 → 3                     |
 | `src/features/board/domain/schema/index.ts`                                         | cascading | active  | p3-lane       | 4       | 1 → 1                    | 9 → 9                     |
-| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane       | 182     | 48 → 48                  | 42 → 42                   |
-| `src/features/board/infrastructure/persistence/index.ts`                            | cascading | active  | p3-lane       | 13      | 7 → 7                    | 5 → 5                     |
-| `src/features/board/infrastructure/preview/index.ts`                                | cascading | active  | p3-lane       | 5       | 6 → 6                    | 12 → 12                   |
-| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane       | 83      | 95 → 95                  | 42 → 42                   |
+| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane       | 182     | 48 → 48                  | 47 → 47                   |
+| `src/features/board/infrastructure/persistence/index.ts`                            | cascading | active  | p3-lane       | 13      | 11 → 11                  | 5 → 5                     |
+| `src/features/board/infrastructure/preview/index.ts`                                | cascading | active  | p3-lane       | 5       | 7 → 7                    | 12 → 12                   |
+| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane       | 83      | 95 → 95                  | 47 → 47                   |
 | `src/features/board/presentation/catalog/index.ts`                                  | cascading | active  | p3-lane       | 14      | 1 → 1                    | 27 → 27                   |
-| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane       | 7       | 7 → 7                    | 1 → 1                     |
+| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane       | 7       | 10 → 10                  | 8 → 8                     |
 | `src/features/canvas/application/board-session/index.ts`                            | canonical | active  | p5-lane       | 9       | 5 → 5                    | 17 → 17                   |
 | `src/features/canvas/application/editing/index.ts`                                  | canonical | active  | p5-lane       | 10      | 5 → 5                    | 40 → 40                   |
 | `src/features/canvas/application/execution/board-attachment/index.ts`               | canonical | active  | p5-lane       | 2       | 12 → 12                  | 0 → 0                     |
@@ -60589,7 +60745,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane       | 4       | 5 → 5                    | 0 → 0                     |
 | `src/features/library/index.ts`                                                     | canonical | active  | p2-lane       | 69      | 23 → 23                  | 37 → 37                   |
 | `src/features/search/index.ts`                                                      | canonical | active  | p3-lane       | 21      | 2 → 2                    | 40 → 40                   |
-| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 41      | 16 → 16                  | 50 → 48                   |
+| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 41      | 19 → 19                  | 50 → 48                   |
 | `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | active  | workspace-p2  | 20      | 1 → 1                    | 1 → 1                     |
 | `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2  | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane       | 9       | 34 → 34                  | 1 → 1                     |

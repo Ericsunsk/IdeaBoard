@@ -320,9 +320,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "sync-design/draft-overlay-precedence"
       ],
       "B_p": 6,
-      "zeroRetirementReason": "Design acceptance and isolated unmerged spike; permanent regression scenarios are mandatory but no implementation-source constraint retirement is selected.",
+      "zeroRetirementReason": "Design and test-only executable thin slice; no production migration or implementation-source constraint retirement in P2.5.",
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local",
+      "evidence": "R_p=0: N/A with frozen design/test-only scope. B_p=6: all six mandatory design behaviors verified by p25-cleanup-specs (38 active tests). Current command/technical review evidence in syncDesign; formal plan-owner acceptance and CI remain pending.",
+      "verifiedAt": "2026-10-10T20:45:09.451503+00:00"
     },
     {
       "phase": "P3",
@@ -16788,89 +16790,1158 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P2.5",
       "owner": "/root/p2.5-lane",
       "requirement": "Accepted Sync design defines server snapshot SoT and an executable test rejects stale incoming facts.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Accepted Sync design defines server snapshot SoT and an executable test rejects stale incoming facts.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 74,
+          "scenario": "selection port owns the scope: resolution fails closed before any network call",
+          "assertion": "expect(getBoardScope()).toEqual({\n    userScope: expect.any(String),\n    workspaceId: WORKSPACE_ID,\n})",
+          "fingerprint": "1d7fe5000362a53b"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 78,
+          "scenario": "selection port owns the scope: resolution fails closed before any network call",
+          "assertion": "expect(requireBoardWorkspaceId()).toBe(WORKSPACE_ID)",
+          "fingerprint": "179623f53091c201"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 82,
+          "scenario": "selection port owns the scope: resolution fails closed before any network call",
+          "assertion": "expect(() => requireBoardWorkspaceId()).toThrow(BoardWorkspaceUnavailableError)",
+          "fingerprint": "9271c9a17011c325"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 83,
+          "scenario": "selection port owns the scope: resolution fails closed before any network call",
+          "assertion": "expect(mocks.request).not.toHaveBeenCalled()",
+          "fingerprint": "350687cf21dd0b37"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 90,
+          "scenario": "feature store owns the draft overlay: local drafts survive without server writes",
+          "assertion": "expect(getBoardById('draft-1')?.name).toBe('Draft')",
+          "fingerprint": "3ab282f5b8da0a2e"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 91,
+          "scenario": "feature store owns the draft overlay: local drafts survive without server writes",
+          "assertion": "expect(getBoardState('draft-1')).not.toBeNull()",
+          "fingerprint": "04c11a9e67917e41"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 92,
+          "scenario": "feature store owns the draft overlay: local drafts survive without server writes",
+          "assertion": "expect(mocks.request).not.toHaveBeenCalled()",
+          "fingerprint": "12d25005f4c22a50"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 101,
+          "scenario": "feature store isolates drafts per workspace scope",
+          "assertion": "expect(listBoards()).toEqual([])",
+          "fingerprint": "918d306896c37ac6"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 102,
+          "scenario": "feature store isolates drafts per workspace scope",
+          "assertion": "expect(getBoardState('board-a')).toBeNull()",
+          "fingerprint": "761de978d40231e2"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 105,
+          "scenario": "feature store isolates drafts per workspace scope",
+          "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['board-a'])",
+          "fingerprint": "3f0e7a3ccc149460"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 114,
+          "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
+          "assertion": "expect(query\n    .getQueryCache()\n    .getAll()\n    .map((entry) => entry.queryKey)).toEqual([['boards', WORKSPACE_ID, 'list']])",
+          "fingerprint": "6b218437a215a3fa"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 120,
+          "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
+          "assertion": "expect(list).toEqual([\n    expect.objectContaining({ id: 'board-a', name: 'Server Board', revision: 8 }),\n])",
+          "fingerprint": "ad07f013d026b92e"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 123,
+          "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
+          "assertion": "expect(query.getQueryData(designBoardKeys.list(WORKSPACE_ID))).toEqual(list)",
+          "fingerprint": "338da5879c74a292"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 124,
+          "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
+          "assertion": "expect(mocks.request).toHaveBeenCalledWith(expect.stringContaining(`/workspaces/${WORKSPACE_ID}/boards`), expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }))",
+          "fingerprint": "632606d3edfed376"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 135,
+          "scenario": "caches each board document under [\"boards\", workspaceId, \"board\", boardId, \"document\"]",
+          "assertion": "expect(query\n    .getQueryCache()\n    .getAll()\n    .map((entry) => entry.queryKey)).toEqual([['boards', WORKSPACE_ID, 'board', 'board-a', 'document']])",
+          "fingerprint": "72a6cf3f3d4b1837"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 141,
+          "scenario": "caches each board document under [\"boards\", workspaceId, \"board\", boardId, \"document\"]",
+          "assertion": "expect(document).toMatchObject({ boardId: 'board-a', revision: 8 })",
+          "fingerprint": "b2079cffe1f4c66c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 142,
+          "scenario": "caches each board document under [\"boards\", workspaceId, \"board\", boardId, \"document\"]",
+          "assertion": "expect(mocks.request).toHaveBeenCalledWith(`/v1/workspaces/${WORKSPACE_ID}/boards/board-a/document`, expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }))",
+          "fingerprint": "ddb8029454bc44ee"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 154,
+          "scenario": "keeps local draft edits separate from the cached server document",
+          "assertion": "expect(getBoardState('board-a')?.promptNodes[0]?.text).toBe('local draft')",
+          "fingerprint": "4b22ae91a6bd7051"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 155,
+          "scenario": "keeps local draft edits separate from the cached server document",
+          "assertion": "expect(query.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-a'))).toEqual(document)",
+          "fingerprint": "427439bb2e2e7075"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 158,
+          "scenario": "keeps local draft edits separate from the cached server document",
+          "assertion": "expect(document.document).toMatchObject({ payload: { promptNodes: [{ text: 'server' }] } })",
+          "fingerprint": "ef343fffc73fb3c5"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 159,
+          "scenario": "keeps local draft edits separate from the cached server document",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "6e1df29e5ab725fb"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 173,
+          "scenario": "never regresses the cached document revision on an older server read",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "1f7c64cf53a557f5"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 174,
+          "scenario": "never regresses the cached document revision on an older server read",
+          "assertion": "expect(query.getQueryData(options.queryKey)).toMatchObject({\n    revision: 8,\n    document: { payload: { promptNodes: [{ text: 'server' }] } },\n})",
+          "fingerprint": "5b863c23b056cf1f"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 200,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(oldSignal).toBeInstanceOf(AbortSignal)",
+          "fingerprint": "9d354ea404b67e92"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 204,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(9)",
+          "fingerprint": "6b77ee33dbccb5d9"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 205,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(oldSignal?.aborted).toBe(true)",
+          "fingerprint": "86776b337a5fa96e"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 210,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(query.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-a'))).toBeUndefined()",
+          "fingerprint": "1b2dd4fcc1b1fd8d"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 211,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 9,\n    document: { payload: { promptNodes: [{ text: 'other workspace' }] } },\n})",
+          "fingerprint": "80866eadf5d494a0"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 215,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "438c90901ce4dd9e"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "missingEvidence": []
     },
     {
       "id": "sync-design/freshness-gc",
       "phase": "P2.5",
       "owner": "/root/p2.5-lane",
       "requirement": "Accepted staleTime/gcTime settings preserve snapshot lifecycle across navigation and cache eviction.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Accepted staleTime/gcTime settings preserve snapshot lifecycle across navigation and cache eviction.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 51,
+          "scenario": "global query defaults own document freshness, gc, retry, and focus policy",
+          "assertion": "expect(queryClient.getDefaultOptions().queries).toMatchObject({\n    staleTime: 5000,\n    gcTime: 10 * 60 * 1000,\n    retry: 1,\n    refetchOnWindowFocus: false,\n})",
+          "fingerprint": "3b680c1dd195a6bd"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 60,
+          "scenario": "accountScoped() defaults to 15s freshness and keeps the global retry policy",
+          "assertion": "expect(STALE_TIME_MS.account).toBe(15000)",
+          "fingerprint": "a6749477c94a24ee"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 61,
+          "scenario": "accountScoped() defaults to 15s freshness and keeps the global retry policy",
+          "assertion": "expect(accountScoped()).toEqual({ staleTime: 15000 })",
+          "fingerprint": "aad7fe6aa8724921"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 62,
+          "scenario": "accountScoped() defaults to 15s freshness and keeps the global retry policy",
+          "assertion": "expect('retry' in accountScoped()).toBe(false)",
+          "fingerprint": "fbb428fd0bf9b0f6"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 72,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(first.getCurrentResult().data?.[0]?.id).toBe('board-a')",
+          "fingerprint": "167ffe09a46dfd17"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 73,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(first.getCurrentResult().isStale).toBe(false)",
+          "fingerprint": "1817c875c11ff498"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 74,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "acb63966c11752ff"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 82,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(false)",
+          "fingerprint": "ea85a1f0c40f2c7a"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 83,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "acb63966c11752ff"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 85,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(true)",
+          "fingerprint": "d7035668d7ecf4d3"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 91,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "c605b72f5ece35de"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 92,
+          "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
+          "assertion": "expect(staleVisit.getCurrentResult().isStale).toBe(false)",
+          "fingerprint": "85e85475b9396b86"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 101,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(first.getCurrentResult().data?.boardId).toBe('board-a')",
+          "fingerprint": "53d59308b5cba66f"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 102,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "b63a1fa4c28e70ae"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 110,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(false)",
+          "fingerprint": "f8af30973d0c93ec"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 111,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "b63a1fa4c28e70ae"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 113,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(true)",
+          "fingerprint": "e40349956a9bfd72"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 119,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "b3484989e3f77c14"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 120,
+          "scenario": "per-board document stays at 5s freshness across navigation",
+          "assertion": "expect(staleVisit.getCurrentResult().data?.revision).toBe(1)",
+          "fingerprint": "1278863455e9630b"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 132,
+          "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
+          "assertion": "expect(client.getQueryData(options.queryKey)).toMatchObject({ boardId: 'board-a' })",
+          "fingerprint": "ef960a7af4f484a3"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 133,
+          "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "a6c4f894aedc97c8"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 135,
+          "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
+          "assertion": "expect(client.getQueryCache().find({ queryKey: options.queryKey, exact: true })).toBeUndefined()",
+          "fingerprint": "506d602d6a090a66"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 141,
+          "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "dafbf6586d6730bb"
+        },
+        {
+          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "line": 142,
+          "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
+          "assertion": "expect(returnVisit.getCurrentResult().data?.boardId).toBe('board-a')",
+          "fingerprint": "6d87446bd032363c"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "missingEvidence": []
     },
     {
       "id": "sync-design/focus-refetch",
       "phase": "P2.5",
       "owner": "/root/p2.5-lane",
       "requirement": "Accepted focus/refetch policy avoids overwriting local drafts or duplicating focused-tab requests.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Accepted focus/refetch policy avoids overwriting local drafts or duplicating focused-tab requests.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 81,
+          "scenario": "keeps refetchOnWindowFocus disabled globally (explicit invalidate only)",
+          "assertion": "expect(queryClient.getDefaultOptions().queries?.refetchOnWindowFocus).toBe(false)",
+          "fingerprint": "3d3764cf3e107992"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 87,
+          "scenario": "coalesces a visible double-touch into a single explicit invalidate",
+          "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)",
+          "fingerprint": "55dfca6a2c6620e9"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 91,
+          "scenario": "coalesces a visible double-touch into a single explicit invalidate",
+          "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(2)",
+          "fingerprint": "dcdcaef9bab1d622"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 95,
+          "scenario": "coalesces a visible double-touch into a single explicit invalidate",
+          "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(2)",
+          "fingerprint": "dcdcaef9bab1d622"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 101,
+          "scenario": "never fetches while the tab stays hidden",
+          "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)",
+          "fingerprint": "98e40683947e060c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 108,
+          "scenario": "never fetches while the tab stays hidden",
+          "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)",
+          "fingerprint": "98e40683947e060c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 113,
+          "scenario": "never fetches while the tab stays hidden",
+          "assertion": "expect(Object.getOwnPropertyDescriptor(document, 'visibilityState')).toEqual(original)",
+          "fingerprint": "67a94cc73aaa34b7"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 129,
+          "scenario": "flushes the pending save when the document hides",
+          "assertion": "expect(save).toHaveBeenCalledExactlyOnceWith({ silent: true })",
+          "fingerprint": "a9e3447c1971bd9b"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 142,
+          "scenario": "binds the hidden visibility event to the pending save",
+          "assertion": "expect(save).not.toHaveBeenCalled()",
+          "fingerprint": "d9d82729c52d9aca"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 145,
+          "scenario": "binds the hidden visibility event to the pending save",
+          "assertion": "expect(save).toHaveBeenCalledExactlyOnceWith({ silent: true })",
+          "fingerprint": "df8ca6fc8acbb851"
+        },
+        {
+          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "line": 151,
+          "scenario": "binds the hidden visibility event to the pending save",
+          "assertion": "expect(Object.getOwnPropertyDescriptor(document, 'visibilityState')).toEqual(original)",
+          "fingerprint": "c67b32ee2e4b45da"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "missingEvidence": []
     },
     {
       "id": "sync-design/sse-broadcast",
       "phase": "P2.5",
       "owner": "/root/p2.5-lane",
       "requirement": "Accepted SSE setQueryData/invalidation mapping converges duplicate/out-of-order broadcast revisions without poll-free facts being lost.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Accepted SSE setQueryData/invalidation mapping converges duplicate/out-of-order broadcast revisions without poll-free facts being lost.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 156,
+          "scenario": "freezes the board event types in the workspace registry",
+          "assertion": "expect(WORKSPACE_EVENT_TYPES).toContain('board.document_replaced')",
+          "fingerprint": "aec919c3a2933318"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 157,
+          "scenario": "freezes the board event types in the workspace registry",
+          "assertion": "expect(WORKSPACE_EVENT_TYPES).toContain('board.member_changed')",
+          "fingerprint": "3895d580b37ec8cc"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 158,
+          "scenario": "freezes the board event types in the workspace registry",
+          "assertion": "expect(WORKSPACE_EVENT_TYPES).toContain('board.share_revoked')",
+          "fingerprint": "b0ac9ac89d084f2a"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 159,
+          "scenario": "freezes the board event types in the workspace registry",
+          "assertion": "expect(isWorkspaceEventType('board.document_replaced')).toBe(true)",
+          "fingerprint": "67b6a04fb5247262"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 160,
+          "scenario": "freezes the board event types in the workspace registry",
+          "assertion": "expect(isWorkspaceEventType('board.member_changed')).toBe(true)",
+          "fingerprint": "5ff1bd2d96ef334c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 161,
+          "scenario": "freezes the board event types in the workspace registry",
+          "assertion": "expect(isWorkspaceEventType('board.share_revoked')).toBe(true)",
+          "fingerprint": "521bd561b5e50052"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 170,
+          "scenario": "fans out board envelopes per workspace and drops cross-workspace frames",
+          "assertion": "expect(MockEventSource.instances).toHaveLength(1)",
+          "fingerprint": "c7beb5346270ae36"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 173,
+          "scenario": "fans out board envelopes per workspace and drops cross-workspace frames",
+          "assertion": "expect(seen).toHaveLength(1)",
+          "fingerprint": "5e89ad57b049ede8"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 179,
+          "scenario": "fans out board envelopes per workspace and drops cross-workspace frames",
+          "assertion": "expect(seen).toHaveLength(1)",
+          "fingerprint": "5e89ad57b049ede8"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 192,
+          "scenario": "surfaces gap notices so board clients refetch state",
+          "assertion": "expect(gaps).toEqual([{ lastEventId: 'evt_abc123' }])",
+          "fingerprint": "26afa05c00a5eedf"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 207,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "044262492cca726b"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 208,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(7)",
+          "fingerprint": "767f29c431a417f7"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 211,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "fa60721b336e01a4"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 212,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 10,\n    document: { payload: { promptNodes: [{ text: 'latest from HTTP' }] } },\n})",
+          "fingerprint": "7c69ac175f3c910b"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 216,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(write).not.toHaveBeenCalled()",
+          "fingerprint": "fb01b45d6dc50cab"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 218,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "fa60721b336e01a4"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 227,
+          "scenario": "drops document_replaced frames at or below the local revision",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "560108ef703abdee"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 228,
+          "scenario": "drops document_replaced frames at or below the local revision",
+          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(false)",
+          "fingerprint": "cbafd8bfb20c5d96"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 240,
+          "scenario": "drops document_replaced frames at or below the local revision",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "aed0cd5a22442f7f"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 241,
+          "scenario": "drops document_replaced frames at or below the local revision",
+          "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(8)",
+          "fingerprint": "29f3e61b29e867b7"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 253,
+          "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+          "fingerprint": "49d1fe3922aed750"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 256,
+          "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+          "assertion": "expect(observer.getCurrentResult().isStale).toBe(true)",
+          "fingerprint": "e6119428c88aa240"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 257,
+          "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "1aee821f38c7a305"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 258,
+          "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+          "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 7,\n    document: { payload: { promptNodes: [{ text: 'server' }] } },\n})",
+          "fingerprint": "1d96be833d8179f0"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 262,
+          "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved local draft')",
+          "fingerprint": "dec3bf89f2439422"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 263,
+          "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+          "assertion": "expect(write).not.toHaveBeenCalled()",
+          "fingerprint": "c9db675df0f999ff"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 280,
+          "scenario": "invalidates the list on member_changed without fetching the document",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(3)",
+          "fingerprint": "8275c65f71b49c6f"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 281,
+          "scenario": "invalidates the list on member_changed without fetching the document",
+          "assertion": "expect(mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/document'))).toHaveLength(1)",
+          "fingerprint": "db22d38cfc4f062e"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 284,
+          "scenario": "invalidates the list on member_changed without fetching the document",
+          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(false)",
+          "fingerprint": "ec63c307c4004d65"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 304,
+          "scenario": "invalidates the list and removes the document on share_revoked",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(3)",
+          "fingerprint": "cefed939c6379d7e"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 305,
+          "scenario": "invalidates the list and removes the document on share_revoked",
+          "assertion": "expect(client\n    .getQueryCache()\n    .find({ queryKey: designBoardKeys.document(WORKSPACE_ID, 'board-1'), exact: true })).toBeUndefined()",
+          "fingerprint": "acf33b47b50066b2"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 310,
+          "scenario": "invalidates the list and removes the document on share_revoked",
+          "assertion": "expect(client.getQueryData(designBoardKeys.list(WORKSPACE_ID))).toBeDefined()",
+          "fingerprint": "8840e07766b45801"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 324,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(client.getQueryState(designBoardKeys.list(WORKSPACE_ID))?.isInvalidated).toBe(true)",
+          "fingerprint": "c649cd8503a75f2d"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 325,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+          "fingerprint": "3d996a95f513ff92"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 328,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(client.getQueryState(designBoardKeys.list(OTHER_WORKSPACE_ID))?.isInvalidated).toBe(false)",
+          "fingerprint": "c4a4c09fefc891e3"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 331,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(client.getQueryState(['tasks', WORKSPACE_ID])?.isInvalidated).toBe(false)",
+          "fingerprint": "5f0dc17cb0d88906"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 332,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(client.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-1'))).toEqual(previous)",
+          "fingerprint": "8504c9e7330e7c62"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 335,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "98a1ff2bd529a878"
+        },
+        {
+          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "line": 336,
+          "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
+          "assertion": "expect(write).not.toHaveBeenCalled()",
+          "fingerprint": "ebffbeba8a974bf3"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "missingEvidence": []
     },
     {
       "id": "sync-design/revision-conflict",
       "phase": "P2.5",
       "owner": "/root/p2.5-lane",
       "requirement": "Accepted revision coexistence handles 404 and conflicting revisions without dropping recoverable local edits.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Accepted revision coexistence handles 404 and conflicting revisions without dropping recoverable local edits.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 98,
+          "scenario": "sends the observed revision as If-Match on document saves",
+          "assertion": "expect(readIfMatch('board-1')).toBe('7')",
+          "fingerprint": "38acbb75cafb62dc"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 99,
+          "scenario": "sends the observed revision as If-Match on document saves",
+          "assertion": "expect(listBoards()[0]?.revision).toBe(8)",
+          "fingerprint": "0fa8304bb3348315"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 121,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
+          "fingerprint": "f24acba1ef764713"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 122,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBe('revision-conflict')",
+          "fingerprint": "d6e53524b79ff4fe"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 123,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(true)",
+          "fingerprint": "4c0a9b13a95b59aa"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 125,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-draft')",
+          "fingerprint": "f9f619495d9768d7"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 126,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(listBoards()[0]?.revision).toBe(7)",
+          "fingerprint": "37f6194591a1a91c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 141,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })",
+          "fingerprint": "b0af7205f6a87dda"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 142,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')",
+          "fingerprint": "a0719ca965a93d84"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 156,
+          "scenario": "keeps archived writes on the banner path, never the conflict path",
+          "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ code: 'board_archived' })",
+          "fingerprint": "d09e4f3a96458f84"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 157,
+          "scenario": "keeps archived writes on the banner path, never the conflict path",
+          "assertion": "expect(isBoardArchivedError(apiState.saveError)).toBe(true)",
+          "fingerprint": "a193d886ec383d79"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 158,
+          "scenario": "keeps archived writes on the banner path, never the conflict path",
+          "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(false)",
+          "fingerprint": "6987d3e1eefd2bc5"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 159,
+          "scenario": "keeps archived writes on the banner path, never the conflict path",
+          "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBeNull()",
+          "fingerprint": "32bcb6993f7c6703"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 178,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({\n    status: 404,\n    code: 'board_not_found',\n})",
+          "fingerprint": "8d9d2119d1da6c69"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 183,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(putCallsFor('board-1')).toHaveLength(1)",
+          "fingerprint": "6a466e5de95e0fa0"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 184,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(readIfMatch('board-1')).toBe(String(revision ?? 1))",
+          "fingerprint": "0c43ed962f079263"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 185,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved-draft')",
+          "fingerprint": "a8f71f7b10ab0803"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 186,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(listBoards()[0]?.revision).toBe(revision)",
+          "fingerprint": "63718ae45e1ca17c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 187,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(false)",
+          "fingerprint": "69ef115242e1be5c"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 188,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(isBoardArchivedError(apiState.saveError)).toBe(false)",
+          "fingerprint": "63171291efd3e66d"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 189,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(apiState.createdBoards).toEqual([])",
+          "fingerprint": "4e35572617641d1b"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 190,
+          "scenario": "preserves the $label draft when the document PUT returns 404",
+          "assertion": "expect(apiState.documentById).toEqual({})",
+          "fingerprint": "a4eb485ef60ce2ac"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 214,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({\n    ok: false,\n    error: { status: 404, code: 'board_not_found' },\n})",
+          "fingerprint": "ddf3ab83b1f52c89"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 218,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(mocks.request).toHaveBeenCalledWith(`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`, expect.objectContaining({ method: 'GET' }))",
+          "fingerprint": "d9843d9dda829f82"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 222,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('synced-draft')",
+          "fingerprint": "5ce78301e84503c4"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 223,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
+          "fingerprint": "ec579cf0898c52df"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 224,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(listBoards().find((board) => board.id === 'board-1')?.revision).toBe(7)",
+          "fingerprint": "9df0fa18bcf4566e"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 227,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({ ok: true })",
+          "fingerprint": "9c6ba477205f9404"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 229,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['offline-new'])",
+          "fingerprint": "ed4afdd6f2b882f9"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 230,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
+          "fingerprint": "ec579cf0898c52df"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 231,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(getBoardState('board-1')).toBeNull()",
+          "fingerprint": "8e9bc439ccdabe95"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 232,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(putCallsFor('board-1')).toEqual([])",
+          "fingerprint": "43ca6e0223a6643a"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 233,
+          "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+          "assertion": "expect(apiState.createdBoards).toEqual([])",
+          "fingerprint": "06e2d7fd75b39d18"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 256,
+          "scenario": "renames PATCH-only without a document write and advances the revision",
+          "assertion": "expect(patchCallsFor('board-1')).toHaveLength(1)",
+          "fingerprint": "7068cf7d9c4482e7"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 257,
+          "scenario": "renames PATCH-only without a document write and advances the revision",
+          "assertion": "expect(putCallsFor('board-1')).toEqual([])",
+          "fingerprint": "97beb7a86f47e9a3"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 258,
+          "scenario": "renames PATCH-only without a document write and advances the revision",
+          "assertion": "expect(remote?.name).toBe('Explicit New Name')",
+          "fingerprint": "a637b9bca5f03030"
+        },
+        {
+          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 259,
+          "scenario": "renames PATCH-only without a document write and advances the revision",
+          "assertion": "expect(listBoards()[0]?.revision).toBe(8)",
+          "fingerprint": "0f2abff06d87681f"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "missingEvidence": []
     },
     {
       "id": "sync-design/draft-overlay-precedence",
       "phase": "P2.5",
       "owner": "/root/p2.5-lane",
       "requirement": "Accepted overlay precedence keeps an active local draft visible across stale snapshot races and explicit reload.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Accepted overlay precedence keeps an active local draft visible across stale snapshot races and explicit reload.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 61,
+          "scenario": "lets the local-newer draft win over an older remote snapshot",
+          "assertion": "expect(listBoards()[0]?.name).toBe('Local Rename')",
+          "fingerprint": "e029f0aca2f785f7"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 62,
+          "scenario": "lets the local-newer draft win over an older remote snapshot",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-newer')",
+          "fingerprint": "25d69ba261737778"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 78,
+          "scenario": "lets an explicit rollback converge to the remote snapshot",
+          "assertion": "expect(listBoards()[0]?.name).toBe('Remote Winner')",
+          "fingerprint": "488ed69013ee5437"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 79,
+          "scenario": "lets an explicit rollback converge to the remote snapshot",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')",
+          "fingerprint": "ada1ac37c08d097d"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 107,
+          "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
+          "assertion": "expect(listBoards()\n    .map((board) => board.id)\n    .sort()).toEqual(['offline-new', 'remote-only'])",
+          "fingerprint": "ed2b0550d0b94ad6"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 112,
+          "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
+          "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
+          "fingerprint": "d5cf933c513b2df1"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 113,
+          "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
+          "assertion": "expect(getBoardState('deleted-elsewhere')).toBeNull()",
+          "fingerprint": "fc2cae08b7d78b28"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 114,
+          "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
+          "assertion": "expect(mocks.request.mock.calls.filter(([url, config]) => typeof url === 'string' &&\n    url.includes('deleted-elsewhere') &&\n    typeof config === 'object' &&\n    config !== null &&\n    'method' in config &&\n    config.method === 'PUT')).toEqual([])",
+          "fingerprint": "32b79d7803acd7bd"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 151,
+          "scenario": "freezes the overlay to the captured scope: a workspace switch drops the late response",
+          "assertion": "expect(hydrateTask).resolves.toMatchObject({ ok: false })",
+          "fingerprint": "cc189e18b83bfdb9"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 152,
+          "scenario": "freezes the overlay to the captured scope: a workspace switch drops the late response",
+          "assertion": "expect(listBoards()).toEqual([])",
+          "fingerprint": "8cea8473eb2b4961"
+        },
+        {
+          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "line": 153,
+          "scenario": "freezes the overlay to the captured scope: a workspace switch drops the late response",
+          "assertion": "expect(getBoardState('board-a')).toBeNull()",
+          "fingerprint": "bb1f37a877493683"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "missingEvidence": []
     },
     {
       "id": "board/query-migration-trio-race",
       "phase": "P3",
       "owner": "/root/p3-lane",
-      "requirement": "After P2.5 accepts the design, make its race regression red before Query migration and green afterward; exact accepted test/assertion is pending.",
+      "requirement": "After formal P2.5 acceptance and merge, bind the frozen race scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
       "status": "pending",
       "evidence": [],
-      "plannedAssertion": "After P2.5 accepts the design, make its race regression red before Query migration and green afterward; exact accepted test/assertion is pending.",
+      "plannedAssertion": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts :: cancels the old workspace read and ignores its late response after observer navigation; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
       "verifiedRun": null
     },
     {
       "id": "board/query-migration-trio-broadcast",
       "phase": "P3",
       "owner": "/root/p3-lane",
-      "requirement": "After P2.5 acceptance, make its broadcast/SSE regression red before migration and green afterward; exact accepted test/assertion is pending.",
+      "requirement": "After formal P2.5 acceptance and merge, bind the frozen broadcast scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
       "status": "pending",
       "evidence": [],
-      "plannedAssertion": "After P2.5 acceptance, make its broadcast/SSE regression red before migration and green afterward; exact accepted test/assertion is pending.",
+      "plannedAssertion": "src/features/board/application/sync/boardSseMapping.contract.spec.ts :: invalidates the document on document_replaced with 500ms coalesce; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
       "verifiedRun": null
     },
     {
       "id": "board/query-migration-trio-conflict",
       "phase": "P3",
       "owner": "/root/p3-lane",
-      "requirement": "After P2.5 acceptance, make its 404/revision/draft regression red before migration and green afterward; exact accepted test/assertion is pending.",
+      "requirement": "After formal P2.5 acceptance and merge, bind the frozen conflict scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
       "status": "pending",
       "evidence": [],
-      "plannedAssertion": "After P2.5 acceptance, make its 404/revision/draft regression red before migration and green afterward; exact accepted test/assertion is pending.",
+      "plannedAssertion": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts :: keeps the draft and the conflict status on 409, then converges on explicit reload; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
       "verifiedRun": null
     },
     {
@@ -25547,6 +26618,1086 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
     "verification": "2026-10-11: strict P1 gates passed;26 ledgerfixtures/0warnings/0unmet;native normal+productionstrict exit0;254entries/3330symbols;531unitfiles/3571tests plus final governance/production12tests;12browserfiles/47tests;build+bundle budget,test:typecheck,full lint(0errors/139warnings),full Web format,stylelint,generateddrift,diffcheck passed.Independentreview PASS.Local working-tree verification only;CI/checkpoint evidence remains unset.",
     "frozenRetired": 149,
     "supplementalRetired": 5
+  },
+  "syncDesign": {
+    "phase": {
+      "phaseId": "P2.5",
+      "owner": "/root",
+      "implementationStatus": "complete",
+      "verificationStatus": "passed",
+      "acceptanceStatus": "pending",
+      "startedAt": "2026-10-10T20:18:56.581Z",
+      "completedAt": "2026-10-10T20:45:09.451503+00:00",
+      "rollbackCheckpoint": null,
+      "gateInstanceIds": [
+        "P2.5/PHASE-CHECKPOINT",
+        "P2.5/SYNC-SOT",
+        "P2.5/SYNC-CACHE-TIMING",
+        "P2.5/SYNC-FOCUS",
+        "P2.5/SYNC-SSE",
+        "P2.5/SYNC-REVISION",
+        "P2.5/SYNC-DRAFT-PRECEDENCE",
+        "P2.5/SYNC-MERGED-DESIGN",
+        "P2.5/PHASE-KNIP",
+        "P2.5/PHASE-QUOTAS",
+        "P2.5/PHASE-COMMON"
+      ]
+    },
+    "artifacts": [
+      {
+        "path": "DESIGN.md",
+        "sha256": "e738da9d8b819f123a1e4b38563216fc4b6bef87b37cbc584ba0d4f7862df6ff"
+      },
+      {
+        "path": "apps/api/openapi.public.yaml",
+        "sha256": "879efcbe0ff3ab0a07ae250696128ad719848a707614c79b8a087cf688aed59a"
+      },
+      {
+        "path": "apps/web/.dependency-cruiser.cjs",
+        "sha256": "6fd632daa50b78711d7aa2da8728db9f13522287c611e77fda60b97493ebe8c5"
+      },
+      {
+        "path": "apps/web/eslint.config.js",
+        "sha256": "2dc34cdd9e667e3418e2a3d65b1a3433e0f02d94b0fcd4c080c4750a4d0162af"
+      },
+      {
+        "path": "apps/web/knip.config.ts",
+        "sha256": "aaad2075feaf905ce9021cd50d9c1e7891f38f9d9733ac73000f17cd7195b4f2"
+      },
+      {
+        "path": "apps/web/knip.production.config.ts",
+        "sha256": "dcd269490751aa371ad6f8cf2d4687829010b06a9a5828905d0c2ce3bb08a219"
+      },
+      {
+        "path": "apps/web/package-lock.json",
+        "sha256": "dda0ff57b1e01452681902500a26b3dd810c2fc7481f3aaf8e768dd4ba6668c1"
+      },
+      {
+        "path": "apps/web/package.json",
+        "sha256": "202ac5d26dfbeda461365b5aead61353afa87ffbfbf1cd9b47c0a7f410ec9bf0"
+      },
+      {
+        "path": "apps/web/scripts/checkFrontendMigrationLedger.ts",
+        "sha256": "ff8de648e13f16b4f1143156a760241d8f3253a64a4454e2621945ad61640d42"
+      },
+      {
+        "path": "apps/web/scripts/knipGovernanceManifest.json",
+        "sha256": "80167cb4762a8fccf1999a1d393dfe8d58d76e57bf055d06053e3afdb858a753"
+      },
+      {
+        "path": "apps/web/src/api/workspaceEventStream.ts",
+        "sha256": "0804f5be9cc65adf96b1de9c9089a4b9f3220005aff448897dfeb672347f2956"
+      },
+      {
+        "path": "apps/web/src/core/CONTEXT.md",
+        "sha256": "7d269f5623e0e273718cf9a614761a1cf22c143e6c243d384fd54d15fa9ae0b5"
+      },
+      {
+        "path": "apps/web/src/core/query/queryClient.ts",
+        "sha256": "0c14e86c68fbc5b1ac581b5136a62f2fc348b3ca5555c0231c81c38eeb209d91"
+      },
+      {
+        "path": "apps/web/src/core/query/queryDefaults.ts",
+        "sha256": "e74f2c97c3cb0a09546d6504c8634d61808101ba6ccd7268bbc327c68fdfb274"
+      },
+      {
+        "path": "apps/web/src/features/board/CONTEXT.md",
+        "sha256": "69b19a9be5d390d9eeb17f980b5510e8a81778120459bbc5267e20aeef9cf626"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+        "sha256": "32c9ce2699407a51939262971654afb65c3c354e967afcaf886bc8d4e3a88a7b"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+        "sha256": "76527fb0ada7470c721823aafe7ec97eadc74b8391960ff7980fcb6fbcfb90ef"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+        "sha256": "85876ea84a552553fea7ac7ad639475954371218f9090ae3816af9f4634a5742"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+        "sha256": "9eaa7c84e8177b3eca4c754af31e9900a33586c3eaf5b12ea21ddce09abc845e"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+        "sha256": "f3c66be6871488d94cc2940c2ee336b5cfe1965447d1d2ad3d9b4263c01f827f"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+        "sha256": "16a529db9b96738d9a81eae537e802f915993a600bf2aadaf2f65ee772f307ec"
+      },
+      {
+        "path": "apps/web/src/features/board/application/sync/boardSync.ts",
+        "sha256": "9e7e7d01e0167c1d6ce6b0aacfc40cad5fd962cbfd8620d4c4b5970c5be7203f"
+      },
+      {
+        "path": "apps/web/src/features/board/infrastructure/api/boardsResource.ts",
+        "sha256": "3f9a8c1a7aa9a34933ce55cd11c5e437fe860744d6571dd3305118a4da668111"
+      },
+      {
+        "path": "apps/web/src/features/board/presentation/catalog/galleryController.ts",
+        "sha256": "74224c5fb4fd14324e65d6eecab34a86c871080e60c932c0c7142ebb8a0cbb59"
+      },
+      {
+        "path": "apps/web/src/features/board/testing/syncDesignHarness.ts",
+        "sha256": "efc0af403390d08367d2d62a0fae699c3f73f03490b225e6e75d1a563b989652"
+      },
+      {
+        "path": "apps/web/src/features/board/testing/syncFixtures.ts",
+        "sha256": "d6d2f53820a3df7c5c217a3c8ae082da925fc7a46cc8dcb6084e5b6843001417"
+      },
+      {
+        "path": "apps/web/src/features/canvas/application/board-session/autosavePolicy.ts",
+        "sha256": "874eb9c6ec61c7474927a3c03842673b1b6674a2a4ecd11d3458c2b9c357c4e7"
+      },
+      {
+        "path": "apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts",
+        "sha256": "dd556c62870434fa57599d9f1163df2e56447c040059755487c3d1fbcacca49e"
+      },
+      {
+        "path": "apps/web/tsconfig.test-node.json",
+        "sha256": "dd7ce06fe0f8995088f12e6a974403a85bb0bae08a727f035d560757d451a47e"
+      },
+      {
+        "path": "apps/web/tsconfig.test.json",
+        "sha256": "be3b98d0ea5597a3e7fa0f7cbc9a28c776b8f4ed2e57366b5617e2745d43a159"
+      },
+      {
+        "path": "apps/web/vite.config.ts",
+        "sha256": "d09a4104c85bf7dd12526b430a19a6f82d8a5492e56f83fcb9a0f96d1353b4ee"
+      },
+      {
+        "path": "docs/adr/0014-board-sync-query-ownership.md",
+        "sha256": "7c7a8ca0dccdf55a38e96bf84378f694f906be34c6f2df50ebd5c68341f049fb"
+      },
+      {
+        "path": "docs/frontend-seam-inventory.md",
+        "sha256": "33385367d7079318f48559e5cbbcbb3ad1abaf632e9df910cc5dc7a35b9ef12e"
+      }
+    ],
+    "gates": [
+      {
+        "instanceId": "P2.5/PHASE-CHECKPOINT",
+        "gateId": "PHASE-CHECKPOINT",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "not-run",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": [],
+        "verifiedAt": null,
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": [
+          "Immutable committed rollback checkpoint with green CI not recorded."
+        ]
+      },
+      {
+        "instanceId": "P2.5/SYNC-SOT",
+        "gateId": "SYNC-SOT",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/SYNC-CACHE-TIMING",
+        "gateId": "SYNC-CACHE-TIMING",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/SYNC-FOCUS",
+        "gateId": "SYNC-FOCUS",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/SYNC-SSE",
+        "gateId": "SYNC-SSE",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/SYNC-REVISION",
+        "gateId": "SYNC-REVISION",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/SYNC-DRAFT-PRECEDENCE",
+        "gateId": "SYNC-DRAFT-PRECEDENCE",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/SYNC-MERGED-DESIGN",
+        "gateId": "SYNC-MERGED-DESIGN",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "not-run",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": [],
+        "verifiedAt": null,
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": [
+          "Plan-owner decision acceptance and design/spec merge not recorded."
+        ]
+      },
+      {
+        "instanceId": "P2.5/PHASE-KNIP",
+        "gateId": "PHASE-KNIP",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": [
+          "p25-cleanup-strict-p1",
+          "p25-cleanup-independent-review",
+          "p25-cleanup-knip-ledger"
+        ],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/PHASE-QUOTAS",
+        "gateId": "PHASE-QUOTAS",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-ledger-p2",
+          "p25-cleanup-independent-review",
+          "p25-cleanup-ledger-p25"
+        ],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      },
+      {
+        "instanceId": "P2.5/PHASE-COMMON",
+        "gateId": "PHASE-COMMON",
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "pending",
+        "evidenceRefs": [
+          "p25-cleanup-typecheck",
+          "p25-cleanup-eslint",
+          "p25-cleanup-format",
+          "p25-cleanup-strict-p1",
+          "p25-full-tests",
+          "p25-build",
+          "p25-lint",
+          "p25-style",
+          "p25-generated",
+          "p25-cleanup-independent-review"
+        ],
+        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
+        "unresolvedItems": ["Plan-owner acceptance pending."]
+      }
+    ],
+    "evidence": [
+      {
+        "id": "p25-specs",
+        "kind": "command",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-QUOTAS"
+        ],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:28:42.899364+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 7.28,
+        "summary": "6 files / 38 active tests passed, 0 skipped; six design decisions."
+      },
+      {
+        "id": "p25-full-tests",
+        "kind": "command",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-COMMON"
+        ],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:13.829586+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:run",
+        "exitCode": 0,
+        "durationSeconds": 206.301,
+        "summary": "540 files / 3624 tests passed; concurrent local run, not CI or a performance baseline."
+      },
+      {
+        "id": "p25-build",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:13.829593+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run build",
+        "exitCode": 0,
+        "durationSeconds": 111.067,
+        "summary": "vue-tsc, Vite production build and bundle-size budget passed."
+      },
+      {
+        "id": "p25-lint",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:13.829585+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint",
+        "exitCode": 0,
+        "durationSeconds": 308.788,
+        "summary": "Complete lint chain passed; ESLint 0 errors / 171 warnings, dual Knip and surface 255 entries / 3346 symbols passed."
+      },
+      {
+        "id": "p25-typecheck",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:13.832062+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:typecheck",
+        "exitCode": 0,
+        "durationSeconds": 133.42,
+        "summary": "Test and node TypeScript checks passed."
+      },
+      {
+        "id": "p25-dependencies",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "f96f7083673755c03bc90566823d12dddcede8ed0168e7adc5e11621d4ade396",
+        "recordedAt": "2026-10-10T20:23:16.372508+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:dependencies -- --strict --phase=P1",
+        "exitCode": 0,
+        "durationSeconds": 51.439,
+        "summary": "Strict P1 dependencies and all positive/negative boundary fixtures passed."
+      },
+      {
+        "id": "p25-strict-p1",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:30:03.115501+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:p1",
+        "exitCode": 0,
+        "durationSeconds": 75.343,
+        "summary": "Strict P1 dependencies, public surface 255/3346, replacement checks, 51 ledger fixtures/0 unmet, dual Knip, locale parity and 110 shim TTL passed."
+      },
+      {
+        "id": "p25-ledger-p2",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:28:42.893680+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2",
+        "exitCode": 0,
+        "durationSeconds": 17.132,
+        "summary": "51 ledger fixtures; 494 frozen constraints; 0 warnings / 0 P2 unmet requirements."
+      },
+      {
+        "id": "p25-knip-ledger-final",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:28:42.887507+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run audit:knip-ledger",
+        "exitCode": 0,
+        "durationSeconds": 17.673,
+        "summary": "Actual normal and production Knip exited 0; no issues or ledger drift."
+      },
+      {
+        "id": "p25-knip-ledger",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:39.738607+00:00",
+        "result": "failed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run audit:knip-ledger",
+        "exitCode": 1,
+        "durationSeconds": 60.089,
+        "summary": "Initial production Knip reported the two new private test helper files. Fixed by exact file/consumer test-support registration; private exports/dependencies stay checked."
+      },
+      {
+        "id": "p25-format-final",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:28:42.890748+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run format:check",
+        "exitCode": 0,
+        "durationSeconds": 21.819,
+        "summary": "Full Web Prettier check passed after final governance edits."
+      },
+      {
+        "id": "p25-format",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:36.215828+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run format:check",
+        "exitCode": 0,
+        "durationSeconds": 87.322,
+        "summary": "Full Web Prettier check passed."
+      },
+      {
+        "id": "p25-style",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:37.367071+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:style",
+        "exitCode": 0,
+        "durationSeconds": 6.894,
+        "summary": "Full Web Stylelint passed."
+      },
+      {
+        "id": "p25-generated",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "recordedAt": "2026-10-10T20:24:38.672713+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run api:check-generated",
+        "exitCode": 0,
+        "durationSeconds": 24.391,
+        "summary": "Generated API client is up to date; no generated file edits."
+      },
+      {
+        "id": "p25-checker-eslint",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:30:03.115496+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx eslint scripts/checkFrontendMigrationLedger.ts",
+        "exitCode": 0,
+        "durationSeconds": 1.532,
+        "summary": "Final changed ledger checker ESLint passed."
+      },
+      {
+        "id": "p25-independent-review",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "kind": "review",
+        "scope": "All 33 final P2.5 design, behavior, helper and governance artifacts; technical review only.; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:31:36.622629+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "reviewer": "/root/p25_final_verifier",
+        "decision": "passed",
+        "reviewedArtifactRefs": ["syncDesign.artifacts"],
+        "summary": "Independent 38 tests, test:typecheck, 51 checker fixtures, hashes, 4 failing negative mutations, exact Seam edges and file-only Knip support review PASS. Does not grant plan-owner acceptance, merge or CI."
+      },
+      {
+        "id": "p25-ledger-p25",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "recordedAt": "2026-10-10T20:31:37.373545+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
+        "exitCode": 0,
+        "durationSeconds": 10.409,
+        "summary": "51 fixtures, 0 review warnings and 0 P2.5 local unmet requirements; formal acceptance explicitly pending."
+      },
+      {
+        "id": "p25-cleanup-specs",
+        "kind": "command",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-QUOTAS"
+        ],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:41:56.088974+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 7.561,
+        "summary": "6 P2.5 files / 38 active tests passed, 0 skipped; all protected scenarios and assertion fingerprints unchanged."
+      },
+      {
+        "id": "p25-cleanup-typecheck",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:41:56.083124+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:typecheck",
+        "exitCode": 0,
+        "durationSeconds": 26.947,
+        "summary": "Test and node TypeScript checks passed after cleanup."
+      },
+      {
+        "id": "p25-cleanup-eslint",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:41:56.083402+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx eslint scripts/checkFrontendMigrationLedger.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 12.658,
+        "summary": "Changed checker/specs ESLint passed: 0 errors / 8 retained warnings."
+      },
+      {
+        "id": "p25-cleanup-strict-p1",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:41:56.090953+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:p1",
+        "exitCode": 0,
+        "durationSeconds": 76.509,
+        "summary": "Strict P1 dependencies, 255/3346 public surface, replacement checks, 51 ledger fixtures/0 warnings/0 unmet, real normal/production Knip, locale parity and 110 shim TTL passed."
+      },
+      {
+        "id": "p25-cleanup-ledger-p2",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:43:09.853138+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2",
+        "exitCode": 0,
+        "durationSeconds": 9.402,
+        "summary": "51 ledger fixtures; 0 review warnings / 0 P2 unmet requirements."
+      },
+      {
+        "id": "p25-cleanup-format",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:43:11.007701+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx prettier --check scripts/checkFrontendMigrationLedger.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts src/core/CONTEXT.md ../../PLANS.md ../../docs/architecture/frontend-contract-inventory.md",
+        "exitCode": 0,
+        "durationSeconds": 1.529,
+        "summary": "All cleanup source/docs passed Prettier check."
+      },
+      {
+        "id": "p25-cleanup-independent-review",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "kind": "review",
+        "scope": "P2.5 redundancy cleanup and all 33 exact final artifacts; technical review only.",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:45:09.451503+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "reviewer": "/root/p25_cleanup_verifier",
+        "decision": "passed",
+        "reviewedArtifactRefs": ["syncDesign.artifacts"],
+        "summary": "Independent equivalence review and 51 real checker fixtures PASS; six behavior assertion multisets and exact trio preserved, all current bytes/frozen invariants verified. No formal acceptance or CI claim."
+      },
+      {
+        "id": "p25-cleanup-knip-ledger",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:44:54.356252+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run audit:knip-ledger",
+        "exitCode": 0,
+        "durationSeconds": 9.839,
+        "summary": "Actual normal and production Knip exited 0; 0 issues and no ledger drift."
+      },
+      {
+        "id": "p25-cleanup-ledger-p25",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "scope": "P2.5 current main uncommitted design/test diff; local execution",
+        "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-10T20:45:10.143322+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
+        "exitCode": 0,
+        "durationSeconds": 9.46,
+        "summary": "51 fixtures, 0 review warnings / 0 P2.5 local unmet requirements; formal acceptance remains pending."
+      }
+    ],
+    "p3Trio": [
+      {
+        "behaviorId": "board/query-migration-trio-race",
+        "referenceEvidence": [
+          {
+            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 200,
+            "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+            "assertion": "expect(oldSignal).toBeInstanceOf(AbortSignal)",
+            "fingerprint": "9d354ea404b67e92"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 204,
+            "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+            "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(9)",
+            "fingerprint": "6b77ee33dbccb5d9"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 205,
+            "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+            "assertion": "expect(oldSignal?.aborted).toBe(true)",
+            "fingerprint": "86776b337a5fa96e"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 210,
+            "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+            "assertion": "expect(query.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-a'))).toBeUndefined()",
+            "fingerprint": "1b2dd4fcc1b1fd8d"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 211,
+            "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+            "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 9,\n    document: { payload: { promptNodes: [{ text: 'other workspace' }] } },\n})",
+            "fingerprint": "80866eadf5d494a0"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 215,
+            "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+            "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+            "fingerprint": "438c90901ce4dd9e"
+          }
+        ],
+        "productionBinding": "Bind the observer navigation race to the production Board Query repository and its captured workspace/abort boundary.",
+        "productionStatus": "pending",
+        "redCommand": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts -t 'cancels the old workspace read and ignores its late response after observer navigation'",
+        "greenCommand": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts -t 'cancels the old workspace read and ignores its late response after observer navigation'",
+        "cwd": "apps/web",
+        "redEvidenceRefs": [],
+        "greenEvidenceRefs": []
+      },
+      {
+        "behaviorId": "board/query-migration-trio-broadcast",
+        "referenceEvidence": [
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 207,
+            "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+            "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+            "fingerprint": "044262492cca726b"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 208,
+            "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+            "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(7)",
+            "fingerprint": "767f29c431a417f7"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 211,
+            "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+            "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+            "fingerprint": "fa60721b336e01a4"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 212,
+            "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+            "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 10,\n    document: { payload: { promptNodes: [{ text: 'latest from HTTP' }] } },\n})",
+            "fingerprint": "7c69ac175f3c910b"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 216,
+            "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+            "assertion": "expect(write).not.toHaveBeenCalled()",
+            "fingerprint": "fb01b45d6dc50cab"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 218,
+            "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+            "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+            "fingerprint": "fa60721b336e01a4"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 253,
+            "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+            "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+            "fingerprint": "49d1fe3922aed750"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 256,
+            "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+            "assertion": "expect(observer.getCurrentResult().isStale).toBe(true)",
+            "fingerprint": "e6119428c88aa240"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 257,
+            "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+            "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+            "fingerprint": "1aee821f38c7a305"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 258,
+            "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+            "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 7,\n    document: { payload: { promptNodes: [{ text: 'server' }] } },\n})",
+            "fingerprint": "1d96be833d8179f0"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 262,
+            "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+            "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved local draft')",
+            "fingerprint": "dec3bf89f2439422"
+          },
+          {
+            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "line": 263,
+            "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
+            "assertion": "expect(write).not.toHaveBeenCalled()",
+            "fingerprint": "c9db675df0f999ff"
+          }
+        ],
+        "productionBinding": "Bind coalescing, revision ordering and dirty invalidation to the production Board SSE Query invalidator.",
+        "productionStatus": "pending",
+        "redCommand": "npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts -t 'invalidates the document on document_replaced with 500ms coalesce'",
+        "greenCommand": "npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts -t 'invalidates the document on document_replaced with 500ms coalesce'",
+        "cwd": "apps/web",
+        "redEvidenceRefs": [],
+        "greenEvidenceRefs": []
+      },
+      {
+        "behaviorId": "board/query-migration-trio-conflict",
+        "referenceEvidence": [
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 121,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
+            "fingerprint": "f24acba1ef764713"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 122,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBe('revision-conflict')",
+            "fingerprint": "d6e53524b79ff4fe"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 123,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(true)",
+            "fingerprint": "4c0a9b13a95b59aa"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 125,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-draft')",
+            "fingerprint": "f9f619495d9768d7"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 126,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(listBoards()[0]?.revision).toBe(7)",
+            "fingerprint": "37f6194591a1a91c"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 141,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })",
+            "fingerprint": "b0af7205f6a87dda"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 142,
+            "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+            "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')",
+            "fingerprint": "a0719ca965a93d84"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 214,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({\n    ok: false,\n    error: { status: 404, code: 'board_not_found' },\n})",
+            "fingerprint": "ddf3ab83b1f52c89"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 218,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(mocks.request).toHaveBeenCalledWith(`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`, expect.objectContaining({ method: 'GET' }))",
+            "fingerprint": "d9843d9dda829f82"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 222,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('synced-draft')",
+            "fingerprint": "5ce78301e84503c4"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 223,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
+            "fingerprint": "ec579cf0898c52df"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 224,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(listBoards().find((board) => board.id === 'board-1')?.revision).toBe(7)",
+            "fingerprint": "9df0fa18bcf4566e"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 227,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({ ok: true })",
+            "fingerprint": "9c6ba477205f9404"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 229,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['offline-new'])",
+            "fingerprint": "ed4afdd6f2b882f9"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 230,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
+            "fingerprint": "ec579cf0898c52df"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 231,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(getBoardState('board-1')).toBeNull()",
+            "fingerprint": "8e9bc439ccdabe95"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 232,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(putCallsFor('board-1')).toEqual([])",
+            "fingerprint": "43ca6e0223a6643a"
+          },
+          {
+            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "line": 233,
+            "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
+            "assertion": "expect(apiState.createdBoards).toEqual([])",
+            "fingerprint": "06e2d7fd75b39d18"
+          }
+        ],
+        "productionBinding": "Keep current transport regression and add production Query document/draft integration for 409 reload and GET 404 recovery.",
+        "productionStatus": "pending",
+        "redCommand": "npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'",
+        "greenCommand": "npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'",
+        "cwd": "apps/web",
+        "redEvidenceRefs": [],
+        "greenEvidenceRefs": []
+      }
+    ],
+    "p3StartStatus": "blocked",
+    "scope": "Design and private test-only executable thin slice on main; production Query migration is out of scope. Local proof and independent technical review do not authorize P3."
   }
 }
 ```

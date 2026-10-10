@@ -20838,6 +20838,24 @@
       "kind": "test-support",
       "evidence": ["src/features/board/testing/index.ts"]
     },
+    "src/features/board/testing/syncDesignHarness.ts": {
+      "kind": "test-support",
+      "evidence": [
+        "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+        "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+        "src/features/board/application/sync/boardSseMapping.contract.spec.ts"
+      ]
+    },
+    "src/features/board/testing/syncFixtures.ts": {
+      "kind": "test-support",
+      "evidence": [
+        "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+        "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+        "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+        "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+        "src/features/board/application/sync/boardSseMapping.contract.spec.ts"
+      ]
+    },
     "src/features/board/testing/index.ts": {
       "kind": "test-support",
       "evidence": [

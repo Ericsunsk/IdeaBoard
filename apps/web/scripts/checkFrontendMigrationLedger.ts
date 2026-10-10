@@ -47,6 +47,61 @@ type Behavior = {
   evidence: Array<Omit<Assertion, 'id' | 'occurrence'>>
   plannedAssertion: string | null
   verifiedRun: string | null
+  missingEvidence?: string[]
+}
+type SyncDesign = {
+  phase: {
+    phaseId: string
+    owner: string
+    implementationStatus: string
+    verificationStatus: string
+    acceptanceStatus: string
+    gateInstanceIds: string[]
+  }
+  artifacts: Array<{ path: string; sha256: string }>
+  gates: Array<{
+    instanceId: string
+    verificationStatus: string
+    acceptanceStatus: string
+    evidenceRefs: string[]
+    unresolvedItems: string[]
+    acceptedBy?: string | null
+    acceptedAt?: string | null
+  }>
+  evidence: Array<{
+    id: string
+    kind: string
+    checkpointSha: string
+    treeFingerprint: string
+    result: string
+    reviewer?: string
+    decision?: string
+    command?: string
+    cwd?: string
+    exitCode?: number
+    durationSeconds?: number
+    requirementIds: string[]
+    ciEvidence?: string
+    mergeSha?: string
+  }>
+  p3Trio: Array<{
+    behaviorId: string
+    referenceEvidence: Array<Omit<Assertion, 'id' | 'occurrence'>>
+    productionBinding: string
+    productionStatus: string
+    redCommand: string
+    greenCommand: string
+  }>
+}
+function artifactFingerprint(artifacts: SyncDesign['artifacts']): string {
+  return createHash('sha256')
+    .update(
+      [...artifacts]
+        .sort((a, b) => a.path.localeCompare(b.path))
+        .map((artifact) => `${artifact.path}\n${artifact.sha256}`)
+        .join('\n'),
+    )
+    .digest('hex')
 }
 type FileMapping = {
   source: string
@@ -129,6 +184,7 @@ type Ledger = {
     status: string
   }>
   supplementalConstraints?: Constraint[]
+  syncDesign?: SyncDesign
 }
 function requireCondition(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Migration ledger: ${message}`)
@@ -366,7 +422,7 @@ function validateLedger(value: Ledger): Ledger {
   )
   return value
 }
-function collectAssertions(file: string, source: string): Assertion[] {
+function collectAssertions(file: string, source: string, activeOnly = false): Assertion[] {
   const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const printer = ts.createPrinter({ removeComments: true })
   const rows: Assertion[] = []
@@ -374,6 +430,8 @@ function collectAssertions(file: string, source: string): Assertion[] {
   function visit(node: ts.Node, scenario = '') {
     if (ts.isCallExpression(node) && node.arguments[0]) {
       const name = node.expression.getText(parsed)
+      if (activeOnly && /^(?:describe|it|test)\.(?:skip|todo|skipIf|runIf)(?:\(|\.|$)/.test(name))
+        return
       const isTest =
         /^(?:it|test)(?:\.(?:only|skip))?$/.test(name) ||
         (ts.isCallExpression(node.expression) &&
@@ -489,6 +547,176 @@ function hasAssertionEvidence(evidence: Omit<Assertion, 'id' | 'occurrence'>): b
     )
   )
 }
+function hasActiveAssertionEvidence(evidence: Omit<Assertion, 'id' | 'occurrence'>): boolean {
+  const sourcePath = path.join(webRoot, evidence.source)
+  return (
+    fs.existsSync(sourcePath) &&
+    collectAssertions(evidence.source, fs.readFileSync(sourcePath, 'utf8'), true).some(
+      (row) => row.fingerprint === evidence.fingerprint,
+    )
+  )
+}
+function syncDesignVerificationFailures(ledger: Ledger): string[] {
+  const design = ledger.syncDesign
+  if (!design) return ['P2.5: current design verification record missing']
+  const failures: string[] = []
+  const fail = (condition: unknown, message: string) => {
+    if (!condition) failures.push(`P2.5: ${message}`)
+  }
+  fail(
+    design.phase.phaseId === 'P2.5' &&
+      nonempty(design.phase.owner) &&
+      design.phase.implementationStatus === 'complete',
+    'design implementation incomplete',
+  )
+  fail(design.artifacts.length > 0, 'artifact revision missing')
+  const requiredArtifacts = [
+    ...ledger.behaviors
+      .filter((row) => row.phase === 'P2.5')
+      .flatMap((row) => row.evidence.map((evidence) => `apps/web/${evidence.source}`)),
+    'docs/adr/0014-board-sync-query-ownership.md',
+    'apps/web/src/core/CONTEXT.md',
+    'apps/web/src/features/board/CONTEXT.md',
+    'apps/web/src/features/board/testing/syncDesignHarness.ts',
+    'apps/web/src/features/board/testing/syncFixtures.ts',
+    'apps/web/scripts/checkFrontendMigrationLedger.ts',
+    'docs/frontend-seam-inventory.md',
+    'apps/web/src/features/board/application/sync/boardSync.ts',
+    'apps/web/src/features/board/infrastructure/api/boardsResource.ts',
+    'apps/web/src/core/query/queryClient.ts',
+    'apps/web/src/core/query/queryDefaults.ts',
+    'apps/web/src/api/workspaceEventStream.ts',
+    'apps/web/src/features/board/presentation/catalog/galleryController.ts',
+    'apps/web/src/features/canvas/application/board-session/autosavePolicy.ts',
+    'apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts',
+    'apps/web/package.json',
+    'apps/web/vite.config.ts',
+    'apps/web/.dependency-cruiser.cjs',
+    'apps/web/scripts/knipGovernanceManifest.json',
+  ]
+  fail(
+    requiredArtifacts.every((file) => design.artifacts.some((artifact) => artifact.path === file)),
+    'artifact scope does not cover design, fixtures and verification rules',
+  )
+  for (const artifact of design.artifacts) {
+    const safePath =
+      nonempty(artifact.path) &&
+      !path.posix.isAbsolute(artifact.path) &&
+      path.posix.normalize(artifact.path) === artifact.path &&
+      !artifact.path.split('/').includes('..')
+    const absolute = safePath ? path.join(webRoot, '../..', artifact.path) : ''
+    fail(
+      safePath &&
+        fs.existsSync(absolute) &&
+        createHash('sha256').update(fs.readFileSync(absolute)).digest('hex') === artifact.sha256,
+      `stale artifact ${artifact.path}`,
+    )
+  }
+  const treeFingerprint = artifactFingerprint(design.artifacts)
+  const currentEvidence = design.evidence.filter(
+    (row) =>
+      row.result === 'passed' &&
+      row.treeFingerprint === treeFingerprint &&
+      /^[a-f0-9]{40}$/.test(row.checkpointSha) &&
+      Array.isArray(row.requirementIds),
+  )
+  fail(
+    currentEvidence.some(
+      (row) => row.kind === 'review' && nonempty(row.reviewer) && row.decision === 'passed',
+    ),
+    'independent review missing or stale',
+  )
+  for (const gateId of [
+    'SYNC-SOT',
+    'SYNC-CACHE-TIMING',
+    'SYNC-FOCUS',
+    'SYNC-SSE',
+    'SYNC-REVISION',
+    'SYNC-DRAFT-PRECEDENCE',
+    'PHASE-KNIP',
+    'PHASE-QUOTAS',
+    'PHASE-COMMON',
+  ]) {
+    const instanceId = `P2.5/${gateId}`
+    const gate = design.gates.find((row) => row.instanceId === instanceId)
+    fail(
+      design.phase.gateInstanceIds.includes(instanceId) &&
+        gate?.verificationStatus === 'passed' &&
+        gate.evidenceRefs.some((id) =>
+          currentEvidence.some(
+            (row) =>
+              row.id === id &&
+              row.requirementIds.includes(instanceId) &&
+              row.kind === 'command' &&
+              row.exitCode === 0 &&
+              nonempty(row.command) &&
+              nonempty(row.cwd) &&
+              typeof row.durationSeconds === 'number' &&
+              row.durationSeconds >= 0,
+          ),
+        ),
+      `${instanceId}: verification evidence missing or stale`,
+    )
+  }
+  fail(
+    sameStrings(
+      design.p3Trio.map((row) => row.behaviorId),
+      ledger.behaviors
+        .filter((row) => row.id.startsWith('board/query-migration-trio-'))
+        .map((row) => row.id),
+    ),
+    'P3 trio not frozen',
+  )
+  for (const row of design.p3Trio)
+    fail(
+      row.referenceEvidence.length > 0 &&
+        row.referenceEvidence.every(hasActiveAssertionEvidence) &&
+        nonempty(row.productionBinding) &&
+        row.productionStatus === 'pending' &&
+        nonempty(row.redCommand) &&
+        nonempty(row.greenCommand),
+      `${row.behaviorId}: exact reference or production red/green binding missing`,
+    )
+  // Local proof cannot authorize P3. Formal acceptance requires every gate,
+  // including the merged design and CI checkpoint, to be accepted separately.
+  fail(
+    design.phase.acceptanceStatus === 'pending' ||
+      (design.phase.acceptanceStatus === 'accepted' &&
+        ['P2.5/PHASE-CHECKPOINT', 'P2.5/SYNC-MERGED-DESIGN'].every((id) =>
+          design.phase.gateInstanceIds.includes(id),
+        ) &&
+        design.phase.gateInstanceIds.every((id) =>
+          design.gates.some(
+            (gate) =>
+              gate.instanceId === id &&
+              gate.acceptanceStatus === 'accepted' &&
+              gate.unresolvedItems.length === 0 &&
+              nonempty(gate.acceptedBy) &&
+              nonempty(gate.acceptedAt) &&
+              gate.evidenceRefs.some((ref) =>
+                currentEvidence.some(
+                  (evidence) =>
+                    evidence.id === ref &&
+                    evidence.requirementIds.includes(id) &&
+                    (id === 'P2.5/PHASE-CHECKPOINT'
+                      ? evidence.kind === 'checkpoint' &&
+                        evidence.checkpointSha === ledger.checkpoints.immutableRollbackSha &&
+                        nonempty(evidence.ciEvidence) &&
+                        evidence.ciEvidence === ledger.checkpoints.ciEvidence
+                      : id === 'P2.5/SYNC-MERGED-DESIGN'
+                        ? evidence.kind === 'merge' &&
+                          /^[a-f0-9]{40}$/.test(evidence.mergeSha ?? '')
+                        : evidence.kind === 'review' &&
+                          evidence.decision === 'accepted' &&
+                          evidence.reviewer === gate.acceptedBy),
+                ),
+              ),
+          ),
+        )),
+    'formal phase acceptance requires accepted start and exit gates',
+  )
+  return failures
+}
 function collectCurrentSources(ledger: Ledger): Map<string, Assertion[]> {
   const sources = new Map<string, Assertion[]>()
   const inventoriedSources = new Set([
@@ -562,10 +790,10 @@ function checkCurrentSources(ledger: Ledger, sources: Map<string, Assertion[]>):
 function phaseAcceptanceFailures(
   ledger: Ledger,
   sources = collectCurrentSources(ledger),
-  phase: 'P1' | 'P2' = 'P1',
+  phase: 'P1' | 'P2' | 'P2.5' = 'P1',
 ): string[] {
   const failures: string[] = []
-  const acceptedPhases = phase === 'P1' ? ['P1a', 'P1b'] : ['P1a', 'P1b', 'P2']
+  const acceptedPhases = phases.slice(0, phase === 'P1' ? 2 : phase === 'P2' ? 3 : 4)
   for (const row of [...ledger.constraints, ...(ledger.supplementalConstraints ?? [])].filter(
     (row) => row.disposition === 'retire' && acceptedPhases.includes(row.phase ?? ''),
   )) {
@@ -585,9 +813,13 @@ function phaseAcceptanceFailures(
       row.status !== 'verified' ||
       !nonempty(row.verifiedRun) ||
       !row.evidence.length ||
-      !row.evidence.every(hasAssertionEvidence)
+      !row.evidence.every(
+        row.phase === 'P2.5' ? hasActiveAssertionEvidence : hasAssertionEvidence,
+      ) ||
+      (row.phase === 'P2.5' && (row.missingEvidence?.length ?? 0) > 0)
     )
       failures.push(`${row.id}: mandatory behavior verification pending`)
+  if (phase === 'P2.5') failures.push(...syncDesignVerificationFailures(ledger))
   return failures
 }
 function runFixtures(ledger: Ledger): void {
@@ -851,7 +1083,7 @@ function runFixtures(ledger: Ledger): void {
     }
     for (const row of value.behaviors.filter((row) => phases.includes(row.phase))) {
       row.status = 'verified'
-      row.evidence = existingEvidence
+      if (row.phase !== 'P2.5') row.evidence = existingEvidence
       row.verifiedRun = verifiedRun
     }
   }
@@ -947,8 +1179,148 @@ function runFixtures(ledger: Ledger): void {
       `P2 rejects ${name}`,
     )
   }
+  const p25Completed = structuredClone(p2Completed)
+  completeFixturePhase(p25Completed, ['P2.5'], 'synthetic P2.5 local-verification fixture')
+  for (const row of p25Completed.behaviors.filter((row) => row.phase === 'P2.5'))
+    row.missingEvidence = []
+  requireCondition(p25Completed.syncDesign, 'P2.5 verification record fixture')
+  for (const artifact of p25Completed.syncDesign.artifacts)
+    artifact.sha256 = createHash('sha256')
+      .update(fs.readFileSync(path.join(webRoot, '../..', artifact.path)))
+      .digest('hex')
+  const fixtureFingerprint = artifactFingerprint(p25Completed.syncDesign.artifacts)
+  p25Completed.syncDesign.evidence = [
+    {
+      id: 'synthetic-review',
+      kind: 'review',
+      checkpointSha: ledger.checkpointSha,
+      treeFingerprint: fixtureFingerprint,
+      result: 'passed',
+      reviewer: 'fixture',
+      decision: 'passed',
+      requirementIds: p25Completed.syncDesign.phase.gateInstanceIds,
+    },
+    {
+      id: 'synthetic-command',
+      kind: 'command',
+      checkpointSha: ledger.checkpointSha,
+      treeFingerprint: fixtureFingerprint,
+      result: 'passed',
+      command: 'synthetic verification fixture',
+      cwd: 'apps/web',
+      exitCode: 0,
+      durationSeconds: 0,
+      requirementIds: p25Completed.syncDesign.phase.gateInstanceIds,
+    },
+  ]
+  for (const gate of p25Completed.syncDesign.gates) {
+    gate.verificationStatus = 'passed'
+    gate.evidenceRefs = ['synthetic-review', 'synthetic-command']
+  }
+  const p25Failures = phaseAcceptanceFailures(p25Completed, new Map(), 'P2.5')
+  requireCondition(
+    p25Failures.length === 0,
+    `P2.5 local-verification positive fixture: ${p25Failures.join('; ')}`,
+  )
+  const p25Invalid: Array<[string, (value: Ledger) => void, string]> = [
+    [
+      'pending behavior',
+      (value) => {
+        value.behaviors.find((row) => row.phase === 'P2.5')!.status = 'pending'
+      },
+      'mandatory behavior verification pending',
+    ],
+    [
+      'partial behavior evidence',
+      (value) => {
+        value.behaviors.find((row) => row.phase === 'P2.5')!.missingEvidence = ['unverified spike']
+      },
+      'mandatory behavior verification pending',
+    ],
+    [
+      'missing design record',
+      (value) => {
+        delete value.syncDesign
+      },
+      'design verification record missing',
+    ],
+    [
+      'stale artifact revision',
+      (value) => {
+        value.syncDesign!.artifacts[0]!.sha256 = '0'.repeat(64)
+      },
+      'stale artifact',
+    ],
+    [
+      'missing independent review',
+      (value) => {
+        value.syncDesign!.evidence = []
+      },
+      'independent review missing or stale',
+    ],
+    [
+      'missing decision verification',
+      (value) => {
+        value.syncDesign!.gates.find(
+          (row) => row.instanceId === 'P2.5/SYNC-SSE',
+        )!.verificationStatus = 'not-run'
+      },
+      'P2.5/SYNC-SSE: verification evidence missing or stale',
+    ],
+    [
+      'unfrozen P3 trio',
+      (value) => {
+        value.syncDesign!.p3Trio = []
+      },
+      'P3 trio not frozen',
+    ],
+    [
+      'command for a different gate',
+      (value) => {
+        value.syncDesign!.evidence.find((row) => row.kind === 'command')!.requirementIds = []
+      },
+      'verification evidence missing or stale',
+    ],
+    [
+      'unearned formal acceptance',
+      (value) => {
+        value.syncDesign!.phase.acceptanceStatus = 'accepted'
+        for (const gate of value.syncDesign!.gates) {
+          gate.acceptanceStatus = 'accepted'
+          gate.acceptedBy = 'fixture'
+          gate.acceptedAt = '2026-10-11'
+          gate.unresolvedItems = []
+        }
+      },
+      'formal phase acceptance requires accepted start and exit gates',
+    ],
+  ]
+  for (const [name, mutate, expected] of p25Invalid) {
+    const value = structuredClone(p25Completed)
+    mutate(value)
+    requireCondition(
+      phaseAcceptanceFailures(value, new Map(), 'P2.5').some((message) =>
+        message.includes(expected),
+      ),
+      `P2.5 rejects ${name}`,
+    )
+  }
+  for (const suite of ['describe.skip', 'it.skip'])
+    requireCondition(
+      collectAssertions(
+        'fixture.spec.ts',
+        `${suite}('inactive', () => { it('case', () => { expect(1).toBe(1) }) })`,
+        true,
+      ).length === 0,
+      `${suite} assertions are not active behavior evidence`,
+    )
+  requireCondition(
+    collectAssertions('fixture.spec.ts', "it('active', () => { expect(1).toBe(1) })", true)
+      .length === 1,
+    'active assertions remain available as behavior evidence',
+  )
   console.log(
-    `Frontend migration ledger fixtures passed (${invalid.length + 18 + p2Invalid.length} cases).`,
+    `Frontend migration ledger fixtures passed (${invalid.length + 22 + p2Invalid.length + p25Invalid.length} cases).`,
   )
 }
 function main(): void {
@@ -969,18 +1341,20 @@ function main(): void {
     `Frontend migration ledger: ${ledger.constraints.length} frozen constraints; R=${retire}, frozen i18n=${frozen}; B=${ledger.behaviors.length}; ${ledger.sharedFileMappings.length} ordinary + ${ledger.generatedMapping.measuredFileCount} generated files mapped; ${ledger.supplementalConstraints?.length ?? 0} supplemental constraints; ${warnings.length} review warnings.`,
   )
   console.log(
-    'Ledger consistency is not phase acceptance. Use --phase=P1 or --phase=P2 to require completed retirements, effective replacements and mandatory behaviors through that phase.',
+    'Ledger consistency is not phase acceptance. --phase=P1/P2 checks retirements and behaviors; --phase=P2.5 checks local design evidence and keeps formal acceptance pending.',
   )
   const phase = process.argv.find((argument) => argument.startsWith('--phase='))
   requireCondition(
-    phase === undefined || phase === '--phase=P1' || phase === '--phase=P2',
-    'supported acceptance phases are P1 and P2',
+    phase === undefined || ['--phase=P1', '--phase=P2', '--phase=P2.5'].includes(phase),
+    'supported verification phases are P1, P2 and P2.5',
   )
   if (phase) {
-    const acceptedPhase = phase === '--phase=P2' ? 'P2' : 'P1'
+    const acceptedPhase = phase.slice('--phase='.length) as 'P1' | 'P2' | 'P2.5'
     const failures = phaseAcceptanceFailures(ledger, sources, acceptedPhase)
     for (const failure of failures) console.error(`[migration-ledger:acceptance] ${failure}`)
-    console.log(`${acceptedPhase} acceptance: ${failures.length} unmet requirements.`)
+    console.log(
+      `${acceptedPhase} ${acceptedPhase === 'P2.5' ? 'local verification (formal acceptance pending)' : 'acceptance'}: ${failures.length} unmet requirements.`,
+    )
     if (failures.length > 0) process.exitCode = 1
   }
   if ((process.argv.includes('--strict') || phase !== undefined) && warnings.length > 0)
