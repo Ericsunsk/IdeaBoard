@@ -5,7 +5,7 @@ import type {
   WorkspaceLibraryFolder,
   WorkspaceLibrarySaveResult,
 } from '../../library'
-import type { LibrarySearchReference } from '../domain/authAction'
+import type { LibrarySearchReference } from '../core/authAction'
 
 export type SearchLibraryCoordinator = LibraryMutationPublisher & {
   folderFacts: LibraryFolderFacts

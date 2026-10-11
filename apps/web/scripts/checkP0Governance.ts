@@ -20,7 +20,7 @@ try {
     '{"compilerOptions":{"strict":true,"target":"ESNext","module":"ESNext","moduleResolution":"bundler"},"include":["src/**/*.ts"]}',
   )
   write('src/features/board/index.ts', 'export const board = 1\n')
-  write('src/features/board/domain/index.ts', 'export const cascaded = 1\n')
+  write('src/features/board/core/index.ts', 'export const cascaded = 1\n')
   write('src/check.ts', 'export const initialized = true\n')
   const baseline = JSON.parse(
     fs.readFileSync(path.join(webRoot, 'scripts/booleanNaming.baseline.json'), 'utf8'),
@@ -116,14 +116,14 @@ try {
   )
   assert.equal(
     (
-      await warnings('import { cascaded } from "./features/board/domain"; console.log(cascaded)')
+      await warnings('import { cascaded } from "./features/board/core"; console.log(cascaded)')
     ).filter((message) => message.ruleId === 'governance/no-barrel-import').length,
     1,
   )
   assert.equal(
     (
       await warnings(
-        'const load = () => import("./features/board/domain/index.ts"); console.log(load)',
+        'const load = () => import("./features/board/core/index.ts"); console.log(load)',
       )
     ).filter((message) => message.ruleId === 'governance/no-barrel-import').length,
     1,

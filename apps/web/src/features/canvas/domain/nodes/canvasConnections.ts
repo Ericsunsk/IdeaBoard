@@ -1,19 +1,19 @@
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
   type CanvasConnectionContractNode,
 } from '../../../board/ports/canvas'
 
 export interface CanvasConnectionEndpointLike {
-  nodeType: CanvasConnectionNodeType
+  nodeType: CanvasConnectionNodeKind
   nodeId: number
   port: CanvasConnectionPort
 }
 
 export type CanvasConnectionNodeLookup = (
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   nodeId: number,
 ) => CanvasConnectionContractNode | null
 

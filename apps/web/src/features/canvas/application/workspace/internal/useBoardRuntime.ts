@@ -54,6 +54,9 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
     message: {
       warning: options.feedback.warning,
     },
+    isDraftDirty: (boardId) =>
+      boardId === stringParam(options.route.query.boardId) &&
+      (isDirty.value || isSavingBoard.value),
   })
 
   // Save-409 archived fan-out: the sync coordinator owns the save outcome,

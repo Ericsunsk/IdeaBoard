@@ -5,9 +5,14 @@ import {
   loadRetirementSources,
   validateRetirementSources,
   validateCanvasPurity,
+  validateAccountPurity,
   type RetirementSources,
   type PurityModule,
 } from '../../scripts/checkRetirementReplacements'
+import {
+  validateBoardsSortSelect,
+  validateRedeemErrorWiring,
+} from '../../scripts/checkThemeContractRetirements'
 
 const valid = loadRetirementSources()
 const app = 'src/app/style.css'
@@ -205,14 +210,14 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'feature-surface-owner',
     invalidate: (s) => {
-      s['src/features/search/presentation/search.css'] +=
+      s['src/features/search/ui/search.css'] +=
         '\n.duplicate { box-shadow: var(--shadow-page-chrome); }'
     },
   },
   {
     rule: 'chrome-consumer',
     invalidate: (s) => {
-      const file = 'src/features/board/presentation/catalog/skin.ts'
+      const file = 'src/features/board/ui/gallery/skin.ts'
       s[file] = s[file]!.replaceAll('page-chrome-surface', 'private-surface')
     },
   },
@@ -233,7 +238,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'readonly-controller',
     invalidate: (s) => {
-      s['src/features/board/presentation/catalog/BoardsPage.vue'] =
+      s['src/features/board/ui/gallery/BoardsPage.vue'] =
         '<template><input v-model="controller.viewModel.sort" /></template>'
     },
   },
@@ -309,7 +314,7 @@ describe('effective retirement lint policies', () => {
       .toString()
       .replace('var(--color-canvas-text-secondary)', 'var( --color-canvas-text-secondary )')
     fixture[app] += '\n/* --color-ib-scrollbar-x: black; missing fake tokens do not count */'
-    fixture['src/features/board/presentation/catalog/BoardsPage.vue'] +=
+    fixture['src/features/board/ui/gallery/BoardsPage.vue'] +=
       '\n<!-- <input v-model="controller.viewModel.sort" /> -->'
     expect(validateRetirementSources(fixture)).toEqual([])
   })
@@ -382,5 +387,57 @@ describe('Canvas runtime dependency graph policy', () => {
         { source: 'src/features/canvas/domain/graph/application/runtime.ts' },
       ]).map((issue) => issue.rule),
     ).toContain('canvas-runtime-location')
+  })
+})
+
+describe('Account runtime dependency graph policy', () => {
+  const accountCore = 'src/features/account/core/money.ts'
+  test.each(runtimeTargets)(
+    'rejects direct and transitive runtime dependencies on %s',
+    (target) => {
+      for (const intermediary of [accountCore, pure]) {
+        const modules: PurityModule[] = [
+          { source: accountCore, dependencies: [{ module: intermediary }] },
+          { source: intermediary, dependencies: [{ module: target }] },
+        ]
+        expect(validateAccountPurity(modules).map((issue) => issue.rule)).toContain(
+          'account-purity',
+        )
+      }
+    },
+  )
+  test('accepts pure core cycles and type-only runtime references', () => {
+    expect(
+      validateAccountPurity([
+        {
+          source: accountCore,
+          dependencies: [{ module: pure }, { module: 'vue', dependencyTypes: ['type-only'] }],
+        },
+        { source: pure, dependencies: [{ module: accountCore }] },
+      ]),
+    ).toEqual([])
+  })
+  test('rejects DOM globals in direct sources and transitive helpers', () => {
+    const modules = [{ source: accountCore, dependencies: [{ module: pure }] }, { source: pure }]
+    for (const source of [accountCore, pure])
+      for (const expression of [
+        'getComputedStyle(document.documentElement)',
+        'globalThis.document.documentElement',
+        'globalThis["document"].documentElement',
+      ])
+        expect(
+          validateAccountPurity(modules, {
+            [source]: `export const style = ${expression}`,
+          }).map((issue) => issue.rule),
+        ).toContain('account-purity')
+    expect(
+      validateAccountPurity(modules, {
+        [accountCore]:
+          'export type Styles = CSSStyleDeclaration; // document\nexport const key = "window"',
+      }),
+    ).toEqual([])
+  })
+  test('rejects missing Account coverage', () => {
+    expect(validateAccountPurity([]).map((issue) => issue.rule)).toContain('account-purity')
   })
 })

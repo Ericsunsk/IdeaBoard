@@ -4,7 +4,7 @@ import {
   type BoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionEndpoint,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
 } from '../../../board/ports/canvas'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
@@ -15,7 +15,7 @@ import {
 } from './flowConnectionIdentityResolver'
 
 export type FlowSnapshotConnectionNodeRef = {
-  nodeType: CanvasConnectionNodeType
+  nodeType: CanvasConnectionNodeKind
   id: number
 }
 
@@ -55,20 +55,20 @@ export function resolveNextCanvasConnectionId(
 }
 
 function getTargetPortKey(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   nodeId: number,
   port: CanvasConnectionPort,
 ) {
   return `${nodeType}:${nodeId}:${port}`
 }
 
-function getInputLimitKey(nodeType: CanvasConnectionNodeType, port: CanvasConnectionPort) {
+function getInputLimitKey(nodeType: CanvasConnectionNodeKind, port: CanvasConnectionPort) {
   return `${nodeType}:${port}`
 }
 
 function createInputLimitResolver() {
   const inputLimitCache = new Map<string, number>()
-  return (nodeType: CanvasConnectionNodeType, port: CanvasConnectionPort) => {
+  return (nodeType: CanvasConnectionNodeKind, port: CanvasConnectionPort) => {
     const key = getInputLimitKey(nodeType, port)
     const cachedLimit = inputLimitCache.get(key)
     if (cachedLimit !== undefined) return cachedLimit > 1
@@ -153,7 +153,7 @@ function resolveClaimedConnections(
   claimIndex: {
     resolveConnectionId: (candidate: FlowSnapshotClaimCandidate) => number | null
   },
-  allowsMultipleInputs: (nodeType: CanvasConnectionNodeType, port: CanvasConnectionPort) => boolean,
+  allowsMultipleInputs: (nodeType: CanvasConnectionNodeKind, port: CanvasConnectionPort) => boolean,
 ): CanvasConnection[] {
   const singleInputConnectionIndex = new Map<string, number>()
   const connections: Array<CanvasConnection | null> = []

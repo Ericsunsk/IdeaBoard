@@ -45,6 +45,8 @@ export default {
     saveFailed: 'Could not save the canvas',
     deleteFailed: 'Could not delete the canvas',
   },
+  // Alias TTL: `workspace.boards.*` duplicates the `board.*` namespace until
+  // the end of P4; deletion owner: P4 board-lane. New callers must use `board.*`.
   boards: {
     title: 'Welcome to IdeaBoard!',
     subtitle: 'Explore, expand, and refine your ideas',

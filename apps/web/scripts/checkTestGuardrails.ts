@@ -196,13 +196,13 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
-  'src/features/account/presentation/shared/ComingSoonPane.component.spec.ts': [
+  'src/features/account/ui/shared/ComingSoonPane.component.spec.ts': [
     {
       reason:
         'Verifies the neutral StatusBadge carrier, card surface override, and lack of a status dot in the coming-soon capsule.',
     },
   ],
-  'src/features/account/presentation/profile/ProfilePane.component.spec.ts': [
+  'src/features/account/ui/profile/ProfilePane.component.spec.ts': [
     {
       reason:
         'Verifies neutral creator and info admin role colors on the shared StatusBadge carrier.',
@@ -283,7 +283,7 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the shared Badge carrier, semantic tone and dot colors, fixed sizes, and caller class merging.',
     },
   ],
-  'src/features/account/presentation/dialog/AccountDialog.component.spec.ts': [
+  'src/features/account/ui/dialog/AccountDialog.component.spec.ts': [
     {
       reason:
         'Verifies the Account dialog overlay shadow class that defines the shared visual chrome for the modal surface.',
@@ -325,25 +325,25 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the keyboard focus visibility class contract for the image result action; the DOM harness cannot compute Tailwind focus pseudo-state styles.',
     },
   ],
-  'src/features/account/presentation/rewards/RewardsPane.component.spec.ts': [
+  'src/features/account/ui/rewards/RewardsPane.component.spec.ts': [
     {
       reason:
         'Verifies that the redemption action stays on the User Shell semantic button contract instead of inheriting the Admin primary theme.',
     },
   ],
-  'src/features/account/presentation/security/SecurityPane.component.spec.ts': [
+  'src/features/account/ui/security/SecurityPane.component.spec.ts': [
     {
       reason:
         'Verifies that the password action stays on the User Shell semantic button contract instead of inheriting the Admin primary theme.',
     },
   ],
-  'src/features/account/presentation/billing/BillingPane.component.spec.ts': [
+  'src/features/account/ui/billing/BillingPane.component.spec.ts': [
     {
       reason:
         'Verifies the confirmed semantic color contract for income, ordinary consumption, and system deductions.',
     },
   ],
-  'src/features/account/presentation/usage/UsagePane.component.spec.ts': [
+  'src/features/account/ui/usage/UsagePane.component.spec.ts': [
     {
       reason:
         'Verifies the fixed responsive 5-column to 2x2-plus-spanning-row layout and stable loading geometry required by the usage summary contract.',

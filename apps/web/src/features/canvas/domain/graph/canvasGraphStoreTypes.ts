@@ -1,6 +1,6 @@
 import {
   type CanvasConnection,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasGroup,
   type CanvasNodeItem,
   type FusionNodeItem,
@@ -8,7 +8,7 @@ import {
   type PromptNodeItem,
 } from '../../../board/ports/canvas'
 
-export type CanvasGraphNodeKind = CanvasConnectionNodeType
+export type CanvasGraphNodeKind = CanvasConnectionNodeKind
 export type CanvasGraphNodeId = `${CanvasGraphNodeKind}-${number}`
 export type CanvasGraphNodeIdForKind<T extends CanvasGraphNodeKind> = `${T}-${number}`
 export type CanvasGraphEdgeId = `connection-${number}`

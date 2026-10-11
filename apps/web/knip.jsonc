@@ -7,7 +7,7 @@
   "entry": [
     // Standalone node:test contract executed by web.yml's Anonymous smoke API contract step.
     "scripts/smokeSupport.contract.spec.ts",
-    "src/features/account/presentation/index.ts",
+    "src/features/account/ui/index.ts",
     "src/features/canvas/presentation/nodes/primitives/index.ts",
     "src/features/canvas/presentation/nodes/workflows/index.ts",
     "src/features/canvas/application/execution/index.ts",

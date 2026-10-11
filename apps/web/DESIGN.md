@@ -227,7 +227,8 @@ attributes on the underlying element.
 fields are all `readonly(readonly(ref))`. `v-model` on one compiles, renders, and
 silently drops the write — the page looks right until a setting stops responding.
 Bind `:model-value` and forward through the command instead, the same shape
-`searchKeyword` uses on `BoardsPage`. `pageChrome.contract.spec.ts` fails if a
+`searchKeyword` uses on `BoardsPage`. `npm run lint:retirement-replacements`
+(`readonly-controller` rule in `scripts/checkRetirementReplacements.ts`) fails if a
 `v-model` reappears there.
 
 ## Touch Targets: 32px Floor, 24px For Drag Handles

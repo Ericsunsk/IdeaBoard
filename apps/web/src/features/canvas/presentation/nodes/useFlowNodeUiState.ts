@@ -14,10 +14,10 @@ import {
 } from '../../domain/nodes/canvasNodeRegistry.ts'
 import {
   resolveWorkflowNodeOutputStatus,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
   type CanvasExecutionOutputNodeItem,
-  type CanvasExecutionOutputNodeType,
+  type CanvasExecutionOutputNodeKind,
   type CanvasNodeItem,
 } from '../../../board/ports/canvas'
 import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNodeUi.ts'
@@ -56,7 +56,7 @@ type FlowNodeConnectionStatus = {
   hasAnyConnection: boolean
   incoming: Partial<Record<CanvasConnectionPort, boolean>>
   pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>>
-  incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>>
+  incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeKind>>
   outgoing: Partial<Record<CanvasConnectionPort, boolean>>
 }
 
@@ -141,7 +141,7 @@ function getSnapshotNode(node: FlowNodeLike | undefined): CanvasNodeItem | null 
   return node.data.snapshotNode as CanvasNodeItem
 }
 
-function getNodeType(node: FlowNodeLike | undefined): CanvasConnectionNodeType | null {
+function getNodeType(node: FlowNodeLike | undefined): CanvasConnectionNodeKind | null {
   return isCanvasConnectionNodeType(node?.data?.kind) ? node.data.kind : null
 }
 
@@ -165,7 +165,7 @@ function resolveConnectedImageReady(
 }
 
 function getNodeConnectionStatus(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   nodeId: string,
   connectionIndex: FlowConnectionIndex,
   nodeMap: ReadonlyMap<string, FlowNodeLike>,
@@ -173,7 +173,7 @@ function getNodeConnectionStatus(
 ): FlowNodeConnectionStatus {
   const incoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
   const pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
-  const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>> = {}
+  const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeKind>> = {}
   const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
   const incomingEdges = connectionIndex.incomingByNodeId.get(nodeId) ?? []
   const outgoingEdges = connectionIndex.outgoingByNodeId.get(nodeId) ?? []
@@ -215,7 +215,7 @@ function getNodeConnectionStatus(
 }
 
 function buildPrimaryAction(
-  nodeType: CanvasExecutionOutputNodeType,
+  nodeType: CanvasExecutionOutputNodeKind,
   status: FlowNodeConnectionStatus,
   isRunning: boolean,
 ) {

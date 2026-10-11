@@ -4,7 +4,7 @@ P0 freeze, 2026-10-10. Checkpoint: `70e5758eddad32b588eaf641d1a470848283b0d4`.
 
 This document's schema-validated JSON block is the single source of truth for current/public and future entry contracts. Status changes and consumer rewrites must be reviewed atomically. Planned records are not accepted entries.
 
-- 407 records: 275 active (254 canonical, 21 cascading), 3 planned, 129 retired. P1 relocations preserve legacy exports and declare actual public subpaths; all 109 P1 compatibility shims have one-phase TTL and p1-lane deletion ownership. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
+- 406 records: 273 active (254 canonical, 19 cascading), 3 planned, 130 retired. P1 relocations preserve legacy exports and declare actual public subpaths; all 109 P1 compatibility shims have one-phase TTL and p1-lane deletion ownership. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P3 2026-10-11 deleted the workspace context shim (TTL expired, zero importers verified). P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
 - Hypothetical API/theme root wrappers are replaced by direct public subpaths actually consumed today. CSS/token files move with the theme directory and remain governed by existing token contracts; no runtime barrel is introduced for CSS.
 - Explicit ownership scopes define external edges; nested scopes overlap intentionally and their totals must not be summed. For pure single-file entries ownership is exactly that file. The Board Canvas port owns Board, so private Board reexports do not count as outbound.
 - Frozen targets preserve source export/import behavior. Composite Admin/Canvas/account entries expose explicitly mapped exports and redirect the frozen external source consumers. Internal consumers remain within their owning scope; API/generated paths retain their P1a carve-out.
@@ -102,7 +102,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/api/client.ts",
           "kind": "runtime"
         },
@@ -230,17 +230,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -375,12 +375,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -11813,7 +11813,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/api/generated-query/public/boards/boards.ts",
           "kind": "runtime"
         }
@@ -16493,7 +16493,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/api/generated-query/public/model/board.ts",
           "kind": "type-only"
         }
@@ -16549,7 +16549,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/api/generated-query/public/model/boardDocument.ts",
           "kind": "type-only"
         }
@@ -16662,27 +16662,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/billing/resource.ts",
+          "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/credits/resource.ts",
+          "from": "src/features/account/session/credits/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/usage/resource.ts",
+          "from": "src/features/account/session/usage/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
@@ -18584,27 +18584,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/billing/resource.ts",
+          "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/credits/resource.ts",
+          "from": "src/features/account/session/credits/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/usage/resource.ts",
+          "from": "src/features/account/session/usage/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/visionBillingResource.ts",
+          "from": "src/features/search/session/adapters/visionBillingResource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         }
@@ -19747,7 +19747,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
           "kind": "runtime"
         }
@@ -19896,12 +19896,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.contract.spec.ts",
+          "from": "src/features/search/session/adapters/workspace.contract.spec.ts",
           "to": "src/api/generated-query/public/workspace-search/workspace-search.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/api/generated-query/public/workspace-search/workspace-search.ts",
           "kind": "runtime"
         }
@@ -20353,12 +20353,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -20373,7 +20373,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -20940,7 +20940,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.component.spec.ts",
+          "from": "src/features/account/ui/profile/ProfilePane.component.spec.ts",
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
         },
@@ -21076,12 +21076,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
@@ -21152,7 +21152,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useAvatarUpload.ts",
+          "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/api/upload.ts",
           "kind": "runtime"
         },
@@ -21177,7 +21177,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/api/upload.ts",
           "kind": "runtime"
         },
@@ -21434,12 +21434,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.unit.spec.ts",
+          "from": "src/features/account/session/payments/resource.unit.spec.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
@@ -21454,12 +21454,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "from": "src/features/board/session/sync/boardSseInvalidation.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
@@ -21469,9 +21474,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 10,
+      "measuredFanIn": 11,
       "measuredFanOut": 4,
-      "targetFanIn": 10,
+      "targetFanIn": 11,
       "targetFanOut": 4,
       "shims": ["src/shared/api/workspaceEventStream.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -22155,7 +22160,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 14,
+      "measuredFanOut": 13,
       "targetFanIn": 1,
       "targetFanOut": 13,
       "shims": [],
@@ -22201,7 +22206,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.vue",
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/components/ui/avatar/index.ts",
           "kind": "runtime"
         }
@@ -22300,47 +22305,47 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/ReturnStatus.vue",
+          "from": "src/features/account/ui/recharge/ReturnStatus.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -22365,12 +22370,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardCard.vue",
+          "from": "src/features/board/ui/gallery/BoardCard.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -22380,17 +22385,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchEmptyState.vue",
+          "from": "src/features/search/ui/components/SearchEmptyState.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchResultCard.vue",
+          "from": "src/features/search/ui/components/SearchResultCard.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -22511,7 +22516,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.vue",
+          "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
         },
@@ -22521,7 +22526,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
         },
@@ -22592,7 +22597,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardCard.vue",
+          "from": "src/features/board/ui/gallery/BoardCard.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
           "kind": "runtime"
         }
@@ -22730,12 +22735,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
@@ -22819,7 +22824,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
+          "from": "src/features/search/ui/components/SearchSavePopover.vue",
           "to": "src/components/ui/popover/index.ts",
           "kind": "runtime"
         }
@@ -22866,7 +22871,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
         }
@@ -22926,27 +22931,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/components/ui/skeleton/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/components/ui/skeleton/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/components/ui/skeleton/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/components/ui/skeleton/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/components/ui/skeleton/index.ts",
           "kind": "runtime"
         }
@@ -23004,12 +23009,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
@@ -23244,12 +23249,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/core/auth/passwordPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/core/auth/passwordPolicy.ts",
           "kind": "runtime"
         },
@@ -23940,17 +23945,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/components/DataTableColumn.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/core/components/DataTableColumn.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/components/DataTableColumn.vue",
           "kind": "runtime"
         },
@@ -24020,17 +24025,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/components/DataTableFrame.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/core/components/DataTableFrame.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/components/DataTableFrame.vue",
           "kind": "runtime"
         },
@@ -24095,7 +24100,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/core/components/IbFormField.vue",
           "kind": "runtime"
         },
@@ -24170,7 +24175,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/core/components/RangedLineChartCard.vue",
           "kind": "runtime"
         },
@@ -24239,7 +24244,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/core/components/SiteBrandLogo.vue",
           "kind": "runtime"
         },
@@ -24305,12 +24310,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.vue",
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/core/components/StatusBadge.vue",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/presentation/shared/ComingSoonPane.vue",
+          "from": "src/features/account/ui/shared/ComingSoonPane.vue",
           "to": "src/core/components/StatusBadge.vue",
           "kind": "runtime"
         },
@@ -24631,12 +24636,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -24651,7 +24656,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/useBoardFeedback.ts",
+          "from": "src/features/board/ui/gallery/useBoardFeedback.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -24676,22 +24681,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchScreenRuntime.ts",
+          "from": "src/features/search/session/screenRuntime.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
+          "from": "src/features/search/ui/components/SearchSavePopover.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -24752,27 +24757,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useAvatarUpload.ts",
+          "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
@@ -24887,7 +24892,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/core/composables/useLogoutRedirect.ts",
           "kind": "runtime"
         },
@@ -25001,7 +25006,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.vue",
+          "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -25021,7 +25026,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -25130,7 +25135,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
         },
@@ -25485,17 +25490,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/billing/useBillingRecords.ts",
+          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/rewards/useRewardHistory.ts",
+          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -25535,7 +25540,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -25651,7 +25656,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -26013,29 +26018,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/domain/models.ts",
+          "from": "src/features/search/core/models.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/search/infrastructure/authContinuation.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/infrastructure/libraryCoordinator.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/search/infrastructure/workspace.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/search/ports/libraryCoordinatorPort.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/session/adapters/authContinuation.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryCoordinator.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/session/adapters/workspace.ts",
+          "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/shared/domain/externalImageProviders.shim.ts",
@@ -26135,12 +26140,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/document/nodes.ts",
+          "from": "src/features/board/core/document/nodes.ts",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/schema/stateSchema.ts",
+          "from": "src/features/board/core/schema/stateSchema.ts",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         },
@@ -26583,37 +26588,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -26623,7 +26628,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -26698,17 +26703,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
+          "from": "src/features/search/ui/components/SearchSavePopover.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -26810,32 +26815,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/session/formatters.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/shared/formatters.ts",
+          "from": "src/features/account/session/money.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -26880,7 +26885,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/format.ts",
+          "from": "src/features/board/ui/gallery/format.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -27015,97 +27020,97 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/billing/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditWallet.ts",
+          "from": "src/features/account/session/chart.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/credits/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/rewards/useRewardRedemption.ts",
+          "from": "src/features/account/session/credits/useCreditWallet.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/formatters.unit.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/money.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/session/money.unit.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/recharge/money.unit.spec.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/shared/formatters.unit.spec.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/billing/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/credits/resource.ts",
+          "from": "src/features/account/session/rewards/useRewardRedemption.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/usage/resource.ts",
+          "from": "src/features/account/session/usage/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/shared/ComingSoonPane.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/usage/UsagePane.component.spec.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/shared/ComingSoonPane.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/usage/UsagePane.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27165,12 +27170,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/collaboration/joinSharedBoardWorkflow.ts",
+          "from": "src/features/board/session/share-join/joinSharedBoardWorkflow.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/useBoardFeedback.ts",
+          "from": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/boardLocaleDualKey.contract.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useBoardFeedback.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27480,32 +27495,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/visionBillingResource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/visionBillingResource.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.component.spec.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchSavePopover.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27535,9 +27555,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 115,
+      "measuredFanIn": 118,
       "measuredFanOut": 5,
-      "targetFanIn": 115,
+      "targetFanIn": 118,
       "targetFanOut": 5,
       "shims": ["src/shared/i18n/index.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -27777,7 +27797,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/core/i18n/locales/en/index.ts",
           "kind": "runtime"
         },
@@ -27804,6 +27824,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "admin",
         "auth",
         "billing",
+        "board",
         "canvas",
         "common",
         "default",
@@ -27859,6 +27880,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "admin",
         "auth",
         "billing",
+        "board",
         "canvas",
         "common",
         "default",
@@ -27914,6 +27936,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "admin",
         "auth",
         "billing",
+        "board",
         "canvas",
         "common",
         "default",
@@ -27969,6 +27992,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "admin",
         "auth",
         "billing",
+        "board",
         "canvas",
         "common",
         "default",
@@ -27997,32 +28021,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/chart.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/ReturnStatus.vue",
+          "from": "src/features/account/ui/recharge/ReturnStatus.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -28087,7 +28111,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -28173,7 +28197,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/session/money.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
@@ -28326,7 +28350,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/core/interaction/interactiveControlState.ts",
           "kind": "runtime"
         },
@@ -28489,7 +28513,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/core/lib/brandMark.ts",
           "kind": "runtime"
         },
@@ -28575,7 +28599,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/chart.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
@@ -28610,7 +28634,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
@@ -28751,7 +28775,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/chart.ts",
           "to": "src/core/lib/chartTimeRange.ts",
           "kind": "runtime"
         },
@@ -29101,7 +29125,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/document/nodes.ts",
+          "from": "src/features/board/core/document/nodes.ts",
           "to": "src/core/media/mediaRef.ts",
           "kind": "type-only"
         },
@@ -29228,22 +29252,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/core/visionReferencePolicy.ts",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/visionReferenceCollection.unit.spec.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/domain/visionReferencePolicy.ts",
+          "from": "src/features/search/session/visionReferenceCollection.unit.spec.ts",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
@@ -29341,7 +29365,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/chart.ts",
           "to": "src/core/motion/chartMotion.ts",
           "kind": "runtime"
         },
@@ -29448,7 +29472,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
         },
@@ -29644,22 +29668,52 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "from": "src/features/board/session/sync/boardQueries.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSseInvalidation.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/application/board-session/repository.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         },
@@ -29669,9 +29723,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 10,
+      "measuredFanIn": 16,
       "measuredFanOut": 1,
-      "targetFanIn": 10,
+      "targetFanIn": 16,
       "targetFanOut": 1,
       "shims": ["src/shared/query/queryClient.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -29722,27 +29776,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/billing/useBillingRecords.ts",
+          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditWallet.ts",
+          "from": "src/features/account/session/credits/useCreditWallet.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/rewards/useRewardHistory.ts",
+          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/usage/useUsage.ts",
+          "from": "src/features/account/session/usage/useUsage.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -29787,12 +29841,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/testing/syncDesignHarness.ts",
+          "from": "src/features/board/session/sync/boardQueries.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -29976,17 +30030,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/billing/useBillingRecords.unit.spec.ts",
+          "from": "src/features/account/session/billing/useBillingRecords.unit.spec.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditsSync.ts",
+          "from": "src/features/account/session/credits/useCreditsSync.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditsSync.unit.spec.ts",
+          "from": "src/features/account/session/credits/useCreditsSync.unit.spec.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
@@ -30072,7 +30126,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/overlay.ts",
+          "from": "src/features/account/session/overlay.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -30117,12 +30171,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -30420,42 +30474,47 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/scope.ts",
+          "from": "src/features/board/session/catalog/scope.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "from": "src/features/board/session/catalog/scope.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -30485,9 +30544,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 26,
+      "measuredFanIn": 27,
       "measuredFanOut": 4,
-      "targetFanIn": 26,
+      "targetFanIn": 27,
       "targetFanOut": 4,
       "shims": ["src/shared/utils/auth.shim.ts"],
       "shimTtl": "1 phase (default)",
@@ -30613,7 +30672,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/session/money.ts",
           "to": "src/core/utils/currency.ts",
           "kind": "runtime"
         },
@@ -30686,7 +30745,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.vue",
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         },
@@ -30791,7 +30850,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
@@ -30902,12 +30961,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/core/utils/formValidation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/core/utils/formValidation.ts",
           "kind": "runtime"
         },
@@ -30972,7 +31031,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
@@ -30992,7 +31051,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/boards.ts",
+          "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
@@ -31022,7 +31081,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
@@ -31180,12 +31239,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/document/fusionBlend.ts",
+          "from": "src/features/board/core/document/fusionBlend.ts",
           "to": "src/core/utils/number.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/core/utils/number.ts",
           "kind": "runtime"
         },
@@ -31326,7 +31385,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/schema/stateSchema.ts",
+          "from": "src/features/board/core/schema/stateSchema.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -31336,7 +31395,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -31520,17 +31579,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/boards.ts",
+          "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/persistence/state.ts",
+          "from": "src/features/board/session/persistence/state.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewThemeStorage.ts",
+          "from": "src/features/board/session/preview/boardPreviewThemeStorage.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
@@ -31540,22 +31599,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/authContinuation.ts",
+          "from": "src/features/search/session/adapters/authContinuation.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/feedPersistence.ts",
+          "from": "src/features/search/session/adapters/feedPersistence.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/libraryIslandPersistence.ts",
+          "from": "src/features/search/session/adapters/libraryIslandPersistence.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/visionReferencePersistence.ts",
+          "from": "src/features/search/session/adapters/visionReferencePersistence.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
@@ -31665,12 +31724,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -31685,7 +31744,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -31725,199 +31784,28 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
-      "path": "src/features/account/application/index.ts",
+      "path": "src/features/account/core/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
-      "exportStyle": "star (star=13, named=0, decl=0)",
+      "exportStyle": "pure computation/types: three star exports and explicit quantity exports",
       "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/account/index.ts",
-          "to": "src/features/account/application/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 28,
-      "targetFanIn": 1,
-      "targetFanOut": 27,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/account root; sole consumer is the parent.",
-      "sourcePaths": ["src/features/account/application/index.ts"],
-      "targetPath": "src/features/account/application/index.ts",
-      "ownershipScope": ["src/features/account/application/"],
-      "publicExports": [
-        "AccountOverlay",
-        "AccountOverlayLocation",
-        "AccountOverlayOptions",
-        "AccountOverlayRoute",
-        "AvatarUploadDependencies",
-        "CreditWalletState",
-        "PasswordChangeDependencies",
-        "PasswordField",
-        "PasswordForm",
-        "ProfileFeedback",
-        "RewardRedemptionDependencies",
-        "createAccountOverlay",
-        "createRewardRedemptionWorkflow",
-        "invalidateUserMoney",
-        "prependRewardRedemption",
-        "provideAccountOverlay",
-        "useAccountOverlay",
-        "useAccountWorkspace",
-        "useAvatarUpload",
-        "useBillingRecords",
-        "useCreditWallet",
-        "useCreditsSync",
-        "usePasswordChange",
-        "useProfileFeedback",
-        "useRecharge",
-        "useRewardHistory",
-        "useRewardRedemption",
-        "useUsage"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/@testing-library/vue/dist/index.js",
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue-router/index.cjs",
-        "node_modules/vue/index.js",
-        "src/api/upload.ts",
-        "src/core/auth/passwordPolicy.ts",
-        "src/core/composables/useAppToast.ts",
-        "src/core/composables/useAsyncAction.ts",
-        "src/core/config/pagination.ts",
-        "src/core/errors/errorCatalog.ts",
-        "src/core/i18n/index.ts",
-        "src/core/i18n/userIdeaCurrency.ts",
-        "src/core/query/queryDefaults.ts",
-        "src/core/query/userCreditsInvalidation.ts",
-        "src/core/router/queryParams.ts",
-        "src/core/utils/formValidation.ts",
-        "src/core/utils/ids.ts",
-        "src/features/account/domain/index.ts",
-        "src/features/account/infrastructure/billing/resource.ts",
-        "src/features/account/infrastructure/index.ts",
-        "src/features/account/infrastructure/rewards/resource.ts",
-        "src/features/account/infrastructure/usage/resource.ts",
-        "src/features/auth/index.ts",
-        "src/features/workspace/infrastructure/workspaceContext.ts",
-        "src/features/workspace/routePaths.ts",
-        "src/test/render.ts"
-      ]
-    },
-    {
-      "path": "src/features/account/domain/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "star (star=5, named=0, decl=0)",
-      "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/account/application/overlay.ts",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/index.ts",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/dialog/AccountDialog.component.spec.ts",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/dialog/AccountDialog.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/RechargePane.component.spec.ts",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/RechargePane.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/ReturnStatus.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/shared/tabRegistry.ts",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
-          "to": "src/features/account/domain/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 16,
-      "measuredFanOut": 9,
-      "targetFanIn": 16,
-      "targetFanOut": 9,
+      "allowedConsumers": [],
+      "measuredFanIn": 0,
+      "measuredFanOut": 79,
+      "targetFanIn": 0,
+      "targetFanOut": 79,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/account root; ",
-      "sourcePaths": ["src/features/account/domain/index.ts"],
-      "targetPath": "src/features/account/domain/index.ts",
-      "ownershipScope": ["src/features/account/domain/"],
+      "sourcePaths": ["src/features/account/core/index.ts"],
+      "targetPath": "src/features/account/core/index.ts",
+      "ownershipScope": ["src/features/account/"],
       "publicExports": [
         "AccountTab",
         "IdeaQuantityParseResult",
@@ -31927,33 +31815,93 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "PaymentReturnSource",
         "UsageChartTheme",
         "UsageTrendPoint",
-        "buildUsageTrendChart",
-        "createUsageChartPlugins",
         "defaultAccountTab",
-        "formatAccountExpiryDateTime",
-        "formatAccountLocalDateTime",
-        "formatAccountRechargeDateTime",
-        "formatAccountShanghaiDateTime",
-        "formatCurrencyMinor",
-        "formatUsdForIdeas",
         "normalizeIdeaQuantity",
-        "parseIdeaQuantity",
         "parsePaymentReturnQuery",
         "resolveAccountTabKey",
-        "resolveUsageChartTheme",
         "stripPaymentReturnQuery"
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
         "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue-router/index.cjs",
+        "node_modules/vue/index.js",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/sessionUserType.ts",
+        "src/api/upload.ts",
+        "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
+        "src/components/ui/avatar/index.ts",
+        "src/components/ui/button/index.ts",
+        "src/components/ui/dialog/dialogClasses.ts",
+        "src/components/ui/dialog/index.ts",
+        "src/components/ui/dropdown-menu/index.ts",
+        "src/components/ui/input/index.ts",
+        "src/components/ui/popover/index.ts",
+        "src/components/ui/skeleton/index.ts",
+        "src/core/auth/passwordPolicy.ts",
+        "src/core/components/DataTableColumn.vue",
+        "src/core/components/DataTableFrame.vue",
+        "src/core/components/IbFormField.vue",
+        "src/core/components/RangedLineChartCard.vue",
+        "src/core/components/SiteBrandLogo.vue",
+        "src/core/components/StatusBadge.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useMenuTriggerFocusRestore.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/composables/useSiteBranding.ts",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/config/pagination.ts",
+        "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
+        "src/core/i18n/localeManifest.ts",
+        "src/core/i18n/locales/en/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
         "src/core/i18n/userLocale.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/lib/brandMark.ts",
         "src/core/lib/chartPrimitives.ts",
         "src/core/lib/chartTimeRange.ts",
+        "src/core/lib/pageChrome.ts",
         "src/core/motion/chartMotion.ts",
-        "src/core/utils/currency.ts"
+        "src/core/motion/motionPolicy.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/currency.ts",
+        "src/core/utils/dateTime.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/formValidation.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/workspaceId.ts",
+        "src/features/admin/routePaths.ts",
+        "src/features/auth/index.ts",
+        "src/features/workspace/routePaths.ts",
+        "src/features/workspace/selection/workspaceContext.ts",
+        "src/lib/utils.ts",
+        "src/test/deferred.ts",
+        "src/test/domOrder.ts",
+        "src/test/factories/index.ts",
+        "src/test/render.ts",
+        "src/test/toast.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
+        "src/theme/dialogMask.ts",
+        "src/theme/formControls.ts",
+        "vitest/browser"
       ]
     },
     {
@@ -31989,9 +31937,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 83,
+      "measuredFanOut": 79,
       "targetFanIn": 4,
-      "targetFanOut": 72,
+      "targetFanOut": 79,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -32134,18 +32082,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "fs",
-        "fs/promises",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
-        "node_modules/@types/node/index.d.ts",
         "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
@@ -32159,7 +32104,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
+        "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/input/index.ts",
+        "src/components/ui/popover/index.ts",
         "src/components/ui/skeleton/index.ts",
         "src/core/auth/passwordPolicy.ts",
         "src/core/components/DataTableColumn.vue",
@@ -32171,19 +32118,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useMenuTriggerFocusRestore.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/composables/useSiteBranding.ts",
+        "src/core/composables/useSupportChannels.ts",
         "src/core/config/pagination.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
-        "src/core/i18n/locales/en/account.ts",
+        "src/core/i18n/localeManifest.ts",
+        "src/core/i18n/locales/en/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
         "src/core/i18n/userLocale.ts",
         "src/core/interaction/interactiveControlState.ts",
         "src/core/lib/brandMark.ts",
         "src/core/lib/chartPrimitives.ts",
         "src/core/lib/chartTimeRange.ts",
+        "src/core/lib/pageChrome.ts",
         "src/core/motion/chartMotion.ts",
         "src/core/motion/motionPolicy.ts",
         "src/core/query/queryDefaults.ts",
@@ -32195,187 +32146,69 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/utils/formValidation.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/workspaceId.ts",
+        "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
-        "src/features/workspace/infrastructure/workspaceContext.ts",
         "src/features/workspace/routePaths.ts",
+        "src/features/workspace/selection/workspaceContext.ts",
         "src/lib/utils.ts",
         "src/test/deferred.ts",
+        "src/test/domOrder.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
         "src/theme/dialogMask.ts",
         "src/theme/formControls.ts",
         "vitest/browser"
       ]
     },
     {
-      "path": "src/features/account/infrastructure/index.ts",
+      "path": "src/features/account/session/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
-      "exportStyle": "star (star=6, named=0, decl=0)",
+      "exportStyle": "session resources, orchestration and runtime display adapters",
       "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/account/application/billing/useBillingRecords.unit.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/application/invalidateUserMoney.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/invalidateUserMoney.unit.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/recharge/useCreditWallet.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/recharge/useCreditsSync.unit.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/rewards/useRewardHistory.unit.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/application/rewards/useRewardRedemption.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/rewards/useRewardRedemption.unit.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/application/usage/useUsage.unit.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/index.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/billing/BillingPane.component.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/RechargePane.component.spec.ts",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/recharge/ReturnStatus.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
-          "to": "src/features/account/infrastructure/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 22,
-      "measuredFanOut": 11,
-      "targetFanIn": 22,
-      "targetFanOut": 11,
+      "allowedConsumers": [],
+      "measuredFanIn": 0,
+      "measuredFanOut": 79,
+      "targetFanIn": 0,
+      "targetFanOut": 79,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "re-exported by features/account root; ",
-      "sourcePaths": ["src/features/account/infrastructure/index.ts"],
-      "targetPath": "src/features/account/infrastructure/index.ts",
-      "ownershipScope": ["src/features/account/infrastructure/"],
+      "notes": "re-exported by features/account root; sole consumer is the parent.",
+      "sourcePaths": ["src/features/account/session/index.ts"],
+      "targetPath": "src/features/account/session/index.ts",
+      "ownershipScope": ["src/features/account/"],
       "publicExports": [
         "ACCOUNT_GUIDANCE_COPY_KEYS",
+        "AccountOverlay",
+        "AccountOverlayLocation",
+        "AccountOverlayOptions",
+        "AccountOverlayRoute",
         "AccountUsage",
+        "AvatarUploadDependencies",
         "BillingRecord",
         "BillingRecordItem",
         "BillingRecordKind",
         "BillingRecordPage",
         "BillingRecordPageData",
         "CreditWallet",
+        "CreditWalletState",
         "CreditWalletSummary",
         "DEFAULT_USAGE_RANGE",
         "GetUserUsageRange",
         "ListUserBillingRecordsParams",
         "ListUserRewardRedemptionsParams",
+        "PasswordChangeDependencies",
+        "PasswordField",
+        "PasswordForm",
         "PaymentCheckoutRequest",
         "PaymentCheckoutSession",
         "PaymentEvent",
@@ -32387,10 +32220,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "PaymentsResource",
         "PendingPaymentOrder",
         "PendingPaymentOrderList",
+        "ProfileFeedback",
         "RechargeHistoryItem",
         "RechargeHistoryPage",
         "RewardRedeemResult",
         "RewardRedemption",
+        "RewardRedemptionDependencies",
         "RewardRedemptionHistoryItem",
         "RewardRedemptionHistoryPage",
         "RewardRedemptionItem",
@@ -32402,111 +32237,80 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "WorkspaceBillingGuidanceError",
         "asWorkspaceBillingError",
         "billingRecordsQueryKeys",
+        "buildUsageTrendChart",
+        "createAccountOverlay",
+        "createRewardRedemptionWorkflow",
+        "createUsageChartPlugins",
         "creditsQueryKeys",
         "fetchBillingRecords",
         "fetchCreditWallet",
         "fetchRewardRedemptions",
         "fetchUsage",
+        "formatAccountExpiryDateTime",
+        "formatAccountLocalDateTime",
+        "formatAccountRechargeDateTime",
+        "formatAccountShanghaiDateTime",
+        "formatCurrencyMinor",
+        "formatUsdForIdeas",
+        "invalidateUserMoney",
+        "parseIdeaQuantity",
         "parsePaymentEvent",
         "paymentsContextKey",
         "paymentsQueryKeys",
         "paymentsResource",
+        "prependRewardRedemption",
+        "provideAccountOverlay",
         "readContractListBody",
         "redeemRewardCode",
         "requireAccountWorkspaceId",
+        "resolveUsageChartTheme",
         "resolveWorkspaceBillingData",
         "rewardRedemptionsQueryKeys",
         "subscribeToPaymentEvents",
         "usageQueryKeys",
-        "usePaymentsContext"
+        "useAccountOverlay",
+        "useAccountWorkspace",
+        "useAvatarUpload",
+        "useBillingRecords",
+        "useCreditWallet",
+        "useCreditsSync",
+        "usePasswordChange",
+        "usePaymentsContext",
+        "useProfileFeedback",
+        "useRecharge",
+        "useRewardHistory",
+        "useRewardRedemption",
+        "useUsage"
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
         "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
         "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
         "src/api/idempotencyKey.ts",
-        "src/api/workspaceEventStream.ts",
-        "src/core/i18n/index.ts",
-        "src/core/utils/errorMessages.ts",
-        "src/core/utils/workspaceId.ts"
-      ]
-    },
-    {
-      "path": "src/features/account/presentation/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "explicit (star=1, named=12, decl=0)",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/account/index.ts",
-          "to": "src/features/account/presentation/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 57,
-      "targetFanIn": 1,
-      "targetFanOut": 57,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "declared knip entry surface, but sole consumer is the features/account parent; P3 decides promote-or-fold.",
-      "sourcePaths": ["src/features/account/presentation/index.ts"],
-      "targetPath": "src/features/account/presentation/index.ts",
-      "ownershipScope": ["src/features/account/presentation/"],
-      "publicExports": [
-        "AccountDialog",
-        "AccountDialogContent",
-        "AccountDialogHost",
-        "AccountPane",
-        "AccountTabEntry",
-        "BillingPane",
-        "ComingSoonPane",
-        "ProfilePane",
-        "RechargePane",
-        "RewardsPane",
-        "SecurityPane",
-        "UsagePane",
-        "accountCardPanelClass",
-        "accountCloseButtonClass",
-        "accountContentPaneClass",
-        "accountDataTableFrameClass",
-        "accountDialogContentClass",
-        "accountLogoutButtonClass",
-        "accountMainContentClass",
-        "accountNavTabClass",
-        "accountPrimaryActionButtonClass",
-        "accountTabRegistry",
-        "resolveAccountTab"
-      ],
-      "surfaceSeverity": "error",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/@testing-library/vue/dist/index.js",
-        "node_modules/@vueuse/core/dist/index.js",
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue-i18n/index.js",
-        "node_modules/vue-router/index.cjs",
-        "node_modules/vue/index.js",
         "src/api/sessionUserType.ts",
+        "src/api/upload.ts",
+        "src/api/workspaceEventStream.ts",
         "src/app/style.css",
         "src/components/ui/avatar/index.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
+        "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/input/index.ts",
+        "src/components/ui/popover/index.ts",
         "src/components/ui/skeleton/index.ts",
+        "src/core/auth/passwordPolicy.ts",
         "src/core/components/DataTableColumn.vue",
         "src/core/components/DataTableFrame.vue",
         "src/core/components/IbFormField.vue",
@@ -32516,35 +32320,46 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useMenuTriggerFocusRestore.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/composables/useSiteBranding.ts",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/config/pagination.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
-        "src/core/i18n/locales/en/account.ts",
+        "src/core/i18n/localeManifest.ts",
+        "src/core/i18n/locales/en/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/i18n/userLocale.ts",
         "src/core/interaction/interactiveControlState.ts",
         "src/core/lib/brandMark.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTimeRange.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/core/motion/chartMotion.ts",
         "src/core/motion/motionPolicy.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/currency.ts",
         "src/core/utils/dateTime.ts",
-        "src/features/account/application/billing/useBillingRecords.ts",
-        "src/features/account/application/overlay.ts",
-        "src/features/account/application/profile/useAvatarUpload.ts",
-        "src/features/account/application/profile/useProfileFeedback.ts",
-        "src/features/account/application/recharge/useRecharge.ts",
-        "src/features/account/application/rewards/useRewardHistory.ts",
-        "src/features/account/application/rewards/useRewardRedemption.ts",
-        "src/features/account/application/security/usePasswordChange.ts",
-        "src/features/account/application/usage/useUsage.ts",
-        "src/features/account/domain/index.ts",
-        "src/features/account/infrastructure/index.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/formValidation.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/workspaceId.ts",
+        "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
         "src/features/workspace/routePaths.ts",
+        "src/features/workspace/selection/workspaceContext.ts",
         "src/lib/utils.ts",
         "src/test/deferred.ts",
+        "src/test/domOrder.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
         "src/theme/dialogMask.ts",
         "src/theme/formControls.ts",
         "vitest/browser"
@@ -32783,8 +32598,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 8,
+      "measuredFanOut": 13,
       "targetFanIn": 8,
       "targetFanOut": 13,
       "shims": [],
@@ -32926,6 +32741,137 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": []
     },
     {
+      "path": "src/features/account/ui/index.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "explicit (star=1, named=12, decl=0)",
+      "surfaceBaseline": true,
+      "allowedConsumers": [],
+      "measuredFanIn": 0,
+      "measuredFanOut": 79,
+      "targetFanIn": 0,
+      "targetFanOut": 79,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "declared knip entry surface, but sole consumer is the features/account parent; P3 decides promote-or-fold.",
+      "sourcePaths": ["src/features/account/ui/index.ts"],
+      "targetPath": "src/features/account/ui/index.ts",
+      "ownershipScope": ["src/features/account/"],
+      "publicExports": [
+        "AccountDialog",
+        "AccountDialogContent",
+        "AccountDialogHost",
+        "AccountPane",
+        "AccountTabEntry",
+        "BillingPane",
+        "ComingSoonPane",
+        "ProfilePane",
+        "RechargePane",
+        "RewardsPane",
+        "SecurityPane",
+        "UsagePane",
+        "accountCardPanelClass",
+        "accountCloseButtonClass",
+        "accountContentPaneClass",
+        "accountDataTableFrameClass",
+        "accountDialogContentClass",
+        "accountLogoutButtonClass",
+        "accountMainContentClass",
+        "accountNavTabClass",
+        "accountPrimaryActionButtonClass",
+        "accountTabRegistry",
+        "resolveAccountTab"
+      ],
+      "surfaceSeverity": "error",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue-router/index.cjs",
+        "node_modules/vue/index.js",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/sessionUserType.ts",
+        "src/api/upload.ts",
+        "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
+        "src/components/ui/avatar/index.ts",
+        "src/components/ui/button/index.ts",
+        "src/components/ui/dialog/dialogClasses.ts",
+        "src/components/ui/dialog/index.ts",
+        "src/components/ui/dropdown-menu/index.ts",
+        "src/components/ui/input/index.ts",
+        "src/components/ui/popover/index.ts",
+        "src/components/ui/skeleton/index.ts",
+        "src/core/auth/passwordPolicy.ts",
+        "src/core/components/DataTableColumn.vue",
+        "src/core/components/DataTableFrame.vue",
+        "src/core/components/IbFormField.vue",
+        "src/core/components/RangedLineChartCard.vue",
+        "src/core/components/SiteBrandLogo.vue",
+        "src/core/components/StatusBadge.vue",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useLogoutRedirect.ts",
+        "src/core/composables/useMenuTriggerFocusRestore.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/composables/useSiteBranding.ts",
+        "src/core/composables/useSupportChannels.ts",
+        "src/core/config/pagination.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/i18n/localeManifest.ts",
+        "src/core/i18n/locales/en/index.ts",
+        "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/i18n/userLocale.ts",
+        "src/core/interaction/interactiveControlState.ts",
+        "src/core/lib/brandMark.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTimeRange.ts",
+        "src/core/lib/pageChrome.ts",
+        "src/core/motion/chartMotion.ts",
+        "src/core/motion/motionPolicy.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/query/userCreditsInvalidation.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/currency.ts",
+        "src/core/utils/dateTime.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/formValidation.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/workspaceId.ts",
+        "src/features/admin/routePaths.ts",
+        "src/features/auth/index.ts",
+        "src/features/workspace/routePaths.ts",
+        "src/features/workspace/selection/workspaceContext.ts",
+        "src/lib/utils.ts",
+        "src/test/deferred.ts",
+        "src/test/domOrder.ts",
+        "src/test/factories/index.ts",
+        "src/test/render.ts",
+        "src/test/toast.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/composables/useTheme.ts",
+        "src/theme/dialogMask.ts",
+        "src/theme/formControls.ts",
+        "vitest/browser"
+      ]
+    },
+    {
       "path": "src/features/admin/credits/wallets/index.ts",
       "kind": "canonical",
       "confidence": "high",
@@ -33064,7 +33010,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/overlay.ts",
+          "from": "src/features/account/session/overlay.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
@@ -37360,8 +37306,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 125,
+      "measuredFanOut": 56,
       "targetFanIn": 125,
       "targetFanOut": 56,
       "shims": [],
@@ -40273,42 +40219,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useAvatarUpload.ts",
+          "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogHost.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogHost.component.spec.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.vue",
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.component.spec.ts",
+          "from": "src/features/account/ui/security/SecurityPane.component.spec.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -40343,12 +40289,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchScreenRuntime.ts",
+          "from": "src/features/search/session/screenRuntime.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -40394,7 +40340,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 28,
-      "measuredFanOut": 45,
+      "measuredFanOut": 41,
       "targetFanIn": 28,
       "targetFanOut": 41,
       "shims": [],
@@ -40481,219 +40427,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
-      "path": "src/features/board/application/catalog/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "star (star=4, named=0, decl=0)",
-      "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/board/index.ts",
-          "to": "src/features/board/application/catalog/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ports/canvas.ts",
-          "to": "src/features/board/application/catalog/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 11,
-      "targetFanIn": 2,
-      "targetFanOut": 11,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
-      "sourcePaths": ["src/features/board/application/catalog/index.ts"],
-      "targetPath": "src/features/board/application/catalog/index.ts",
-      "ownershipScope": ["src/features/board/application/catalog/"],
-      "publicExports": [
-        "BoardCommandDependencies",
-        "BoardCommands",
-        "BoardCreateResult",
-        "BoardDeleteResult",
-        "BoardDuplicateResult",
-        "BoardMeta",
-        "BoardOptimisticRenameResult",
-        "BoardRenameRemoteResult",
-        "BoardRenameResult",
-        "BoardRepository",
-        "BoardRepositoryCommands",
-        "BoardRepositoryDependencies",
-        "BoardRepositoryRenameResult",
-        "BoardRepositoryViewModel",
-        "BoardRollbackRenameResult",
-        "BoardScope",
-        "BoardScopeChangedResult",
-        "CompleteBoardScope",
-        "boardScopeKey",
-        "createBoard",
-        "createBoardCommands",
-        "createBoardRepository",
-        "deleteBoard",
-        "duplicateBoard",
-        "getBoardById",
-        "getBoardScope",
-        "getRecoverableBoardScope",
-        "isBoardNameTaken",
-        "isBoardScopeCurrent",
-        "isCompleteBoardScope",
-        "listBoards",
-        "normalizeBoardName",
-        "publishCatalogChange",
-        "registerBoardMeta",
-        "renameBoard",
-        "replaceBoards",
-        "scopedBoardStorageKey",
-        "setBoardArchivedAt",
-        "setBoardRevision",
-        "subscribeBoardChanges",
-        "subscribeBoardScopeChange",
-        "touchBoard",
-        "useBoardRepository"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/core/utils/auth.ts",
-        "src/core/utils/ids.ts",
-        "src/core/utils/storage.ts",
-        "src/features/board/application/sync/boardSync.ts",
-        "src/features/board/infrastructure/api/boardsResource.ts",
-        "src/features/board/infrastructure/persistence/index.ts",
-        "src/features/board/testing/index.ts",
-        "src/features/workspace/index.ts",
-        "src/test/factories/index.ts"
-      ]
-    },
-    {
-      "path": "src/features/board/application/collaboration/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "star (star=1, named=0, decl=0)",
-      "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/board/index.ts",
-          "to": "src/features/board/application/collaboration/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 6,
-      "targetFanIn": 1,
-      "targetFanOut": 6,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
-      "sourcePaths": ["src/features/board/application/collaboration/index.ts"],
-      "targetPath": "src/features/board/application/collaboration/index.ts",
-      "ownershipScope": ["src/features/board/application/collaboration/"],
-      "publicExports": ["JoinSharedBoardResult", "joinSharedBoardByToken"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "src/core/i18n/index.ts",
-        "src/features/board/application/catalog/repository.ts",
-        "src/features/board/domain/index.ts",
-        "src/features/board/infrastructure/api/boardsResource.ts",
-        "src/features/workspace/index.ts"
-      ]
-    },
-    {
-      "path": "src/features/board/application/sync/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "star (star=1, named=0, decl=0)",
-      "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/board/index.ts",
-          "to": "src/features/board/application/sync/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ports/canvas.ts",
-          "to": "src/features/board/application/sync/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 24,
-      "targetFanIn": 2,
-      "targetFanOut": 24,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
-      "sourcePaths": ["src/features/board/application/sync/index.ts"],
-      "targetPath": "src/features/board/application/sync/index.ts",
-      "ownershipScope": ["src/features/board/application/sync/"],
-      "publicExports": [
-        "BoardSyncConflictKind",
-        "HydrateBoardsFromServerOptions",
-        "HydrateBoardsFromServerResult",
-        "clearPendingBoardSyncRollback",
-        "fetchBoardArchivedAt",
-        "getBoardSyncConflictKind",
-        "hydrateBoardsFromServer",
-        "isBoardArchivedError",
-        "isBoardSyncConflictError",
-        "markBoardArchivedLocally",
-        "syncBoardRenameToServer",
-        "syncBoardToServer",
-        "syncDeleteBoardToServer",
-        "syncRestoreBoardToServer"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/api/stripUndefined.ts",
-        "src/api/workspaceEventStream.ts",
-        "src/core/errors/errorCatalog.ts",
-        "src/core/query/queryClient.ts",
-        "src/core/query/queryDefaults.ts",
-        "src/core/utils/auth.ts",
-        "src/features/board/application/catalog/boards.ts",
-        "src/features/board/application/catalog/repository.ts",
-        "src/features/board/application/catalog/scope.ts",
-        "src/features/board/domain/index.ts",
-        "src/features/board/infrastructure/api/boardsResource.ts",
-        "src/features/board/infrastructure/persistence/index.ts",
-        "src/features/board/infrastructure/preview/index.ts",
-        "src/features/board/presentation/catalog/galleryController.ts",
-        "src/features/board/testing/factories.ts",
-        "src/features/board/testing/index.ts",
-        "src/features/board/testing/syncDesignHarness.ts",
-        "src/features/board/testing/syncFixtures.ts",
-        "src/features/canvas/application/board-session/autosavePolicy.ts",
-        "src/features/canvas/application/board-session/useBoardAutosave.ts",
-        "src/features/workspace/index.ts"
-      ]
-    },
-    {
-      "path": "src/features/board/domain/document/index.ts",
+      "path": "src/features/board/core/document/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
@@ -40704,8 +40438,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [
         {
-          "from": "src/features/board/domain/index.ts",
-          "to": "src/features/board/domain/document/index.ts",
+          "from": "src/features/board/core/index.ts",
+          "to": "src/features/board/core/document/index.ts",
           "kind": "runtime"
         }
       ],
@@ -40718,8 +40452,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by board/domain barrel.",
-      "sourcePaths": ["src/features/board/domain/document/index.ts"],
-      "targetPath": "src/features/board/domain/document/index.ts",
+      "sourcePaths": ["src/features/board/core/document/index.ts"],
+      "targetPath": "src/features/board/core/document/index.ts",
       "ownershipScope": ["src/features/board/domain/document/"],
       "publicExports": [
         "BOARD_STATE_SCHEMA_VERSION",
@@ -40734,11 +40468,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "CanvasConnectionDirection",
         "CanvasConnectionEndpoint",
         "CanvasConnectionKind",
-        "CanvasConnectionNodeType",
+        "CanvasConnectionNodeKind",
         "CanvasConnectionPort",
         "CanvasCreatableNodeKind",
         "CanvasExecutionOutputNodeItem",
-        "CanvasExecutionOutputNodeType",
+        "CanvasExecutionOutputNodeKind",
         "CanvasGroup",
         "CanvasGroupId",
         "CanvasGroupNodeId",
@@ -40817,11 +40551,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/contracts/generationContract.ts",
         "src/core/media/mediaRef.ts",
         "src/core/utils/number.ts",
-        "src/features/board/domain/schema/stateSchema.ts"
+        "src/features/board/core/schema/stateSchema.ts"
       ]
     },
     {
-      "path": "src/features/board/domain/index.ts",
+      "path": "src/features/board/core/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
@@ -40832,83 +40566,83 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [
         {
-          "from": "src/features/board/application/collaboration/joinSharedBoardWorkflow.contract.spec.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSync.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/index.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/board/infrastructure/persistence/boardStateSerialization.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/persistence/boardStateSerialization.unit.spec.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/persistence/state.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/preview/boardPreviewRefreshQueue.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "src/features/board/domain/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
-          "to": "src/features/board/domain/index.ts",
+          "to": "src/features/board/core/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/ports/canvas.ts",
-          "to": "src/features/board/domain/index.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/session/persistence/boardStateSerialization.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/persistence/boardStateSerialization.unit.spec.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/persistence/state.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/share-join/joinSharedBoardWorkflow.contract.spec.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
+          "to": "src/features/board/core/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.ts",
+          "to": "src/features/board/core/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/testing/factories.ts",
-          "to": "src/features/board/domain/index.ts",
+          "to": "src/features/board/core/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/testing/syncFixtures.ts",
-          "to": "src/features/board/domain/index.ts",
+          "to": "src/features/board/core/index.ts",
           "kind": "runtime"
         }
       ],
@@ -40921,8 +40655,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root; ",
-      "sourcePaths": ["src/features/board/domain/index.ts"],
-      "targetPath": "src/features/board/domain/index.ts",
+      "sourcePaths": ["src/features/board/core/index.ts"],
+      "targetPath": "src/features/board/core/index.ts",
       "ownershipScope": ["src/features/board/domain/"],
       "publicExports": [
         "BOARD_STATE_SCHEMA_VERSION",
@@ -40938,11 +40672,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "CanvasConnectionDirection",
         "CanvasConnectionEndpoint",
         "CanvasConnectionKind",
-        "CanvasConnectionNodeType",
+        "CanvasConnectionNodeKind",
         "CanvasConnectionPort",
         "CanvasCreatableNodeKind",
         "CanvasExecutionOutputNodeItem",
-        "CanvasExecutionOutputNodeType",
+        "CanvasExecutionOutputNodeKind",
         "CanvasGroup",
         "CanvasGroupId",
         "CanvasGroupNodeId",
@@ -41030,7 +40764,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
-      "path": "src/features/board/domain/media/index.ts",
+      "path": "src/features/board/core/media/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
@@ -41041,8 +40775,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [
         {
-          "from": "src/features/board/domain/index.ts",
-          "to": "src/features/board/domain/media/index.ts",
+          "from": "src/features/board/core/index.ts",
+          "to": "src/features/board/core/media/index.ts",
           "kind": "runtime"
         }
       ],
@@ -41055,19 +40789,19 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by board/domain barrel.",
-      "sourcePaths": ["src/features/board/domain/media/index.ts"],
-      "targetPath": "src/features/board/domain/media/index.ts",
+      "sourcePaths": ["src/features/board/core/media/index.ts"],
+      "targetPath": "src/features/board/core/media/index.ts",
       "ownershipScope": ["src/features/board/domain/media/"],
       "publicExports": ["rebuildBoardMediaRefs"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vitest/dist/index.js",
-        "src/features/board/domain/document/nodes.ts",
+        "src/features/board/core/document/nodes.ts",
         "src/features/board/testing/index.ts"
       ]
     },
     {
-      "path": "src/features/board/domain/schema/index.ts",
+      "path": "src/features/board/core/schema/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
@@ -41078,8 +40812,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": false,
       "allowedConsumers": [
         {
-          "from": "src/features/board/domain/index.ts",
-          "to": "src/features/board/domain/schema/index.ts",
+          "from": "src/features/board/core/index.ts",
+          "to": "src/features/board/core/schema/index.ts",
           "kind": "runtime"
         }
       ],
@@ -41092,8 +40826,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by board/domain barrel.",
-      "sourcePaths": ["src/features/board/domain/schema/index.ts"],
-      "targetPath": "src/features/board/domain/schema/index.ts",
+      "sourcePaths": ["src/features/board/core/schema/index.ts"],
+      "targetPath": "src/features/board/core/schema/index.ts",
       "ownershipScope": ["src/features/board/domain/schema/"],
       "publicExports": [
         "BoardStateEnvelopeContract",
@@ -41107,10 +40841,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vitest/dist/index.js",
         "src/core/contracts/generationContract.ts",
         "src/core/utils/opaqueIds.ts",
-        "src/features/board/domain/document/latestBoardState.ts",
-        "src/features/board/domain/document/nodeRegistry.ts",
-        "src/features/board/domain/document/nodes.ts",
-        "src/features/board/domain/document/promptAspectRatio.ts",
+        "src/features/board/core/document/latestBoardState.ts",
+        "src/features/board/core/document/nodeRegistry.ts",
+        "src/features/board/core/document/nodes.ts",
+        "src/features/board/core/document/promptAspectRatio.ts",
         "src/features/board/testing/index.ts"
       ]
     },
@@ -41389,6 +41123,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetPath": "src/features/board/index.ts",
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
+        "BOARD_DOCUMENT_REPLACE_COALESCE_MS",
         "BOARD_PREVIEW_RENDERER_VERSION",
         "BOARD_STATE_SCHEMA_VERSION",
         "BoardCommandDependencies",
@@ -41410,6 +41145,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "BoardRollbackRenameResult",
         "BoardScope",
         "BoardScopeChangedResult",
+        "BoardShareRevokedConvergence",
         "BoardSnapshot",
         "BoardState",
         "BoardStateEnvelopeContract",
@@ -41426,11 +41162,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "CanvasConnectionDirection",
         "CanvasConnectionEndpoint",
         "CanvasConnectionKind",
-        "CanvasConnectionNodeType",
+        "CanvasConnectionNodeKind",
         "CanvasConnectionPort",
         "CanvasCreatableNodeKind",
         "CanvasExecutionOutputNodeItem",
-        "CanvasExecutionOutputNodeType",
+        "CanvasExecutionOutputNodeKind",
         "CanvasGroup",
         "CanvasGroupId",
         "CanvasGroupNodeId",
@@ -41477,10 +41213,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "PromptNodeInputImage",
         "PromptNodeItem",
         "WorkflowNodeOutputStatus",
+        "adoptBoardRenameRevision",
         "areFusionBlendPointsEqual",
         "assertLatestBoardSnapshot",
         "assertLatestBoardState",
         "blankBoardPreviewSurfaceClass",
+        "boardDocumentOptions",
+        "boardListOptions",
+        "boardQueryKeys",
         "boardScopeKey",
         "boardSnapshotSchema",
         "boardStateSchema",
@@ -41507,6 +41247,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "fetchBoardArchivedAt",
         "formatCatalogDate",
         "getBoardById",
+        "getBoardDocumentRevision",
         "getBoardScope",
         "getBoardState",
         "getBoardStates",
@@ -41544,6 +41285,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "publishCatalogChange",
         "rebuildBoardMediaRefs",
         "registerBoardMeta",
+        "removeBoardDocumentQuery",
         "renameBoard",
         "renderBoardPreviewDataUrl",
         "replaceBoardStateMap",
@@ -41556,12 +41298,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "resolvePromptAspectRatioValue",
         "resolveWorkflowNodeOutputStatus",
         "scopedBoardStorageKey",
+        "seedBoardDocumentQuery",
+        "seedBoardListQuery",
         "serializeBoardState",
         "setBoardArchivedAt",
         "setBoardPreviewSnapshot",
         "setBoardRevision",
         "setBoardState",
         "subscribeBoardChanges",
+        "subscribeBoardQueryInvalidation",
+        "subscribeBoardQueryScopeInvalidation",
         "subscribeBoardScopeChange",
         "syncBoardRenameToServer",
         "syncBoardToServer",
@@ -41570,7 +41316,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "touchBoard",
         "useBoardFeedback",
         "useBoardRepository",
-        "useCatalog"
+        "useCatalog",
+        "writeBoardListMeta"
       ],
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
@@ -41621,191 +41368,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
         "src/theme/dialogMask.ts"
-      ]
-    },
-    {
-      "path": "src/features/board/infrastructure/persistence/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "star (star=2, named=0, decl=0)",
-      "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/board/application/catalog/commands.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/catalog/scope.contract.spec.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSync.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/index.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/preview/boardPreviewRefreshQueue.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ports/canvas.ts",
-          "to": "src/features/board/infrastructure/persistence/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 11,
-      "measuredFanOut": 5,
-      "targetFanIn": 11,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root; ",
-      "sourcePaths": ["src/features/board/infrastructure/persistence/index.ts"],
-      "targetPath": "src/features/board/infrastructure/persistence/index.ts",
-      "ownershipScope": ["src/features/board/infrastructure/persistence/"],
-      "publicExports": [
-        "BoardStateSerializationResult",
-        "BoardStateSerializationTarget",
-        "deleteBoardState",
-        "deserializeRemoteBoardStateEnvelope",
-        "duplicateBoardState",
-        "getBoardState",
-        "getBoardStates",
-        "loadBoardState",
-        "normalizeBoardState",
-        "replaceBoardStateMap",
-        "serializeBoardState",
-        "setBoardPreviewSnapshot",
-        "setBoardState"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "src/core/utils/storage.ts",
-        "src/features/board/application/catalog/scope.ts",
-        "src/features/board/domain/index.ts",
-        "src/features/board/testing/index.ts"
-      ]
-    },
-    {
-      "path": "src/features/board/infrastructure/preview/index.ts",
-      "kind": "cascading",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "explicit (star=0, named=4, decl=0)",
-      "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/board/index.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ports/canvas.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/presentation/catalog/galleryController.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/board/presentation/catalog/galleryController.unit.spec.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/board/presentation/catalog/skin.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/presentation/catalog/useCatalog.ts",
-          "to": "src/features/board/infrastructure/preview/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 7,
-      "measuredFanOut": 12,
-      "targetFanIn": 7,
-      "targetFanOut": 12,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root; ",
-      "sourcePaths": ["src/features/board/infrastructure/preview/index.ts"],
-      "targetPath": "src/features/board/infrastructure/preview/index.ts",
-      "ownershipScope": ["src/features/board/infrastructure/preview/"],
-      "publicExports": [
-        "BOARD_PREVIEW_RENDERER_VERSION",
-        "BoardPreviewRefreshQueue",
-        "blankBoardPreviewSurfaceClass",
-        "createBoardPreviewRefreshQueue",
-        "renderBoardPreviewDataUrl"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/core/config/runtimeUrls.ts",
-        "src/core/lib/chartPrimitives.ts",
-        "src/core/utils/number.ts",
-        "src/core/utils/storage.ts",
-        "src/features/board/application/catalog/boards.ts",
-        "src/features/board/application/sync/boardSync.ts",
-        "src/features/board/domain/index.ts",
-        "src/features/board/infrastructure/persistence/index.ts",
-        "src/features/board/testing/index.ts",
-        "src/theme/composables/useTheme.ts"
       ]
     },
     {
@@ -42347,11 +41909,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "CanvasConnection",
         "CanvasConnectionContractNode",
         "CanvasConnectionEndpoint",
-        "CanvasConnectionNodeType",
+        "CanvasConnectionNodeKind",
         "CanvasConnectionPort",
         "CanvasCreatableNodeKind",
         "CanvasExecutionOutputNodeItem",
-        "CanvasExecutionOutputNodeType",
+        "CanvasExecutionOutputNodeKind",
         "CanvasGroup",
         "CanvasGroupNodeId",
         "CanvasNodeItem",
@@ -42474,7 +42036,499 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
-      "path": "src/features/board/presentation/catalog/index.ts",
+      "path": "src/features/board/session/catalog/index.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "star (star=4, named=0, decl=0)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/index.ts",
+          "to": "src/features/board/session/catalog/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ports/canvas.ts",
+          "to": "src/features/board/session/catalog/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 11,
+      "targetFanIn": 2,
+      "targetFanOut": 11,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "re-exported by features/board root.",
+      "sourcePaths": ["src/features/board/session/catalog/index.ts"],
+      "targetPath": "src/features/board/session/catalog/index.ts",
+      "ownershipScope": ["src/features/board/application/catalog/"],
+      "publicExports": [
+        "BoardCommandDependencies",
+        "BoardCommands",
+        "BoardCreateResult",
+        "BoardDeleteResult",
+        "BoardDuplicateResult",
+        "BoardMeta",
+        "BoardOptimisticRenameResult",
+        "BoardRenameRemoteResult",
+        "BoardRenameResult",
+        "BoardRepository",
+        "BoardRepositoryCommands",
+        "BoardRepositoryDependencies",
+        "BoardRepositoryRenameResult",
+        "BoardRepositoryViewModel",
+        "BoardRollbackRenameResult",
+        "BoardScope",
+        "BoardScopeChangedResult",
+        "CompleteBoardScope",
+        "boardScopeKey",
+        "createBoard",
+        "createBoardCommands",
+        "createBoardRepository",
+        "deleteBoard",
+        "duplicateBoard",
+        "getBoardById",
+        "getBoardScope",
+        "getRecoverableBoardScope",
+        "isBoardNameTaken",
+        "isBoardScopeCurrent",
+        "isCompleteBoardScope",
+        "listBoards",
+        "normalizeBoardName",
+        "publishCatalogChange",
+        "registerBoardMeta",
+        "renameBoard",
+        "replaceBoards",
+        "scopedBoardStorageKey",
+        "setBoardArchivedAt",
+        "setBoardRevision",
+        "subscribeBoardChanges",
+        "subscribeBoardScopeChange",
+        "touchBoard",
+        "useBoardRepository"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
+        "src/core/utils/auth.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/storage.ts",
+        "src/features/board/session/adapters/boardsResource.ts",
+        "src/features/board/session/persistence/index.ts",
+        "src/features/board/session/sync/boardSync.ts",
+        "src/features/board/testing/index.ts",
+        "src/features/workspace/index.ts",
+        "src/test/factories/index.ts"
+      ]
+    },
+    {
+      "path": "src/features/board/session/persistence/index.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "star (star=2, named=0, decl=0)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/index.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ports/canvas.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/commands.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/scope.contract.spec.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 11,
+      "measuredFanOut": 5,
+      "targetFanIn": 11,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "re-exported by features/board root; ",
+      "sourcePaths": ["src/features/board/session/persistence/index.ts"],
+      "targetPath": "src/features/board/session/persistence/index.ts",
+      "ownershipScope": ["src/features/board/infrastructure/persistence/"],
+      "publicExports": [
+        "BoardStateSerializationResult",
+        "BoardStateSerializationTarget",
+        "deleteBoardState",
+        "deserializeRemoteBoardStateEnvelope",
+        "duplicateBoardState",
+        "getBoardState",
+        "getBoardStates",
+        "loadBoardState",
+        "normalizeBoardState",
+        "replaceBoardStateMap",
+        "serializeBoardState",
+        "setBoardPreviewSnapshot",
+        "setBoardState"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "src/core/utils/storage.ts",
+        "src/features/board/core/index.ts",
+        "src/features/board/session/catalog/scope.ts",
+        "src/features/board/testing/index.ts"
+      ]
+    },
+    {
+      "path": "src/features/board/session/preview/index.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "explicit (star=0, named=4, decl=0)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/index.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ports/canvas.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/ui/gallery/controller.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/ui/gallery/controller.unit.spec.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/ui/gallery/skin.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.ts",
+          "to": "src/features/board/session/preview/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 7,
+      "measuredFanOut": 12,
+      "targetFanIn": 7,
+      "targetFanOut": 12,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "re-exported by features/board root; ",
+      "sourcePaths": ["src/features/board/session/preview/index.ts"],
+      "targetPath": "src/features/board/session/preview/index.ts",
+      "ownershipScope": ["src/features/board/infrastructure/preview/"],
+      "publicExports": [
+        "BOARD_PREVIEW_RENDERER_VERSION",
+        "BoardPreviewRefreshQueue",
+        "blankBoardPreviewSurfaceClass",
+        "createBoardPreviewRefreshQueue",
+        "renderBoardPreviewDataUrl"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/utils/number.ts",
+        "src/core/utils/storage.ts",
+        "src/features/board/core/index.ts",
+        "src/features/board/session/catalog/boards.ts",
+        "src/features/board/session/persistence/index.ts",
+        "src/features/board/session/sync/boardSync.ts",
+        "src/features/board/testing/index.ts",
+        "src/theme/composables/useTheme.ts"
+      ]
+    },
+    {
+      "path": "src/features/board/session/share-join/index.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "star (star=1, named=0, decl=0)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/index.ts",
+          "to": "src/features/board/session/share-join/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 6,
+      "targetFanIn": 1,
+      "targetFanOut": 6,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "re-exported by features/board root.",
+      "sourcePaths": ["src/features/board/session/share-join/index.ts"],
+      "targetPath": "src/features/board/session/share-join/index.ts",
+      "ownershipScope": ["src/features/board/application/collaboration/"],
+      "publicExports": ["JoinSharedBoardResult", "joinSharedBoardByToken"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "src/core/i18n/index.ts",
+        "src/features/board/core/index.ts",
+        "src/features/board/session/adapters/boardsResource.ts",
+        "src/features/board/session/catalog/repository.ts",
+        "src/features/workspace/index.ts"
+      ]
+    },
+    {
+      "path": "src/features/board/session/sync/index.ts",
+      "kind": "cascading",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "star (star=1, named=0, decl=0)",
+      "surfaceBaseline": false,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/index.ts",
+          "to": "src/features/board/session/sync/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ports/canvas.ts",
+          "to": "src/features/board/session/sync/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 24,
+      "targetFanIn": 2,
+      "targetFanOut": 24,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "re-exported by features/board root.",
+      "sourcePaths": ["src/features/board/session/sync/index.ts"],
+      "targetPath": "src/features/board/session/sync/index.ts",
+      "ownershipScope": ["src/features/board/application/sync/"],
+      "publicExports": [
+        "BoardSyncConflictKind",
+        "HydrateBoardsFromServerOptions",
+        "HydrateBoardsFromServerResult",
+        "clearPendingBoardSyncRollback",
+        "fetchBoardArchivedAt",
+        "getBoardSyncConflictKind",
+        "hydrateBoardsFromServer",
+        "isBoardArchivedError",
+        "isBoardSyncConflictError",
+        "markBoardArchivedLocally",
+        "syncBoardRenameToServer",
+        "syncBoardToServer",
+        "syncDeleteBoardToServer",
+        "syncRestoreBoardToServer"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
+        "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/utils/auth.ts",
+        "src/features/board/core/index.ts",
+        "src/features/board/session/adapters/boardsResource.ts",
+        "src/features/board/session/catalog/boards.ts",
+        "src/features/board/session/catalog/repository.ts",
+        "src/features/board/session/catalog/scope.ts",
+        "src/features/board/session/persistence/index.ts",
+        "src/features/board/session/preview/index.ts",
+        "src/features/board/testing/factories.ts",
+        "src/features/board/testing/index.ts",
+        "src/features/board/testing/syncDesignHarness.ts",
+        "src/features/board/testing/syncFixtures.ts",
+        "src/features/board/ui/gallery/controller.ts",
+        "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/useBoardAutosave.ts",
+        "src/features/workspace/index.ts"
+      ]
+    },
+    {
+      "path": "src/features/board/testing/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p3-lane",
+      "activationPhase": "pre-P0",
+      "scope": "intra-feature",
+      "exportStyle": "star (star=1, named=0, decl=0)",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/board/core/media/references.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/schema/boardStateEnvelopeContract.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/schema/stateSchema.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/scope.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/persistence/boardStateSerialization.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 10,
+      "measuredFanOut": 8,
+      "targetFanIn": 10,
+      "targetFanOut": 8,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "test-only seam;  not re-exported by board root.",
+      "sourcePaths": ["src/features/board/testing/index.ts"],
+      "targetPath": "src/features/board/testing/index.ts",
+      "ownershipScope": ["src/features/board/testing/"],
+      "publicExports": [
+        "MockBoardRecordFixture",
+        "MockWorkspaceBoardApiState",
+        "createMockWorkspaceBoardApiRequest",
+        "createMockWorkspaceBoardApiState",
+        "makeBoardSnapshot",
+        "makeBoardState",
+        "makePendingImageNodeSnapshot"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "src/api/workspaceEventStream.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/utils/auth.ts",
+        "src/features/board/core/index.ts",
+        "src/features/board/session/adapters/boardsResource.ts",
+        "src/features/workspace/index.ts"
+      ]
+    },
+    {
+      "path": "src/features/board/ui/gallery/index.ts",
       "kind": "cascading",
       "confidence": "high",
       "status": "active",
@@ -42486,7 +42540,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/features/board/index.ts",
-          "to": "src/features/board/presentation/catalog/index.ts",
+          "to": "src/features/board/ui/gallery/index.ts",
           "kind": "runtime"
         }
       ],
@@ -42499,8 +42553,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "re-exported by features/board root.",
-      "sourcePaths": ["src/features/board/presentation/catalog/index.ts"],
-      "targetPath": "src/features/board/presentation/catalog/index.ts",
+      "sourcePaths": ["src/features/board/ui/gallery/index.ts"],
+      "targetPath": "src/features/board/ui/gallery/index.ts",
       "ownershipScope": ["src/features/board/presentation/catalog/"],
       "publicExports": [
         "BoardFeedback",
@@ -42535,11 +42589,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
-        "src/features/board/application/catalog/boards.ts",
-        "src/features/board/application/catalog/commands.ts",
-        "src/features/board/application/catalog/repository.ts",
-        "src/features/board/application/sync/boardSync.ts",
-        "src/features/board/infrastructure/preview/index.ts",
+        "src/features/board/session/catalog/boards.ts",
+        "src/features/board/session/catalog/commands.ts",
+        "src/features/board/session/catalog/repository.ts",
+        "src/features/board/session/preview/index.ts",
+        "src/features/board/session/sync/boardSync.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -42547,101 +42601,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
         "src/theme/dialogMask.ts"
-      ]
-    },
-    {
-      "path": "src/features/board/testing/index.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p3-lane",
-      "activationPhase": "pre-P0",
-      "scope": "intra-feature",
-      "exportStyle": "star (star=1, named=0, decl=0)",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/board/application/catalog/scope.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/domain/media/references.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/domain/schema/boardStateEnvelopeContract.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/domain/schema/stateSchema.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/persistence/boardStateSerialization.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 10,
-      "measuredFanOut": 8,
-      "targetFanIn": 10,
-      "targetFanOut": 8,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "test-only seam;  not re-exported by board root.",
-      "sourcePaths": ["src/features/board/testing/index.ts"],
-      "targetPath": "src/features/board/testing/index.ts",
-      "ownershipScope": ["src/features/board/testing/"],
-      "publicExports": [
-        "MockBoardRecordFixture",
-        "MockWorkspaceBoardApiState",
-        "createMockWorkspaceBoardApiRequest",
-        "createMockWorkspaceBoardApiState",
-        "makeBoardSnapshot",
-        "makeBoardState",
-        "makePendingImageNodeSnapshot"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "src/api/workspaceEventStream.ts",
-        "src/core/query/queryClient.ts",
-        "src/core/query/queryDefaults.ts",
-        "src/core/utils/auth.ts",
-        "src/features/board/domain/index.ts",
-        "src/features/board/infrastructure/api/boardsResource.ts",
-        "src/features/workspace/index.ts"
       ]
     },
     {
@@ -44180,8 +44139,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 0,
-      "measuredFanOut": 0,
+      "measuredFanIn": 2,
+      "measuredFanOut": 79,
       "targetFanIn": 2,
       "targetFanOut": 79,
       "shims": [],
@@ -45732,7 +45691,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [],
       "measuredFanIn": 0,
-      "measuredFanOut": 3,
+      "measuredFanOut": 5,
       "targetFanIn": 0,
       "targetFanOut": 5,
       "shims": [],
@@ -45965,49 +45924,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/feed.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/application/useSearchScreenRuntime.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/application/useSearchSession.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/core/authAction.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/search/application/useVisionQueryLifecycle.unit.spec.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/domain/authAction.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/search/infrastructure/libraryBridge.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/infrastructure/libraryCoordinator.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/infrastructure/libraryCoordinator.unit.spec.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/search/ports/libraryCoordinatorPort.ts",
@@ -46015,17 +45934,57 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/search/presentation/useSearchScreenRuntime.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/useSearchScreenRuntime.unit.spec.ts",
+          "from": "src/features/search/session/adapters/libraryBridge.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryCoordinator.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryCoordinator.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/feed.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/screenRuntime.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/screenRuntime.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useSearchSession.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
         }
@@ -46267,52 +46226,52 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/scope.ts",
+          "from": "src/features/board/session/catalog/scope.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/collaboration/joinSharedBoardWorkflow.contract.spec.ts",
+          "from": "src/features/board/session/catalog/scope.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "from": "src/features/board/session/share-join/joinSharedBoardWorkflow.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
-          "to": "src/features/workspace/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/testing/syncFixtures.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
@@ -46352,27 +46311,25 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchScreenRuntime.ts",
+          "from": "src/features/search/session/screenRuntime.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         }
       ],
       "measuredFanIn": 19,
-      "measuredFanOut": 50,
+      "measuredFanOut": 48,
       "targetFanIn": 19,
       "targetFanOut": 48,
-      "shims": [
-        "src/features/workspace/infrastructure/workspaceContext.shim.ts"
-      ],
+      "shims": [],
       "shimTtl": "1 phase — delete after P2",
       "retirementPhase": "P2",
       "deletionOwner": "workspace-p2",
-      "notes": "workspace feature seam; 16 external importers (board catalog/sync, canvas).",
+      "notes": "workspace feature seam; 16 external importers (board catalog/sync, canvas). P3 2026-10-11: context shim deleted (TTL expired, zero importers); shims list cleared.",
       "sourcePaths": ["src/features/workspace/index.ts"],
       "targetPath": "src/features/workspace/index.ts",
       "ownershipScope": ["src/features/workspace/"],
@@ -46475,28 +46432,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "workspace-p2",
       "activationPhase": "P2",
       "scope": "workspace",
       "exportStyle": "compat re-export (export * from selection)",
       "surfaceBaseline": false,
-      "allowedConsumers": [
-        {
-          "from": "src/features/account/application/accountWorkspace.ts",
-          "to": "src/features/workspace/infrastructure/workspaceContext.shim.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
+      "allowedConsumers": [],
+      "measuredFanIn": 0,
       "measuredFanOut": 1,
-      "targetFanIn": 1,
+      "targetFanIn": 0,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase — delete after P2",
       "retirementPhase": "P2",
       "deletionOwner": "workspace-p2",
-      "notes": "P2 TTL-governed shim: implementation moved to selection/workspaceContext; retained solely for the cycle-free account consumer. Owned by the canonical workspace entry; do not add importers; delete after P2.",
+      "notes": "P3 deleted 2026-10-11 (integrator): TTL expired; zero production importers verified by grep (account consumer already on selection/workspaceContext). File removed; historical source and measurements retained.",
       "sourcePaths": [
         "src/features/workspace/infrastructure/workspaceContext.shim.ts"
       ],
@@ -46602,27 +46553,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/overlay.ts",
+          "from": "src/features/account/session/overlay.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -46667,7 +46618,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -46702,17 +46653,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -46927,7 +46878,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/shared/api/client.ts",
           "kind": "runtime"
         },
@@ -47012,17 +46963,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -47157,12 +47108,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -49792,7 +49743,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/shared/api/generated-query/public/boards/boards.ts",
           "kind": "runtime"
         },
@@ -50633,7 +50584,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/shared/api/generated-query/public/model/board.ts",
           "kind": "type-only"
         },
@@ -50686,7 +50637,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/shared/api/generated-query/public/model/boardDocument.ts",
           "kind": "type-only"
         },
@@ -50736,27 +50687,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/billing/resource.ts",
+          "from": "src/features/account/session/billing/resource.ts",
           "to": "src/shared/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/credits/resource.ts",
+          "from": "src/features/account/session/credits/resource.ts",
           "to": "src/shared/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/shared/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/shared/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/infrastructure/usage/resource.ts",
+          "from": "src/features/account/session/usage/resource.ts",
           "to": "src/shared/api/generated-query/public/model/index.ts",
           "kind": "type-only"
         },
@@ -51178,27 +51129,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/billing/resource.ts",
+          "from": "src/features/account/session/billing/resource.ts",
           "to": "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/credits/resource.ts",
+          "from": "src/features/account/session/credits/resource.ts",
           "to": "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/usage/resource.ts",
+          "from": "src/features/account/session/usage/resource.ts",
           "to": "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/visionBillingResource.ts",
+          "from": "src/features/search/session/adapters/visionBillingResource.ts",
           "to": "src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
@@ -51471,7 +51422,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
           "kind": "runtime"
         },
@@ -51535,12 +51486,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/search/infrastructure/workspace.contract.spec.ts",
+          "from": "src/features/search/session/adapters/workspace.contract.spec.ts",
           "to": "src/shared/api/generated-query/public/workspace-search/workspace-search.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/shared/api/generated-query/public/workspace-search/workspace-search.ts",
           "kind": "runtime"
         },
@@ -51692,12 +51643,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/shared/api/idempotencyKey.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/shared/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -51712,7 +51663,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/shared/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -52040,7 +51991,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.component.spec.ts",
+          "from": "src/features/account/ui/profile/ProfilePane.component.spec.ts",
           "to": "src/shared/api/sessionUserType.ts",
           "kind": "type-only"
         },
@@ -52173,12 +52124,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/shared/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/shared/api/stripUndefined.ts",
           "kind": "runtime"
         },
@@ -52216,7 +52167,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/profile/useAvatarUpload.ts",
+          "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/shared/api/upload.ts",
           "kind": "runtime"
         },
@@ -52241,7 +52192,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/api/upload.ts",
           "kind": "runtime"
         },
@@ -52367,12 +52318,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/shared/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.unit.spec.ts",
+          "from": "src/features/account/session/payments/resource.unit.spec.ts",
           "to": "src/shared/api/workspaceEventStream.ts",
           "kind": "runtime"
         },
@@ -52848,12 +52799,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/shared/auth/passwordPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/shared/auth/passwordPolicy.ts",
           "kind": "runtime"
         },
@@ -53302,17 +53253,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/shared/components/DataTableColumn.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/shared/components/DataTableColumn.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/shared/components/DataTableColumn.vue",
           "kind": "runtime"
         },
@@ -53354,17 +53305,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/shared/components/DataTableFrame.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/shared/components/DataTableFrame.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/shared/components/DataTableFrame.vue",
           "kind": "runtime"
         },
@@ -53406,7 +53357,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/shared/components/IbFormField.vue",
           "kind": "runtime"
         },
@@ -53463,7 +53414,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/shared/components/RangedLineChartCard.vue",
           "kind": "runtime"
         },
@@ -53509,7 +53460,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/components/SiteBrandLogo.vue",
           "kind": "runtime"
         },
@@ -53557,12 +53508,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.vue",
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/shared/components/StatusBadge.vue",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/presentation/shared/ComingSoonPane.vue",
+          "from": "src/features/account/ui/shared/ComingSoonPane.vue",
           "to": "src/shared/components/StatusBadge.vue",
           "kind": "runtime"
         },
@@ -53924,12 +53875,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -53944,7 +53895,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/useBoardFeedback.ts",
+          "from": "src/features/board/ui/gallery/useBoardFeedback.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -53969,22 +53920,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchScreenRuntime.ts",
+          "from": "src/features/search/session/screenRuntime.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
+          "from": "src/features/search/ui/components/SearchSavePopover.vue",
           "to": "src/shared/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -54027,27 +53978,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/profile/useAvatarUpload.ts",
+          "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/shared/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/shared/composables/useAsyncAction.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/shared/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/shared/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
@@ -54139,7 +54090,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/composables/useLogoutRedirect.ts",
           "kind": "runtime"
         },
@@ -54197,7 +54148,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.vue",
+          "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/shared/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -54217,7 +54168,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/shared/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -54291,7 +54242,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/composables/useSiteBranding.ts",
           "kind": "runtime"
         },
@@ -54505,17 +54456,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/billing/useBillingRecords.ts",
+          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/rewards/useRewardHistory.ts",
+          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
@@ -54555,7 +54506,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
@@ -54623,7 +54574,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/shared/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -54937,27 +54888,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/overlay.ts",
+          "from": "src/features/account/session/overlay.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
@@ -55042,7 +54993,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
@@ -55077,17 +55028,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
@@ -55238,29 +55189,29 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/domain/models.ts",
+          "from": "src/features/search/core/models.ts",
           "to": "src/shared/domain/externalImageProviders.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/search/infrastructure/authContinuation.ts",
-          "to": "src/shared/domain/externalImageProviders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/infrastructure/libraryCoordinator.ts",
-          "to": "src/shared/domain/externalImageProviders.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/search/infrastructure/workspace.ts",
-          "to": "src/shared/domain/externalImageProviders.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/search/ports/libraryCoordinatorPort.ts",
           "to": "src/shared/domain/externalImageProviders.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/session/adapters/authContinuation.ts",
+          "to": "src/shared/domain/externalImageProviders.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryCoordinator.ts",
+          "to": "src/shared/domain/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/session/adapters/workspace.ts",
+          "to": "src/shared/domain/externalImageProviders.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/shared/domain/externalImageProviders.unit.spec.ts",
@@ -55332,12 +55283,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/document/nodes.ts",
+          "from": "src/features/board/core/document/nodes.ts",
           "to": "src/shared/domain/generationContract.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/domain/schema/stateSchema.ts",
+          "from": "src/features/board/core/schema/stateSchema.ts",
           "to": "src/shared/domain/generationContract.ts",
           "kind": "runtime"
         },
@@ -55792,37 +55743,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -55832,7 +55783,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -55907,17 +55858,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.vue",
+          "from": "src/features/search/ui/components/SearchSavePopover.vue",
           "to": "src/shared/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -55976,32 +55927,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/core/recharge/money.ts",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/shared/formatters.ts",
+          "from": "src/features/account/core/shared/formatters.ts",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/billing/BillingPane.vue",
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/HistoryTable.vue",
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -56046,7 +55997,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/format.ts",
+          "from": "src/features/board/ui/gallery/format.ts",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -56128,92 +56079,92 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/core/recharge/money.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditWallet.ts",
+          "from": "src/features/account/core/recharge/money.unit.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/core/shared/formatters.unit.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/rewards/useRewardRedemption.ts",
+          "from": "src/features/account/core/usage/chart.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/billing/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/credits/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/session/credits/useCreditWallet.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/recharge/money.unit.spec.ts",
+          "from": "src/features/account/session/payments/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/shared/formatters.unit.spec.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/billing/resource.ts",
+          "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/credits/resource.ts",
+          "from": "src/features/account/session/rewards/useRewardRedemption.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/payments/resource.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/rewards/resource.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/usage/resource.ts",
+          "from": "src/features/account/session/usage/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/shared/ComingSoonPane.component.spec.ts",
+          "from": "src/features/account/ui/shared/ComingSoonPane.component.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.component.spec.ts",
+          "from": "src/features/account/ui/usage/UsagePane.component.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
@@ -56273,12 +56224,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/collaboration/joinSharedBoardWorkflow.ts",
+          "from": "src/features/board/session/share-join/joinSharedBoardWorkflow.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/useBoardFeedback.ts",
+          "from": "src/features/board/ui/gallery/useBoardFeedback.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
@@ -56578,32 +56529,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/adapters/visionBillingResource.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/resource.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/visionBillingResource.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchSavePopover.component.spec.ts",
+          "from": "src/features/search/ui/components/SearchSavePopover.component.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
@@ -56970,32 +56921,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/profile/useProfileFeedback.ts",
+          "from": "src/features/account/core/usage/chart.ts",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/PendingOrders.vue",
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/recharge/ReturnStatus.vue",
+          "from": "src/features/account/ui/recharge/ReturnStatus.vue",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/usage/UsagePane.vue",
+          "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -57060,7 +57011,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -57103,7 +57054,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/core/recharge/money.ts",
           "to": "src/shared/i18n/userLocale.ts",
           "kind": "runtime"
         },
@@ -57223,7 +57174,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/shared/interaction/interactiveControlState.ts",
           "kind": "runtime"
         },
@@ -57336,7 +57287,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/lib/brandMark.ts",
           "kind": "runtime"
         },
@@ -57384,7 +57335,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/core/usage/chart.ts",
           "to": "src/shared/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
@@ -57419,7 +57370,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/shared/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
@@ -57492,7 +57443,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/core/usage/chart.ts",
           "to": "src/shared/lib/chartTimeRange.ts",
           "kind": "runtime"
         },
@@ -57705,7 +57656,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/domain/document/nodes.ts",
+          "from": "src/features/board/core/document/nodes.ts",
           "to": "src/shared/media/mediaRef.ts",
           "kind": "type-only"
         },
@@ -57837,22 +57788,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/core/visionReferencePolicy.ts",
           "to": "src/shared/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/visionReferenceCollection.unit.spec.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/domain/visionReferencePolicy.ts",
+          "from": "src/features/search/session/visionReferenceCollection.unit.spec.ts",
           "to": "src/shared/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/shared/media/visionIngressPolicy.ts",
           "kind": "runtime"
         },
@@ -57907,7 +57858,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/usage/chart.ts",
+          "from": "src/features/account/core/usage/chart.ts",
           "to": "src/shared/motion/chartMotion.ts",
           "kind": "runtime"
         },
@@ -57953,7 +57904,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.vue",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.vue",
           "to": "src/shared/motion/motionPolicy.ts",
           "kind": "runtime"
         },
@@ -58093,7 +58044,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.ts",
+          "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/shared/query/queryClient.ts",
           "kind": "runtime"
         },
@@ -58133,27 +58084,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/billing/useBillingRecords.ts",
+          "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditWallet.ts",
+          "from": "src/features/account/session/credits/useCreditWallet.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/rewards/useRewardHistory.ts",
+          "from": "src/features/account/session/rewards/useRewardHistory.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/usage/useUsage.ts",
+          "from": "src/features/account/session/usage/useUsage.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -58321,17 +58272,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/billing/useBillingRecords.unit.spec.ts",
+          "from": "src/features/account/session/billing/useBillingRecords.unit.spec.ts",
           "to": "src/shared/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditsSync.ts",
+          "from": "src/features/account/session/credits/useCreditsSync.ts",
           "to": "src/shared/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/recharge/useCreditsSync.unit.spec.ts",
+          "from": "src/features/account/session/credits/useCreditsSync.unit.spec.ts",
           "to": "src/shared/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
@@ -58384,7 +58335,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/overlay.ts",
+          "from": "src/features/account/session/overlay.ts",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -58429,12 +58380,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useSearchSession.ts",
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/pages/SearchPage.vue",
+          "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -58543,7 +58494,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/shared/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
@@ -58622,17 +58573,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewRefreshQueue.ts",
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
           "to": "src/shared/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/shared/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/useCatalog.ts",
+          "from": "src/features/board/ui/gallery/useCatalog.ts",
           "to": "src/shared/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
@@ -58684,12 +58635,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialog.component.spec.ts",
           "to": "src/shared/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.vue",
+          "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/shared/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -58699,7 +58650,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/shared/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -58742,17 +58693,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/shared/theme/formControls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/shared/theme/formControls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/shared/theme/formControls.ts",
           "kind": "runtime"
         },
@@ -58830,7 +58781,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchLightboxModal.vue",
+          "from": "src/features/search/ui/components/SearchLightboxModal.vue",
           "to": "src/shared/theme/lightboxScrim.ts",
           "kind": "runtime"
         },
@@ -58907,17 +58858,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "from": "src/features/board/session/catalog/scope.contract.spec.ts",
           "to": "src/shared/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/scope.ts",
+          "from": "src/features/board/session/catalog/scope.ts",
           "to": "src/shared/utils/auth.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/sync/boardSync.contract.spec.ts",
+          "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
           "to": "src/shared/utils/auth.ts",
           "kind": "runtime"
         },
@@ -59001,7 +58952,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/domain/recharge/money.ts",
+          "from": "src/features/account/core/recharge/money.ts",
           "to": "src/shared/utils/currency.ts",
           "kind": "runtime"
         },
@@ -59046,7 +58997,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.vue",
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/shared/utils/dateTime.ts",
           "kind": "runtime"
         },
@@ -59113,7 +59064,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/shared/utils/errorMessages.ts",
           "kind": "runtime"
         },
@@ -59201,12 +59152,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/security/usePasswordChange.contract.spec.ts",
+          "from": "src/features/account/session/security/usePasswordChange.contract.spec.ts",
           "to": "src/shared/utils/formValidation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/application/security/usePasswordChange.ts",
+          "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/shared/utils/formValidation.ts",
           "kind": "runtime"
         },
@@ -59253,7 +59204,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/application/recharge/useRecharge.ts",
+          "from": "src/features/account/session/payments/useRecharge.ts",
           "to": "src/shared/utils/ids.ts",
           "kind": "runtime"
         },
@@ -59273,7 +59224,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/boards.ts",
+          "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/shared/utils/ids.ts",
           "kind": "runtime"
         },
@@ -59303,7 +59254,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/application/useVisionQueryLifecycle.ts",
+          "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/shared/utils/ids.ts",
           "kind": "runtime"
         }
@@ -59410,12 +59361,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/domain/document/fusionBlend.ts",
+          "from": "src/features/board/core/document/fusionBlend.ts",
           "to": "src/shared/utils/number.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/shared/utils/number.ts",
           "kind": "runtime"
         },
@@ -59513,7 +59464,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/board/domain/schema/stateSchema.ts",
+          "from": "src/features/board/core/schema/stateSchema.ts",
           "to": "src/shared/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -59523,7 +59474,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/shared/utils/opaqueIds.ts",
           "kind": "runtime"
         },
@@ -59651,17 +59602,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/boards.ts",
+          "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/persistence/state.ts",
+          "from": "src/features/board/session/persistence/state.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewThemeStorage.ts",
+          "from": "src/features/board/session/preview/boardPreviewThemeStorage.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
@@ -59671,22 +59622,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/authContinuation.ts",
+          "from": "src/features/search/session/adapters/authContinuation.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/feedPersistence.ts",
+          "from": "src/features/search/session/adapters/feedPersistence.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/libraryIslandPersistence.ts",
+          "from": "src/features/search/session/adapters/libraryIslandPersistence.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/visionReferencePersistence.ts",
+          "from": "src/features/search/session/adapters/visionReferencePersistence.ts",
           "to": "src/shared/utils/storage.ts",
           "kind": "runtime"
         },
@@ -59748,12 +59699,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/infrastructure/workspaceBilling.ts",
+          "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/shared/utils/workspaceId.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/api/boardsResource.ts",
+          "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/shared/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -59768,7 +59719,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/infrastructure/workspace.ts",
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/shared/utils/workspaceId.ts",
           "kind": "runtime"
         },
@@ -59816,17 +59767,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogContent.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialogHost.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialogHost.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/profile/ProfilePane.component.spec.ts",
+          "from": "src/features/account/ui/profile/ProfilePane.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
@@ -59866,7 +59817,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "from": "src/features/board/session/catalog/scope.contract.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
@@ -59886,7 +59837,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 15,
+      "measuredFanIn": 14,
       "measuredFanOut": 1,
       "targetFanIn": 14,
       "targetFanOut": 1,
@@ -59937,7 +59888,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
@@ -60139,17 +60090,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewRefreshQueue.ts",
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/infrastructure/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/useCatalog.ts",
+          "from": "src/features/board/ui/gallery/useCatalog.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
@@ -60234,12 +60185,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.component.spec.ts",
+          "from": "src/features/account/ui/dialog/AccountDialog.component.spec.ts",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/dialog/AccountDialog.vue",
+          "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -60249,7 +60200,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/presentation/catalog/BoardsPage.vue",
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -60300,17 +60251,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/account/presentation/recharge/PurchaseCard.vue",
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/rewards/RewardsPane.vue",
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/presentation/security/SecurityPane.vue",
+          "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
@@ -60416,7 +60367,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/presentation/components/SearchLightboxModal.vue",
+          "from": "src/features/search/ui/components/SearchLightboxModal.vue",
           "to": "src/theme/lightboxScrim.ts",
           "kind": "runtime"
         },
@@ -60519,7 +60470,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/api/workspaceTaskTransport.ts`                                                 | canonical | active  | p1-lane       | 7       | 8 → 8                    | 5 → 5                     |
 | `src/api/workspaceTaskWaiter.ts`                                                    | canonical | active  | p1-lane       | 2       | 3 → 3                    | 5 → 5                     |
 | `src/api/workspaceTasks.ts`                                                         | canonical | active  | p1-lane       | 23      | 4 → 4                    | 3 → 3                     |
-| `src/app/router/index.ts`                                                           | canonical | active  | integrator    | 1       | 1 → 1                    | 14 → 13                   |
+| `src/app/router/index.ts`                                                           | canonical | active  | integrator    | 1       | 1 → 1                    | 13 → 13                   |
 | `src/components/ui/avatar/index.ts`                                                 | canonical | active  | design-system | 3       | 2 → 2                    | 3 → 3                     |
 | `src/components/ui/badge/index.ts`                                                  | canonical | active  | design-system | 3       | 3 → 3                    | 3 → 3                     |
 | `src/components/ui/button/index.ts`                                                 | canonical | active  | design-system | 10      | 24 → 24                  | 6 → 6                     |
@@ -60572,10 +60523,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane       | 7       | 115 → 115                | 5 → 5                     |
 | `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane       | 5       | 6 → 6                    | 0 → 0                     |
 | `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane       | 2       | 5 → 5                    | 5 → 5                     |
-| `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane       | 11      | 4 → 4                    | 0 → 0                     |
-| `src/core/i18n/locales/es/index.ts`                                                 | canonical | active  | p1-lane       | 11      | 3 → 3                    | 0 → 0                     |
-| `src/core/i18n/locales/ko/index.ts`                                                 | canonical | active  | p1-lane       | 11      | 3 → 3                    | 0 → 0                     |
-| `src/core/i18n/locales/zh-CN/index.ts`                                              | canonical | active  | p1-lane       | 11      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane       | 12      | 4 → 4                    | 0 → 0                     |
+| `src/core/i18n/locales/es/index.ts`                                                 | canonical | active  | p1-lane       | 12      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/locales/ko/index.ts`                                                 | canonical | active  | p1-lane       | 12      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/locales/zh-CN/index.ts`                                              | canonical | active  | p1-lane       | 12      | 3 → 3                    | 0 → 0                     |
 | `src/core/i18n/userIdeaCurrency.ts`                                                 | canonical | active  | p1-lane       | 1       | 22 → 22                  | 1 → 1                     |
 | `src/core/i18n/userLocale.ts`                                                       | canonical | active  | p1-lane       | 9       | 18 → 18                  | 6 → 6                     |
 | `src/core/interaction/interactiveControlState.ts`                                   | canonical | active  | p1-lane       | 5       | 10 → 10                  | 0 → 0                     |
@@ -60611,16 +60562,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/core/utils/polling.ts`                                                         | canonical | active  | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
 | `src/core/utils/storage.ts`                                                         | canonical | active  | p1-lane       | 8       | 15 → 15                  | 0 → 0                     |
 | `src/core/utils/workspaceId.ts`                                                     | canonical | active  | p1-lane       | 2       | 9 → 9                    | 1 → 1                     |
-| `src/features/account/application/index.ts`                                         | cascading | active  | p3-lane       | 28      | 1 → 1                    | 28 → 27                   |
-| `src/features/account/domain/index.ts`                                              | cascading | active  | p3-lane       | 23      | 16 → 16                  | 9 → 9                     |
-| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane       | 130     | 4 → 4                    | 83 → 72                   |
-| `src/features/account/infrastructure/index.ts`                                      | cascading | active  | p3-lane       | 56      | 22 → 22                  | 11 → 11                   |
-| `src/features/account/presentation/index.ts`                                        | cascading | active  | p3-lane       | 23      | 1 → 1                    | 57 → 57                   |
+| `src/features/account/core/index.ts`                                                | cascading | active  | p3-lane       | 13      | 0 → 0                    | 79 → 79                   |
+| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane       | 130     | 4 → 4                    | 79 → 79                   |
+| `src/features/account/session/index.ts`                                             | cascading | active  | p3-lane       | 94      | 0 → 0                    | 79 → 79                   |
 | `src/features/account/ui/chrome/SupportChannelQr.vue`                               | canonical | active  | p1-lane       | 1       | 2 → 2                    | 9 → 9                     |
 | `src/features/account/ui/chrome/UserAccountMenu.vue`                                | canonical | active  | p1-lane       | 1       | 7 → 7                    | 14 → 14                   |
 | `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                        | canonical | active  | p1-lane       | 1       | 2 → 2                    | 2 → 2                     |
-| `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane       | 5       | 0 → 8                    | 0 → 13                    |
+| `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane       | 5       | 8 → 8                    | 13 → 13                   |
 | `src/features/account/ui/chrome/userAccountMenu.types.ts`                           | canonical | active  | p1-lane       | 4       | 7 → 7                    | 0 → 0                     |
+| `src/features/account/ui/index.ts`                                                  | cascading | active  | p3-lane       | 23      | 0 → 0                    | 79 → 79                   |
 | `src/features/admin/credits/wallets/index.ts`                                       | canonical | active  | p4-lane       | 1       | 1 → 1                    | 31 → 31                   |
 | `src/features/admin/prompts/core/promptVariables.ts`                                | canonical | active  | p1-lane       | 3       | 4 → 4                    | 1 → 1                     |
 | `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane       | 14      | 17 → 17                  | 1 → 1                     |
@@ -60672,7 +60622,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/admin/shared/composables/usePagePagination.ts`                        | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
 | `src/features/admin/shared/composables/useQueryPolling.ts`                          | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
 | `src/features/admin/shared/composables/useRefetchOnClose.ts`                        | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/index.ts`                                                | canonical | planned | p4-lane       | 131     | 0 → 125                  | 0 → 56                    |
+| `src/features/admin/shared/index.ts`                                                | canonical | planned | p4-lane       | 131     | 125 → 125                | 56 → 56                   |
 | `src/features/admin/shared/lib/anomalyRules.ts`                                     | canonical | active  | p4-lane       | 4       | 3 → 3                    | 3 → 3                     |
 | `src/features/admin/shared/lib/cellClasses.ts`                                      | canonical | active  | p4-lane       | 4       | 4 → 4                    | 0 → 0                     |
 | `src/features/admin/shared/lib/cellPlaceholders.ts`                                 | canonical | active  | p4-lane       | 4       | 7 → 7                    | 0 → 0                     |
@@ -60695,20 +60645,20 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/admin/shared/ui/serviceIcons.ts`                                      | canonical | active  | p1-lane       | 1       | 4 → 4                    | 3 → 3                     |
 | `src/features/admin/shared/validation/actionReasonContract.ts`                      | canonical | active  | p4-lane       | 3       | 2 → 2                    | 0 → 0                     |
 | `src/features/auth/components/auth-fields/index.ts`                                 | cascading | active  | p2-lane       | 10      | 3 → 3                    | 11 → 11                   |
-| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane       | 28      | 28 → 28                  | 45 → 41                   |
-| `src/features/board/application/catalog/index.ts`                                   | cascading | active  | p3-lane       | 43      | 2 → 2                    | 11 → 11                   |
-| `src/features/board/application/collaboration/index.ts`                             | cascading | active  | p3-lane       | 2       | 1 → 1                    | 6 → 6                     |
-| `src/features/board/application/sync/index.ts`                                      | cascading | active  | p3-lane       | 14      | 2 → 2                    | 24 → 24                   |
-| `src/features/board/domain/document/index.ts`                                       | cascading | active  | p3-lane       | 87      | 1 → 1                    | 6 → 6                     |
-| `src/features/board/domain/index.ts`                                                | cascading | active  | p3-lane       | 92      | 14 → 14                  | 7 → 7                     |
-| `src/features/board/domain/media/index.ts`                                          | cascading | active  | p3-lane       | 1       | 1 → 1                    | 3 → 3                     |
-| `src/features/board/domain/schema/index.ts`                                         | cascading | active  | p3-lane       | 4       | 1 → 1                    | 9 → 9                     |
-| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane       | 182     | 48 → 48                  | 47 → 47                   |
-| `src/features/board/infrastructure/persistence/index.ts`                            | cascading | active  | p3-lane       | 13      | 11 → 11                  | 5 → 5                     |
-| `src/features/board/infrastructure/preview/index.ts`                                | cascading | active  | p3-lane       | 5       | 7 → 7                    | 12 → 12                   |
+| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane       | 28      | 28 → 28                  | 41 → 41                   |
+| `src/features/board/core/document/index.ts`                                         | cascading | active  | p3-lane       | 87      | 1 → 1                    | 6 → 6                     |
+| `src/features/board/core/index.ts`                                                  | cascading | active  | p3-lane       | 92      | 14 → 14                  | 7 → 7                     |
+| `src/features/board/core/media/index.ts`                                            | cascading | active  | p3-lane       | 1       | 1 → 1                    | 3 → 3                     |
+| `src/features/board/core/schema/index.ts`                                           | cascading | active  | p3-lane       | 4       | 1 → 1                    | 9 → 9                     |
+| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane       | 195     | 48 → 48                  | 47 → 47                   |
 | `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane       | 83      | 95 → 95                  | 47 → 47                   |
-| `src/features/board/presentation/catalog/index.ts`                                  | cascading | active  | p3-lane       | 14      | 1 → 1                    | 27 → 27                   |
+| `src/features/board/session/catalog/index.ts`                                       | cascading | active  | p3-lane       | 43      | 2 → 2                    | 11 → 11                   |
+| `src/features/board/session/persistence/index.ts`                                   | cascading | active  | p3-lane       | 13      | 11 → 11                  | 5 → 5                     |
+| `src/features/board/session/preview/index.ts`                                       | cascading | active  | p3-lane       | 5       | 7 → 7                    | 12 → 12                   |
+| `src/features/board/session/share-join/index.ts`                                    | cascading | active  | p3-lane       | 2       | 1 → 1                    | 6 → 6                     |
+| `src/features/board/session/sync/index.ts`                                          | cascading | active  | p3-lane       | 14      | 2 → 2                    | 24 → 24                   |
 | `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane       | 7       | 10 → 10                  | 8 → 8                     |
+| `src/features/board/ui/gallery/index.ts`                                            | cascading | active  | p3-lane       | 14      | 1 → 1                    | 27 → 27                   |
 | `src/features/canvas/application/board-session/index.ts`                            | canonical | active  | p5-lane       | 9       | 5 → 5                    | 17 → 17                   |
 | `src/features/canvas/application/editing/index.ts`                                  | canonical | active  | p5-lane       | 10      | 5 → 5                    | 40 → 40                   |
 | `src/features/canvas/application/execution/board-attachment/index.ts`               | canonical | active  | p5-lane       | 2       | 12 → 12                  | 0 → 0                     |
@@ -60721,7 +60671,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane       | 1       | 7 → 7                    | 1 → 1                     |
 | `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane       | 1       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/domain/graph/index.ts`                                         | canonical | active  | p5-lane       | 58      | 59 → 59                  | 3 → 3                     |
-| `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane       | 2       | 0 → 2                    | 0 → 79                    |
+| `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane       | 2       | 2 → 2                    | 79 → 79                   |
 | `src/features/canvas/infrastructure/vue-flow-adapter/index.ts`                      | canonical | active  | p5-lane       | 20      | 20 → 20                  | 27 → 27                   |
 | `src/features/canvas/presentation/chrome/components/index.ts`                       | canonical | active  | p5-lane       | 6       | 1 → 1                    | 12 → 12                   |
 | `src/features/canvas/presentation/chrome/index.ts`                                  | cascading | active  | p5-lane       | 6       | 1 → 1                    | 21 → 21                   |
@@ -60740,13 +60690,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane       | 7       | 2 → 2                    | 6 → 6                     |
 | `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane       | 34      | 13 → 13                  | 27 → 27                   |
 | `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane       | 7       | 0 → 0                    | 3 → 5                     |
+| `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane       | 7       | 0 → 0                    | 5 → 5                     |
 | `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane       | 1       | 4 → 4                    | 1 → 1                     |
 | `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane       | 4       | 5 → 5                    | 0 → 0                     |
 | `src/features/library/index.ts`                                                     | canonical | active  | p2-lane       | 69      | 23 → 23                  | 37 → 37                   |
 | `src/features/search/index.ts`                                                      | canonical | active  | p3-lane       | 21      | 2 → 2                    | 40 → 40                   |
-| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 41      | 19 → 19                  | 50 → 48                   |
-| `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | active  | workspace-p2  | 20      | 1 → 1                    | 1 → 1                     |
+| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 41      | 19 → 19                  | 48 → 48                   |
+| `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | retired | workspace-p2  | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2  | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane       | 9       | 34 → 34                  | 1 → 1                     |
 | `src/features/workspace/selection/workspaceSelectionPort.ts`                        | canonical | active  | workspace-p2  | 7       | 2 → 2                    | 3 → 3                     |
@@ -60878,7 +60828,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/shared/utils/polling.ts`                                                       | canonical | retired | p1-lane       | 5       | 4 → 4                    | 0 → 0                     |
 | `src/shared/utils/storage.ts`                                                       | canonical | retired | p1-lane       | 8       | 14 → 14                  | 0 → 0                     |
 | `src/shared/utils/workspaceId.ts`                                                   | canonical | retired | p1-lane       | 2       | 8 → 8                    | 1 → 1                     |
-| `src/test/factories/index.ts`                                                       | canonical | active  | integrator    | 12      | 15 → 14                  | 1 → 1                     |
+| `src/test/factories/index.ts`                                                       | canonical | active  | integrator    | 12      | 14 → 14                  | 1 → 1                     |
 | `src/theme/appOverlayMenu.ts`                                                       | canonical | active  | p1-lane       | 5       | 7 → 7                    | 0 → 0                     |
 | `src/theme/composables/themeKeyboard.ts`                                            | canonical | active  | p1-lane       | 2       | 2 → 2                    | 2 → 2                     |
 | `src/theme/composables/themeMode.ts`                                                | canonical | active  | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |

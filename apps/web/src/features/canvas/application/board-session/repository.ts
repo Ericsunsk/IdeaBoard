@@ -1,3 +1,4 @@
+import { getCurrentScope, onScopeDispose } from 'vue'
 import {
   syncBoardToServer,
   useBoardRepository,
@@ -44,8 +45,14 @@ export function isBoardSessionRemoteSyncError(
   return error instanceof BoardSessionRemoteSyncError
 }
 
-export function createBoardSessionRepository(): BoardSessionRepository {
+export function createBoardSessionRepository(
+  isDraftDirty?: (boardId: string) => boolean,
+): BoardSessionRepository {
   const boardRepository = useBoardRepository()
+  if (isDraftDirty && getCurrentScope()) {
+    const stop = boardRepository.registerDraftGuard?.(isDraftDirty)
+    if (stop) onScopeDispose(stop)
+  }
 
   async function load(boardId: string): Promise<BoardSnapshot | null> {
     const normalized = normalizeBoardId(boardId)
@@ -53,7 +60,10 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     // Read before hydration so malformed local state is rejected at its storage boundary;
     // hydration must not silently replace or mask a recoverable local validation error.
     loadBoardState(normalized)
-    const hydrateResult = await boardRepository.commands.hydrate()
+    const hydrateResult = await boardRepository.commands.hydrate({
+      includeDocuments: true,
+      force: false,
+    })
     if (!hydrateResult.ok && hydrateResult.error instanceof InvalidBoardStateError) {
       throw hydrateResult.error
     }

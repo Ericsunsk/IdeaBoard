@@ -2,7 +2,7 @@ import {
   isCanvasConnectionNodeType,
   isCanvasImageInputSourceNodeType,
   resolveImageNodeDisplayRatio,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type ImageNodeItem,
   type ImageNodeOutputItem,
 } from '../../../board/ports/canvas'
@@ -23,7 +23,7 @@ export interface FlowExecutionGraphOptions {
 }
 
 export interface FlowConnectedInput {
-  sourceType: CanvasConnectionNodeType
+  sourceType: CanvasConnectionNodeKind
   snapshotNode: FlowSnapshotNodeLike
 }
 
@@ -41,7 +41,7 @@ export interface ResolvedFlowInputImage {
 
 export type FlowConnectedInputPort = 'image' | 'prompt'
 export type FlowGraphNode = FlowExecutionGraphOptions['nodes'][number]
-type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeType | null
+type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeKind | null
 
 export type FlowSnapshotNodeLike = {
   type?: unknown
@@ -113,7 +113,7 @@ export function parseHandlePort(handle: string | null | undefined): string {
   return handle
 }
 
-function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null {
+function resolveNodeType(nodeId: string): CanvasConnectionNodeKind | null {
   const [head] = nodeId.split('-')
   return isCanvasConnectionNodeType(head) ? head : null
 }
@@ -126,7 +126,7 @@ function readLatestOutputImage(snapshotNode: FlowSnapshotNodeLike): ImageNodeOut
 }
 
 export function resolveSourceImageFromNode(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   snapshotNode: FlowSnapshotNodeLike,
 ): string {
   if (nodeType === 'image') {
@@ -137,7 +137,7 @@ export function resolveSourceImageFromNode(
 }
 
 function resolveSourceAssetIdFromNode(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   snapshotNode: FlowSnapshotNodeLike,
 ): string | undefined {
   const ref =
@@ -151,7 +151,7 @@ function resolveSourceAssetIdFromNode(
 }
 
 function resolveSourceMediaAssetIdFromNode(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   snapshotNode: FlowSnapshotNodeLike,
 ): number | undefined {
   const raw =
@@ -199,12 +199,12 @@ export function resolveConnectedInput(
   )
 }
 
-function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeType {
+function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeKind {
   return isCanvasImageInputSourceNodeType(kind)
 }
 
 export function resolveFlowSourceImageRatio(
-  sourceKind: CanvasConnectionNodeType,
+  sourceKind: CanvasConnectionNodeKind,
   snapshotNode: FlowSnapshotNodeLike,
 ): number {
   if (sourceKind === 'image') {

@@ -1,6 +1,6 @@
-import type { CanvasConnectionNodeType } from '../../../board/ports/canvas'
+import type { CanvasConnectionNodeKind } from '../../../board/ports/canvas'
 
-export type FlowNodeKind = CanvasConnectionNodeType
+export type FlowNodeKind = CanvasConnectionNodeKind
 
 /**
  * Browser-only continuity for a local image while its managed Media upload is pending.
@@ -13,7 +13,7 @@ export type FlowLocalUploadState = {
 
 export interface FlowNodeData {
   kind: FlowNodeKind
-  nodeType?: CanvasConnectionNodeType
+  nodeType?: CanvasConnectionNodeKind
   title: string
   summary?: string
   snapshotNode?: unknown

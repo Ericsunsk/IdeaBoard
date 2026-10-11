@@ -43,6 +43,8 @@ export default {
     saveFailed: '保存画布失败',
     deleteFailed: '删除画布失败',
   },
+  // Alias TTL: `workspace.boards.*` duplicates the `board.*` namespace until
+  // the end of P4; deletion owner: P4 board-lane. New callers must use `board.*`.
   boards: {
     title: '欢迎来到 IdeaBoard！',
     subtitle: '探索、扩展并打磨你的创意',

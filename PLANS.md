@@ -1,5 +1,16 @@
 # ExecPlans
 
+## P3 审计修复（2026-10-11）
+
+- Goal: 按用户“依次修复”指令完成 P3 审计的六项缺口修复与独立复核。
+- Scope: 当前 main 的未提交 P3 diff；依次修复 production Query reads/observers/scope cancellation、真实 clean/dirty 判定、Account core purity、theme retirement guard、当前 revision evidence 与 P3 trio status。integrator 独占 canonical ledger，保留用户其他 staged/unstaged/untracked 内容；不 commit、push、切 branch 或创建 worktree。
+- Success criteria: 真实 gallery/Canvas 读取由 Query 驱动；clean SSE refetch、dirty stale-only 与 scope abort 有 observable tests；Account core 无 Vue/i18n/DOM runtime；retirement negative fixtures 拦截错绑定与无条件描述；当前 P2.5/P3 证据与实际检查一致，历史 acceptance/red 缺口不伪造；相关 tests/type/build/lint/ledger 与独立复核通过。
+- Risks: 保持 drafts/base revisions、404/409 fail-closed、HTTP adapter boundary、storage/locale keys、frozen 494 IDs/R403/B57/quotas。真实 red-before-original-implementation 未记录时保留历史缺口，并记录本轮修复前真实失败与修复后 green；不通过改写时间宣称历史通过。
+- Rollback: 只撤回本轮 targeted patches；保留原 P3 迁移及历史证据，不 reset 或变更持久数据。
+- Results: Board production Query ownership 已接入 `session/sync`，Gallery 使用 list-only hydrate，Canvas 使用 document hydrate；scope switch 会 abort 并丢弃 late response；clean SSE 触发 refetch，dirty/saving draft 只 mark stale。Account runtime helpers 已从 `core` 移至 `session`，theme retirement guard 改为 SFC/DOM AST 校验，Board public barrel 不再暴露 observer。ADR/Core/Board CONTEXT、Seam inventory 与 migration ledger 已同步当前 ownership。按实际 graph 更新 5 条受迁移影响的 P1 Seam consumers，`lint:dependencies -- --strict --phase=P1` 通过。用户同意将 trio 原始 implementation-before red 缺失记录为 scoped deviation；原始证据仍标 missing，三项 `productionStatus` 保持 pending。
+- Verification: Board/Canvas focused suites、Account/retirement suites、typecheck、normal/production Knip、theme contract、locale parity、shim TTL、stylelint、production build、strict public API surface、strict P1 Seam current-batch check 与 migration ledger（60 fixtures / 0 warnings / 0 unmet）通过。独立 reviewer 通过核心行为（43 files / 312 tests、255 entrypoints / 3363 symbols）。无 phase filter 的 all-active-Seams strict 仍覆盖非本批 legacy records，不能据此宣称全仓 Seam strict 已通过；其 P0 advisory 是 205 条，当前 P1 report 的 `undeclaredDeepImports` 为 0。
+- Status: COMPLETE：P3 audit repair、文档/ledger 修正、P1 current-batch Seam 收敛和独立复核完成；P3 formal acceptance 与本地 committed green checkpoint 尚待完成。未 commit/push。
+
 ## P2.5 Closeout（2026-10-11）
 
 - Goal: 按用户“收尾p2.5”指令完成当前具名 delegated acceptance、前置验收及本地交付。

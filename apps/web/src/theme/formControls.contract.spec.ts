@@ -28,12 +28,11 @@ describe('User form input contract', () => {
     expect(ibFormInputClass).not.toContain('hover:border-border-hover')
   })
 
-  it('wires the redeem input to the error-text contract', () => {
-    const pane = src('features/account/presentation/rewards', 'RewardsPane.vue')
-    expect(pane).toContain('aria-describedby="redeemFailed')
-    expect(pane).toContain('id="account-reward-code-error"')
-    expect(pane).toContain('role="alert"')
-  })
+  // P3 retirement: the "wires the redeem input to the error-text contract"
+  // source-string assertions (3) moved to the
+  // source-policy/formControls.contract/5d0f9348 governance script
+  // (scripts/checkThemeContractRetirements.ts, rule redeem-error-wiring),
+  // which asserts the aria-describedby -> id -> role="alert" linkage.
 
   it('gives the canvas prompt textarea a visible focus ring', () => {
     // Borderless and transparent by design, so the ring is the only focus

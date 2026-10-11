@@ -1,4 +1,4 @@
-import type { SearchResult, VisionExternalReference } from '../domain/models'
+import type { SearchResult, VisionExternalReference } from '../core/models'
 
 export type SearchFeedSnapshot = {
   query: string

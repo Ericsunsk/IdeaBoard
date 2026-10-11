@@ -7,7 +7,7 @@ import {
   type BoardState,
   type ImageNodeItem,
   type ImageNodeOutputItem,
-} from '../domain'
+} from '../core'
 
 export type MockBoardRecordFixture = {
   board: Record<string, unknown>

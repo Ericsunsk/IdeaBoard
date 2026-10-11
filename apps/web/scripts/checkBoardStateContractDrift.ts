@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const files = {
-  domain: path.join(webRoot, 'src/features/board/domain/document/nodes.ts'),
-  schema: path.join(webRoot, 'src/features/board/domain/schema/stateSchema.ts'),
+  domain: path.join(webRoot, 'src/features/board/core/document/nodes.ts'),
+  schema: path.join(webRoot, 'src/features/board/core/schema/stateSchema.ts'),
 } as const
 
 async function main() {

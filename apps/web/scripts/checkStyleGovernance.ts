@@ -209,19 +209,19 @@ const tokenCountRules = [
 type TokenCountRuleId = (typeof tokenCountRules)[number]['id']
 
 const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/account/domain/usage/chart.ts': {
+  'src/features/account/session/chart.ts': {
     counts: {
       'hex-color': 6,
     },
     reason: 'Account usage chart palette is a domain visual contract for chart series colors.',
   },
-  'src/features/board/infrastructure/preview/boardPreviewSerializer.ts': {
+  'src/features/board/session/preview/boardPreviewSerializer.ts': {
     counts: {
       'hex-color': 26,
     },
     reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
   },
-  'src/features/board/infrastructure/preview/boardPreviewStyle.ts': {
+  'src/features/board/session/preview/boardPreviewStyle.ts': {
     counts: {
       'hex-color': 4,
     },
@@ -306,19 +306,19 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'shadcn-vue standard microcopy size; matches the upstream primitive contract.',
   },
-  'src/features/account/presentation/dialog/AccountDialogContent.vue': {
+  'src/features/account/ui/dialog/AccountDialogContent.vue': {
     counts: {
       'text-px': 1,
     },
     reason: 'Account brand wordmark optical size; no type-scale tier.',
   },
-  'src/features/account/presentation/profile/ProfilePane.vue': {
+  'src/features/account/ui/profile/ProfilePane.vue': {
     counts: {
       'text-px': 3,
     },
     reason: 'Profile hero numerals sit outside the type scale (30/34/24 display sizes).',
   },
-  'src/features/account/presentation/usage/UsagePane.vue': {
+  'src/features/account/ui/usage/UsagePane.vue': {
     counts: {
       'text-px': 2,
     },
@@ -330,7 +330,7 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Auth kicker optical size; no type-scale tier.',
   },
-  'src/features/board/presentation/catalog/skin.ts': {
+  'src/features/board/ui/gallery/skin.ts': {
     counts: {
       'text-px': 3,
     },
@@ -348,11 +348,11 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Legal page title display size; no type-scale tier.',
   },
-  'src/features/search/presentation/pages/SearchPage.vue': {
+  'src/features/search/ui/pages/SearchPage.vue': {
     counts: {
       'text-px': 1,
     },
-    reason: 'Search result optical size; no type-scale tier.',
+    reason: 'Search input optical size; no type-scale tier.',
   },
 }
 
@@ -386,13 +386,13 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
     reason:
       'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/board/infrastructure/preview/boardPreviewStyle.ts': {
+  'src/features/board/session/preview/boardPreviewStyle.ts': {
     counts: {
       'legacy-token': 2,
     },
     reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
   },
-  'src/features/board/presentation/catalog/BoardCard.vue': {
+  'src/features/board/ui/gallery/BoardCard.vue': {
     counts: {
       'legacy-token': 4,
     },
@@ -529,7 +529,7 @@ function isSearchTokenAllowedFile(file: SourceFile): boolean {
 function isPageDotBackgroundAllowedFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
-    file.sourcePath.startsWith('src/features/board/infrastructure/preview/')
+    file.sourcePath.startsWith('src/features/board/session/preview/')
   )
 }
 
@@ -660,7 +660,7 @@ function checkPageDotBackgroundUtilityBoundary(file: SourceFile, content: string
       file: file.sourcePath,
       rule: 'page-dot-background-utility',
       message:
-        'User page dot backgrounds must use page-dot-bg; board preview dots stay in board/infrastructure/preview because previews mirror the serialized canvas thumbnail surface.',
+        'User page dot backgrounds must use page-dot-bg; board preview dots stay in board/session/preview because previews mirror the serialized canvas thumbnail surface.',
       details: matchDetails(content, pattern),
     },
   ]

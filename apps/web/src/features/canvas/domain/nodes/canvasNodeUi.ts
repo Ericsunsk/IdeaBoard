@@ -1,5 +1,5 @@
 import type {
-  CanvasConnectionNodeType,
+  CanvasConnectionNodeKind,
   WorkflowNodeOutputStatus,
 } from '../../../board/ports/canvas'
 
@@ -10,7 +10,7 @@ type NodePrimaryActionState = {
 
 type NodeConnectionMap<TPort extends string = string> = Partial<Record<TPort, boolean | undefined>>
 type NodeConnectionSourceMap<TPort extends string = string> = Partial<
-  Record<TPort, CanvasConnectionNodeType | undefined>
+  Record<TPort, CanvasConnectionNodeKind | undefined>
 >
 
 type NodeConnectionState<TPort extends string = string> = {

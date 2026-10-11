@@ -9,8 +9,7 @@
  * capability is curated here so the coupling stays explicit and minimal.
  *
  * This port re-exports Board-owned implementations without copying them;
- * behavior and ownership stay in `board/domain`, `board/application`, and
- * `board/infrastructure`.
+ * behavior and ownership stay in `board/core` and `board/session`.
  */
 
 // Durable snapshot facts, pure validation, and media-ref extraction
@@ -60,11 +59,11 @@ export {
   type CanvasConnection,
   type CanvasConnectionContractNode,
   type CanvasConnectionEndpoint,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
   type CanvasCreatableNodeKind,
   type CanvasExecutionOutputNodeItem,
-  type CanvasExecutionOutputNodeType,
+  type CanvasExecutionOutputNodeKind,
   type CanvasGroup,
   type CanvasGroupNodeId,
   type CanvasNodeItem,
@@ -83,7 +82,7 @@ export {
   type PromptNodeInputImage,
   type PromptNodeItem,
   type WorkflowNodeOutputStatus,
-} from '../domain'
+} from '../core'
 
 // Local persistence and preview adapters.
 export {
@@ -91,11 +90,11 @@ export {
   serializeBoardState,
   setBoardPreviewSnapshot,
   setBoardState,
-} from '../infrastructure/persistence'
+} from '../session/persistence'
 export {
   BOARD_PREVIEW_RENDERER_VERSION,
   renderBoardPreviewDataUrl,
-} from '../infrastructure/preview'
+} from '../session/preview'
 
 // Catalog and revision-gated sync use cases.
 export {
@@ -104,7 +103,7 @@ export {
   touchBoard,
   useBoardRepository,
   type BoardRepository,
-} from '../application/catalog'
+} from '../session/catalog'
 export {
   fetchBoardArchivedAt,
   isBoardArchivedError,
@@ -113,4 +112,4 @@ export {
   syncBoardToServer,
   syncRestoreBoardToServer,
   type BoardSyncConflictKind,
-} from '../application/sync'
+} from '../session/sync'

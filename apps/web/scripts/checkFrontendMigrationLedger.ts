@@ -346,7 +346,10 @@ function validateLedger(value: Ledger): Ledger {
         value.constraints.filter((row) => row.disposition === disposition).length,
       `${disposition}: measured count mismatch`,
     )
-  requireCondition(value.counts.retire === 403, 'P0 retirement denominator must remain 403')
+  requireCondition(
+    value.counts.retire === 403,
+    'Retirement denominator is 403 after the approved P3 final integration (P0 403 frozen; 20 search matchers retired via red-proven browser replacements; see ledger re-scope record)',
+  )
   requireCondition(
     value.quotas.find((row) => row.phase === 'P1b')?.R_p === 149,
     'P1b frozen retirement quota must remain 149',
@@ -577,16 +580,18 @@ function syncDesignVerificationFailures(ledger: Ledger): string[] {
     'docs/adr/0014-board-sync-query-ownership.md',
     'apps/web/src/core/CONTEXT.md',
     'apps/web/src/features/board/CONTEXT.md',
-    'apps/web/src/features/board/testing/syncDesignHarness.ts',
+    'apps/web/src/features/board/session/sync/boardQueryKeys.ts',
+    'apps/web/src/features/board/session/sync/boardQueries.ts',
+    'apps/web/src/features/board/session/sync/boardSseInvalidation.ts',
     'apps/web/src/features/board/testing/syncFixtures.ts',
     'apps/web/scripts/checkFrontendMigrationLedger.ts',
     'docs/frontend-seam-inventory.md',
-    'apps/web/src/features/board/application/sync/boardSync.ts',
-    'apps/web/src/features/board/infrastructure/api/boardsResource.ts',
+    'apps/web/src/features/board/session/sync/boardSync.ts',
+    'apps/web/src/features/board/session/adapters/boardsResource.ts',
     'apps/web/src/core/query/queryClient.ts',
     'apps/web/src/core/query/queryDefaults.ts',
     'apps/web/src/api/workspaceEventStream.ts',
-    'apps/web/src/features/board/presentation/catalog/galleryController.ts',
+    'apps/web/src/features/board/ui/gallery/controller.ts',
     'apps/web/src/features/canvas/application/board-session/autosavePolicy.ts',
     'apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts',
     'apps/web/package.json',

@@ -110,6 +110,7 @@ type UseBoardSessionOptions = {
   repository?: BoardSessionRepository
   previewRenderer?: BoardSessionPreviewRenderer
   message: BoardSessionMessage
+  isDraftDirty?: (boardId: string) => boolean
 }
 
 type BoardSessionUploadLifecycleFactory = typeof createBoardSessionUploadLifecycle
@@ -124,7 +125,7 @@ function classifyRemoteSyncFailure(error: unknown): BoardSessionRemoteSyncFailur
 }
 
 export function useBoardSession(options: BoardSessionTestOptions): BoardSession {
-  const repository = options.repository ?? createBoardSessionRepository()
+  const repository = options.repository ?? createBoardSessionRepository(options.isDraftDirty)
   const previewRenderer = options.previewRenderer ?? defaultBoardSessionPreviewRenderer
   const createUploadLifecycle = options.createUploadLifecycle ?? createBoardSessionUploadLifecycle
 

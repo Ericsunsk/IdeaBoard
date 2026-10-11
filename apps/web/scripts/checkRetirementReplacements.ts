@@ -139,9 +139,9 @@ const primitiveRequired = [
 ]
 const chromeConsumers = [
   'features/workspace/shell/components/WorkspaceNavigation.vue',
-  'features/search/presentation/pages/SearchPage.vue',
-  'features/search/presentation/components/SearchBatchActionDock.vue',
-  'features/board/presentation/catalog/skin.ts',
+  'features/search/ui/pages/SearchPage.vue',
+  'features/search/ui/components/SearchBatchActionDock.vue',
+  'features/board/ui/gallery/skin.ts',
   'features/library/ui/LibraryFloatingIsland.vue',
   'features/canvas/presentation/chrome/components/CanvasChrome.vue',
   'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
@@ -150,12 +150,12 @@ const chromeConsumers = [
   'features/account/ui/chrome/UserCreditBalanceButton.vue',
 ].map((file) => `src/${file}`)
 const featureSkins = [
-  'src/features/search/presentation/search.css',
+  'src/features/search/ui/search.css',
   'src/features/canvas/presentation/styles/canvas-chrome.css',
   'src/features/canvas/presentation/styles/canvas-vue-flow-adapter-skin.css',
 ]
 const lightboxes = [
-  'src/features/search/presentation/components/SearchLightboxModal.vue',
+  'src/features/search/ui/components/SearchLightboxModal.vue',
   'src/features/library/ui/LibraryAssetLightbox.vue',
 ]
 const formFields = [
@@ -185,7 +185,7 @@ export function loadRetirementSources(root = webRoot): RetirementSources {
     ...featureSkins,
     ...lightboxes,
     ...formFields,
-    'src/features/board/presentation/catalog/BoardsPage.vue',
+    'src/features/board/ui/gallery/BoardsPage.vue',
   ]
   return Object.fromEntries(
     files.map((file) => [file, fs.readFileSync(path.join(root, file), 'utf8')]),
@@ -642,7 +642,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
         )
     }
   }
-  const boards = 'src/features/board/presentation/catalog/BoardsPage.vue'
+  const boards = 'src/features/board/ui/gallery/BoardsPage.vue'
   if (
     elements(sources[boards] ?? '').some((el) =>
       el.props.some((prop) => prop.type === NodeTypes.DIRECTIVE && prop.name === 'model'),
@@ -857,6 +857,94 @@ export function validateCanvasPurity(modules: PurityModule[]): RetirementViolati
   return issues
 }
 
+/** Account core stays deterministic, including dependencies hidden behind barrels. */
+export function validateAccountPurity(
+  modules: PurityModule[],
+  sources: Record<string, string> = {},
+): RetirementViolation[] {
+  const issues: RetirementViolation[] = []
+  const roots = modules.filter(
+    (module) =>
+      module.source.startsWith('src/features/account/core/') && !/\.spec\.ts$/.test(module.source),
+  )
+  const graph = new Map(modules.map((module) => [module.source, module.dependencies ?? []]))
+  if (!roots.length)
+    issues.push({
+      rule: 'account-purity',
+      file: 'src/features/account/core',
+      message: 'No Account core sources were analyzed',
+    })
+  const forbidden = (target: string) =>
+    /^(?:vue(?:-router|-i18n)?|pinia|axios|ofetch|better-auth)(?:$|\/)|^@(?:tanstack|vue-flow|vueuse)\//.test(
+      target,
+    ) ||
+    /^src\/(?:api|components|theme)(?:\/|$)/.test(target) ||
+    (/^src\/features\//.test(target) && !target.startsWith('src/features/account/core/')) ||
+    (/^src\/(?:core|shared)\/(?:auth|query|i18n)(?:\/|$)/.test(target) &&
+      target !== 'src/core/i18n/localeCore.ts')
+  const domGlobals = new Set([
+    'document',
+    'window',
+    'getComputedStyle',
+    'localStorage',
+    'sessionStorage',
+    'navigator',
+    'fetch',
+    'XMLHttpRequest',
+  ])
+  for (const root of roots) {
+    const seen = new Set<string>()
+    const visit = (source: string, chain: string[]) => {
+      if (seen.has(source)) return
+      seen.add(source)
+      const sourceText = sources[source]
+      if (sourceText !== undefined) {
+        const file = ts.createSourceFile(source, sourceText, ts.ScriptTarget.Latest, true)
+        const checkGlobals = (node: ts.Node) => {
+          if (ts.isTypeNode(node)) return
+          if (
+            (ts.isIdentifier(node) &&
+              domGlobals.has(node.text) &&
+              !(
+                (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) ||
+                (ts.isPropertyAssignment(node.parent) && node.parent.name === node)
+              )) ||
+            (ts.isPropertyAccessExpression(node) &&
+              ts.isIdentifier(node.expression) &&
+              node.expression.text === 'globalThis' &&
+              domGlobals.has(node.name.text)) ||
+            (ts.isElementAccessExpression(node) &&
+              ts.isIdentifier(node.expression) &&
+              node.expression.text === 'globalThis' &&
+              ts.isStringLiteral(node.argumentExpression) &&
+              domGlobals.has(node.argumentExpression.text))
+          )
+            issues.push({
+              rule: 'account-purity',
+              file: root.source,
+              message: [...chain, `DOM/network global ${node.getText(file)}`].join(' -> '),
+            })
+          ts.forEachChild(node, checkGlobals)
+        }
+        checkGlobals(file)
+      }
+      for (const dep of graph.get(source) ?? []) {
+        if (dep.dependencyTypes?.includes('type-only')) continue
+        const target = dep.resolved ?? dep.module
+        if (forbidden(dep.module) || forbidden(target))
+          issues.push({
+            rule: 'account-purity',
+            file: root.source,
+            message: [...chain, target].join(' -> '),
+          })
+        else if (graph.has(target)) visit(target, [...chain, target])
+      }
+    }
+    visit(root.source, [root.source])
+  }
+  return issues
+}
+
 export function runCanvasPurity(root = webRoot): RetirementViolation[] {
   const result = spawnSync(
     'npx',
@@ -869,7 +957,15 @@ export function runCanvasPurity(root = webRoot): RetirementViolation[] {
     )
   const output = JSON.parse(result.stdout) as { modules?: PurityModule[] }
   if (!output.modules) throw new Error('dependency-cruiser graph has no modules')
-  return validateCanvasPurity(output.modules)
+  const sources = Object.fromEntries(
+    output.modules
+      .filter((module) => module.source.startsWith('src/') && /\.ts$/.test(module.source))
+      .map((module) => [module.source, fs.readFileSync(path.join(root, module.source), 'utf8')]),
+  )
+  return [
+    ...validateCanvasPurity(output.modules),
+    ...validateAccountPurity(output.modules, sources),
+  ]
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -878,6 +974,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (issues.length) process.exitCode = 1
   else
     console.log(
-      'Retirement replacements: PostCSS, Vue/TypeScript AST, synchronous theme boot and Canvas graph policies passed.',
+      'Retirement replacements: PostCSS, Vue/TypeScript AST, synchronous theme boot and Canvas/Account graph policies passed.',
     )
 }

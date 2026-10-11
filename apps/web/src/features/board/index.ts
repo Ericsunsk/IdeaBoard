@@ -6,22 +6,22 @@
  * Canvas `board-session` orchestrates through the narrow `ports/canvas` entry.
  *
  * Export groups are intentionally classified by responsibility:
- * - domain: durable Board document facts and pure validation rules
- * - application: catalog, sync, and collaboration use cases/ports
- * - infrastructure: persistence and preview adapters with stable contracts
- * - presentation: catalog view composition consumed by route wiring
+ * - core: durable Board document facts and pure validation rules
+ * - session: catalog, sync, and share-join use cases/ports
+ * - session/persistence + session/preview: stable adapters with contracts
+ * - ui/gallery: catalog view composition consumed by route wiring
  *
- * The generated API adapter remains private to Board infrastructure. Consumers
- * must not import `infrastructure/api` or any other Board implementation path.
+ * The generated API adapter remains private to Board session. Consumers
+ * must not import `session/adapters` or any other Board implementation path.
  */
 // Durable Board facts and pure domain rules.
-export * from './domain'
-// Application use cases and repository/sync ports.
-export * from './application/catalog'
-export * from './application/sync'
-export * from './application/collaboration'
+export * from './core'
+// Session use cases and repository/sync ports.
+export * from './session/catalog'
+export * from './session/sync'
+export * from './session/share-join'
 // Stable adapters for persistence and preview boundaries.
-export * from './infrastructure/persistence'
-export * from './infrastructure/preview'
+export * from './session/persistence'
+export * from './session/preview'
 // Catalog presentation composition (route-level public surface).
-export * from './presentation/catalog'
+export * from './ui/gallery'

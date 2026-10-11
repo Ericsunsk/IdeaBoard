@@ -1,8 +1,8 @@
 import type {
   CanvasCreatableNodeKind,
-  CanvasConnectionNodeType,
+  CanvasConnectionNodeKind,
   CanvasConnectionPort,
-  CanvasExecutionOutputNodeType,
+  CanvasExecutionOutputNodeKind,
 } from '../../../board/ports/canvas'
 
 /** Copy resolver injected by the caller (application/presentation own i18n). */
@@ -13,7 +13,7 @@ export type ExecutionActionLabels = { ready: string; running: string }
 type ExecutionActionLabelKeys = { readyKey: string; runningKey: string }
 
 type CanvasNodeUiRegistryItem = {
-  kind: CanvasConnectionNodeType
+  kind: CanvasConnectionNodeKind
   defaultTitleKey: string
   primaryAction?: ExecutionActionLabelKeys
 }
@@ -35,23 +35,23 @@ const CANVAS_NODE_UI_REGISTRY = {
       runningKey: 'canvas.node.processing',
     },
   },
-} as const satisfies Record<CanvasConnectionNodeType, CanvasNodeUiRegistryItem>
+} as const satisfies Record<CanvasConnectionNodeKind, CanvasNodeUiRegistryItem>
 
 const CANVAS_NODE_UI_REGISTRY_LIST = Object.values(CANVAS_NODE_UI_REGISTRY)
 
-function getCanvasNodeUiRegistryItem(nodeType: CanvasConnectionNodeType): CanvasNodeUiRegistryItem {
+function getCanvasNodeUiRegistryItem(nodeType: CanvasConnectionNodeKind): CanvasNodeUiRegistryItem {
   return CANVAS_NODE_UI_REGISTRY[nodeType]
 }
 
 export function getDefaultCanvasNodeTitle(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   translate: CanvasNodeCopyResolver,
 ): string {
   return translate(getCanvasNodeUiRegistryItem(nodeType).defaultTitleKey)
 }
 
 export function getCanvasNodeExecutionActionLabels(
-  nodeType: CanvasExecutionOutputNodeType,
+  nodeType: CanvasExecutionOutputNodeKind,
   translate: CanvasNodeCopyResolver,
 ): ExecutionActionLabels {
   const keys = getCanvasNodeUiRegistryItem(nodeType).primaryAction

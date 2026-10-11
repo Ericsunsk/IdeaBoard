@@ -48,6 +48,8 @@ export default {
     saveFailed: 'No se pudo guardar el lienzo',
     deleteFailed: 'No se pudo eliminar el lienzo',
   },
+  // Alias TTL: `workspace.boards.*` duplicates the `board.*` namespace until
+  // the end of P4; deletion owner: P4 board-lane. New callers must use `board.*`.
   boards: {
     title: '¡Te damos la bienvenida a IdeaBoard!',
     subtitle: 'Explora, amplía y perfecciona tus ideas',

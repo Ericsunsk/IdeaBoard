@@ -14,6 +14,7 @@ import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'
+import { queryClient } from '../../../../core/query/queryClient'
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
@@ -193,6 +194,7 @@ function makeState(updatedAt: number, promptText: string): BoardState {
 
 describe('createBoardSessionRepository', () => {
   beforeEach(() => {
+    queryClient.clear()
     localStorage.clear()
     clearStoredAuth()
     setStoredAuth({
@@ -209,6 +211,7 @@ describe('createBoardSessionRepository', () => {
   })
 
   afterEach(() => {
+    queryClient.clear()
     resetWorkspaceSelectionStore()
     resetMediaWorkspaceIdResolver()
   })

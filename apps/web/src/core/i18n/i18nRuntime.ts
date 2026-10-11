@@ -9,6 +9,7 @@ import {
   errors,
   workspace,
   account,
+  board,
   admin,
 } from './locales/en/index'
 import type { SupportedLocale } from './localeCore'
@@ -23,6 +24,7 @@ export const englishMessages = {
   errorCodes: errors,
   workspace,
   account,
+  board,
   admin,
 } as const
 

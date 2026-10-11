@@ -46,6 +46,8 @@ export default {
     saveFailed: '캔버스를 저장할 수 없습니다',
     deleteFailed: '캔버스를 삭제할 수 없습니다',
   },
+  // Alias TTL: `workspace.boards.*` duplicates the `board.*` namespace until
+  // the end of P4; deletion owner: P4 board-lane. New callers must use `board.*`.
   boards: {
     title: 'IdeaBoard에 오신 것을 환영합니다!',
     subtitle: '아이디어를 탐색하고 확장하며 다듬어 보세요',

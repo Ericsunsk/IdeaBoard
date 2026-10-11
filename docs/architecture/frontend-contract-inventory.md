@@ -45,7 +45,7 @@ Reproduce from `apps/web`: `npx tsx scripts/checkFrontendMigrationLedger.ts`; ap
 | P6    |          6 |             5 | Not started                                           |
 | P7    |          0 |             5 | Coverage/finalization only; explicit zero scope       |
 
-Measured `R=403`, plus 18 frozen i18n candidates awaiting assignment; mandatory `B=57` distinct scenarios. At the P0 freeze, twenty-five existing observable scenarios have exact mappings and local verification evidence from the full non-browser test run; 32 scenarios were pending. Missing scenarios retain concrete expected assertions. The P3 Query trio has an accepted P2.5 design; production binding and separate P3 authorization remain pending. P7 cannot pass with pending requirements or unassigned i18n candidates.
+Measured `R=403`, plus 18 frozen i18n candidates awaiting assignment; mandatory `B=57` distinct scenarios. At the P0 freeze, twenty-five existing observable scenarios have exact mappings and local verification evidence from the full non-browser test run; 32 scenarios were pending. Missing scenarios retain concrete expected assertions. The P3 Query trio has an accepted P2.5 design and is now bound to production Query ownership; original implementation-before red evidence and formal P3 acceptance remain pending. P7 cannot pass with pending requirements or unassigned i18n candidates.
 
 P1b has eight planned packages totaling 56 net working hours. The working-day baseline is 2026-10-12 through 2026-10-21; these are estimates, not actual hours or completed dates. This is the frozen estimate; current execution evidence is recorded in the ledger below. Calendar dates do not start a lane. Actual hours, completion dates, rolling HEAD, immutable green rollback SHA and CI evidence remain distinct. Fix-forward is limited to 8 net working hours or one working day, whichever comes first; the integrator then stops assigning packages until the plan owner chooses revert or replanning.
 
@@ -54,6 +54,12 @@ All 680 measured `src/shared` files have destinations: 263 ordinary files are li
 Historical P1 audit correction, 2026-10-10: relocation preserves the original 494 frozen matcher IDs and `R=403`; the 90 relocated P1b source constraints remain retirement obligations within the original `R_p=149`. Three ownership-path-only assertion updates have separate reviewed mappings. Current destinations are checked individually; generated targets project back to the original 417 source paths and SHA-256. The new theme keyboard spec is inventoried separately (28 behavior matchers and five source-text constraints pending at that audit; their completed retirement is recorded below) without changing frozen IDs or quotas.
 
 P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates, relevant verification and independent review passed. Current retrospective delegated acceptance and committed local-green baseline are recorded in `syncDesign.predecessorAcceptance` / `closeoutBaseline`; original before-start checkpoint gaps remain as accepted scoped historical deviations. All 149 frozen P1b matchers and five supplemental source checks have now been retired after effective semantic lint or observable browser replacements. The four previously pending mandatory scenarios have verified evidence: 417 byte-identical generated files plus actual Orval drift, concurrent/repeated 401 redirect-once, all eight service labels in four locales, and real user/Admin controls and dialogs in light/dark and normal/reduced motion. Frozen IDs and quota denominators remain unchanged. `--strict` checks consistency; `--phase=P1` also requires completed retirement and effective replacement/behavior evidence.
+
+P3 R re-scope, 2026-10-11 (plan-owner pre-approved): P3 retirement denominator revised 51->31. Twenty searchChrome matchers stay RETAINED with frozen reason (negative control proven 2026-10-11: equivalent mutations produce zero retirement-lint violation, so no enforcement point exists; the observable behavior spec is the enforcement): groups b149bb99 (7, popover treatment), e1406aae (4, overlay-btn token provenance), 918f5c82 (4, overlay gutter placement), plus 5 of 9a88ea3e (searchStyles background negations + input hover border). The remaining 4 of 9a88ea3e retire after effective chrome-consumer + feature-surface-owner lint replacements (positive controls green). Denominators honestly revised, never silently shrunk: counts retire 403->383 and retain-behavior 58->78; P3 R_p 51->31 with the per-group rationale above. All 51 frozen IDs preserved; only dispositions changed. Formal P3 acceptance still pending.
+
+P2.5 evidence re-anchor, 2026-10-11 (integrator): the P3 board lane migrated the sync specs from the retired design harness (`designBoardKeys`) to the production Query boundary (`boardQueryKeys`); 12 P2.5/trio evidence assertions are re-pointed at the identical production assertions in the same scenarios (boardSourceOfTruth 3, boardSseMapping 9), both spec files rerun green (2 files / 21 tests). Historical closeout evidence is preserved in git history and `syncDesign.closeoutBaseline`.
+
+P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not retention): the 20 retained searchChrome matchers retire with red-proven computed-style browser replacements passing first (`src/features/search/searchChromeStyle.browser.spec.ts` 5/5 chromium green, rerun by the integrator). Group coverage: batch-dock test + SearchPage hover-border test cover 9a88ea3e (5); popover-treatment test covers b149bb99 (7); overlay-gutter test covers 918f5c82 (4); overlay-btn-fills test covers e1406aae (4). Bookkeeping decision per quota formulas (`R_p` must equal `len(retirementIds)`; `counts` must equal measured dispositions): restore the P0-frozen denominators rather than keeping `R_p=31` with 20 additionally-retired outliers — counts retire 383->403 and retain-behavior 78->58; P3 `R_p` 31->51 with the 20 IDs restored to `retirementIds`. All 51 frozen P3 IDs (494 total, `R=403`) preserved; only dispositions/statuses changed. No silent shrink at any step (51->31 recorded with rationale; 31->51 restores the frozen denominator with this approval record). Formal P3 acceptance still pending.
 
 ```json migration-ledger
 {
@@ -352,8 +358,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "source-450589ef96c7fc0e-1",
         "source-0bf1f60bfb1daffb-1",
         "source-3770ba5d0b685c80-1",
-        "source-a6588811e7b79010-1",
         "source-d70159f9180de89e-1",
+        "source-2d852d08f7118359-1",
+        "source-788b512d57647892-1",
+        "source-7d479687bca2c193-1",
+        "source-6faf45e8bc066fa8-1",
+        "source-251cf6984427346a-1",
+        "source-18e4419619623a52-1",
+        "source-c74ce5adb4b3f158-1",
+        "source-a6588811e7b79010-1",
         "source-7c151b52afcce12c-1",
         "source-84ade399403b3c6c-1",
         "source-6d4958a2c5b086c9-1",
@@ -372,14 +385,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "source-c79e3079f59f8599-1",
         "source-71a5ed51c451005b-1",
         "source-ff64338dcff277a7-1",
-        "source-05ea5143f5f04c4a-1",
-        "source-2d852d08f7118359-1",
-        "source-788b512d57647892-1",
-        "source-7d479687bca2c193-1",
-        "source-6faf45e8bc066fa8-1",
-        "source-251cf6984427346a-1",
-        "source-18e4419619623a52-1",
-        "source-c74ce5adb4b3f158-1"
+        "source-05ea5143f5f04c4a-1"
       ],
       "R_p": 51,
       "behaviorIds": [
@@ -399,7 +405,9 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "B_p": 12,
       "zeroRetirementReason": null,
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local",
+      "verifiedAt": "2026-10-11",
+      "evidence": "2026-10-11 integrator final verification: 51 retirements (board 13 browser, search 24 [4 lint + 20 browser], account 7 behavior, theme 7 script) + 12 behaviors verified with exact assertion evidence; 20 search matchers retired via red-proven searchChromeStyle.browser.spec.ts (5/5 chromium green) under plan-owner 2026-10-11 APPROVED deletion of all 20. Formal P3 acceptance pending; no CI/checkpoint claim."
     },
     {
       "phase": "P4",
@@ -1959,12 +1967,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -1982,12 +2014,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -2005,12 +2061,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -2028,12 +2108,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -2051,12 +2155,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -2074,12 +2202,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -2097,12 +2249,36 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-planned",
+        "kind": "behavior",
         "id": "account-overlay/workspace-provider-lifecycle",
         "requirement": "Two Workspace hosts get isolated installed overlays; no implicit global fallback; controls open their own overlay.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 70,
+            "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+            "assertion": "expect(overlayA).not.toBe(overlayB)",
+            "fingerprint": "9a616d796ab23288"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 124,
+            "scenario": "releases a host overlay on unmount without touching the surviving host",
+            "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+            "fingerprint": "e9feec8ac2e581fa"
+          },
+          {
+            "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+            "line": 138,
+            "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+            "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+            "fingerprint": "d75f92e082851bf1"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3575,12 +3751,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/820e9d54",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps hover and focus feedback on the stable card root",
-        "status": "not-implemented"
+        "requirement": "keeps hover and focus feedback on the stable card root",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 124,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(durationsOf(card)).toEqual(['0.16s', '0.16s'])",
+            "fingerprint": "f90d16a6368983f1"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 133,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(styleOf(card).transform).not.toBe('none')",
+            "fingerprint": "86ec5b205d7ed436"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3598,12 +3791,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/820e9d54",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps hover and focus feedback on the stable card root",
-        "status": "not-implemented"
+        "requirement": "keeps hover and focus feedback on the stable card root",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 124,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(durationsOf(card)).toEqual(['0.16s', '0.16s'])",
+            "fingerprint": "f90d16a6368983f1"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 133,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(styleOf(card).transform).not.toBe('none')",
+            "fingerprint": "86ec5b205d7ed436"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3621,12 +3831,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/820e9d54",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps hover and focus feedback on the stable card root",
-        "status": "not-implemented"
+        "requirement": "keeps hover and focus feedback on the stable card root",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 124,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(durationsOf(card)).toEqual(['0.16s', '0.16s'])",
+            "fingerprint": "f90d16a6368983f1"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 133,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(styleOf(card).transform).not.toBe('none')",
+            "fingerprint": "86ec5b205d7ed436"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3644,12 +3871,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/820e9d54",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps hover and focus feedback on the stable card root",
-        "status": "not-implemented"
+        "requirement": "keeps hover and focus feedback on the stable card root",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 124,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(durationsOf(card)).toEqual(['0.16s', '0.16s'])",
+            "fingerprint": "f90d16a6368983f1"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 133,
+            "scenario": "keeps hover and focus feedback on the stable card root",
+            "assertion": "expect(styleOf(card).transform).not.toBe('none')",
+            "fingerprint": "86ec5b205d7ed436"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3667,12 +3911,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/698c2204",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: animates card appearance and removal from the board list boundary",
-        "status": "not-implemented"
+        "requirement": "animates card appearance and removal from the board list boundary",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 169,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect(leaving.classList.contains('board-card-leave-from')).toBe(true)",
+            "fingerprint": "ba4ed03cb493dd1f"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 176,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect.poll(() => article()).toBeNull()",
+            "fingerprint": "4eceb1ff1904ad4f"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3690,12 +3951,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/698c2204",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: animates card appearance and removal from the board list boundary",
-        "status": "not-implemented"
+        "requirement": "animates card appearance and removal from the board list boundary",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 169,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect(leaving.classList.contains('board-card-leave-from')).toBe(true)",
+            "fingerprint": "ba4ed03cb493dd1f"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 176,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect.poll(() => article()).toBeNull()",
+            "fingerprint": "4eceb1ff1904ad4f"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3713,12 +3991,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/698c2204",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: animates card appearance and removal from the board list boundary",
-        "status": "not-implemented"
+        "requirement": "animates card appearance and removal from the board list boundary",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 169,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect(leaving.classList.contains('board-card-leave-from')).toBe(true)",
+            "fingerprint": "ba4ed03cb493dd1f"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 176,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect.poll(() => article()).toBeNull()",
+            "fingerprint": "4eceb1ff1904ad4f"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3736,12 +4031,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/698c2204",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: animates card appearance and removal from the board list boundary",
-        "status": "not-implemented"
+        "requirement": "animates card appearance and removal from the board list boundary",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 169,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect(leaving.classList.contains('board-card-leave-from')).toBe(true)",
+            "fingerprint": "ba4ed03cb493dd1f"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 176,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect.poll(() => article()).toBeNull()",
+            "fingerprint": "4eceb1ff1904ad4f"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3759,12 +4071,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/698c2204",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: animates card appearance and removal from the board list boundary",
-        "status": "not-implemented"
+        "requirement": "animates card appearance and removal from the board list boundary",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 169,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect(leaving.classList.contains('board-card-leave-from')).toBe(true)",
+            "fingerprint": "ba4ed03cb493dd1f"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 176,
+            "scenario": "animates card appearance and removal from the board list boundary",
+            "assertion": "expect.poll(() => article()).toBeNull()",
+            "fingerprint": "4eceb1ff1904ad4f"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3782,12 +4111,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/01c7c957",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: removes transform motion but keeps the final card state visible when reduced-motion is preferred",
-        "status": "not-implemented"
+        "requirement": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 190,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(resting.transitionProperty).not.toContain('transform')",
+            "fingerprint": "95570c9f12eb544c"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 195,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(styleOf(card).transform).toBe('none')",
+            "fingerprint": "25e7abb31db6a646"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3805,12 +4151,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/01c7c957",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: removes transform motion but keeps the final card state visible when reduced-motion is preferred",
-        "status": "not-implemented"
+        "requirement": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 190,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(resting.transitionProperty).not.toContain('transform')",
+            "fingerprint": "95570c9f12eb544c"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 195,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(styleOf(card).transform).toBe('none')",
+            "fingerprint": "25e7abb31db6a646"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3828,12 +4191,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/01c7c957",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: removes transform motion but keeps the final card state visible when reduced-motion is preferred",
-        "status": "not-implemented"
+        "requirement": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 190,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(resting.transitionProperty).not.toContain('transform')",
+            "fingerprint": "95570c9f12eb544c"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 195,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(styleOf(card).transform).toBe('none')",
+            "fingerprint": "25e7abb31db6a646"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -3851,12 +4231,29 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/01c7c957",
-        "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: removes transform motion but keeps the final card state visible when reduced-motion is preferred",
-        "status": "not-implemented"
+        "requirement": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 190,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(resting.transitionProperty).not.toContain('transform')",
+            "fingerprint": "95570c9f12eb544c"
+          },
+          {
+            "source": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
+            "line": 195,
+            "scenario": "removes transform motion but keeps the final card state visible when reduced-motion is preferred",
+            "assertion": "expect(styleOf(card).transform).toBe('none')",
+            "fingerprint": "25e7abb31db6a646"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: boardCardMotion.browser.spec.ts 3 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/board/ui/gallery/boardCardMotion.browser.spec.ts`); evidence re-pointed at the identical assertions after the board lane move (presentation/catalog/boardCardMotion -> ui/gallery/boardCardMotion); replaces 13 source-string matchers deleted with boardCardMotion.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -9537,12 +9934,44 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/searchChrome.contract/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 292,
+            "scenario": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "assertion": "expect(validateRetirementSources(valid)).toEqual([])",
+            "fingerprint": "4286c0c847aae5b0"
+          },
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 319,
+            "scenario": "rejects a semantic violation of $rule",
+            "assertion": "expect(validateRetirementSources(fixture).map((issue) => issue.rule)).toContain(rule)",
+            "fingerprint": "acbd684a05f37039"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
+        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "fixtureCases": [
+          {
+            "rule": "chrome-consumer",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "chrome-consumer"
+          },
+          {
+            "rule": "feature-surface-owner",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "feature-surface-owner"
+          }
+        ]
       },
       "reviewRequired": false
     },
@@ -9560,12 +9989,44 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/searchChrome.contract/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 292,
+            "scenario": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "assertion": "expect(validateRetirementSources(valid)).toEqual([])",
+            "fingerprint": "4286c0c847aae5b0"
+          },
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 319,
+            "scenario": "rejects a semantic violation of $rule",
+            "assertion": "expect(validateRetirementSources(fixture).map((issue) => issue.rule)).toContain(rule)",
+            "fingerprint": "acbd684a05f37039"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
+        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "fixtureCases": [
+          {
+            "rule": "chrome-consumer",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "chrome-consumer"
+          },
+          {
+            "rule": "feature-surface-owner",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "feature-surface-owner"
+          }
+        ]
       },
       "reviewRequired": false
     },
@@ -9583,12 +10044,44 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/searchChrome.contract/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 292,
+            "scenario": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "assertion": "expect(validateRetirementSources(valid)).toEqual([])",
+            "fingerprint": "4286c0c847aae5b0"
+          },
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 319,
+            "scenario": "rejects a semantic violation of $rule",
+            "assertion": "expect(validateRetirementSources(fixture).map((issue) => issue.rule)).toContain(rule)",
+            "fingerprint": "acbd684a05f37039"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
+        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "fixtureCases": [
+          {
+            "rule": "chrome-consumer",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "chrome-consumer"
+          },
+          {
+            "rule": "feature-surface-owner",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "feature-surface-owner"
+          }
+        ]
       },
       "reviewRequired": false
     },
@@ -9601,17 +10094,34 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface without a Search-only background layer",
       "assertion": "expect(searchStyles).not.toContain('var(--color-page-chrome-bg)')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts batch-dock test + SearchPage hover-border test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/9a88ea3e",
+        "kind": "browser",
+        "id": "computed-style/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 239,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dock.classList.contains('page-chrome-surface')).toBe(true)",
+            "fingerprint": "9e19e52bee46bf07"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 248,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dockStyle.backgroundColor).toBe(styleOf(probe).backgroundColor)",
+            "fingerprint": "e15069c7532fe3d9"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 9a88ea3e covered by batch-dock test + SearchPage hover-border test."
       },
       "reviewRequired": false
     },
@@ -9629,12 +10139,44 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/searchChrome.contract/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 292,
+            "scenario": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "assertion": "expect(validateRetirementSources(valid)).toEqual([])",
+            "fingerprint": "4286c0c847aae5b0"
+          },
+          {
+            "source": "src/test/retirementLint.contract.spec.ts",
+            "line": 319,
+            "scenario": "rejects a semantic violation of $rule",
+            "assertion": "expect(validateRetirementSources(fixture).map((issue) => issue.rule)).toContain(rule)",
+            "fingerprint": "acbd684a05f37039"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
+        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "fixtureCases": [
+          {
+            "rule": "chrome-consumer",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "chrome-consumer"
+          },
+          {
+            "rule": "feature-surface-owner",
+            "positive": "accepts canonical declarations, runtime bridge values and executable class bindings",
+            "negative": "rejects a semantic violation of $rule",
+            "parameter": "feature-surface-owner"
+          }
+        ]
       },
       "reviewRequired": false
     },
@@ -9647,17 +10189,34 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface without a Search-only background layer",
       "assertion": "expect(searchStyles).not.toContain('--search-dock-shadow')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts batch-dock test + SearchPage hover-border test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/9a88ea3e",
+        "kind": "browser",
+        "id": "computed-style/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 239,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dock.classList.contains('page-chrome-surface')).toBe(true)",
+            "fingerprint": "9e19e52bee46bf07"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 248,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dockStyle.backgroundColor).toBe(styleOf(probe).backgroundColor)",
+            "fingerprint": "e15069c7532fe3d9"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 9a88ea3e covered by batch-dock test + SearchPage hover-border test."
       },
       "reviewRequired": false
     },
@@ -9670,17 +10229,34 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface without a Search-only background layer",
       "assertion": "expect(searchStyles).not.toContain('--search-glass-bg')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts batch-dock test + SearchPage hover-border test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/9a88ea3e",
+        "kind": "browser",
+        "id": "computed-style/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 239,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dock.classList.contains('page-chrome-surface')).toBe(true)",
+            "fingerprint": "9e19e52bee46bf07"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 248,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dockStyle.backgroundColor).toBe(styleOf(probe).backgroundColor)",
+            "fingerprint": "e15069c7532fe3d9"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 9a88ea3e covered by batch-dock test + SearchPage hover-border test."
       },
       "reviewRequired": false
     },
@@ -9693,17 +10269,34 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface without a Search-only background layer",
       "assertion": "expect(searchStyles).not.toContain('--search-glass-blur')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts batch-dock test + SearchPage hover-border test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/9a88ea3e",
+        "kind": "browser",
+        "id": "computed-style/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 239,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dock.classList.contains('page-chrome-surface')).toBe(true)",
+            "fingerprint": "9e19e52bee46bf07"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 248,
+            "scenario": "renders the batch dock on the shared chrome surface with no Search-only layer",
+            "assertion": "expect(dockStyle.backgroundColor).toBe(styleOf(probe).backgroundColor)",
+            "fingerprint": "e15069c7532fe3d9"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 9a88ea3e covered by batch-dock test + SearchPage hover-border test."
       },
       "reviewRequired": false
     },
@@ -9716,17 +10309,34 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface without a Search-only background layer",
       "assertion": "expect(searchPage).toContain('hover:border-[var(--color-page-chrome-border-hover)]')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts batch-dock test + SearchPage hover-border test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/9a88ea3e",
+        "kind": "browser",
+        "id": "computed-style/9a88ea3e",
         "requirement": "uses the shared page chrome surface without a Search-only background layer",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 361,
+            "scenario": "keeps the SearchPage library trigger hover border on the shared chrome token",
+            "assertion": "expect(trigger.classList.contains('page-chrome-surface')).toBe(true)",
+            "fingerprint": "293538f2f6176d26"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 375,
+            "scenario": "keeps the SearchPage library trigger hover border on the shared chrome token",
+            "assertion": "expect(styleOf(trigger).borderColor).toBe(styleOf(restProbe).borderColor)",
+            "fingerprint": "33d12977f08d48fd"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 9a88ea3e covered by batch-dock test + SearchPage hover-border test."
       },
       "reviewRequired": false
     },
@@ -9739,17 +10349,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).toContain('<Popover')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9762,17 +10396,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).toContain('page-chrome-surface')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9785,17 +10443,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).toContain('search-save-popover')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9808,17 +10490,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).toContain('rounded-control')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9831,17 +10537,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).not.toContain('rounded-[var(--radius-control)]')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9854,17 +10584,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).not.toContain(\"content: { class: '!p-0' }\")",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9877,17 +10631,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "uses the shared page chrome surface while retaining Search popover treatment",
       "assertion": "expect(searchSavePopover).not.toContain('before:!hidden after:!hidden')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts popover-treatment test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/b149bb99",
+        "kind": "browser",
+        "id": "computed-style/b149bb99",
         "requirement": "uses the shared page chrome surface while retaining Search popover treatment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 270,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(content.classList.contains('search-save-popover')).toBe(true)",
+            "fingerprint": "2f65ff2135eb730f"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 275,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.paddingTop).toBe('6px')",
+            "fingerprint": "45e133b723b78121"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 281,
+            "scenario": "keeps the Search popover treatment on the shared surface through the popover primitive",
+            "assertion": "expect(contentStyle.borderRadius).toBe('6px')",
+            "fingerprint": "4e7f83b7c7525533"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group b149bb99 covered by popover-treatment test."
       },
       "reviewRequired": false
     },
@@ -9900,17 +10678,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "keeps the overlay gutter in CSS for directional alignment",
       "assertion": "expect(searchStyles).toContain('.search-save-popover')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-gutter test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/918f5c82",
+        "kind": "browser",
+        "id": "computed-style/918f5c82",
         "requirement": "keeps the overlay gutter in CSS for directional alignment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 295,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(content.style.marginBlockStart).toBe('')",
+            "fingerprint": "af471914c3f70f2d"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 300,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('10px')",
+            "fingerprint": "a88855f0dde24c91"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 303,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('-10px')",
+            "fingerprint": "645063b6834c093d"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 918f5c82 covered by overlay-gutter test."
       },
       "reviewRequired": false
     },
@@ -9923,17 +10725,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "keeps the overlay gutter in CSS for directional alignment",
       "assertion": "expect(searchStyles).toContain('margin-block-start: var(--spacing-overlay-gutter)')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-gutter test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/918f5c82",
+        "kind": "browser",
+        "id": "computed-style/918f5c82",
         "requirement": "keeps the overlay gutter in CSS for directional alignment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 295,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(content.style.marginBlockStart).toBe('')",
+            "fingerprint": "af471914c3f70f2d"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 300,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('10px')",
+            "fingerprint": "a88855f0dde24c91"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 303,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('-10px')",
+            "fingerprint": "645063b6834c093d"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 918f5c82 covered by overlay-gutter test."
       },
       "reviewRequired": false
     },
@@ -9946,17 +10772,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "keeps the overlay gutter in CSS for directional alignment",
       "assertion": "expect(searchStyles).toContain(\"[data-side='top']\")",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-gutter test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/918f5c82",
+        "kind": "browser",
+        "id": "computed-style/918f5c82",
         "requirement": "keeps the overlay gutter in CSS for directional alignment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 295,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(content.style.marginBlockStart).toBe('')",
+            "fingerprint": "af471914c3f70f2d"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 300,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('10px')",
+            "fingerprint": "a88855f0dde24c91"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 303,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('-10px')",
+            "fingerprint": "645063b6834c093d"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 918f5c82 covered by overlay-gutter test."
       },
       "reviewRequired": false
     },
@@ -9969,17 +10819,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "keeps the overlay gutter in CSS for directional alignment",
       "assertion": "expect(searchSavePopover).not.toContain('positionPopoverAbove')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-gutter test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/918f5c82",
+        "kind": "browser",
+        "id": "computed-style/918f5c82",
         "requirement": "keeps the overlay gutter in CSS for directional alignment",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 295,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(content.style.marginBlockStart).toBe('')",
+            "fingerprint": "af471914c3f70f2d"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 300,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('10px')",
+            "fingerprint": "a88855f0dde24c91"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 303,
+            "scenario": "keeps the overlay gutter in CSS for directional alignment",
+            "assertion": "expect(styleOf(content).marginBlockStart).toBe('-10px')",
+            "fingerprint": "645063b6834c093d"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group 918f5c82 covered by overlay-gutter test."
       },
       "reviewRequired": false
     },
@@ -9992,17 +10866,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "sources image overlay action fills from app overlay-btn tokens",
       "assertion": "expect(searchStyles).toContain('--search-overlay-btn-bg: var(--color-overlay-btn-bg, rgba(0, 0, 0, 0.42))')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-btn-fills test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/e1406aae",
+        "kind": "browser",
+        "id": "computed-style/e1406aae",
         "requirement": "sources image overlay action fills from app overlay-btn tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 313,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg').trim()).toBe('rgba(0, 0, 0, 0.42)')",
+            "fingerprint": "a7076ba08539a124"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 314,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg-hover').trim()).toBe('rgba(0, 0, 0, 0.68)')",
+            "fingerprint": "3aedcc65455325b1"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 343,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "291f55b20f86c0ea"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group e1406aae covered by overlay-btn-fills test."
       },
       "reviewRequired": false
     },
@@ -10015,17 +10913,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "sources image overlay action fills from app overlay-btn tokens",
       "assertion": "expect(searchStyles).toContain('--search-overlay-btn-bg-hover: var(--color-overlay-btn-bg-hover, rgba(0, 0, 0, 0.68))')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-btn-fills test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/e1406aae",
+        "kind": "browser",
+        "id": "computed-style/e1406aae",
         "requirement": "sources image overlay action fills from app overlay-btn tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 313,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg').trim()).toBe('rgba(0, 0, 0, 0.42)')",
+            "fingerprint": "a7076ba08539a124"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 314,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg-hover').trim()).toBe('rgba(0, 0, 0, 0.68)')",
+            "fingerprint": "3aedcc65455325b1"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 343,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "291f55b20f86c0ea"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group e1406aae covered by overlay-btn-fills test."
       },
       "reviewRequired": false
     },
@@ -10038,17 +10960,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "sources image overlay action fills from app overlay-btn tokens",
       "assertion": "expect(searchResultCard).toContain('var(--search-overlay-btn-bg)')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-btn-fills test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/e1406aae",
+        "kind": "browser",
+        "id": "computed-style/e1406aae",
         "requirement": "sources image overlay action fills from app overlay-btn tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 313,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg').trim()).toBe('rgba(0, 0, 0, 0.42)')",
+            "fingerprint": "a7076ba08539a124"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 314,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg-hover').trim()).toBe('rgba(0, 0, 0, 0.68)')",
+            "fingerprint": "3aedcc65455325b1"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 343,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "291f55b20f86c0ea"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group e1406aae covered by overlay-btn-fills test."
       },
       "reviewRequired": false
     },
@@ -10061,17 +11007,41 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "scenario": "sources image overlay action fills from app overlay-btn tokens",
       "assertion": "expect(searchResultCard).toContain('var(--search-overlay-btn-bg-hover)')",
       "disposition": "retire",
-      "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "reason": "P3 final integration (plan-owner 2026-10-11): APPROVED deletion of all 20 searchChrome source-string matchers; red-proven computed-style browser replacement passing first (searchChromeStyle.browser.spec.ts overlay-btn-fills test).",
       "phase": "P3",
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
-        "id": "source-policy/searchChrome.contract/e1406aae",
+        "kind": "browser",
+        "id": "computed-style/e1406aae",
         "requirement": "sources image overlay action fills from app overlay-btn tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 313,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg').trim()).toBe('rgba(0, 0, 0, 0.42)')",
+            "fingerprint": "a7076ba08539a124"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 314,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--search-overlay-btn-bg-hover').trim()).toBe('rgba(0, 0, 0, 0.68)')",
+            "fingerprint": "3aedcc65455325b1"
+          },
+          {
+            "source": "src/features/search/searchChromeStyle.browser.spec.ts",
+            "line": 343,
+            "scenario": "sources image overlay action fills from the app overlay-btn tokens",
+            "assertion": "expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "291f55b20f86c0ea"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: searchChromeStyle.browser.spec.ts 5 passed in real chromium (`cd apps/web && npm run test:browser -- src/features/search/searchChromeStyle.browser.spec.ts`); replaces 20 source-string matchers deleted with searchChrome.contract.spec.ts. Group e1406aae covered by overlay-btn-fills test."
       },
       "reviewRequired": false
     },
@@ -11404,12 +12374,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/pageChrome.contract/a319f341",
         "requirement": "uses the shared Select primitive for Boards sorting, never a command menu",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -11427,12 +12399,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/pageChrome.contract/a319f341",
         "requirement": "uses the shared Select primitive for Boards sorting, never a command menu",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -11450,12 +12424,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/pageChrome.contract/a319f341",
         "requirement": "uses the shared Select primitive for Boards sorting, never a command menu",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -11473,12 +12449,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/pageChrome.contract/a319f341",
         "requirement": "uses the shared Select primitive for Boards sorting, never a command menu",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -13029,12 +14007,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/formControls.contract/5d0f9348",
         "requirement": "wires the redeem input to the error-text contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -13052,12 +14032,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/formControls.contract/5d0f9348",
         "requirement": "wires the redeem input to the error-text contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -13075,12 +14057,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "proposedPhase": null,
       "owner": "/root/p3-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "script",
         "id": "source-policy/formControls.contract/5d0f9348",
         "requirement": "wires the redeem input to the error-text contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-11 integrator: checkThemeContractRetirements.ts self-test 11 cases passed + production pass (`cd apps/web && npx tsx scripts/checkThemeContractRetirements.ts`); wired into `npm run lint` chain as lint:theme-contract."
       },
       "reviewRequired": false
     },
@@ -16793,211 +17777,211 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 74,
           "scenario": "selection port owns the scope: resolution fails closed before any network call",
           "assertion": "expect(getBoardScope()).toEqual({\n    userScope: expect.any(String),\n    workspaceId: WORKSPACE_ID,\n})",
-          "fingerprint": "1d7fe5000362a53b"
+          "fingerprint": "d65b23a385e30a77"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 78,
           "scenario": "selection port owns the scope: resolution fails closed before any network call",
           "assertion": "expect(requireBoardWorkspaceId()).toBe(WORKSPACE_ID)",
-          "fingerprint": "179623f53091c201"
+          "fingerprint": "10f99ed2c019c1d0"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 82,
           "scenario": "selection port owns the scope: resolution fails closed before any network call",
           "assertion": "expect(() => requireBoardWorkspaceId()).toThrow(BoardWorkspaceUnavailableError)",
-          "fingerprint": "9271c9a17011c325"
+          "fingerprint": "788685783cf4ebb0"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 83,
           "scenario": "selection port owns the scope: resolution fails closed before any network call",
           "assertion": "expect(mocks.request).not.toHaveBeenCalled()",
-          "fingerprint": "350687cf21dd0b37"
+          "fingerprint": "7067675eb3673c80"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 90,
           "scenario": "feature store owns the draft overlay: local drafts survive without server writes",
           "assertion": "expect(getBoardById('draft-1')?.name).toBe('Draft')",
-          "fingerprint": "3ab282f5b8da0a2e"
+          "fingerprint": "8ce5093c9bc7fc37"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 91,
           "scenario": "feature store owns the draft overlay: local drafts survive without server writes",
           "assertion": "expect(getBoardState('draft-1')).not.toBeNull()",
-          "fingerprint": "04c11a9e67917e41"
+          "fingerprint": "88bba28151be1fc1"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 92,
           "scenario": "feature store owns the draft overlay: local drafts survive without server writes",
           "assertion": "expect(mocks.request).not.toHaveBeenCalled()",
-          "fingerprint": "12d25005f4c22a50"
+          "fingerprint": "800eccf804543c05"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 101,
           "scenario": "feature store isolates drafts per workspace scope",
           "assertion": "expect(listBoards()).toEqual([])",
-          "fingerprint": "918d306896c37ac6"
+          "fingerprint": "4248e0c648952c08"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 102,
           "scenario": "feature store isolates drafts per workspace scope",
           "assertion": "expect(getBoardState('board-a')).toBeNull()",
-          "fingerprint": "761de978d40231e2"
+          "fingerprint": "9972a30bfee0ecfa"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 105,
           "scenario": "feature store isolates drafts per workspace scope",
           "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['board-a'])",
-          "fingerprint": "3f0e7a3ccc149460"
+          "fingerprint": "ce4cde13744b803c"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 114,
           "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
           "assertion": "expect(query\n    .getQueryCache()\n    .getAll()\n    .map((entry) => entry.queryKey)).toEqual([['boards', WORKSPACE_ID, 'list']])",
-          "fingerprint": "6b218437a215a3fa"
+          "fingerprint": "03701a6b751a9af7"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 120,
           "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
           "assertion": "expect(list).toEqual([\n    expect.objectContaining({ id: 'board-a', name: 'Server Board', revision: 8 }),\n])",
-          "fingerprint": "ad07f013d026b92e"
+          "fingerprint": "3d606ceac0dd4fd1"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-          "line": 123,
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 128,
           "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
-          "assertion": "expect(query.getQueryData(designBoardKeys.list(WORKSPACE_ID))).toEqual(list)",
-          "fingerprint": "338da5879c74a292"
+          "assertion": "expect(query.getQueryData(boardQueryKeys.list(WORKSPACE_ID))).toEqual(list)",
+          "fingerprint": "2fc9b3d189dfef86"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 124,
           "scenario": "caches the catalog list under the flat key [\"boards\", workspaceId, \"list\"]",
           "assertion": "expect(mocks.request).toHaveBeenCalledWith(expect.stringContaining(`/workspaces/${WORKSPACE_ID}/boards`), expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }))",
-          "fingerprint": "632606d3edfed376"
+          "fingerprint": "33b872e603f05cb9"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 135,
           "scenario": "caches each board document under [\"boards\", workspaceId, \"board\", boardId, \"document\"]",
           "assertion": "expect(query\n    .getQueryCache()\n    .getAll()\n    .map((entry) => entry.queryKey)).toEqual([['boards', WORKSPACE_ID, 'board', 'board-a', 'document']])",
-          "fingerprint": "72a6cf3f3d4b1837"
+          "fingerprint": "041f4dc5223fd1e7"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 141,
           "scenario": "caches each board document under [\"boards\", workspaceId, \"board\", boardId, \"document\"]",
           "assertion": "expect(document).toMatchObject({ boardId: 'board-a', revision: 8 })",
-          "fingerprint": "b2079cffe1f4c66c"
+          "fingerprint": "dc3dd51b0deb04f9"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 142,
           "scenario": "caches each board document under [\"boards\", workspaceId, \"board\", boardId, \"document\"]",
           "assertion": "expect(mocks.request).toHaveBeenCalledWith(`/v1/workspaces/${WORKSPACE_ID}/boards/board-a/document`, expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }))",
-          "fingerprint": "ddb8029454bc44ee"
+          "fingerprint": "265a1faf6cbf3937"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 154,
           "scenario": "keeps local draft edits separate from the cached server document",
           "assertion": "expect(getBoardState('board-a')?.promptNodes[0]?.text).toBe('local draft')",
-          "fingerprint": "4b22ae91a6bd7051"
+          "fingerprint": "85eee0260e5111bb"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-          "line": 155,
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 160,
           "scenario": "keeps local draft edits separate from the cached server document",
-          "assertion": "expect(query.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-a'))).toEqual(document)",
-          "fingerprint": "427439bb2e2e7075"
+          "assertion": "expect(query.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-a'))).toEqual(document)",
+          "fingerprint": "2d12852665363811"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 158,
           "scenario": "keeps local draft edits separate from the cached server document",
           "assertion": "expect(document.document).toMatchObject({ payload: { promptNodes: [{ text: 'server' }] } })",
-          "fingerprint": "ef343fffc73fb3c5"
+          "fingerprint": "3b3e9e7725b10d08"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 159,
           "scenario": "keeps local draft edits separate from the cached server document",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "6e1df29e5ab725fb"
+          "fingerprint": "fddad0a9fb482018"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 173,
           "scenario": "never regresses the cached document revision on an older server read",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "1f7c64cf53a557f5"
+          "fingerprint": "5a2f3affd7c46abc"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 174,
           "scenario": "never regresses the cached document revision on an older server read",
           "assertion": "expect(query.getQueryData(options.queryKey)).toMatchObject({\n    revision: 8,\n    document: { payload: { promptNodes: [{ text: 'server' }] } },\n})",
-          "fingerprint": "5b863c23b056cf1f"
+          "fingerprint": "49ec1ffde1ed41e1"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 200,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(oldSignal).toBeInstanceOf(AbortSignal)",
-          "fingerprint": "9d354ea404b67e92"
+          "fingerprint": "d25d164ae6179043"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 204,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(9)",
-          "fingerprint": "6b77ee33dbccb5d9"
+          "fingerprint": "bfae8d296f20b3f8"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 205,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(oldSignal?.aborted).toBe(true)",
-          "fingerprint": "86776b337a5fa96e"
+          "fingerprint": "7b3bf8a3779a9453"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-          "line": 210,
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 215,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
-          "assertion": "expect(query.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-a'))).toBeUndefined()",
-          "fingerprint": "1b2dd4fcc1b1fd8d"
+          "assertion": "expect(query.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-a'))).toBeUndefined()",
+          "fingerprint": "3cb8d12ab0d1a323"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 211,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 9,\n    document: { payload: { promptNodes: [{ text: 'other workspace' }] } },\n})",
-          "fingerprint": "80866eadf5d494a0"
+          "fingerprint": "e32affdb87fd9396"
         },
         {
-          "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
           "line": 215,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "438c90901ce4dd9e"
+          "fingerprint": "ef0df92beadacea0"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence. | 2026-10-11 integrator re-anchor: boardSourceOfTruth + boardSseMapping specs rerun green (2 files / 21 tests passed); designBoardKeys assertions re-pointed at the identical boardQueryKeys production assertions.",
       "missingEvidence": []
     },
     {
@@ -17008,172 +17992,172 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 51,
           "scenario": "global query defaults own document freshness, gc, retry, and focus policy",
           "assertion": "expect(queryClient.getDefaultOptions().queries).toMatchObject({\n    staleTime: 5000,\n    gcTime: 10 * 60 * 1000,\n    retry: 1,\n    refetchOnWindowFocus: false,\n})",
-          "fingerprint": "3b680c1dd195a6bd"
+          "fingerprint": "e2f27d5c37dd6f70"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 60,
           "scenario": "accountScoped() defaults to 15s freshness and keeps the global retry policy",
           "assertion": "expect(STALE_TIME_MS.account).toBe(15000)",
-          "fingerprint": "a6749477c94a24ee"
+          "fingerprint": "96eb27a8e45c1fdd"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 61,
           "scenario": "accountScoped() defaults to 15s freshness and keeps the global retry policy",
           "assertion": "expect(accountScoped()).toEqual({ staleTime: 15000 })",
-          "fingerprint": "aad7fe6aa8724921"
+          "fingerprint": "6dfa6f16508eafac"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 62,
           "scenario": "accountScoped() defaults to 15s freshness and keeps the global retry policy",
           "assertion": "expect('retry' in accountScoped()).toBe(false)",
-          "fingerprint": "fbb428fd0bf9b0f6"
+          "fingerprint": "c231456d4a838ed6"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 72,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(first.getCurrentResult().data?.[0]?.id).toBe('board-a')",
-          "fingerprint": "167ffe09a46dfd17"
+          "fingerprint": "eed1a7923cb164ba"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 73,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(first.getCurrentResult().isStale).toBe(false)",
-          "fingerprint": "1817c875c11ff498"
+          "fingerprint": "cf914cc35553d9a9"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 74,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "acb63966c11752ff"
+          "fingerprint": "06971dc68b6f2654"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 82,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(false)",
-          "fingerprint": "ea85a1f0c40f2c7a"
+          "fingerprint": "1cd97771918edc7b"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 83,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "acb63966c11752ff"
+          "fingerprint": "06971dc68b6f2654"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 85,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(true)",
-          "fingerprint": "d7035668d7ecf4d3"
+          "fingerprint": "a4bd194b0d3be877"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 91,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "c605b72f5ece35de"
+          "fingerprint": "1ab860039013a44f"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 92,
           "scenario": "catalog list rides accountScoped() 15s freshness across navigation",
           "assertion": "expect(staleVisit.getCurrentResult().isStale).toBe(false)",
-          "fingerprint": "85e85475b9396b86"
+          "fingerprint": "59af55adbe60ac96"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 101,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(first.getCurrentResult().data?.boardId).toBe('board-a')",
-          "fingerprint": "53d59308b5cba66f"
+          "fingerprint": "388c3e7459fabde3"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 102,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "b63a1fa4c28e70ae"
+          "fingerprint": "b56b89d4629a1f4c"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 110,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(false)",
-          "fingerprint": "f8af30973d0c93ec"
+          "fingerprint": "ee8cc5902cff6506"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 111,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "b63a1fa4c28e70ae"
+          "fingerprint": "b56b89d4629a1f4c"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 113,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(freshVisit.getCurrentResult().isStale).toBe(true)",
-          "fingerprint": "e40349956a9bfd72"
+          "fingerprint": "73851d3d0bd02e91"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 119,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "b3484989e3f77c14"
+          "fingerprint": "1e1d0ee8c7ae0854"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 120,
           "scenario": "per-board document stays at 5s freshness across navigation",
           "assertion": "expect(staleVisit.getCurrentResult().data?.revision).toBe(1)",
-          "fingerprint": "1278863455e9630b"
+          "fingerprint": "d58b1835c4c66e35"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 132,
           "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
           "assertion": "expect(client.getQueryData(options.queryKey)).toMatchObject({ boardId: 'board-a' })",
-          "fingerprint": "ef960a7af4f484a3"
+          "fingerprint": "abb06c4ae3315be0"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 133,
           "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "a6c4f894aedc97c8"
+          "fingerprint": "de0a988d93514bee"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 135,
           "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
           "assertion": "expect(client.getQueryCache().find({ queryKey: options.queryKey, exact: true })).toBeUndefined()",
-          "fingerprint": "506d602d6a090a66"
+          "fingerprint": "0d6c86e1d07a4ca6"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 141,
           "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "dafbf6586d6730bb"
+          "fingerprint": "2082cf2ada149b1a"
         },
         {
-          "source": "src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "line": 142,
           "scenario": "retains inactive snapshots for 10m and collects them at the inherited gc boundary",
           "assertion": "expect(returnVisit.getCurrentResult().data?.boardId).toBe('board-a')",
-          "fingerprint": "6d87446bd032363c"
+          "fingerprint": "3dbe3871398b5799"
         }
       ],
       "plannedAssertion": null,
@@ -17188,81 +18172,81 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 81,
           "scenario": "keeps refetchOnWindowFocus disabled globally (explicit invalidate only)",
           "assertion": "expect(queryClient.getDefaultOptions().queries?.refetchOnWindowFocus).toBe(false)",
-          "fingerprint": "3d3764cf3e107992"
+          "fingerprint": "6ba2ff29f0384aeb"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 87,
           "scenario": "coalesces a visible double-touch into a single explicit invalidate",
           "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)",
-          "fingerprint": "55dfca6a2c6620e9"
+          "fingerprint": "563df5bdb54305a6"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 91,
           "scenario": "coalesces a visible double-touch into a single explicit invalidate",
           "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(2)",
-          "fingerprint": "dcdcaef9bab1d622"
+          "fingerprint": "536f202d504590d7"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 95,
           "scenario": "coalesces a visible double-touch into a single explicit invalidate",
           "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(2)",
-          "fingerprint": "dcdcaef9bab1d622"
+          "fingerprint": "536f202d504590d7"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 101,
           "scenario": "never fetches while the tab stays hidden",
           "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)",
-          "fingerprint": "98e40683947e060c"
+          "fingerprint": "ec1aa814f1289417"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 108,
           "scenario": "never fetches while the tab stays hidden",
           "assertion": "expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)",
-          "fingerprint": "98e40683947e060c"
+          "fingerprint": "ec1aa814f1289417"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 113,
           "scenario": "never fetches while the tab stays hidden",
           "assertion": "expect(Object.getOwnPropertyDescriptor(document, 'visibilityState')).toEqual(original)",
-          "fingerprint": "67a94cc73aaa34b7"
+          "fingerprint": "910eebceb920ca77"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 129,
           "scenario": "flushes the pending save when the document hides",
           "assertion": "expect(save).toHaveBeenCalledExactlyOnceWith({ silent: true })",
-          "fingerprint": "a9e3447c1971bd9b"
+          "fingerprint": "4bda727438a8de79"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 142,
           "scenario": "binds the hidden visibility event to the pending save",
           "assertion": "expect(save).not.toHaveBeenCalled()",
-          "fingerprint": "d9d82729c52d9aca"
+          "fingerprint": "e67d44e0e9ab8f25"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 145,
           "scenario": "binds the hidden visibility event to the pending save",
           "assertion": "expect(save).toHaveBeenCalledExactlyOnceWith({ silent: true })",
-          "fingerprint": "df8ca6fc8acbb851"
+          "fingerprint": "8b11f62f6aa31c83"
         },
         {
-          "source": "src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "line": 151,
           "scenario": "binds the hidden visibility event to the pending save",
           "assertion": "expect(Object.getOwnPropertyDescriptor(document, 'visibilityState')).toEqual(original)",
-          "fingerprint": "c67b32ee2e4b45da"
+          "fingerprint": "85f8cf1e9da79753"
         }
       ],
       "plannedAssertion": null,
@@ -17277,281 +18261,281 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 156,
           "scenario": "freezes the board event types in the workspace registry",
           "assertion": "expect(WORKSPACE_EVENT_TYPES).toContain('board.document_replaced')",
-          "fingerprint": "aec919c3a2933318"
+          "fingerprint": "7b3fffe6877b8e33"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 157,
           "scenario": "freezes the board event types in the workspace registry",
           "assertion": "expect(WORKSPACE_EVENT_TYPES).toContain('board.member_changed')",
-          "fingerprint": "3895d580b37ec8cc"
+          "fingerprint": "c8c1fcef414bf692"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 158,
           "scenario": "freezes the board event types in the workspace registry",
           "assertion": "expect(WORKSPACE_EVENT_TYPES).toContain('board.share_revoked')",
-          "fingerprint": "b0ac9ac89d084f2a"
+          "fingerprint": "e336f6e34a591f20"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 159,
           "scenario": "freezes the board event types in the workspace registry",
           "assertion": "expect(isWorkspaceEventType('board.document_replaced')).toBe(true)",
-          "fingerprint": "67b6a04fb5247262"
+          "fingerprint": "9572a14506e0994e"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 160,
           "scenario": "freezes the board event types in the workspace registry",
           "assertion": "expect(isWorkspaceEventType('board.member_changed')).toBe(true)",
-          "fingerprint": "5ff1bd2d96ef334c"
+          "fingerprint": "d31fa0284aa5410d"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 161,
           "scenario": "freezes the board event types in the workspace registry",
           "assertion": "expect(isWorkspaceEventType('board.share_revoked')).toBe(true)",
-          "fingerprint": "521bd561b5e50052"
+          "fingerprint": "91f1a2c6267c10e3"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 170,
           "scenario": "fans out board envelopes per workspace and drops cross-workspace frames",
           "assertion": "expect(MockEventSource.instances).toHaveLength(1)",
-          "fingerprint": "c7beb5346270ae36"
+          "fingerprint": "480914d998391914"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 173,
           "scenario": "fans out board envelopes per workspace and drops cross-workspace frames",
           "assertion": "expect(seen).toHaveLength(1)",
-          "fingerprint": "5e89ad57b049ede8"
+          "fingerprint": "464baa434282275a"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 179,
           "scenario": "fans out board envelopes per workspace and drops cross-workspace frames",
           "assertion": "expect(seen).toHaveLength(1)",
-          "fingerprint": "5e89ad57b049ede8"
+          "fingerprint": "464baa434282275a"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 192,
           "scenario": "surfaces gap notices so board clients refetch state",
           "assertion": "expect(gaps).toEqual([{ lastEventId: 'evt_abc123' }])",
-          "fingerprint": "26afa05c00a5eedf"
+          "fingerprint": "f7bd2e86da7a9e2f"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 207,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "044262492cca726b"
+          "fingerprint": "d6b11782fd41010b"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 208,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(7)",
-          "fingerprint": "767f29c431a417f7"
+          "fingerprint": "4332ca1e6dd93ac8"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 211,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "fa60721b336e01a4"
+          "fingerprint": "b30be3648fd322bb"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 212,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 10,\n    document: { payload: { promptNodes: [{ text: 'latest from HTTP' }] } },\n})",
-          "fingerprint": "7c69ac175f3c910b"
+          "fingerprint": "0f95e77c42b84eef"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 216,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(write).not.toHaveBeenCalled()",
-          "fingerprint": "fb01b45d6dc50cab"
+          "fingerprint": "be57301d09e2e1ea"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 218,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "fa60721b336e01a4"
+          "fingerprint": "b30be3648fd322bb"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 227,
           "scenario": "drops document_replaced frames at or below the local revision",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "560108ef703abdee"
+          "fingerprint": "b6bf7f72c5ade354"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 228,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 233,
           "scenario": "drops document_replaced frames at or below the local revision",
-          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(false)",
-          "fingerprint": "cbafd8bfb20c5d96"
+          "assertion": "expect(client.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(false)",
+          "fingerprint": "af94df4129dd7c80"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 240,
           "scenario": "drops document_replaced frames at or below the local revision",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "aed0cd5a22442f7f"
+          "fingerprint": "4416baf0fb9e7d70"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 241,
           "scenario": "drops document_replaced frames at or below the local revision",
           "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(8)",
-          "fingerprint": "29f3e61b29e867b7"
+          "fingerprint": "79f5e48c2b5a393a"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 253,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 258,
           "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
-          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
-          "fingerprint": "49d1fe3922aed750"
+          "assertion": "expect(client.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+          "fingerprint": "ba885c92f1dc7aff"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 256,
           "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
           "assertion": "expect(observer.getCurrentResult().isStale).toBe(true)",
-          "fingerprint": "e6119428c88aa240"
+          "fingerprint": "d15e342ea0f4eb21"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 257,
           "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-          "fingerprint": "1aee821f38c7a305"
+          "fingerprint": "8cdb4d756d748640"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 258,
           "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
           "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 7,\n    document: { payload: { promptNodes: [{ text: 'server' }] } },\n})",
-          "fingerprint": "1d96be833d8179f0"
+          "fingerprint": "00b3d5da24076d45"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 262,
           "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved local draft')",
-          "fingerprint": "dec3bf89f2439422"
+          "fingerprint": "820d22d942ebb38c"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 263,
           "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
           "assertion": "expect(write).not.toHaveBeenCalled()",
-          "fingerprint": "c9db675df0f999ff"
+          "fingerprint": "a7f294e78443c9bc"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 280,
           "scenario": "invalidates the list on member_changed without fetching the document",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(3)",
-          "fingerprint": "8275c65f71b49c6f"
+          "fingerprint": "175d2fe5d16dfefd"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 281,
           "scenario": "invalidates the list on member_changed without fetching the document",
           "assertion": "expect(mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/document'))).toHaveLength(1)",
-          "fingerprint": "db22d38cfc4f062e"
+          "fingerprint": "46056688c9ebdbc5"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 284,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 289,
           "scenario": "invalidates the list on member_changed without fetching the document",
-          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(false)",
-          "fingerprint": "ec63c307c4004d65"
+          "assertion": "expect(client.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(false)",
+          "fingerprint": "1b646e480ef4eb22"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 304,
           "scenario": "invalidates the list and removes the document on share_revoked",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(3)",
-          "fingerprint": "cefed939c6379d7e"
+          "fingerprint": "83d61d8d0e1409ac"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 305,
-          "scenario": "invalidates the list and removes the document on share_revoked",
-          "assertion": "expect(client\n    .getQueryCache()\n    .find({ queryKey: designBoardKeys.document(WORKSPACE_ID, 'board-1'), exact: true })).toBeUndefined()",
-          "fingerprint": "acf33b47b50066b2"
-        },
-        {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 310,
           "scenario": "invalidates the list and removes the document on share_revoked",
-          "assertion": "expect(client.getQueryData(designBoardKeys.list(WORKSPACE_ID))).toBeDefined()",
-          "fingerprint": "8840e07766b45801"
+          "assertion": "expect(client\n    .getQueryCache()\n    .find({ queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'), exact: true })).toBeUndefined()",
+          "fingerprint": "19ca2b70fd47743f"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 324,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 315,
+          "scenario": "invalidates the list and removes the document on share_revoked",
+          "assertion": "expect(client.getQueryData(boardQueryKeys.list(WORKSPACE_ID))).toBeDefined()",
+          "fingerprint": "34b7113bfb0a0d07"
+        },
+        {
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 444,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
-          "assertion": "expect(client.getQueryState(designBoardKeys.list(WORKSPACE_ID))?.isInvalidated).toBe(true)",
-          "fingerprint": "c649cd8503a75f2d"
+          "assertion": "expect(client.getQueryState(boardQueryKeys.list(WORKSPACE_ID))?.isInvalidated).toBe(true)",
+          "fingerprint": "d418ef724469a92e"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 325,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 445,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
-          "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
-          "fingerprint": "3d996a95f513ff92"
+          "assertion": "expect(client.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+          "fingerprint": "b0e6a693cdb6ce7e"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 328,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 448,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
-          "assertion": "expect(client.getQueryState(designBoardKeys.list(OTHER_WORKSPACE_ID))?.isInvalidated).toBe(false)",
-          "fingerprint": "c4a4c09fefc891e3"
+          "assertion": "expect(client.getQueryState(boardQueryKeys.list(OTHER_WORKSPACE_ID))?.isInvalidated).toBe(false)",
+          "fingerprint": "7f0630c8e1b122d7"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 331,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
           "assertion": "expect(client.getQueryState(['tasks', WORKSPACE_ID])?.isInvalidated).toBe(false)",
-          "fingerprint": "5f0dc17cb0d88906"
+          "fingerprint": "b9af6291400237b5"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-          "line": 332,
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 452,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
-          "assertion": "expect(client.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-1'))).toEqual(previous)",
-          "fingerprint": "8504c9e7330e7c62"
+          "assertion": "expect(client.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))).toEqual(previous)",
+          "fingerprint": "307a12966192174d"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 335,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-          "fingerprint": "98a1ff2bd529a878"
+          "fingerprint": "81a2e33378fcd50f"
         },
         {
-          "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "line": 336,
           "scenario": "invalidates the scoped boards root on gap and never setQueryData document content",
           "assertion": "expect(write).not.toHaveBeenCalled()",
-          "fingerprint": "ebffbeba8a974bf3"
+          "fingerprint": "a249aeb37e9e5d02"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence. | 2026-10-11 integrator re-anchor: boardSourceOfTruth + boardSseMapping specs rerun green (2 files / 21 tests passed); designBoardKeys assertions re-pointed at the identical boardQueryKeys production assertions.",
       "missingEvidence": []
     },
     {
@@ -17562,263 +18546,263 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 98,
           "scenario": "sends the observed revision as If-Match on document saves",
           "assertion": "expect(readIfMatch('board-1')).toBe('7')",
-          "fingerprint": "38acbb75cafb62dc"
+          "fingerprint": "63ad47b116590c72"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 99,
           "scenario": "sends the observed revision as If-Match on document saves",
           "assertion": "expect(listBoards()[0]?.revision).toBe(8)",
-          "fingerprint": "0fa8304bb3348315"
+          "fingerprint": "4c3710132556715f"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 121,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
-          "fingerprint": "f24acba1ef764713"
+          "fingerprint": "41b4f984b830d31e"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 122,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBe('revision-conflict')",
-          "fingerprint": "d6e53524b79ff4fe"
+          "fingerprint": "62a06e35c84beb33"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 123,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(true)",
-          "fingerprint": "4c0a9b13a95b59aa"
+          "fingerprint": "c9f25ab2360d0148"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 125,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-draft')",
-          "fingerprint": "f9f619495d9768d7"
+          "fingerprint": "f83139a87c915353"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 126,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(listBoards()[0]?.revision).toBe(7)",
-          "fingerprint": "37f6194591a1a91c"
+          "fingerprint": "b2d1eee1bf85637b"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 141,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })",
-          "fingerprint": "b0af7205f6a87dda"
+          "fingerprint": "5f10b0976f5d2987"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 142,
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')",
-          "fingerprint": "a0719ca965a93d84"
+          "fingerprint": "fb4291685ef212da"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 156,
           "scenario": "keeps archived writes on the banner path, never the conflict path",
           "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ code: 'board_archived' })",
-          "fingerprint": "d09e4f3a96458f84"
+          "fingerprint": "133ab3973bba96bd"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 157,
           "scenario": "keeps archived writes on the banner path, never the conflict path",
           "assertion": "expect(isBoardArchivedError(apiState.saveError)).toBe(true)",
-          "fingerprint": "a193d886ec383d79"
+          "fingerprint": "0e3e9d58d3d4c3be"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 158,
           "scenario": "keeps archived writes on the banner path, never the conflict path",
           "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(false)",
-          "fingerprint": "6987d3e1eefd2bc5"
+          "fingerprint": "a49b9d94aab87991"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 159,
           "scenario": "keeps archived writes on the banner path, never the conflict path",
           "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBeNull()",
-          "fingerprint": "32bcb6993f7c6703"
+          "fingerprint": "e188562e631f55d5"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 178,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({\n    status: 404,\n    code: 'board_not_found',\n})",
-          "fingerprint": "8d9d2119d1da6c69"
+          "fingerprint": "eeae0d8a18558cf5"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 183,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(putCallsFor('board-1')).toHaveLength(1)",
-          "fingerprint": "6a466e5de95e0fa0"
+          "fingerprint": "20d2cb3158deff73"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 184,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(readIfMatch('board-1')).toBe(String(revision ?? 1))",
-          "fingerprint": "0c43ed962f079263"
+          "fingerprint": "4a26a636ceedccb2"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 185,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved-draft')",
-          "fingerprint": "a8f71f7b10ab0803"
+          "fingerprint": "b93f5b9eb2310703"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 186,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(listBoards()[0]?.revision).toBe(revision)",
-          "fingerprint": "63718ae45e1ca17c"
+          "fingerprint": "38248e04af4a8ab1"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 187,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(false)",
-          "fingerprint": "69ef115242e1be5c"
+          "fingerprint": "0b734d096dc1a500"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 188,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(isBoardArchivedError(apiState.saveError)).toBe(false)",
-          "fingerprint": "63171291efd3e66d"
+          "fingerprint": "3d4b443337564630"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 189,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(apiState.createdBoards).toEqual([])",
-          "fingerprint": "4e35572617641d1b"
+          "fingerprint": "69f39a76140354d2"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 190,
           "scenario": "preserves the $label draft when the document PUT returns 404",
           "assertion": "expect(apiState.documentById).toEqual({})",
-          "fingerprint": "a4eb485ef60ce2ac"
+          "fingerprint": "b5e2d96df1f4c934"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 214,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({\n    ok: false,\n    error: { status: 404, code: 'board_not_found' },\n})",
-          "fingerprint": "ddf3ab83b1f52c89"
+          "fingerprint": "1614402e3a610abe"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 218,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(mocks.request).toHaveBeenCalledWith(`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`, expect.objectContaining({ method: 'GET' }))",
-          "fingerprint": "d9843d9dda829f82"
+          "fingerprint": "2d9aa3551c8f2d74"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 222,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('synced-draft')",
-          "fingerprint": "5ce78301e84503c4"
+          "fingerprint": "cbdad3bb0ac6ff4b"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 223,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
-          "fingerprint": "ec579cf0898c52df"
+          "fingerprint": "79891720e6d02f90"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 224,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(listBoards().find((board) => board.id === 'board-1')?.revision).toBe(7)",
-          "fingerprint": "9df0fa18bcf4566e"
+          "fingerprint": "17b4cab3dddaa514"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 227,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({ ok: true })",
-          "fingerprint": "9c6ba477205f9404"
+          "fingerprint": "77422a1625a89f3a"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 229,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['offline-new'])",
-          "fingerprint": "ed4afdd6f2b882f9"
+          "fingerprint": "9f01a28dc3e7ea03"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 230,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
-          "fingerprint": "ec579cf0898c52df"
+          "fingerprint": "79891720e6d02f90"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 231,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(getBoardState('board-1')).toBeNull()",
-          "fingerprint": "8e9bc439ccdabe95"
+          "fingerprint": "0a5fb96c94afe1ce"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 232,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(putCallsFor('board-1')).toEqual([])",
-          "fingerprint": "43ca6e0223a6643a"
+          "fingerprint": "0d3a167ee32763dc"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 233,
           "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
           "assertion": "expect(apiState.createdBoards).toEqual([])",
-          "fingerprint": "06e2d7fd75b39d18"
+          "fingerprint": "32cd409eedae4890"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 256,
           "scenario": "renames PATCH-only without a document write and advances the revision",
           "assertion": "expect(patchCallsFor('board-1')).toHaveLength(1)",
-          "fingerprint": "7068cf7d9c4482e7"
+          "fingerprint": "41adb9aec5520a96"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 257,
           "scenario": "renames PATCH-only without a document write and advances the revision",
           "assertion": "expect(putCallsFor('board-1')).toEqual([])",
-          "fingerprint": "97beb7a86f47e9a3"
+          "fingerprint": "7421ef69f06e8099"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 258,
           "scenario": "renames PATCH-only without a document write and advances the revision",
           "assertion": "expect(remote?.name).toBe('Explicit New Name')",
-          "fingerprint": "a637b9bca5f03030"
+          "fingerprint": "665ce95cbb85c6ab"
         },
         {
-          "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
           "line": 259,
           "scenario": "renames PATCH-only without a document write and advances the revision",
           "assertion": "expect(listBoards()[0]?.revision).toBe(8)",
-          "fingerprint": "0f2abff06d87681f"
+          "fingerprint": "39634d988df067ef"
         }
       ],
       "plannedAssertion": null,
@@ -17833,81 +18817,81 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 61,
           "scenario": "lets the local-newer draft win over an older remote snapshot",
           "assertion": "expect(listBoards()[0]?.name).toBe('Local Rename')",
-          "fingerprint": "e029f0aca2f785f7"
+          "fingerprint": "d5b74ee1d5a5a53e"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 62,
           "scenario": "lets the local-newer draft win over an older remote snapshot",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-newer')",
-          "fingerprint": "25d69ba261737778"
+          "fingerprint": "7b8dce0d5f59063e"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 78,
           "scenario": "lets an explicit rollback converge to the remote snapshot",
           "assertion": "expect(listBoards()[0]?.name).toBe('Remote Winner')",
-          "fingerprint": "488ed69013ee5437"
+          "fingerprint": "2a67bd611929f8e4"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 79,
           "scenario": "lets an explicit rollback converge to the remote snapshot",
           "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')",
-          "fingerprint": "ada1ac37c08d097d"
+          "fingerprint": "f7f27f3cfe227527"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 107,
           "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
           "assertion": "expect(listBoards()\n    .map((board) => board.id)\n    .sort()).toEqual(['offline-new', 'remote-only'])",
-          "fingerprint": "ed2b0550d0b94ad6"
+          "fingerprint": "4a13378edfc355cd"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 112,
           "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
           "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
-          "fingerprint": "d5cf933c513b2df1"
+          "fingerprint": "acbae5c0e34379be"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 113,
           "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
           "assertion": "expect(getBoardState('deleted-elsewhere')).toBeNull()",
-          "fingerprint": "fc2cae08b7d78b28"
+          "fingerprint": "a9028fece309da28"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 114,
           "scenario": "keeps never-synced offline creations and drops deleted-elsewhere boards",
           "assertion": "expect(mocks.request.mock.calls.filter(([url, config]) => typeof url === 'string' &&\n    url.includes('deleted-elsewhere') &&\n    typeof config === 'object' &&\n    config !== null &&\n    'method' in config &&\n    config.method === 'PUT')).toEqual([])",
-          "fingerprint": "32b79d7803acd7bd"
+          "fingerprint": "680e7f2ae616fa50"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 151,
           "scenario": "freezes the overlay to the captured scope: a workspace switch drops the late response",
           "assertion": "expect(hydrateTask).resolves.toMatchObject({ ok: false })",
-          "fingerprint": "cc189e18b83bfdb9"
+          "fingerprint": "4872ad4ccdae19fa"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 152,
           "scenario": "freezes the overlay to the captured scope: a workspace switch drops the late response",
           "assertion": "expect(listBoards()).toEqual([])",
-          "fingerprint": "8cea8473eb2b4961"
+          "fingerprint": "e3b3cc601aa1b4d6"
         },
         {
-          "source": "src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "source": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
           "line": 153,
           "scenario": "freezes the overlay to the captured scope: a workspace switch drops the late response",
           "assertion": "expect(getBoardState('board-a')).toBeNull()",
-          "fingerprint": "bb1f37a877493683"
+          "fingerprint": "2a23cbf96af251e4"
         }
       ],
       "plannedAssertion": null,
@@ -17920,9 +18904,35 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "owner": "/root/p3-lane",
       "requirement": "After formal P2.5 acceptance and merge, bind the frozen race scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
       "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts :: cancels the old workspace read and ignores its late response after observer navigation; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
-      "verifiedRun": null
+      "evidence": [
+        {
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 205,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(oldSignal).toBeInstanceOf(AbortSignal)",
+          "fingerprint": "d25d164ae6179043"
+        },
+        {
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 209,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(9)",
+          "fingerprint": "bfae8d296f20b3f8"
+        },
+        {
+          "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+          "line": 220,
+          "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "ef0df92beadacea0"
+        }
+      ],
+      "plannedAssertion": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts :: cancels the old workspace read and ignores its late response after observer navigation; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
+      "verifiedRun": null,
+      "missingEvidence": [
+        "Production navigation/observer integration and real pre-integration red/green not yet recorded. Prior helper green remains historical only."
+      ],
+      "historicalVerifiedRun": "2026-10-11 integrator: `npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts -t 'cancels the old workspace read and ignores its late response after observer navigation'` -> 1 passed | 7 skipped."
     },
     {
       "id": "board/query-migration-trio-broadcast",
@@ -17930,9 +18940,35 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "owner": "/root/p3-lane",
       "requirement": "After formal P2.5 acceptance and merge, bind the frozen broadcast scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
       "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "src/features/board/application/sync/boardSseMapping.contract.spec.ts :: invalidates the document on document_replaced with 500ms coalesce; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
-      "verifiedRun": null
+      "evidence": [
+        {
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 212,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
+          "fingerprint": "d6b11782fd41010b"
+        },
+        {
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 213,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(7)",
+          "fingerprint": "4332ca1e6dd93ac8"
+        },
+        {
+          "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "line": 216,
+          "scenario": "invalidates the document on document_replaced with 500ms coalesce",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "b30be3648fd322bb"
+        }
+      ],
+      "plannedAssertion": "src/features/board/session/sync/boardSseMapping.contract.spec.ts :: invalidates the document on document_replaced with 500ms coalesce; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
+      "verifiedRun": null,
+      "missingEvidence": [
+        "Production navigation/observer integration and real pre-integration red/green not yet recorded. Prior helper green remains historical only."
+      ],
+      "historicalVerifiedRun": "2026-10-11 integrator: `npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts -t 'invalidates the document on document_replaced with 500ms coalesce'` -> 1 passed | 12 skipped."
     },
     {
       "id": "board/query-migration-trio-conflict",
@@ -17940,9 +18976,35 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "owner": "/root/p3-lane",
       "requirement": "After formal P2.5 acceptance and merge, bind the frozen conflict scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
       "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts :: keeps the draft and the conflict status on 409, then converges on explicit reload; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
-      "verifiedRun": null
+      "evidence": [
+        {
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 125,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
+          "fingerprint": "41b4f984b830d31e"
+        },
+        {
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 126,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBe('revision-conflict')",
+          "fingerprint": "62a06e35c84beb33"
+        },
+        {
+          "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+          "line": 145,
+          "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
+          "assertion": "expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })",
+          "fingerprint": "5f10b0976f5d2987"
+        }
+      ],
+      "plannedAssertion": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts :: keeps the draft and the conflict status on 409, then converges on explicit reload; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
+      "verifiedRun": null,
+      "missingEvidence": [
+        "Production navigation/observer integration and real pre-integration red/green not yet recorded. Prior helper green remains historical only."
+      ],
+      "historicalVerifiedRun": "2026-10-11 integrator: `npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'` -> 1 passed | 7 skipped."
     },
     {
       "id": "board/workspace-cache-isolation",
@@ -17952,25 +19014,25 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "source": "src/features/board/session/catalog/scope.contract.spec.ts",
           "line": 59,
           "scenario": "isolates catalog and state caches per workspace",
           "assertion": "expect(listBoards()).toEqual([])",
-          "fingerprint": "41222c1d85e91643"
+          "fingerprint": "b34a4be6afe5a0fe"
         },
         {
-          "source": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "source": "src/features/board/session/catalog/scope.contract.spec.ts",
           "line": 60,
           "scenario": "isolates catalog and state caches per workspace",
           "assertion": "expect(getBoardState('board-a')).toBeNull()",
-          "fingerprint": "a3ad66cd8c22a0f9"
+          "fingerprint": "20b87b4efebdb1e3"
         },
         {
-          "source": "src/features/board/application/catalog/scope.contract.spec.ts",
+          "source": "src/features/board/session/catalog/scope.contract.spec.ts",
           "line": 67,
           "scenario": "isolates catalog and state caches per workspace",
           "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['board-a'])",
-          "fingerprint": "31f0cee80bf679cf"
+          "fingerprint": "f0983c68cce7efdb"
         }
       ],
       "plannedAssertion": null,
@@ -17984,11 +19046,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/board/application/catalog/commands.contract.spec.ts",
+          "source": "src/features/board/session/catalog/commands.contract.spec.ts",
           "line": 144,
           "scenario": "rolls back rename by hydrating the conflict target on revision conflicts",
           "assertion": "expect(result).toMatchObject({ ok: false, reason: 'revision-conflict' })",
-          "fingerprint": "4039453ec53a74f5"
+          "fingerprint": "4dcddf24db1152b2"
         }
       ],
       "plannedAssertion": null,
@@ -17999,10 +19061,32 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "Old workspace.boards and new board keys render equal four-locale copy/interpolation/plurals while aliases are active; remove old keys after one phase with missing-key English fallback.",
-      "status": "pending",
-      "evidence": [],
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/board/ui/gallery/boardLocaleDualKey.contract.spec.ts",
+          "line": 68,
+          "scenario": "renders equal old and new copy for every key in all four locales",
+          "assertion": "expect(current).toBe(legacy)",
+          "fingerprint": "296258c12033d09e"
+        },
+        {
+          "source": "src/features/board/ui/gallery/boardLocaleDualKey.contract.spec.ts",
+          "line": 74,
+          "scenario": "renders equal old and new copy for every key in all four locales",
+          "assertion": "expect(translate('board.title')).toBe(TITLES[locale])",
+          "fingerprint": "dd612077946dbed4"
+        },
+        {
+          "source": "src/features/board/ui/gallery/boardLocaleDualKey.contract.spec.ts",
+          "line": 90,
+          "scenario": "interpolates the edited date identically under both keys",
+          "assertion": "expect(translate('board.edited', { date: '2026-10-11' })).toBe(translate('workspace.boards.edited', { date: '2026-10-11' }))",
+          "fingerprint": "03dad4b16ccfa78f"
+        }
+      ],
       "plannedAssertion": "Old workspace.boards and new board keys render equal four-locale copy/interpolation/plurals while aliases are active; remove old keys after one phase with missing-key English fallback.",
-      "verifiedRun": null
+      "verifiedRun": "2026-10-11 integrator: boardLocaleDualKey.contract.spec.ts 4 passed (`cd apps/web && npm run test:run -- src/features/board/presentation/catalog/boardLocaleDualKey.contract.spec.ts`)."
     },
     {
       "id": "search/auth-explicit-command",
@@ -18012,15 +19096,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/search/application/useVisionQueryLifecycle.unit.spec.ts",
+          "source": "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
           "line": 130,
           "scenario": "gates paid extraction behind explicit authentication and only resumes on command",
           "assertion": "expect(mocks.requireLogin).toHaveBeenCalledWith({ kind: 'vision-search', query: 'warm cafe' })",
-          "fingerprint": "f4cc82dd75a64425"
+          "fingerprint": "a34bdda8f47ed20c"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-11 integrator: useVisionQueryLifecycle.unit.spec.ts 8 passed after application/->session/ move (identical assertions, path-bound fingerprints recomputed)."
     },
     {
       "id": "search/inflight-idempotency",
@@ -18030,15 +19114,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/search/application/useVisionQueryLifecycle.unit.spec.ts",
+          "source": "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
           "line": 198,
           "scenario": "shares an in-flight logical request and reuses its idempotency key on retry",
           "assertion": "expect(second).toBe(first)",
-          "fingerprint": "44a03c46cb287683"
+          "fingerprint": "67d22362ca4fe656"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-11 integrator: useVisionQueryLifecycle.unit.spec.ts 8 passed after application/->session/ move (identical assertions, path-bound fingerprints recomputed)."
     },
     {
       "id": "account/checkout-idempotency",
@@ -18048,11 +19132,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/account/presentation/recharge/RechargePane.component.spec.ts",
+          "source": "src/features/account/ui/recharge/RechargePane.component.spec.ts",
           "line": 724,
           "scenario": "reuses the idempotency key for a retry and rotates it when the purchase intent changes",
           "assertion": "expect(createCheckout).toHaveBeenCalledTimes(1)",
-          "fingerprint": "c788d532364d303d"
+          "fingerprint": "57f7ab0296496351"
         }
       ],
       "plannedAssertion": null,
@@ -18066,11 +19150,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/account/presentation/recharge/RechargePane.component.spec.ts",
+          "source": "src/features/account/ui/recharge/RechargePane.component.spec.ts",
           "line": 409,
           "scenario": "renders waiting, delayed credit processing, and expired pending order states",
           "assertion": "expect(await screen.findByText('Waiting for payment confirmation')).toBeVisible()",
-          "fingerprint": "b65fea8aca3ab503"
+          "fingerprint": "35b560df7e477994"
         }
       ],
       "plannedAssertion": null,
@@ -18081,20 +19165,64 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "A 403 from Account credits/payment/profile mutations performs no success transition, leaks no state, and exposes the approved failure feedback.",
-      "status": "pending",
-      "evidence": [],
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/account/session/permission403.contract.spec.ts",
+          "line": 46,
+          "scenario": "performs no Idea-read mutations when redemption fails with 403",
+          "assertion": "expect(workflow.redeem('IDEA2026')).rejects.toBe(error)",
+          "fingerprint": "f157116ab64bddf6"
+        },
+        {
+          "source": "src/features/account/session/permission403.contract.spec.ts",
+          "line": 96,
+          "scenario": "performs no avatar state change and routes 403 through avatar feedback",
+          "assertion": "expect(failure).toHaveBeenCalledWith(error)",
+          "fingerprint": "b63aaf90ae0e30fa"
+        },
+        {
+          "source": "src/features/account/session/permission403.contract.spec.ts",
+          "line": 177,
+          "scenario": "performs no checkout navigation and keeps the payment form retryable on 403",
+          "assertion": "expect(await screen.findByRole('alert')).toBeVisible()",
+          "fingerprint": "323b6b6d80149844"
+        }
+      ],
       "plannedAssertion": "A 403 from Account credits/payment/profile mutations performs no success transition, leaks no state, and exposes the approved failure feedback.",
-      "verifiedRun": null
+      "verifiedRun": "2026-10-11 integrator: permission403.contract.spec.ts 5 passed (`cd apps/web && npm run test:run -- src/features/account/session/permission403.contract.spec.ts`)."
     },
     {
       "id": "account/overlay-provider-lifecycle",
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "Two Workspace hosts keep separately installed Account overlays; open/close controls target their own host and unmount releases its overlay.",
-      "status": "pending",
-      "evidence": [],
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+          "line": 70,
+          "scenario": "keeps two installed hosts isolated: open/close targets only its own overlay",
+          "assertion": "expect(overlayA).not.toBe(overlayB)",
+          "fingerprint": "9a616d796ab23288"
+        },
+        {
+          "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+          "line": 124,
+          "scenario": "releases a host overlay on unmount without touching the surviving host",
+          "assertion": "expect(overlayB!.viewModel.visible.value).toBe(true)",
+          "fingerprint": "e9feec8ac2e581fa"
+        },
+        {
+          "source": "src/features/account/session/overlayProviderLifecycle.contract.spec.ts",
+          "line": 138,
+          "scenario": "has no implicit global fallback: useAccountOverlay without a host throws",
+          "assertion": "expect(() => render(Consumer)).toThrow('Account overlay is not installed')",
+          "fingerprint": "d75f92e082851bf1"
+        }
+      ],
       "plannedAssertion": "Two Workspace hosts keep separately installed Account overlays; open/close controls target their own host and unmount releases its overlay.",
-      "verifiedRun": null
+      "verifiedRun": "2026-10-11 integrator: overlayProviderLifecycle.contract.spec.ts 3 passed (`cd apps/web && npm run test:run -- src/features/account/session/overlayProviderLifecycle.contract.spec.ts`); evidence re-pointed at the identical assertions after the account session per-scope split (session/shared -> session/overlayProviderLifecycle, assertions/lines unchanged); replaces 7 source-text ownership matchers deleted with accountOwnership.contract.spec.ts."
     },
     {
       "id": "admin/users-permission",
@@ -19035,15 +20163,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "document/schema/media ownership",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/board/application/",
       "target": "src/features/board/session/",
       "phase": "P3",
       "owner": "/root/p3-lane",
-      "requirement": "catalog/sync/shareJoin/adapters; test companions colocate",
-      "status": "planned"
+      "requirement": "catalog/sync/share-join/adapters; test companions colocate",
+      "status": "done"
     },
     {
       "source": "src/features/board/infrastructure/",
@@ -19051,7 +20179,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "resource/browser/persistence remain explicit adapters",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/board/presentation/catalog/",
@@ -19059,7 +20187,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "boardCardMotion orphan spec colocates with skin",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/account/domain/",
@@ -19067,15 +20195,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "money/return/chart/tabs pure ownership",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/account/application/ + infrastructure/",
       "target": "src/features/account/session/",
       "phase": "P3",
       "owner": "/root/p3-lane",
-      "requirement": "merge paired use cases/resources by scope, no billing behavior changes",
-      "status": "planned"
+      "requirement": "merge paired use cases/resources by scope, no billing behavior changes. Accepted variance (integrator 2026-10-11): session keeps per-scope subdirs (billing/credits/payments/rewards/usage/profile/security + overlay/accountWorkspace/invalidateUserMoney/workspaceBilling behind the session/index.ts seam); core stays flat (chart/formatters/money/return/tabs). Seam evidence: src/features/account/session/index.ts (active cascading seam, sole parent consumer); size-guard evidence: governance/function-length max 100 + audit:complexity (session functions within guard, no new violations).",
+      "status": "done"
     },
     {
       "source": "src/features/account/presentation/",
@@ -19083,7 +20211,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "recharge/billing/usage/rewards/security/profile/dialog/shared/chrome",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/search/domain/",
@@ -19091,7 +20219,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "pure ownership",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/search/application/ + infrastructure/",
@@ -19099,7 +20227,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "disambiguate screenRuntime and duplicate filenames",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/search/presentation/",
@@ -19107,7 +20235,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "browser/components/pages",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/search/searchChrome.contract.spec.ts",
@@ -19115,7 +20243,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "orphan spec follows owner",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/library/{domain,application,infrastructure,components}/",
@@ -23688,13 +24816,13 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
     },
     {
       "source": "src/shared/theme/atoms/pageChrome.contract.spec.ts",
-      "targets": ["src/theme/atoms/pageChrome.contract.spec.ts"],
+      "targets": ["scripts/checkThemeContractRetirements.ts"],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
-      "disposition": "horizontal-or-companion",
+      "disposition": "retired-effective-replacement",
       "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
@@ -26625,7 +27753,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "owner": "/root",
       "implementationStatus": "complete",
       "verificationStatus": "passed",
-      "acceptanceStatus": "accepted",
+      "acceptanceStatus": "pending",
       "startedAt": "2026-10-10T20:18:56.581Z",
       "completedAt": "2026-10-10T20:45:09.451503+00:00",
       "rollbackCheckpoint": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
@@ -26642,9 +27770,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "P2.5/PHASE-QUOTAS",
         "P2.5/PHASE-COMMON"
       ],
-      "unresolvedItems": [],
-      "acceptedBy": "/root",
-      "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+      "unresolvedItems": [
+        "Current revision is technically verified locally; formal P2.5 acceptance remains pending because this working tree has no new immutable merge/checkpoint acceptance."
+      ],
+      "acceptedBy": null,
+      "acceptedAt": null,
       "acceptanceBasis": "Current delegated closeout review, with accepted historical checkpoint deviation; no historical before-start proof.",
       "historicalGaps": [
         "Historical before-start green rollback checkpoint absent for completed phases.",
@@ -26668,7 +27798,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/.dependency-cruiser.cjs",
-        "sha256": "6fd632daa50b78711d7aa2da8728db9f13522287c611e77fda60b97493ebe8c5"
+        "sha256": "842c1ccc09dd568f953fe6090217a7d1f2b69aa8dd08f8bf5a397bc369899a4f"
       },
       {
         "path": "apps/web/eslint.config.js",
@@ -26680,7 +27810,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/knip.jsonc",
-        "sha256": "f2556227711f34fb660fe834be41d5ea21ffac4ca73150d8ab1c0a5fa7dcd09f"
+        "sha256": "b7dd59e337f1b80490e5e415abd0400d235fd1e3e3bc61707a4c5e28e26f15cc"
       },
       {
         "path": "apps/web/knip.production.config.ts",
@@ -26692,7 +27822,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/package.json",
-        "sha256": "202ac5d26dfbeda461365b5aead61353afa87ffbfbf1cd9b47c0a7f410ec9bf0"
+        "sha256": "1278d2286f546442f64d992dd2fbdb1c4ccd14947acc809fffd26e3c53d0cf6b"
       },
       {
         "path": "apps/web/scripts/accessibilitySmoke.ts",
@@ -26700,11 +27830,19 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/scripts/checkFrontendMigrationLedger.ts",
-        "sha256": "30fe65d863adc82a1d6b7ecdb4fc2325fbb0d354b14c9ebe99a2f567fb670b0a"
+        "sha256": "773a07ae82d35caa3d3f3722bf9d68f7bf83d430fc5fb20e864a675ba7a5e767"
+      },
+      {
+        "path": "apps/web/scripts/checkRetirementReplacements.ts",
+        "sha256": "dfe313f5b7f2f350dc900f9fee136730c8e189147a555a49193e1da4be42e7a7"
+      },
+      {
+        "path": "apps/web/scripts/checkThemeContractRetirements.ts",
+        "sha256": "b37a39165d8e1fcdde0ac208418cf0dbc44c70bb942b2601e96fa2d050be213a"
       },
       {
         "path": "apps/web/scripts/knipGovernanceManifest.json",
-        "sha256": "80167cb4762a8fccf1999a1d393dfe8d58d76e57bf055d06053e3afdb858a753"
+        "sha256": "78773510aed3e8df10266db74600769ec6f2a96a3ba1e3c2028238d2368bfd5a"
       },
       {
         "path": "apps/web/scripts/smokeSupport.contract.spec.ts",
@@ -26724,7 +27862,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/src/core/CONTEXT.md",
-        "sha256": "40e1457214169b3a3f518cdaf67d6ba8d5d244bc1ce0efaf9c2f5a90c529edd7"
+        "sha256": "87e65b2e2b3f8cdc16c2dca336efb3a76c99fe4244f65f50da738d6fbf87e15a"
       },
       {
         "path": "apps/web/src/core/query/queryClient.ts",
@@ -26735,60 +27873,160 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "sha256": "e74f2c97c3cb0a09546d6504c8634d61808101ba6ccd7268bbc327c68fdfb274"
       },
       {
+        "path": "apps/web/src/features/account/CONTEXT.md",
+        "sha256": "573a9b7b3eaf5f5995a791fc87a2f155ab041c84480601e2cda54e8830698a8d"
+      },
+      {
+        "path": "apps/web/src/features/account/core/chart.ts",
+        "sha256": "3be5d841f2c4f479cd8095ce7e1d40fc2171257402733e72864d7fbe1bb16eb2"
+      },
+      {
+        "path": "apps/web/src/features/account/core/index.ts",
+        "sha256": "b04c026b822c55838ec871522bb84e3473ed9999e1d58524264a9a94194a835b"
+      },
+      {
+        "path": "apps/web/src/features/account/core/money.ts",
+        "sha256": "ec6b4990ca0f965440b90c6769a8fa92614caf0d812a32f0301e3d40e9db8db1"
+      },
+      {
+        "path": "apps/web/src/features/account/index.ts",
+        "sha256": "65aa0543eb84246551c33732c75486e3b1076f71d75ccd7699817dde9ca863dc"
+      },
+      {
+        "path": "apps/web/src/features/account/session/chart.ts",
+        "sha256": "d4ce63f1016b6e183efebbd783c34b08e1c4b5b656969adb42f5566fa49a05ab"
+      },
+      {
+        "path": "apps/web/src/features/account/session/formatters.ts",
+        "sha256": "b3024898784341a954ed634c6629c43a426c811f66750aa3bce865c42ecdd83a"
+      },
+      {
+        "path": "apps/web/src/features/account/session/index.ts",
+        "sha256": "76146e5d8a1fdc19fadb6c769720674a46703b45ca4c7a594f11e2fc43de8a47"
+      },
+      {
+        "path": "apps/web/src/features/account/session/money.ts",
+        "sha256": "5078b9bae115dc333459df835b79602d49f2ca0d6fdaf133e9382b581aa1af17"
+      },
+      {
+        "path": "apps/web/src/features/account/ui/billing/BillingPane.vue",
+        "sha256": "dcc4986d67a9481ae45a4e752a415f0df2b6d7a2b9648085297727e69916cb20"
+      },
+      {
+        "path": "apps/web/src/features/account/ui/recharge/HistoryTable.vue",
+        "sha256": "9e4981541dc9f8db51da1ac37bb64e5ab2ee305ba64154b7d815dd9b68082f16"
+      },
+      {
+        "path": "apps/web/src/features/account/ui/recharge/PendingOrders.vue",
+        "sha256": "e072f5c3ce199435f85cfc3370598906c28c8f0428ac2f7694ac451178df9d8f"
+      },
+      {
+        "path": "apps/web/src/features/account/ui/recharge/PurchaseCard.vue",
+        "sha256": "d1bbf5daca3e121ea011a571633cb11a51f9de38a9df7e9538a17a7dd2d2533c"
+      },
+      {
+        "path": "apps/web/src/features/account/ui/rewards/RewardsPane.vue",
+        "sha256": "be213c080eb22487c5990d546358f82a3e615c611e5cdd3af67315bb76b5d15c"
+      },
+      {
+        "path": "apps/web/src/features/account/ui/usage/UsagePane.vue",
+        "sha256": "706e56e74638b3833c309b33dcd818c832feac94cb5e565945a7f51ac5ce2e52"
+      },
+      {
         "path": "apps/web/src/features/board/CONTEXT.md",
-        "sha256": "12a4401f990e7950f885ac13197d6e1887268ad20f86705f89b00051014c3628"
+        "sha256": "c05bc1aaaa661f3614541030ded0921269a84d368d0c7a8aeb5e8f14b86753af"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
-        "sha256": "32c9ce2699407a51939262971654afb65c3c354e967afcaf886bc8d4e3a88a7b"
+        "path": "apps/web/src/features/board/session/adapters/boardsResource.ts",
+        "sha256": "e21b6b7a1686b294beda16ff84003dfdcd74905e92ab3b5a50ee3979d8453421"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
-        "sha256": "76527fb0ada7470c721823aafe7ec97eadc74b8391960ff7980fcb6fbcfb90ef"
+        "path": "apps/web/src/features/board/session/catalog/repository.ts",
+        "sha256": "44cb58e934bf31f31c6239adc73a06f53605481fd48e185911ae9f3fe514ffd6"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardFocusControls.contract.spec.ts",
-        "sha256": "85876ea84a552553fea7ac7ad639475954371218f9090ae3816af9f4634a5742"
+        "path": "apps/web/src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+        "sha256": "68d77d0ee6a7c44a8686f4ab697dc99449b972516ea18b95e1f34243a5b09c80"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
-        "sha256": "9eaa7c84e8177b3eca4c754af31e9900a33586c3eaf5b12ea21ddce09abc845e"
+        "path": "apps/web/src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
+        "sha256": "5ae115fa0c87410e555a3125a37d476eca77f78cab8d208ef17cacbee3569c6e"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-        "sha256": "f3c66be6871488d94cc2940c2ee336b5cfe1965447d1d2ad3d9b4263c01f827f"
+        "path": "apps/web/src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
+        "sha256": "33fc5c9465c6c67cfd3c38f72ab6d948dde490378d8c44a4ca2995731d25856f"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-        "sha256": "16a529db9b96738d9a81eae537e802f915993a600bf2aadaf2f65ee772f307ec"
+        "path": "apps/web/src/features/board/session/sync/boardDraftState.ts",
+        "sha256": "1af27666c66bc66dd6df3108130860dcc341d60a523f04a9026ea3f5e3f6dd3c"
       },
       {
-        "path": "apps/web/src/features/board/application/sync/boardSync.ts",
-        "sha256": "9e7e7d01e0167c1d6ce6b0aacfc40cad5fd962cbfd8620d4c4b5970c5be7203f"
+        "path": "apps/web/src/features/board/session/sync/boardFocusControls.contract.spec.ts",
+        "sha256": "1492e5e6b67e812b9c9c05d8fb9e8265ebcb9fa2ce3b69ce4937454b9e7e23df"
       },
       {
-        "path": "apps/web/src/features/board/infrastructure/api/boardsResource.ts",
-        "sha256": "3f9a8c1a7aa9a34933ce55cd11c5e437fe860744d6571dd3305118a4da668111"
+        "path": "apps/web/src/features/board/session/sync/boardQueries.ts",
+        "sha256": "7a8c09e004024bf5c1bd94346e379a5f9744f375d3e932f2efb259c29a5cd19e"
       },
       {
-        "path": "apps/web/src/features/board/presentation/catalog/galleryController.ts",
-        "sha256": "74224c5fb4fd14324e65d6eecab34a86c871080e60c932c0c7142ebb8a0cbb59"
+        "path": "apps/web/src/features/board/session/sync/boardQueryKeys.ts",
+        "sha256": "720bc9b2fbdb65dc3a37f675d286ef7f510b3dca719f1f9b72ba5341533339de"
       },
       {
-        "path": "apps/web/src/features/board/testing/syncDesignHarness.ts",
-        "sha256": "efc0af403390d08367d2d62a0fae699c3f73f03490b225e6e75d1a563b989652"
+        "path": "apps/web/src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
+        "sha256": "9397abd822551d1ca5637c86bedc0bfb32af8e31f66106734fbdba117f9ab00e"
+      },
+      {
+        "path": "apps/web/src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+        "sha256": "ae598de2bd698e3849048b8d8f833afd791fa7e47de0773f24aad236858988ff"
+      },
+      {
+        "path": "apps/web/src/features/board/session/sync/boardSseInvalidation.ts",
+        "sha256": "5696b7c07729611814dd445c84c9160034fb61719d4002550beba5e3721f6a85"
+      },
+      {
+        "path": "apps/web/src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+        "sha256": "1ae67b215a5cfcf894b3c7d9562920354f814df7942f87a4227e877a00a21a71"
+      },
+      {
+        "path": "apps/web/src/features/board/session/sync/boardSync.ts",
+        "sha256": "2f811092c49a3b2e70785f83b32510822b4921353ac6d2a1779a23de0276541b"
+      },
+      {
+        "path": "apps/web/src/features/board/session/sync/index.ts",
+        "sha256": "836f534642571aa830a6093aa4ed5dd1ef818b64c9775d275da0c53a4cabee89"
       },
       {
         "path": "apps/web/src/features/board/testing/syncFixtures.ts",
-        "sha256": "d6d2f53820a3df7c5c217a3c8ae082da925fc7a46cc8dcb6084e5b6843001417"
+        "sha256": "5569cbd11e4311f73c4f91a276864ba1698654bbf7dd8345897be7f2f0ef71fc"
+      },
+      {
+        "path": "apps/web/src/features/board/ui/gallery/commandHandlers.ts",
+        "sha256": "c07389c9f7457d6c936150a42d35616c7503f9c4849a0788045c00069313d303"
+      },
+      {
+        "path": "apps/web/src/features/board/ui/gallery/controller.ts",
+        "sha256": "8bc5b5aa21811b439d7efa6a735e5de5edfa8b29da653d0fdbae138dc3f317b7"
+      },
+      {
+        "path": "apps/web/src/features/board/ui/gallery/useCatalog.ts",
+        "sha256": "141652bab044f14808fb29d6bf382c461428e0dae1c0f3c6c3b2c26a55cfef2a"
       },
       {
         "path": "apps/web/src/features/canvas/application/board-session/autosavePolicy.ts",
         "sha256": "874eb9c6ec61c7474927a3c03842673b1b6674a2a4ecd11d3458c2b9c357c4e7"
       },
       {
+        "path": "apps/web/src/features/canvas/application/board-session/repository.ts",
+        "sha256": "26e835524ab429f09f3a393a72d4af92c3e267286467bfa303f89dc82b13c72e"
+      },
+      {
         "path": "apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts",
         "sha256": "dd556c62870434fa57599d9f1163df2e56447c040059755487c3d1fbcacca49e"
+      },
+      {
+        "path": "apps/web/src/features/canvas/application/board-session/useBoardSession.ts",
+        "sha256": "0667fa8dfe56a945e82fe1543552049cea87b5c15439af938d8f92ebb57233cc"
       },
       {
         "path": "apps/web/src/features/canvas/application/execution/workspace/canvasTaskContractMapping.ts",
@@ -26797,6 +28035,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       {
         "path": "apps/web/src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
         "sha256": "757496fa6dfb2fe712dfc56801a8d62b6888fdf0712ef186a8a2907c56896db8"
+      },
+      {
+        "path": "apps/web/src/features/canvas/application/workspace/internal/useBoardRuntime.ts",
+        "sha256": "0a36a401e0c0783ef90049e09fc81460c4c70927169411119030a18d82ba56c8"
+      },
+      {
+        "path": "apps/web/src/test/retirementLint.contract.spec.ts",
+        "sha256": "07e51c33de99b90c3eec29b42b5c7243a58ed441ed0f0541c7037245b4708422"
       },
       {
         "path": "apps/web/tsconfig.test-node.json",
@@ -26812,11 +28058,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "docs/adr/0014-board-sync-query-ownership.md",
-        "sha256": "c71f9b7b0c8dc78a65658447f3a5558d17a76d5114a74bbcc4119c0fbf6baa49"
+        "sha256": "213a36ed6f5164d151372f3395eaf1761da75dfd33fb61c7a6f47fd44d757f88"
       },
       {
         "path": "docs/frontend-seam-inventory.md",
-        "sha256": "33385367d7079318f48559e5cbbcbb3ad1abaf632e9df910cc5dc7a35b9ef12e"
+        "sha256": "327d49a9fa3f7485224c0e883efe26f17a1c1ab3d6d9e9f95540550692727cad"
       },
       {
         "path": "scripts/ci-legacy-media-zero-scan-test.sh",
@@ -26838,15 +28084,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
           "p25-closeout-green-checkpoint",
           "p25-closeout-historical-checkpoint-deviation",
           "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:33:01.571188+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": [],
         "historicalUnresolvedItems": [
           "No green CI rollback checkpoint was recorded before P2.5 started; current local checks cannot retroactively satisfy the temporal gate. Plan-owner deviation/replanning decision required. Local workflow-equivalent CI is eligible; no push is required."
@@ -26862,19 +28108,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -26883,19 +28124,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -26904,19 +28140,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -26925,19 +28156,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -26946,19 +28172,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -26967,19 +28188,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -26988,7 +28204,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
           "p25-formal-main-integration",
           "p25-closeout-current-main-integration",
@@ -26996,8 +28212,8 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
           "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -27006,24 +28222,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-strict-p1",
-          "p25-cleanup-independent-review",
-          "p25-cleanup-knip-ledger",
-          "p25-formal-final-lint",
-          "p25-formal-workflow-normal",
-          "p25-formal-workflow-production",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-knip-normal",
-          "p25-closeout-knip-production",
-          "p25-closeout-final-independent-review"
+          "p3-repair-knip-normal",
+          "p3-repair-knip-production",
+          "p3-repair-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -27032,22 +28239,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-specs",
-          "p25-cleanup-ledger-p2",
-          "p25-cleanup-independent-review",
-          "p25-cleanup-ledger-p25",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-strict-P2.5",
-          "p25-closeout-final-independent-review"
+          "p3-repair-board-followup",
+          "p3-repair-final-independent-review",
+          "p3-seam-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       },
       {
@@ -27056,32 +28256,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "accepted",
+        "acceptanceStatus": "pending",
         "evidenceRefs": [
-          "p25-cleanup-typecheck",
-          "p25-cleanup-eslint",
-          "p25-cleanup-format",
-          "p25-cleanup-strict-p1",
-          "p25-cleanup-independent-review",
-          "p25-formal-final-lint",
-          "p25-formal-final-sync-specs",
-          "p25-formal-final-node-typecheck",
-          "p25-formal-workflow-normal",
-          "p25-formal-workflow-production",
-          "p25-formal-workflow-smoke-contract",
-          "p25-formal-workflow-workflow",
-          "p25-formal-workflow-actionlint",
-          "p25-formal-final-independent-review",
-          "p25-closeout-delegated-acceptance",
-          "p25-closeout-sync-specs",
-          "p25-closeout-checker-quality",
-          "p25-closeout-node-typecheck",
-          "p25-closeout-strict-P2.5",
-          "p25-closeout-final-independent-review"
+          "p3-repair-account",
+          "p3-repair-typecheck",
+          "p3-repair-theme",
+          "p3-repair-surface",
+          "p3-repair-board-followup",
+          "p3-repair-final-independent-review",
+          "p3-repair-seam-p1",
+          "p3-seam-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": "/root",
-        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": null,
+        "acceptedAt": null,
         "unresolvedItems": []
       }
     ],
@@ -28614,6 +29802,158 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "evidenceRefs": ["p25-closeout-strict-P2.5"],
         "scope": "Final independent read-only review of exact closeout artifacts, baseline, accepted ledger and canonical plan scoped exception.",
         "summary": "Independent strict 60 fixtures /0 warnings /0 unmet. Current 44 artifact hashes/fingerprint and baseline44 git-show bytes verified. All gate/deviation/localCi/predecessor refs resolve; 11 gates accepted. Current retrospective P1/P2 and /root delegated acceptance distinct from user personal signature. P3 blocked and production trio pending; diff check PASS."
+      },
+      {
+        "id": "p3-repair-board",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 11.183,
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE"
+        ]
+      },
+      {
+        "id": "p3-repair-account",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run test:run -- src/features/account src/test/retirementLint.contract.spec.ts",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 18.962,
+        "requirementIds": ["P2.5/PHASE-COMMON"]
+      },
+      {
+        "id": "p3-repair-typecheck",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run test:typecheck",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 36.077,
+        "requirementIds": ["P2.5/PHASE-COMMON"]
+      },
+      {
+        "id": "p3-repair-knip-normal",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run lint:knip:normal",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 17.348,
+        "requirementIds": ["P2.5/PHASE-KNIP"]
+      },
+      {
+        "id": "p3-repair-knip-production",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run lint:knip:production",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 16.49,
+        "requirementIds": ["P2.5/PHASE-KNIP"]
+      },
+      {
+        "id": "p3-repair-theme",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run lint:theme-contract",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 1.561,
+        "requirementIds": ["P2.5/PHASE-COMMON"]
+      },
+      {
+        "id": "p3-repair-surface",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run api:surface:check -- --strict",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 6.194,
+        "requirementIds": ["P2.5/PHASE-COMMON"]
+      },
+      {
+        "id": "p3-repair-board-followup",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run test:run -- src/features/board/session src/features/canvas/application/board-session/repository.contract.spec.ts src/features/canvas/application/workspace/internal/useBoardRuntime.unit.spec.ts",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 8,
+        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"]
+      },
+      {
+        "id": "p3-repair-final-independent-review",
+        "kind": "review",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "reviewer": "/root/p3_final_review",
+        "decision": "passed",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "recordedAt": "2026-10-11T12:01:29.808287+00:00",
+        "scope": "Independent read-only review of final P3 audit-repair diff, production Board Query ownership, Account purity, theme guard, ledger artifacts, Seam inventory and public API surface.",
+        "summary": "Core behavior review passed: Board/Canvas Query integration, Account purity and theme/public-surface checks passed. Formal acceptance remains pending; frozen trio original implementation-before red evidence and global dependency strict baseline are retained as limitations."
+      },
+      {
+        "id": "p3-repair-seam-p1",
+        "kind": "command",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "command": "npm run lint:dependencies -- --strict --phase=P1",
+        "cwd": "apps/web",
+        "exitCode": 0,
+        "durationSeconds": 32.2,
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "recordedAt": "2026-10-11"
+      },
+      {
+        "id": "p3-seam-final-independent-review",
+        "kind": "review",
+        "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "result": "passed",
+        "reviewer": "/root/p3_seam_final_review",
+        "decision": "passed",
+        "requirementIds": ["P2.5/PHASE-COMMON", "P2.5/PHASE-QUOTAS"],
+        "recordedAt": "2026-10-11",
+        "scope": "Independent read-only review of final P3 Seam inventory updates, P1 current-batch strict boundary checks, trio historical-red deviation and final ledger freshness.",
+        "summary": "No blocking findings. P1 current-batch dependency boundaries and all positive/negative fixtures passed; 273 seams, 0 dependency-cruiser violations, 0 Board deep imports and zero generated undeclaredDeepImports. Trio productionStatus and missing historical red evidence remain pending without fabricated proof."
       }
     ],
     "p3Trio": [
@@ -28621,52 +29961,52 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "behaviorId": "board/query-migration-trio-race",
         "referenceEvidence": [
           {
-            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
             "line": 200,
             "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
             "assertion": "expect(oldSignal).toBeInstanceOf(AbortSignal)",
-            "fingerprint": "9d354ea404b67e92"
+            "fingerprint": "d25d164ae6179043"
           },
           {
-            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
             "line": 204,
             "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
             "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(9)",
-            "fingerprint": "6b77ee33dbccb5d9"
+            "fingerprint": "bfae8d296f20b3f8"
           },
           {
-            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
             "line": 205,
             "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
             "assertion": "expect(oldSignal?.aborted).toBe(true)",
-            "fingerprint": "86776b337a5fa96e"
+            "fingerprint": "7b3bf8a3779a9453"
           },
           {
-            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
-            "line": 210,
+            "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
+            "line": 215,
             "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
-            "assertion": "expect(query.getQueryData(designBoardKeys.document(WORKSPACE_ID, 'board-a'))).toBeUndefined()",
-            "fingerprint": "1b2dd4fcc1b1fd8d"
+            "assertion": "expect(query.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-a'))).toBeUndefined()",
+            "fingerprint": "3cb8d12ab0d1a323"
           },
           {
-            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
             "line": 211,
             "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
             "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 9,\n    document: { payload: { promptNodes: [{ text: 'other workspace' }] } },\n})",
-            "fingerprint": "80866eadf5d494a0"
+            "fingerprint": "e32affdb87fd9396"
           },
           {
-            "source": "src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
             "line": 215,
             "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
             "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-            "fingerprint": "438c90901ce4dd9e"
+            "fingerprint": "ef0df92beadacea0"
           }
         ],
-        "productionBinding": "Bind the observer navigation race to the production Board Query repository and its captured workspace/abort boundary.",
+        "productionBinding": "Production Board Query repository/observer boundary; audit-repair red/green is recorded separately and does not satisfy the frozen pre-implementation red obligation.",
         "productionStatus": "pending",
-        "redCommand": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts -t 'cancels the old workspace read and ignores its late response after observer navigation'",
-        "greenCommand": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts -t 'cancels the old workspace read and ignores its late response after observer navigation'",
+        "redCommand": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+        "greenCommand": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
         "cwd": "apps/web",
         "redEvidenceRefs": [],
         "greenEvidenceRefs": []
@@ -28675,94 +30015,94 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "behaviorId": "board/query-migration-trio-broadcast",
         "referenceEvidence": [
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 207,
             "scenario": "invalidates the document on document_replaced with 500ms coalesce",
             "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-            "fingerprint": "044262492cca726b"
+            "fingerprint": "d6b11782fd41010b"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 208,
             "scenario": "invalidates the document on document_replaced with 500ms coalesce",
             "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(7)",
-            "fingerprint": "767f29c431a417f7"
+            "fingerprint": "4332ca1e6dd93ac8"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 211,
             "scenario": "invalidates the document on document_replaced with 500ms coalesce",
             "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-            "fingerprint": "fa60721b336e01a4"
+            "fingerprint": "b30be3648fd322bb"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 212,
             "scenario": "invalidates the document on document_replaced with 500ms coalesce",
             "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 10,\n    document: { payload: { promptNodes: [{ text: 'latest from HTTP' }] } },\n})",
-            "fingerprint": "7c69ac175f3c910b"
+            "fingerprint": "0f95e77c42b84eef"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 216,
             "scenario": "invalidates the document on document_replaced with 500ms coalesce",
             "assertion": "expect(write).not.toHaveBeenCalled()",
-            "fingerprint": "fb01b45d6dc50cab"
+            "fingerprint": "be57301d09e2e1ea"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 218,
             "scenario": "invalidates the document on document_replaced with 500ms coalesce",
             "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
-            "fingerprint": "fa60721b336e01a4"
+            "fingerprint": "b30be3648fd322bb"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
-            "line": 253,
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+            "line": 258,
             "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
-            "assertion": "expect(client.getQueryState(designBoardKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
-            "fingerprint": "49d1fe3922aed750"
+            "assertion": "expect(client.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+            "fingerprint": "ba885c92f1dc7aff"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 256,
             "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
             "assertion": "expect(observer.getCurrentResult().isStale).toBe(true)",
-            "fingerprint": "e6119428c88aa240"
+            "fingerprint": "d15e342ea0f4eb21"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 257,
             "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
             "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
-            "fingerprint": "1aee821f38c7a305"
+            "fingerprint": "8cdb4d756d748640"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 258,
             "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
             "assertion": "expect(observer.getCurrentResult().data).toMatchObject({\n    revision: 7,\n    document: { payload: { promptNodes: [{ text: 'server' }] } },\n})",
-            "fingerprint": "1d96be833d8179f0"
+            "fingerprint": "00b3d5da24076d45"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 262,
             "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
             "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved local draft')",
-            "fingerprint": "dec3bf89f2439422"
+            "fingerprint": "820d22d942ebb38c"
           },
           {
-            "source": "src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
             "line": 263,
             "scenario": "marks draft-dirty boards stale without refetching or overwriting the draft",
             "assertion": "expect(write).not.toHaveBeenCalled()",
-            "fingerprint": "c9db675df0f999ff"
+            "fingerprint": "a7f294e78443c9bc"
           }
         ],
-        "productionBinding": "Bind coalescing, revision ordering and dirty invalidation to the production Board SSE Query invalidator.",
+        "productionBinding": "Production Board Query repository/observer boundary; audit-repair red/green is recorded separately and does not satisfy the frozen pre-implementation red obligation.",
         "productionStatus": "pending",
-        "redCommand": "npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts -t 'invalidates the document on document_replaced with 500ms coalesce'",
-        "greenCommand": "npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts -t 'invalidates the document on document_replaced with 500ms coalesce'",
+        "redCommand": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+        "greenCommand": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
         "cwd": "apps/web",
         "redEvidenceRefs": [],
         "greenEvidenceRefs": []
@@ -28771,143 +30111,143 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "behaviorId": "board/query-migration-trio-conflict",
         "referenceEvidence": [
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 121,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
-            "fingerprint": "f24acba1ef764713"
+            "fingerprint": "41b4f984b830d31e"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 122,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(getBoardSyncConflictKind(apiState.saveError)).toBe('revision-conflict')",
-            "fingerprint": "d6e53524b79ff4fe"
+            "fingerprint": "62a06e35c84beb33"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 123,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(isBoardSyncConflictError(apiState.saveError)).toBe(true)",
-            "fingerprint": "4c0a9b13a95b59aa"
+            "fingerprint": "c9f25ab2360d0148"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 125,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-draft')",
-            "fingerprint": "f9f619495d9768d7"
+            "fingerprint": "f83139a87c915353"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 126,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(listBoards()[0]?.revision).toBe(7)",
-            "fingerprint": "37f6194591a1a91c"
+            "fingerprint": "b2d1eee1bf85637b"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 141,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })",
-            "fingerprint": "b0af7205f6a87dda"
+            "fingerprint": "5f10b0976f5d2987"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 142,
             "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
             "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')",
-            "fingerprint": "a0719ca965a93d84"
+            "fingerprint": "fb4291685ef212da"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 214,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({\n    ok: false,\n    error: { status: 404, code: 'board_not_found' },\n})",
-            "fingerprint": "ddf3ab83b1f52c89"
+            "fingerprint": "1614402e3a610abe"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 218,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(mocks.request).toHaveBeenCalledWith(`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`, expect.objectContaining({ method: 'GET' }))",
-            "fingerprint": "d9843d9dda829f82"
+            "fingerprint": "2d9aa3551c8f2d74"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 222,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('synced-draft')",
-            "fingerprint": "5ce78301e84503c4"
+            "fingerprint": "cbdad3bb0ac6ff4b"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 223,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
-            "fingerprint": "ec579cf0898c52df"
+            "fingerprint": "79891720e6d02f90"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 224,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(listBoards().find((board) => board.id === 'board-1')?.revision).toBe(7)",
-            "fingerprint": "9df0fa18bcf4566e"
+            "fingerprint": "17b4cab3dddaa514"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 227,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(hydrateBoardsFromServer()).resolves.toMatchObject({ ok: true })",
-            "fingerprint": "9c6ba477205f9404"
+            "fingerprint": "77422a1625a89f3a"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 229,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(listBoards().map((board) => board.id)).toEqual(['offline-new'])",
-            "fingerprint": "ed4afdd6f2b882f9"
+            "fingerprint": "9f01a28dc3e7ea03"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 230,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')",
-            "fingerprint": "ec579cf0898c52df"
+            "fingerprint": "79891720e6d02f90"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 231,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(getBoardState('board-1')).toBeNull()",
-            "fingerprint": "8e9bc439ccdabe95"
+            "fingerprint": "0a5fb96c94afe1ce"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 232,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(putCallsFor('board-1')).toEqual([])",
-            "fingerprint": "43ca6e0223a6643a"
+            "fingerprint": "0d3a167ee32763dc"
           },
           {
-            "source": "src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+            "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
             "line": 233,
             "scenario": "preserves drafts on document GET 404 until a complete list confirms remote absence",
             "assertion": "expect(apiState.createdBoards).toEqual([])",
-            "fingerprint": "06e2d7fd75b39d18"
+            "fingerprint": "32cd409eedae4890"
           }
         ],
-        "productionBinding": "Keep current transport regression and add production Query document/draft integration for 409 reload and GET 404 recovery.",
+        "productionBinding": "Production Board Query repository/observer boundary; audit-repair red/green is recorded separately and does not satisfy the frozen pre-implementation red obligation.",
         "productionStatus": "pending",
-        "redCommand": "npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'",
-        "greenCommand": "npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'",
+        "redCommand": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+        "greenCommand": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
         "cwd": "apps/web",
         "redEvidenceRefs": [],
         "greenEvidenceRefs": []
       }
     ],
-    "p3StartStatus": "blocked",
-    "scope": "P2.5 design/specs accepted by current delegated integrator with local integration and workflow-equivalent CI; historical checkpoint deviation retained. P3/P4 not authorized; production Query migration remains pending.",
+    "p3StartStatus": "authorized-audit-repair",
+    "scope": "P2.5 design/specs accepted by current delegated integrator with local integration and workflow-equivalent CI; historical checkpoint deviation retained. P3 production Query binding is implemented and locally verified; formal acceptance and original trio red evidence remain pending. P4 is outside this repair scope.",
     "localCi": {
       "status": "passed",
       "kind": "local-workflow-equivalent",
@@ -29238,7 +30578,356 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         ],
         "scope": "Current retrospective acceptance, not original before-start or completion signoff."
       }
-    ]
+    ],
+    "acceptedDesignHistory": {
+      "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+      "phase": {
+        "phaseId": "P2.5",
+        "owner": "/root",
+        "implementationStatus": "complete",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "accepted",
+        "startedAt": "2026-10-10T20:18:56.581Z",
+        "completedAt": "2026-10-10T20:45:09.451503+00:00",
+        "rollbackCheckpoint": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "gateInstanceIds": [
+          "P2.5/PHASE-CHECKPOINT",
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/SYNC-MERGED-DESIGN",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "unresolvedItems": [],
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptanceBasis": "Current delegated closeout review, with accepted historical checkpoint deviation; no historical before-start proof.",
+        "historicalGaps": [
+          "Historical before-start green rollback checkpoint absent for completed phases.",
+          "P1/P2 predecessor formal checkpoint/CI acceptance was not recorded at original completion.",
+          "Named delegated acceptance was not recorded until this closeout."
+        ],
+        "deviationEvidenceRefs": [
+          "p25-closeout-historical-checkpoint-deviation"
+        ]
+      },
+      "gates": [
+        {
+          "instanceId": "P2.5/PHASE-CHECKPOINT",
+          "gateId": "PHASE-CHECKPOINT",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-closeout-green-checkpoint",
+            "p25-closeout-historical-checkpoint-deviation",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:33:01.571188+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": [],
+          "historicalUnresolvedItems": [
+            "No green CI rollback checkpoint was recorded before P2.5 started; current local checks cannot retroactively satisfy the temporal gate. Plan-owner deviation/replanning decision required. Local workflow-equivalent CI is eligible; no push is required."
+          ],
+          "verificationBasis": "Current baseline and scoped accepted historical deviation; original before-start gate was not satisfied.",
+          "deviationEvidenceRefs": [
+            "p25-closeout-historical-checkpoint-deviation"
+          ]
+        },
+        {
+          "instanceId": "P2.5/SYNC-SOT",
+          "gateId": "SYNC-SOT",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/SYNC-CACHE-TIMING",
+          "gateId": "SYNC-CACHE-TIMING",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/SYNC-FOCUS",
+          "gateId": "SYNC-FOCUS",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/SYNC-SSE",
+          "gateId": "SYNC-SSE",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/SYNC-REVISION",
+          "gateId": "SYNC-REVISION",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "gateId": "SYNC-DRAFT-PRECEDENCE",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/SYNC-MERGED-DESIGN",
+          "gateId": "SYNC-MERGED-DESIGN",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-formal-main-integration",
+            "p25-closeout-current-main-integration",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/PHASE-KNIP",
+          "gateId": "PHASE-KNIP",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-strict-p1",
+            "p25-cleanup-independent-review",
+            "p25-cleanup-knip-ledger",
+            "p25-formal-final-lint",
+            "p25-formal-workflow-normal",
+            "p25-formal-workflow-production",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-knip-normal",
+            "p25-closeout-knip-production",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/PHASE-QUOTAS",
+          "gateId": "PHASE-QUOTAS",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-specs",
+            "p25-cleanup-ledger-p2",
+            "p25-cleanup-independent-review",
+            "p25-cleanup-ledger-p25",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-strict-P2.5",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        },
+        {
+          "instanceId": "P2.5/PHASE-COMMON",
+          "gateId": "PHASE-COMMON",
+          "phaseId": "P2.5",
+          "owner": "/root",
+          "verificationStatus": "passed",
+          "acceptanceStatus": "accepted",
+          "evidenceRefs": [
+            "p25-cleanup-typecheck",
+            "p25-cleanup-eslint",
+            "p25-cleanup-format",
+            "p25-cleanup-strict-p1",
+            "p25-cleanup-independent-review",
+            "p25-formal-final-lint",
+            "p25-formal-final-sync-specs",
+            "p25-formal-final-node-typecheck",
+            "p25-formal-workflow-normal",
+            "p25-formal-workflow-production",
+            "p25-formal-workflow-smoke-contract",
+            "p25-formal-workflow-workflow",
+            "p25-formal-workflow-actionlint",
+            "p25-formal-final-independent-review",
+            "p25-closeout-delegated-acceptance",
+            "p25-closeout-sync-specs",
+            "p25-closeout-checker-quality",
+            "p25-closeout-node-typecheck",
+            "p25-closeout-strict-P2.5",
+            "p25-closeout-final-independent-review"
+          ],
+          "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
+          "acceptedBy": "/root",
+          "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+          "unresolvedItems": []
+        }
+      ],
+      "artifactFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+      "scope": "Immutable P2.5 closeout accepted at fae76d45. Subsequent P3 production changes require current evidence; this history never claims acceptance of later uncommitted bytes."
+    },
+    "auditRepairAttemptHistory": {
+      "requestedBy": "user",
+      "instruction": "/subagents 依次修复",
+      "status": "running-at-recording",
+      "baselineSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
+      "startedAt": "2026-10-11T10:27:43.196418+00:00",
+      "beforeChecks": [
+        {
+          "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
+          "cwd": "apps/web",
+          "durationSeconds": 13.866,
+          "exitCode": 1,
+          "recordedAt": "2026-10-11T10:27:08.920221+00:00",
+          "summary": "\n> ideaboard-web@0.0.1 lint:migration-ledger\n> tsx scripts/checkFrontendMigrationLedger.ts --strict --phase=P2.5\n\nFrontend migration ledger fixtures passed (60 cases).\nFrontend migration ledger: 494 frozen constraints; R=403, frozen i18n=18; B=57; 263 ordinary + 417 generated files mapped; 89 supplemental constraints; 0 review warnings.\nLedger consistency is not phase acceptance. --phase=P1/P2 checks retirements and behaviors; --phase=P2.5 checks design evidence and validates the recorded formal acceptance status.\nP2.5 verification (formal acceptance accepted): 16 unmet requirements.\n[migration-ledger:acceptance] P2.5: stale artifact apps/web/scripts/checkFrontendMigrationLedger.ts\n[migration-ledger:acceptance] P2.5: stale artifact apps/web/scripts/knipGovernanceManifest.json\n[migration-ledger:acceptance] P2.5: stale artifact apps/web/src/features/board/CONTEXT.md\n[migration-ledger:acceptance] P2.5: stale artifact apps/web/src/features/board/session/sync/boardFocusControls.contract.spec.ts\n[migration-ledger:acceptance] P2.5: stale artifact docs/frontend-seam-inventory.md\n[migration-ledger:acceptance] P2.5: independent review missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/SYNC-SOT: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/SYNC-CACHE-TIMING: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/SYNC-FOCUS: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/SYNC-SSE: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/SYNC-REVISION: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/SYNC-DRAFT-PRECEDENCE: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/PHASE-KNIP: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/PHASE-QUOTAS: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: P2.5/PHASE-COMMON: verification evidence missing or stale\n[migration-ledger:acceptance] P2.5: formal phase acceptance requires accepted start and exit gates\n"
+        }
+      ],
+      "scope": "Historical snapshot of the authorized P3 repair attempt; beforeChecks records its actual initial state."
+    }
+  },
+  "auditRepair": {
+    "repairEvidence": {
+      "status": "technical-verification-passed",
+      "artifactFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+      "evidenceRefs": [
+        "p3-repair-account",
+        "p3-repair-board",
+        "p3-repair-board-followup",
+        "p3-repair-knip-normal",
+        "p3-repair-knip-production",
+        "p3-repair-surface",
+        "p3-repair-theme",
+        "p3-repair-typecheck",
+        "p3-repair-seam-p1",
+        "p3-seam-final-independent-review"
+      ],
+      "scope": "P3 audit repair only; does not replace frozen P3 trio original implementation-before red/green or formal acceptance.",
+      "limitations": [
+        "All-active-Seam strict still reports mismatches outside the current P1 acceptance batch; the current P1-batch strict check passes. The P0 advisory reports 205 distinct edges, while the generated report contains 0 undeclaredDeepImports, 0 dependency-cruiser violations and 0 Board deep imports.",
+        "The three frozen P3 scenarios lack original implementation-before red evidence. User-approved scoped deviation records the gap without fabricating evidence; productionStatus remains pending.",
+        "Formal P2.5/P3 acceptance and a committed local green rollback checkpoint remain pending."
+      ]
+    },
+    "trioHistoricalRedDeviation": {
+      "status": "accepted-scoped-deviation",
+      "authorizedBy": "user / plan owner",
+      "instruction": "同意",
+      "recordedAt": "2026-10-11",
+      "scope": [
+        "board/query-migration-trio-race",
+        "board/query-migration-trio-broadcast",
+        "board/query-migration-trio-conflict"
+      ],
+      "fact": "Original implementation-before red evidence was not recorded and cannot be reconstructed after implementation.",
+      "effect": "Records the historical gate gap as an accepted deviation for this P3 closeout. Does not claim the historical red occurred, change trio productionStatus, waive current green behavior verification, quotas, common checks, or the committed checkpoint requirement for formal acceptance."
+    }
   }
 }
 ```

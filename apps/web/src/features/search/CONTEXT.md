@@ -5,27 +5,27 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 
 ## Domain Language
 
-| Term                         | Meaning                                                                                                                                                                                                                           |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Search Feed                  | Feed fact owner in `application/createSearchFeed`: `results`, `nextCursor`, `hasMore`, `loading`, `loadingMore`, `hasError`, `savedKeys`, `failedImages`; stale requests cancelled in order via `AbortController` + `generation`. |
-| Submitted Query              | `route.query.q`, the single source of truth for search; `useSearchSession` drives `feed.load(true)` through an `immediate` watcher.                                                                                               |
-| Vision Reference             | Image-search input reference: library asset ID or external reference plus optional `File`/`blob` preview; only the serializable part is persisted.                                                                                |
-| Library Bridge / Coordinator | Pure mapping between Feed and Library (`SearchResult`/`LibraryAssetView` <-> `VisionReference`) plus pub/sub that writes saved state back to the feed.                                                                            |
-| Auth Continuation            | Pending intent resumed after login for anonymous actions (search, save, open Library); `vision-search` intent stays memory-only, others may use `sessionStorage`.                                                                 |
-| Scope                        | Storage isolation key `userPublicID ?? anonymous`; post-login scope switch migrates only vision references and disposes the old scope.                                                                                            |
+| Term                         | Meaning                                                                                                                                                                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search Feed                  | Feed fact owner in `session/createSearchFeed`: `results`, `nextCursor`, `hasMore`, `loading`, `loadingMore`, `hasError`, `savedKeys`, `failedImages`; stale requests cancelled in order via `AbortController` + `generation`. |
+| Submitted Query              | `route.query.q`, the single source of truth for search; `useSearchSession` drives `feed.load(true)` through an `immediate` watcher.                                                                                           |
+| Vision Reference             | Image-search input reference: library asset ID or external reference plus optional `File`/`blob` preview; only the serializable part is persisted.                                                                            |
+| Library Bridge / Coordinator | Pure mapping between Feed and Library (`SearchResult`/`LibraryAssetView` <-> `VisionReference`) plus pub/sub that writes saved state back to the feed.                                                                        |
+| Auth Continuation            | Pending intent resumed after login for anonymous actions (search, save, open Library); `vision-search` intent stays memory-only, others may use `sessionStorage`.                                                             |
+| Scope                        | Storage isolation key `userPublicID ?? anonymous`; post-login scope switch migrates only vision references and disposes the old scope.                                                                                        |
 
 ## Public Seams
 
-- `features/search/index.ts` unified public export: exports domain models (`SearchResult`, `SearchPage`) and intent-continuation API (`clearPendingSearchAuthAction`).
-- `ports/` (feature-root hexagonal seam): `libraryCoordinatorPort` + `persistencePort` are the only application↔infrastructure contracts; application and infrastructure never import each other directly.
-- `SearchPage` the only route page (`meta.public`); pure assembly, lazy-loaded by `workspaceRoutes` via `useSearchScreenRuntime`.
+- `features/search/index.ts` unified public export: exports core models (`SearchResult`, `SearchPage`) and intent-continuation API (`clearPendingSearchAuthAction`).
+- `ports/` (feature-root hexagonal seam): `libraryCoordinatorPort` + `persistencePort` are the only session↔adapter contracts; session and adapters never import each other directly.
+- `SearchPage` the only route page (`meta.public`); pure assembly, lazy-loaded by `workspaceRoutes` via `loadSearchPage`, screen lifetime owned by `session/screenRuntime`.
 - Search viewport components virtualized masonry viewport, save dialog, batch dock; callback props only (`load-next-page`, `scroll-position`), no data ownership.
-- `application/createSearchFeed` feed factory; `reload` keeps cards via `keepResultsOnNextLoad`.
-- `infrastructure/resource.ts` sole generated-API caller for inspiration search and vision extraction; `inFlightRequests` dedup, query capped at 200 rune.
-- `infrastructure/visionBillingResource.ts` quote-only pricing display with `sku=ai-search:vision`.
+- `session/feed` feed factory; `reload` keeps cards via `keepResultsOnNextLoad`.
+- `session/adapters/resource.ts` sole generated-API caller for inspiration search and vision extraction; `inFlightRequests` dedup, query capped at 200 rune.
+- `session/adapters/visionBillingResource.ts` quote-only pricing display with `sku=ai-search:vision`.
 - `requireLogin` sets the pending intent and opens the overlay; `resumePendingAction` resumes it after login.
-- `infrastructure/libraryBridge` pure mapping; `infrastructure/libraryCoordinator` pub/sub over `provide/inject search:library-coordinator`.
-- `infrastructure/browserPersistence` scope-isolated `sessionStorage` primitives via `searchScopedStorageKey(:scope)`; `anonymous-query-gate` dedups by query with a cap of 5.
+- `session/adapters/libraryBridge` pure mapping; `session/adapters/libraryCoordinator` pub/sub over `provide/inject search:library-coordinator`.
+- `session/adapters/browserPersistence` scope-isolated `sessionStorage` primitives via `searchScopedStorageKey(:scope)`; `anonymous-query-gate` dedups by query with a cap of 5.
 
 Provider IDs and recognition share the pure `core/contracts/externalImageProviders` vocabulary with Admin; payload mapping and validation errors remain feature-owned.
 

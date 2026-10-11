@@ -8,7 +8,7 @@ import {
   type CanvasSnapshotNodeCollectionKey,
   type BoardSnapshot,
   type CanvasConnection,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasGroupNodeId,
   type CanvasNodeItem,
   type ImageNodeItem,
@@ -84,13 +84,13 @@ function appendCurrentGroups(
   })
 }
 
-function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
+function toFlowNodeId(nodeType: CanvasConnectionNodeKind, id: number) {
   return `${nodeType}-${id}`
 }
 
 export function parseFlowNodeId(
   nodeId: string,
-): { nodeType: CanvasConnectionNodeType; id: number } | null {
+): { nodeType: CanvasConnectionNodeKind; id: number } | null {
   const dashIndex = nodeId.indexOf('-')
   if (dashIndex <= 0) return null
   const prefix = nodeId.slice(0, dashIndex)
@@ -104,7 +104,7 @@ export function parseFlowNodeId(
 
 export function resolveFlowNodeCanvasRef(
   node: Pick<FlowAdapterNode, 'id' | 'data'>,
-): { nodeType: CanvasConnectionNodeType; id: number } | null {
+): { nodeType: CanvasConnectionNodeKind; id: number } | null {
   const parsed = parseFlowNodeId(node.id)
   if (parsed) return parsed
 
@@ -124,7 +124,7 @@ export function resolveFlowNodeCanvasRef(
   return { nodeType, id }
 }
 
-function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { title?: unknown }): string {
+function resolveNodeTitle(nodeType: CanvasConnectionNodeKind, node: { title?: unknown }): string {
   const title = typeof node.title === 'string' ? node.title.trim() : ''
   return title || getDefaultCanvasNodeTitle(nodeType, (key) => i18n.global.t(key))
 }
@@ -137,7 +137,7 @@ function getSnapshotNodeCollection(
 }
 
 function getSnapshotNodeCollectionsByType(snapshot: BoardSnapshot) {
-  const collections = new Map<CanvasConnectionNodeType, CanvasNodeItem[]>()
+  const collections = new Map<CanvasConnectionNodeKind, CanvasNodeItem[]>()
   CANVAS_NODE_REGISTRY_LIST.forEach(({ kind, snapshotCollection }) => {
     collections.set(kind, getSnapshotNodeCollection(snapshot, snapshotCollection))
   })
@@ -145,7 +145,7 @@ function getSnapshotNodeCollectionsByType(snapshot: BoardSnapshot) {
 }
 
 function toFlowDataFromCanvasNode(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   node: CanvasNodeItem,
 ): FlowNodeData {
   return {
@@ -163,7 +163,7 @@ function toFlowDataFromCanvasNode(
  * instead of rebuilding a Board snapshot and every Flow node on each edit.
  */
 export function canvasNodeToFlowNode(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   node: CanvasNodeItem,
   selected = false,
 ): FlowAdapterNode {
@@ -249,7 +249,7 @@ export function flowToBoardSnapshot(
   const snapshotNodeCollections = getSnapshotNodeCollectionsByType(snapshot)
   const persistedFlowNodeRefs = new Map<
     string,
-    { nodeType: CanvasConnectionNodeType; id: number }
+    { nodeType: CanvasConnectionNodeKind; id: number }
   >()
   const persistedCanvasNodeIds = new Set<string>()
   const flowNodeDataMap = new Map<string, FlowNodeData>()

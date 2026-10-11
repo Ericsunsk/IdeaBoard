@@ -7,7 +7,7 @@ import {
   isCanvasConnectionNodeType,
   type CanvasConnection,
   type CanvasConnectionEndpoint,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
   type CanvasConnectionContractNode,
   type CanvasNodePortContract,
@@ -16,7 +16,7 @@ import {
 const AUTO_HANDLE_PORT = '__auto'
 
 interface ParsedNodeRef {
-  nodeType: CanvasConnectionNodeType
+  nodeType: CanvasConnectionNodeKind
   nodeId: number
 }
 
@@ -34,7 +34,7 @@ type FlowEdgeLike = {
 
 function parseNodeRef(
   nodeId: string | null | undefined,
-  fallbackType?: CanvasConnectionNodeType,
+  fallbackType?: CanvasConnectionNodeKind,
 ): ParsedNodeRef | null {
   if (!nodeId) return null
   const [prefix, idPart] = nodeId.split('-')
@@ -54,7 +54,7 @@ function parseHandleRef(handleId: string | null | undefined): ParsedHandleRef | 
 }
 
 function buildContractNode(
-  nodeType: CanvasConnectionNodeType,
+  nodeType: CanvasConnectionNodeKind,
   nodeId: number,
   data: FlowNodeData | undefined,
 ): CanvasConnectionContractNode {
@@ -74,7 +74,7 @@ function buildContractNode(
 
 function createNodeLookup(lookupData: (nodeId: string) => FlowNodeData | undefined) {
   return (
-    nodeType: CanvasConnectionNodeType,
+    nodeType: CanvasConnectionNodeKind,
     nodeId: number,
   ): CanvasConnectionContractNode | null => {
     const key = `${nodeType}-${nodeId}`

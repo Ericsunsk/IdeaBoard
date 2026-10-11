@@ -114,13 +114,13 @@ module.exports = {
       name: 'no-cross-feature-deep-imports',
       severity: 'error',
       comment:
-        'Features must consume another feature through its public entrypoint; Board domain, application, infrastructure, presentation, and testing modules are private.',
+        'Features must consume another feature through its public entrypoint or the narrow Board canvas port; Board core, session, ui (including gallery), and testing modules are private.',
       from: {
         path: '^src/features/[^/]+(?:/|$)',
         pathNot: '^src/features/board(?:/|$)',
       },
       to: {
-        path: '^src/features/board/(?:domain|application|infrastructure|presentation|testing)(?:/|$)',
+        path: '^src/features/board/(?:core|session|ui|gallery|testing)(?:/|$)',
       },
     },
     {
@@ -145,7 +145,7 @@ module.exports = {
       from: {
         path: '^src/(?:app|features/[^/]+)(?:/|$)',
         pathNot:
-          '^src/features/workspace(?:/|$)|^src/features/account/application/accountWorkspace\\.ts$',
+          '^src/features/workspace(?:/|$)|^src/features/account/session/accountWorkspace\\.ts$',
       },
       to: {
         path: '^src/features/workspace/',

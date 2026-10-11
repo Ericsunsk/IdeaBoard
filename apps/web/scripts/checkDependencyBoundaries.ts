@@ -155,7 +155,7 @@ function scanBoardDeepImports(
       const target = resolveSourceModule(root, absoluteSource, specifier)
       if (
         !target ||
-        !/^src\/features\/board\/(?:domain|application|infrastructure|presentation|testing)(?:\/|$)/.test(
+        !/^src\/features\/board\/(?:core|session|ui|gallery|testing)(?:\/|$)/.test(
           target,
         )
       )
@@ -292,7 +292,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
     files: [
       {
         filePath: 'src/features/admin/boundary-cross-feature-deep.fixture.ts',
-        content: `import { createEmptyBoardSnapshot } from '{target:src/features/board/domain/index}'; console.log(createEmptyBoardSnapshot);`,
+        content: `import { createEmptyBoardSnapshot } from '{target:src/features/board/core/index}'; console.log(createEmptyBoardSnapshot);`,
       },
     ],
   },
@@ -302,7 +302,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
     files: [
       {
         filePath: 'src/features/admin/boundary-board-alias.fixture.ts',
-        content: `import { createEmptyBoardSnapshot } from '@/features/board/domain'; console.log(createEmptyBoardSnapshot);`,
+        content: `import { createEmptyBoardSnapshot } from '@/features/board/core'; console.log(createEmptyBoardSnapshot);`,
       },
     ],
     scannerOnly: true,
@@ -338,12 +338,12 @@ const fixtureCases: BoundaryFixtureCase[] = [
     ],
   },
   {
-    name: 'prohibits cross-feature deep imports into search presentation',
+    name: 'prohibits cross-feature deep imports into search session',
     expectedRule: 'no-cross-feature-deep-imports',
     files: [
       {
         filePath: 'src/features/admin/boundary-search-deep.fixture.ts',
-        content: `import { useSearchScreenRuntime } from '{target:src/features/search/presentation/useSearchScreenRuntime}'; console.log(useSearchScreenRuntime);`,
+        content: `import { screenRuntime } from '{target:src/features/search/session/screenRuntime}'; console.log(screenRuntime);`,
       },
     ],
   },
@@ -974,7 +974,7 @@ try {
     )
     const scannerTriggered = testCase.scannerOnly
       ? scanBoardDeepImports(workspace, { includeFixtures: true }).has(
-          `${fixtureModule}|src/features/board/domain/index.ts`,
+          `${fixtureModule}|src/features/board/core/index.ts`,
         )
       : false
 

@@ -22,7 +22,7 @@ function buildImportFixture(name: string, importer: string, source: string): Pla
 
 const allowedFixtures: PlacementFixture[] = [
   ...[
-    ['account resource', 'src/features/account/application/resource.ts'],
+    ['account resource', 'src/features/account/session/credits/resource.ts'],
     ['admin resource', 'src/features/admin/statistics/resource.ts'],
     ['workspace selection', 'src/features/workspace/session/selection.ts'],
     ['shared singleton', 'src/shared/query/queryClient.ts'],
@@ -83,8 +83,8 @@ const advisoryFixtures: PlacementFixture[] = [
   ),
   buildImportFixture(
     'Board shared Query client',
-    'src/features/board/session/sync.ts',
-    '../../../shared/query/queryClient',
+    'src/features/board/session/sync/boardSync.ts',
+    '../../../../shared/query/queryClient',
   ),
   {
     name: 'auth cleanup import cannot also expose the client',

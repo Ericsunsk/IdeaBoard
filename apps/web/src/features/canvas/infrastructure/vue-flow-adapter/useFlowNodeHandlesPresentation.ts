@@ -4,7 +4,7 @@ import { i18n } from '../../../../core/i18n'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
 } from '../../../board/ports/canvas'
 import { useCanvasHandleProximity } from './useCanvasHandleProximity'
@@ -40,7 +40,7 @@ type FlowNodeHandlesPresentation = {
 
 type UseFlowNodeHandlesPresentationOptions = {
   nodeId: MaybeRefOrGetter<string>
-  kind: () => CanvasConnectionNodeType
+  kind: () => CanvasConnectionNodeKind
   showHandles: () => boolean
   disabled: () => boolean
 }
@@ -49,7 +49,7 @@ type HandleDirectionPolicy = {
   centeredStyle: CSSProperties
   handleType: 'source' | 'target'
   position: Position
-  getPorts: (kind: CanvasConnectionNodeType) => CanvasConnectionPort[]
+  getPorts: (kind: CanvasConnectionNodeKind) => CanvasConnectionPort[]
   getAggregateId: (ids: string[]) => string | null
   getAnchorIds: (ids: string[]) => string[]
   portPrefix: 'in' | 'out'
@@ -103,9 +103,9 @@ function createFollowStyle(
   }
 }
 
-function getNodeKindLabel(kind: CanvasConnectionNodeType) {
+function getNodeKindLabel(kind: CanvasConnectionNodeKind) {
   const { t } = i18n.global
-  const labelKeys: Partial<Record<CanvasConnectionNodeType, string>> = {
+  const labelKeys: Partial<Record<CanvasConnectionNodeKind, string>> = {
     prompt: 'canvas.handles.promptNodeLabel',
     image: 'canvas.handles.imageNodeLabel',
     fusion: 'canvas.handles.fusionNodeLabel',

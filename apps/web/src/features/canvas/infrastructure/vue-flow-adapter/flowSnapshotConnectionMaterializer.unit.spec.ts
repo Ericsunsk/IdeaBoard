@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createEmptyBoardSnapshot,
-  type CanvasConnectionNodeType,
+  type CanvasConnectionNodeKind,
   type CanvasNodeItem,
 } from '../../../board'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
@@ -57,7 +57,7 @@ function fusionSnapshot(id: number): CanvasNodeItem {
   }
 }
 
-function nodeData(kind: CanvasConnectionNodeType, snapshotNode: CanvasNodeItem): FlowNodeData {
+function nodeData(kind: CanvasConnectionNodeKind, snapshotNode: CanvasNodeItem): FlowNodeData {
   return {
     kind,
     nodeType: kind,
