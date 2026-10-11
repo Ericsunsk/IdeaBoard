@@ -874,6 +874,7 @@ function runFixtures(ledger: Ledger): void {
       'rollback without CI',
       (value) => {
         value.checkpoints.immutableRollbackSha = value.checkpointSha
+        value.checkpoints.ciEvidence = null
       },
     ],
     [
@@ -1184,6 +1185,7 @@ function runFixtures(ledger: Ledger): void {
   for (const row of p25Completed.behaviors.filter((row) => row.phase === 'P2.5'))
     row.missingEvidence = []
   requireCondition(p25Completed.syncDesign, 'P2.5 verification record fixture')
+  p25Completed.syncDesign.phase.acceptanceStatus = 'pending'
   for (const artifact of p25Completed.syncDesign.artifacts)
     artifact.sha256 = createHash('sha256')
       .update(fs.readFileSync(path.join(webRoot, '../..', artifact.path)))
@@ -1215,6 +1217,9 @@ function runFixtures(ledger: Ledger): void {
   ]
   for (const gate of p25Completed.syncDesign.gates) {
     gate.verificationStatus = 'passed'
+    gate.acceptanceStatus = 'pending'
+    gate.acceptedBy = null
+    gate.acceptedAt = null
     gate.evidenceRefs = ['synthetic-review', 'synthetic-command']
   }
   const p25Failures = phaseAcceptanceFailures(p25Completed, new Map(), 'P2.5')
@@ -1305,6 +1310,115 @@ function runFixtures(ledger: Ledger): void {
       `P2.5 rejects ${name}`,
     )
   }
+  const p25Accepted = structuredClone(p25Completed)
+  const acceptedDesign = p25Accepted.syncDesign!
+  acceptedDesign.phase.acceptanceStatus = 'accepted'
+  p25Accepted.checkpoints.immutableRollbackSha = ledger.checkpointSha
+  p25Accepted.checkpoints.ciEvidence = 'synthetic workflow-equivalent CI evidence'
+  acceptedDesign.evidence.push(
+    {
+      id: 'synthetic-accepted-review',
+      kind: 'review',
+      checkpointSha: ledger.checkpointSha,
+      treeFingerprint: fixtureFingerprint,
+      result: 'passed',
+      reviewer: 'fixture',
+      decision: 'accepted',
+      requirementIds: acceptedDesign.phase.gateInstanceIds,
+    },
+    {
+      id: 'synthetic-checkpoint',
+      kind: 'checkpoint',
+      checkpointSha: ledger.checkpointSha,
+      treeFingerprint: fixtureFingerprint,
+      result: 'passed',
+      ciEvidence: p25Accepted.checkpoints.ciEvidence,
+      requirementIds: ['P2.5/PHASE-CHECKPOINT'],
+    },
+    {
+      id: 'synthetic-merge',
+      kind: 'merge',
+      checkpointSha: ledger.checkpointSha,
+      treeFingerprint: fixtureFingerprint,
+      result: 'passed',
+      mergeSha: ledger.checkpointSha,
+      requirementIds: ['P2.5/SYNC-MERGED-DESIGN'],
+    },
+  )
+  for (const gate of acceptedDesign.gates) {
+    gate.acceptanceStatus = 'accepted'
+    gate.acceptedBy = 'fixture'
+    gate.acceptedAt = '2026-10-11'
+    gate.unresolvedItems = []
+    gate.evidenceRefs.push('synthetic-accepted-review', 'synthetic-checkpoint', 'synthetic-merge')
+  }
+  const formalFailures = phaseAcceptanceFailures(p25Accepted, new Map(), 'P2.5')
+  requireCondition(
+    formalFailures.length === 0,
+    `P2.5 formal-acceptance positive fixture: ${formalFailures.join('; ')}`,
+  )
+  const p25FormalInvalid: Array<[string, (value: Ledger) => void]> = [
+    [
+      'missing checkpoint CI',
+      (value) => {
+        delete value.syncDesign!.evidence.find((row) => row.kind === 'checkpoint')!.ciEvidence
+      },
+    ],
+    [
+      'mismatched checkpoint CI',
+      (value) => {
+        value.checkpoints.ciEvidence = 'different CI evidence'
+      },
+    ],
+    [
+      'mismatched rollback checkpoint',
+      (value) => {
+        value.checkpoints.immutableRollbackSha = '0'.repeat(40)
+      },
+    ],
+    [
+      'missing merge evidence',
+      (value) => {
+        value.syncDesign!.evidence = value.syncDesign!.evidence.filter(
+          (row) => row.kind !== 'merge',
+        )
+      },
+    ],
+    [
+      'missing named accepted review',
+      (value) => {
+        value.syncDesign!.evidence.find((row) => row.decision === 'accepted')!.reviewer = ''
+      },
+    ],
+    [
+      'missing acceptance timestamp',
+      (value) => {
+        value.syncDesign!.gates[0]!.acceptedAt = null
+      },
+    ],
+    [
+      'pending gate',
+      (value) => {
+        value.syncDesign!.gates[0]!.acceptanceStatus = 'pending'
+      },
+    ],
+    [
+      'unresolved gate',
+      (value) => {
+        value.syncDesign!.gates[0]!.unresolvedItems = ['unresolved review finding']
+      },
+    ],
+  ]
+  for (const [name, mutate] of p25FormalInvalid) {
+    const value = structuredClone(p25Accepted)
+    mutate(value)
+    requireCondition(
+      phaseAcceptanceFailures(value, new Map(), 'P2.5').some((message) =>
+        message.includes('formal phase acceptance requires accepted start and exit gates'),
+      ),
+      `P2.5 formal acceptance rejects ${name}`,
+    )
+  }
   for (const suite of ['describe.skip', 'it.skip'])
     requireCondition(
       collectAssertions(
@@ -1320,7 +1434,7 @@ function runFixtures(ledger: Ledger): void {
     'active assertions remain available as behavior evidence',
   )
   console.log(
-    `Frontend migration ledger fixtures passed (${invalid.length + 22 + p2Invalid.length + p25Invalid.length} cases).`,
+    `Frontend migration ledger fixtures passed (${invalid.length + 23 + p2Invalid.length + p25Invalid.length + p25FormalInvalid.length} cases).`,
   )
 }
 function main(): void {
@@ -1341,7 +1455,7 @@ function main(): void {
     `Frontend migration ledger: ${ledger.constraints.length} frozen constraints; R=${retire}, frozen i18n=${frozen}; B=${ledger.behaviors.length}; ${ledger.sharedFileMappings.length} ordinary + ${ledger.generatedMapping.measuredFileCount} generated files mapped; ${ledger.supplementalConstraints?.length ?? 0} supplemental constraints; ${warnings.length} review warnings.`,
   )
   console.log(
-    'Ledger consistency is not phase acceptance. --phase=P1/P2 checks retirements and behaviors; --phase=P2.5 checks local design evidence and keeps formal acceptance pending.',
+    'Ledger consistency is not phase acceptance. --phase=P1/P2 checks retirements and behaviors; --phase=P2.5 checks design evidence and validates the recorded formal acceptance status.',
   )
   const phase = process.argv.find((argument) => argument.startsWith('--phase='))
   requireCondition(
@@ -1353,7 +1467,7 @@ function main(): void {
     const failures = phaseAcceptanceFailures(ledger, sources, acceptedPhase)
     for (const failure of failures) console.error(`[migration-ledger:acceptance] ${failure}`)
     console.log(
-      `${acceptedPhase} ${acceptedPhase === 'P2.5' ? 'local verification (formal acceptance pending)' : 'acceptance'}: ${failures.length} unmet requirements.`,
+      `${acceptedPhase} ${acceptedPhase === 'P2.5' ? `verification (formal acceptance ${ledger.syncDesign?.phase.acceptanceStatus ?? 'missing'})` : 'acceptance'}: ${failures.length} unmet requirements.`,
     )
     if (failures.length > 0) process.exitCode = 1
   }

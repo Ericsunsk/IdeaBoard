@@ -1,5 +1,25 @@
 # ExecPlans
 
+## P2.5 Closeout（2026-10-11）
+
+- Goal: 按用户“收尾p2.5”指令完成当前具名 delegated acceptance、前置验收及本地交付。
+- Scope: canonical plan/ledger、ADR/Core/Board CONTEXT 和验收 checker；无 production Query migration、push 或后续 lane 执行。
+- Success criteria: P1/P2 前置验收与六项设计有当前 review；明确记录已完成阶段的 historical checkpoint deviation，用真实 green committed SHA 建立当前 rollback baseline；所有 P2.5 gates accepted，checker accepted 正反 fixtures、artifact freshness、strict checks 与独立复核通过，commit 后工作区干净。
+- Risks: 不伪造历史 before-start、user 亲自 signoff 或远程 CI；只为已完成 P1/P2/P2.5 的记录缺口登记 scoped closeout revision，保留未来 before-start checkpoint、frozen quotas 和 P3 production trio obligations。
+- Rollback: revert 本轮 closeout commit，恢复原 pending 状态及 prior artifacts；不 reset 既有历史或数据。
+- Results: P1/P2 retrospective acceptance 和 P2.5 11 gates 已由当前具名 delegated integrator `/root` 接受；历史 checkpoint 缺口保留为 scoped deviation。`5b7af20b` / `8184c2b9` 为 committed green baseline，closeout artifact fingerprint `9d73659d` 单独记录。ADR/Core/Board 状态同步；P3 blocked、trio production pending。
+- Verification: strict P1/P2/P2.5：60 fixtures /0 warnings /0 unmet；Sync 38 tests、dual Knip、checker ESLint/node typecheck、format、plan JSON 和 diff check PASS；独立 verifier 核对 44 current +44 committed baseline hashes及所有 refs PASS。首次 fingerprint sort mismatch 的 strict 失败保留在 ledger history，canonical algorithm 修正后通过，未放宽 guards。
+- Status: COMPLETE：验收与独立复核完成，local closeout commit 由 Git history 标识；无 push，P3/P4 未启动。
+
+## Acceptance Without Push（2026-10-11）
+
+- Goal: 按用户要求从验收标准移除 push 和远程 CI 的强制依赖。
+- Scope: Desktop canonical plan 与 execution ledger；允许有实际 command/revision evidence 的 local workflow-equivalent CI，不改 runtime、workflow 或历史执行结果。
+- Success criteria: push/remote publication 不再阻断验收；保留检查范围、immutable committed SHA、历史 before-start checkpoint 和 plan-owner review 要求；ledger consistency 与 format 通过。
+- Rollback: 撤回本轮 plan/ledger 文档 patches，不影响已有 commits 或运行数据。
+- Verification: strict P2.5 ledger（51 fixtures /0 warnings /0 unmet）、ledger Prettier、plan JSON registry/state-machine parsing 与 diff check PASS。
+- Status: COMPLETE：canonical plan/ledger 已移除 push/remote CI 强制验收依赖；本地等价检查可作为 CI 证据，未变更剩余历史 checkpoint 和 review 状态。
+
 ## P2.5 Formal Review and CI（2026-10-11）
 
 - Goal: 执行六项 Sync design 的受委托正式 review，运行当前 revision 的 CI lanes，并记录真实验收结果。
@@ -10,7 +30,7 @@
 - Results: 六项 design 与 Common/Knip/Quotas 独立 review PASS；真实 workflow checker、worker negative fixture、retired-param rejection、受限 anonymous smoke fixtures 与 direct Vite 生命周期修复完成。canonical ledger 刷新 44 artifact hashes、当前 command/review/local-main integration evidence，保留初始失败；formal acceptance 与 P3 start 继续 pending/blocked。
 - Verification: 540 files / 3624 unit tests；patch 后 adapter 40、Sync 38、standalone helper 2 tests PASS。generated drift、full lint（0 errors /171 warnings）、style、typecheck、build/bundle budget、dual Knip、strict P1/P2/P2.5（51 fixtures /0 warnings /0 unmet）、实际 Linux smoke 自然 exit0、accessibility、Media/Handbook contracts 与完整 Ops（22 selftests 等）通过；494 frozen IDs、9 quotas、263+417 mappings 与435 generated file bytes 不变。
 - Limitations: 当前 local main 比 remote main 领先230 commits；publication 会启动所有 contexts 的 CI，GitHub 尚无当前 SHA。未授权 push；计划的 named plan-owner acceptance、历史 before-start green checkpoint 与P1/P2前置正式验收需要明确处置，不补造过去记录。local checks 覆盖本轮scope，无 backend/authenticated browser integration claim。
-- Status: NEEDS_DECISION：本地实现、验证及正式 delegated review 完成；等待 plan owner 选择 historical gate deviation/replan，并明确远程 publication 范围。
+- Status at formal review: NEEDS_DECISION；保留当时的 historical checkpoint/predecessor acceptance 缺口。本轮 P2.5 Closeout 已按当前 delegated mandate 完成 scoped deviation 和正式记录，见上方 closeout。
 
 ## P2.5 Diff 冗余清理与提交（2026-10-11）
 

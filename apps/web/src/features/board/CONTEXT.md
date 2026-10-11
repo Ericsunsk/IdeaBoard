@@ -35,9 +35,9 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `board/index.ts` — public entry for non-Canvas consumers and route composition; Canvas uses the narrow port below.
 - `board/ports/canvas.ts` — narrow BoardCanvas port for Canvas callers (issue #861): snapshot facts, local persistence, revision-gated sync, preview rendering, and media-ref extraction only; Canvas production code must use this subpath, never the full barrel.
 
-## Sync / Query Ownership (proposed P2.5 design, ADR-0014; production migration is P3)
+## Sync / Query Ownership (accepted P2.5 design, ADR-0014; production migration is P3)
 
-Current production server catalog/document state remains in `application/catalog`, `application/sync`, and persistence stores. The ownership below is the P3 target, pending independent plan-owner acceptance and merge of the P2.5 design/specs. `testing/syncDesignHarness.ts` is a private test-only executable design harness; it is neither a production integration nor a public export. Local design verification, review, plan-owner acceptance, merge, CI, and P3 production red/green evidence are separate milestones in the canonical `docs/architecture/frontend-contract-inventory.md` ledger (`behaviors` and `syncDesign`).
+Current production server catalog/document state remains in `application/catalog`, `application/sync`, and persistence stores. The ownership below is the accepted P3 target. The P2.5 design/specs are integrated on local main and accepted by the named delegated integrator `/root` under the current closeout instruction; historical checkpoint deviations are recorded in the canonical ledger. P3 remains blocked until separately authorized. `testing/syncDesignHarness.ts` is a private test-only executable design harness; it is neither a production integration nor a public export. Local design verification, review, plan-owner acceptance, merge, CI, and P3 production red/green evidence are separate milestones in the canonical `docs/architecture/frontend-contract-inventory.md` ledger (`behaviors` and `syncDesign`).
 
 | Concern                     | Owner                                                |
 | --------------------------- | ---------------------------------------------------- |

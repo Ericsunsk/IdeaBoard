@@ -45,7 +45,7 @@ Reproduce from `apps/web`: `npx tsx scripts/checkFrontendMigrationLedger.ts`; ap
 | P6    |          6 |             5 | Not started                                           |
 | P7    |          0 |             5 | Coverage/finalization only; explicit zero scope       |
 
-Measured `R=403`, plus 18 frozen i18n candidates awaiting assignment; mandatory `B=57` distinct scenarios. At the P0 freeze, twenty-five existing observable scenarios have exact mappings and local verification evidence from the full non-browser test run; 32 scenarios were pending. Missing scenarios retain concrete expected assertions. The P3 Query trio awaits accepted P2.5 design. P7 cannot pass with pending requirements or unassigned i18n candidates.
+Measured `R=403`, plus 18 frozen i18n candidates awaiting assignment; mandatory `B=57` distinct scenarios. At the P0 freeze, twenty-five existing observable scenarios have exact mappings and local verification evidence from the full non-browser test run; 32 scenarios were pending. Missing scenarios retain concrete expected assertions. The P3 Query trio has an accepted P2.5 design; production binding and separate P3 authorization remain pending. P7 cannot pass with pending requirements or unassigned i18n candidates.
 
 P1b has eight planned packages totaling 56 net working hours. The working-day baseline is 2026-10-12 through 2026-10-21; these are estimates, not actual hours or completed dates. This is the frozen estimate; current execution evidence is recorded in the ledger below. Calendar dates do not start a lane. Actual hours, completion dates, rolling HEAD, immutable green rollback SHA and CI evidence remain distinct. Fix-forward is limited to 8 net working hours or one working day, whichever comes first; the integrator then stops assigning packages until the plan owner chooses revert or replanning.
 
@@ -53,7 +53,7 @@ All 680 measured `src/shared` files have destinations: 263 ordinary files are li
 
 Historical P1 audit correction, 2026-10-10: relocation preserves the original 494 frozen matcher IDs and `R=403`; the 90 relocated P1b source constraints remain retirement obligations within the original `R_p=149`. Three ownership-path-only assertion updates have separate reviewed mappings. Current destinations are checked individually; generated targets project back to the original 417 source paths and SHA-256. The new theme keyboard spec is inventoried separately (28 behavior matchers and five source-text constraints pending at that audit; their completed retirement is recorded below) without changing frozen IDs or quotas.
 
-P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates, relevant verification and independent review passed. CI and committed checkpoint evidence remain unset until actually available. All 149 frozen P1b matchers and five supplemental source checks have now been retired after effective semantic lint or observable browser replacements. The four previously pending mandatory scenarios have verified evidence: 417 byte-identical generated files plus actual Orval drift, concurrent/repeated 401 redirect-once, all eight service labels in four locales, and real user/Admin controls and dialogs in light/dark and normal/reduced motion. Frozen IDs and quota denominators remain unchanged. `--strict` checks consistency; `--phase=P1` also requires completed retirement and effective replacement/behavior evidence.
+P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates, relevant verification and independent review passed. Current retrospective delegated acceptance and committed local-green baseline are recorded in `syncDesign.predecessorAcceptance` / `closeoutBaseline`; original before-start checkpoint gaps remain as accepted scoped historical deviations. All 149 frozen P1b matchers and five supplemental source checks have now been retired after effective semantic lint or observable browser replacements. The four previously pending mandatory scenarios have verified evidence: 417 byte-identical generated files plus actual Orval drift, concurrent/repeated 401 redirect-once, all eight service labels in four locales, and real user/Admin controls and dialogs in light/dark and normal/reduced motion. Frozen IDs and quota denominators remain unchanged. `--strict` checks consistency; `--phase=P1` also requires completed retirement and effective replacement/behavior evidence.
 
 ```json migration-ledger
 {
@@ -323,7 +323,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "zeroRetirementReason": "Design and test-only executable thin slice; no production migration or implementation-source constraint retirement in P2.5.",
       "zeroBehaviorReason": null,
       "status": "verified-local",
-      "evidence": "R_p=0: N/A with frozen design/test-only scope. B_p=6: all six mandatory design behaviors verified by p25-cleanup-specs (38 active tests). Current command/technical review evidence in syncDesign; formal plan-owner acceptance and CI remain pending.",
+      "evidence": "R_p=0: frozen design/test-only scope. B_p=6: p25-closeout-sync-specs (38 active tests). Delegated acceptance, local baseline CI and historical checkpoint deviation recorded in syncDesign.",
       "verifiedAt": "2026-10-10T20:45:09.451503+00:00"
     },
     {
@@ -16997,7 +16997,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
       "missingEvidence": []
     },
     {
@@ -17177,7 +17177,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
       "missingEvidence": []
     },
     {
@@ -17266,7 +17266,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
       "missingEvidence": []
     },
     {
@@ -17551,7 +17551,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
       "missingEvidence": []
     },
     {
@@ -17822,7 +17822,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
       "missingEvidence": []
     },
     {
@@ -17911,7 +17911,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
+      "verifiedRun": "p25-closeout-sync-specs; current delegated acceptance: p25-closeout-delegated-acceptance. Historical runs/reviews retained in syncDesign.evidence.",
       "missingEvidence": []
     },
     {
@@ -18629,11 +18629,11 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
     ]
   },
   "checkpoints": {
-    "rollingIntegrationHead": "70e5758eddad32b588eaf641d1a470848283b0d4",
-    "latestFullyGreenSha": null,
-    "immutableRollbackSha": null,
-    "ciEvidence": null,
-    "phaseStartRequirement": "Publish an immutable rollback SHA with green CI evidence before phase execution; checkpoint HEAD is not proof of green CI."
+    "rollingIntegrationHead": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+    "latestFullyGreenSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+    "immutableRollbackSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+    "ciEvidence": "p25-closeout-baseline-ci-review",
+    "phaseStartRequirement": "Record an immutable committed rollback SHA with actual local workflow-equivalent or remote green CI evidence before phase execution; no push is required, and checkpoint HEAD alone is not proof of green CI."
   },
   "contextMappings": [
     {
@@ -26625,10 +26625,10 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "owner": "/root",
       "implementationStatus": "complete",
       "verificationStatus": "passed",
-      "acceptanceStatus": "pending",
+      "acceptanceStatus": "accepted",
       "startedAt": "2026-10-10T20:18:56.581Z",
       "completedAt": "2026-10-10T20:45:09.451503+00:00",
-      "rollbackCheckpoint": null,
+      "rollbackCheckpoint": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
       "gateInstanceIds": [
         "P2.5/PHASE-CHECKPOINT",
         "P2.5/SYNC-SOT",
@@ -26642,12 +26642,16 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "P2.5/PHASE-QUOTAS",
         "P2.5/PHASE-COMMON"
       ],
-      "unresolvedItems": [
-        "Historical before-start green rollback checkpoint absent; plan-owner deviation/replanning required.",
-        "P1/P2 prerequisite formal CI/checkpoint acceptance unrecorded.",
-        "Named plan-owner acceptance of six decisions unrecorded.",
-        "GitHub CI needs publication of 230 local commits; push not authorized in this turn."
-      ]
+      "unresolvedItems": [],
+      "acceptedBy": "/root",
+      "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+      "acceptanceBasis": "Current delegated closeout review, with accepted historical checkpoint deviation; no historical before-start proof.",
+      "historicalGaps": [
+        "Historical before-start green rollback checkpoint absent for completed phases.",
+        "P1/P2 predecessor formal checkpoint/CI acceptance was not recorded at original completion.",
+        "Named delegated acceptance was not recorded until this closeout."
+      ],
+      "deviationEvidenceRefs": ["p25-closeout-historical-checkpoint-deviation"]
     },
     "artifacts": [
       {
@@ -26696,7 +26700,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/scripts/checkFrontendMigrationLedger.ts",
-        "sha256": "ff8de648e13f16b4f1143156a760241d8f3253a64a4454e2621945ad61640d42"
+        "sha256": "30fe65d863adc82a1d6b7ecdb4fc2325fbb0d354b14c9ebe99a2f567fb670b0a"
       },
       {
         "path": "apps/web/scripts/knipGovernanceManifest.json",
@@ -26720,7 +26724,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/src/core/CONTEXT.md",
-        "sha256": "7d269f5623e0e273718cf9a614761a1cf22c143e6c243d384fd54d15fa9ae0b5"
+        "sha256": "40e1457214169b3a3f518cdaf67d6ba8d5d244bc1ce0efaf9c2f5a90c529edd7"
       },
       {
         "path": "apps/web/src/core/query/queryClient.ts",
@@ -26732,7 +26736,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "apps/web/src/features/board/CONTEXT.md",
-        "sha256": "69b19a9be5d390d9eeb17f980b5510e8a81778120459bbc5267e20aeef9cf626"
+        "sha256": "12a4401f990e7950f885ac13197d6e1887268ad20f86705f89b00051014c3628"
       },
       {
         "path": "apps/web/src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
@@ -26808,7 +26812,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "docs/adr/0014-board-sync-query-ownership.md",
-        "sha256": "812ebea0b67a98d9af8451535df08067a3c494bb258903cca829c886a8fbbdb4"
+        "sha256": "c71f9b7b0c8dc78a65658447f3a5558d17a76d5114a74bbcc4119c0fbf6baa49"
       },
       {
         "path": "docs/frontend-seam-inventory.md",
@@ -26833,15 +26837,23 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "gateId": "PHASE-CHECKPOINT",
         "phaseId": "P2.5",
         "owner": "/root",
-        "verificationStatus": "not-run",
-        "acceptanceStatus": "pending",
-        "evidenceRefs": [],
-        "verifiedAt": null,
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "No green CI rollback checkpoint was recorded before P2.5 started; current local checks cannot retroactively satisfy the temporal gate. Plan-owner deviation/replanning decision required.",
-          "Target commits are unpublished; no GitHub Actions run at the local SHA."
+        "verificationStatus": "passed",
+        "acceptanceStatus": "accepted",
+        "evidenceRefs": [
+          "p25-closeout-green-checkpoint",
+          "p25-closeout-historical-checkpoint-deviation",
+          "p25-closeout-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:33:01.571188+00:00",
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": [],
+        "historicalUnresolvedItems": [
+          "No green CI rollback checkpoint was recorded before P2.5 started; current local checks cannot retroactively satisfy the temporal gate. Plan-owner deviation/replanning decision required. Local workflow-equivalent CI is eligible; no push is required."
+        ],
+        "verificationBasis": "Current baseline and scoped accepted historical deviation; original before-start gate was not satisfied.",
+        "deviationEvidenceRefs": [
+          "p25-closeout-historical-checkpoint-deviation"
         ]
       },
       {
@@ -26850,19 +26862,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-independent-review",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/SYNC-CACHE-TIMING",
@@ -26870,19 +26883,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-independent-review",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/SYNC-FOCUS",
@@ -26890,19 +26904,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-independent-review",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/SYNC-SSE",
@@ -26910,19 +26925,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-independent-review",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/SYNC-REVISION",
@@ -26930,19 +26946,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-independent-review",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/SYNC-DRAFT-PRECEDENCE",
@@ -26950,19 +26967,20 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-independent-review",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/SYNC-MERGED-DESIGN",
@@ -26970,14 +26988,17 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-formal-main-integration"],
+        "acceptanceStatus": "accepted",
+        "evidenceRefs": [
+          "p25-formal-main-integration",
+          "p25-closeout-current-main-integration",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-final-independent-review"
+        ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Named plan-owner acceptance of all six decisions pending; local main integration is recorded, remote merge/CI absent."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/PHASE-KNIP",
@@ -26985,7 +27006,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-strict-p1",
           "p25-cleanup-independent-review",
@@ -26993,14 +27014,17 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
           "p25-formal-final-lint",
           "p25-formal-workflow-normal",
           "p25-formal-workflow-production",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-knip-normal",
+          "p25-closeout-knip-production",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/PHASE-QUOTAS",
@@ -27008,21 +27032,23 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-specs",
           "p25-cleanup-ledger-p2",
           "p25-cleanup-independent-review",
           "p25-cleanup-ledger-p25",
           "p25-formal-final-sync-specs",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-strict-P2.5",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       },
       {
         "instanceId": "P2.5/PHASE-COMMON",
@@ -27030,7 +27056,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "phaseId": "P2.5",
         "owner": "/root",
         "verificationStatus": "passed",
-        "acceptanceStatus": "pending",
+        "acceptanceStatus": "accepted",
         "evidenceRefs": [
           "p25-cleanup-typecheck",
           "p25-cleanup-eslint",
@@ -27045,14 +27071,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
           "p25-formal-workflow-smoke-contract",
           "p25-formal-workflow-workflow",
           "p25-formal-workflow-actionlint",
-          "p25-formal-final-independent-review"
+          "p25-formal-final-independent-review",
+          "p25-closeout-delegated-acceptance",
+          "p25-closeout-sync-specs",
+          "p25-closeout-checker-quality",
+          "p25-closeout-node-typecheck",
+          "p25-closeout-strict-P2.5",
+          "p25-closeout-final-independent-review"
         ],
         "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
-        "acceptedBy": null,
-        "acceptedAt": null,
-        "unresolvedItems": [
-          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
-        ]
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:33:01.571188+00:00",
+        "unresolvedItems": []
       }
     ],
     "evidence": [
@@ -28265,6 +28295,325 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "decision": "passed",
         "reviewedArtifactRefs": ["syncDesign.artifacts"],
         "summary": "All six decisions and Common/Knip/Quotas PASS; exact hashes/fingerprint, unchanged permanent specs/trio, no production Query importer, canonical drift and worker scan, fail-closed retired param, scoped anonymous fixture and real Linux process exit, exact executable Knip entry. No formal phase/CI/checkpoint authorization."
+      },
+      {
+        "id": "p25-closeout-sync-specs",
+        "kind": "command",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:run -- src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 6.103,
+        "scope": "Actual local closeout verification on current artifact bytes; no GitHub Actions claim.",
+        "summary": "6 specs / 38 active tests passed."
+      },
+      {
+        "id": "p25-closeout-knip-normal",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON", "P2.5/PHASE-KNIP"],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:knip:normal",
+        "exitCode": 0,
+        "durationSeconds": 7.562,
+        "scope": "Actual local closeout verification on current artifact bytes; no GitHub Actions claim.",
+        "summary": "Passed on closeout revision."
+      },
+      {
+        "id": "p25-closeout-knip-production",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON", "P2.5/PHASE-KNIP"],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:knip:production",
+        "exitCode": 0,
+        "durationSeconds": 7.247,
+        "scope": "Actual local closeout verification on current artifact bytes; no GitHub Actions claim.",
+        "summary": "Passed on closeout revision."
+      },
+      {
+        "id": "p25-closeout-checker-quality",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx eslint scripts/checkFrontendMigrationLedger.ts",
+        "exitCode": 0,
+        "durationSeconds": 3.49,
+        "scope": "Actual local closeout verification on current artifact bytes; no GitHub Actions claim.",
+        "summary": "Passed on closeout revision."
+      },
+      {
+        "id": "p25-closeout-node-typecheck",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx vue-tsc -p tsconfig.test-node.json --noEmit",
+        "exitCode": 0,
+        "durationSeconds": 3.297,
+        "scope": "Actual local closeout verification on current artifact bytes; no GitHub Actions claim.",
+        "summary": "Passed on closeout revision."
+      },
+      {
+        "id": "p25-closeout-baseline-ci-review",
+        "kind": "review",
+        "requirementIds": [
+          "P2.5/PHASE-CHECKPOINT",
+          "P1/PHASE-CHECKPOINT",
+          "P2/PHASE-CHECKPOINT"
+        ],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "reviewer": "/root",
+        "decision": "passed",
+        "evidenceRefs": [
+          "p25-formal-quality-generated",
+          "p25-formal-quality-style",
+          "p25-formal-quality-typecheck",
+          "p25-formal-quality-build",
+          "p25-formal-quality-affected",
+          "p25-formal-quality-strict-p1",
+          "p25-formal-quality-strict-p2",
+          "p25-formal-final-lint",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-node-typecheck",
+          "p25-formal-browser-linux-smoke",
+          "p25-formal-browser-accessibility",
+          "p25-formal-workflow-normal",
+          "p25-formal-workflow-production",
+          "p25-formal-workflow-smoke-contract",
+          "p25-formal-workflow-workflow",
+          "p25-formal-workflow-actionlint",
+          "p25-formal-media-workflow",
+          "p25-formal-media-fixture",
+          "p25-formal-media-scan",
+          "p25-formal-ops-0",
+          "p25-formal-ops-2",
+          "p25-formal-ops-3",
+          "p25-formal-ops-4",
+          "p25-formal-ops-5",
+          "p25-formal-ops-6",
+          "p25-formal-ops-7",
+          "p25-formal-ops-8",
+          "p25-formal-ops-9",
+          "p25-formal-ops-10",
+          "p25-formal-ops-11",
+          "p25-formal-ops-12",
+          "p25-formal-ops-13",
+          "p25-formal-ops-14",
+          "p25-formal-ops-selftests",
+          "p25-formal-main-integration",
+          "p25-formal-final-independent-review"
+        ],
+        "scope": "Carry-forward review of actual workflow-equivalent CI on immutable baseline, not a new full CI execution.",
+        "summary": "44 baseline artifact bytes matched committed 5b7af20b and prior green fingerprint. This revision changes only acceptance docs and checker fixtures/output; relevant checks rerun. Original CI scopes, skips and failure history preserved."
+      },
+      {
+        "id": "p25-closeout-historical-checkpoint-deviation",
+        "kind": "review",
+        "requirementIds": [
+          "P1/PHASE-CHECKPOINT",
+          "P2/PHASE-CHECKPOINT",
+          "P2.5/PHASE-CHECKPOINT"
+        ],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "reviewer": "/root",
+        "decision": "accepted",
+        "scope": "Canonical plan §5.1/§6.11 scoped closeout revision for already completed P1/P2/P2.5 only.",
+        "summary": "Historical before-start green checkpoint was not recorded. Accepted current closeout deviation under user instruction 收尾p2.5; not retrospective compliance, not user personal signature. Current green baseline replaces the missing rollback record for closeout only. Future phases require their own before-start checkpoint."
+      },
+      {
+        "id": "p25-closeout-green-checkpoint",
+        "kind": "checkpoint",
+        "requirementIds": ["P2.5/PHASE-CHECKPOINT"],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "ciEvidence": "p25-closeout-baseline-ci-review",
+        "baselineRef": "syncDesign.closeoutBaseline",
+        "evidenceRefs": [
+          "p25-closeout-baseline-ci-review",
+          "p25-closeout-historical-checkpoint-deviation"
+        ],
+        "scope": "Current committed green rollback baseline, accepted with explicit historical-timing deviation; not a before-start pass.",
+        "summary": "Baseline SHA 5b7af20b with prior verified 8184c2b9 fingerprint; current docs/checker verification has separate fingerprint."
+      },
+      {
+        "id": "p25-closeout-current-main-integration",
+        "kind": "merge",
+        "requirementIds": ["P2.5/SYNC-MERGED-DESIGN"],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "mergeSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "baselineRef": "syncDesign.closeoutBaseline",
+        "scope": "Six design decisions and permanent specs integrated on current local main at 5b7af20b; closeout documentary/checker delta reviewed separately. No push/remote merge required.",
+        "summary": "Current baseline integration replaces old 70b6df4f integration evidence for acceptance. No production Query importer or P3 migration."
+      },
+      {
+        "id": "p25-closeout-delegated-acceptance",
+        "kind": "review",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "recordedAt": "2026-10-11T05:33:01.571188+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "reviewer": "/root",
+        "decision": "accepted",
+        "evidenceRefs": [
+          "p25-formal-final-independent-review",
+          "p25-closeout-sync-specs",
+          "p25-closeout-knip-normal",
+          "p25-closeout-knip-production",
+          "p25-closeout-checker-quality",
+          "p25-closeout-node-typecheck"
+        ],
+        "scope": "Current named delegated integrator acceptance authorized by user instruction 收尾p2.5; separate from independent technical review and user personal signoff.",
+        "summary": "Six Sync decisions and Common/Knip/Quotas accepted individually through their owning gate references; runtime/contracts/frozen IDs/quotas unchanged. P3 remains blocked."
+      },
+      {
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "id": "p25-closeout-strict-P1",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "recordedAt": "2026-10-11T05:34:00.560624+00:00",
+        "result": "passed",
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P1",
+        "exitCode": 0,
+        "durationSeconds": 15.094,
+        "summary": "60 fixtures / 0 warnings / 0 unmet requirements."
+      },
+      {
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "id": "p25-closeout-strict-P2",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "recordedAt": "2026-10-11T05:34:00.560624+00:00",
+        "result": "passed",
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2",
+        "exitCode": 0,
+        "durationSeconds": 15.118,
+        "summary": "60 fixtures / 0 warnings / 0 unmet requirements."
+      },
+      {
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "id": "p25-closeout-predecessor-acceptance",
+        "kind": "review",
+        "requirementIds": ["P1", "P2", "P2.5/dependencies"],
+        "recordedAt": "2026-10-11T05:34:00.560624+00:00",
+        "result": "passed",
+        "reviewer": "/root",
+        "decision": "accepted",
+        "evidenceRefs": [
+          "p25-closeout-strict-P1",
+          "p25-closeout-strict-P2",
+          "p25-closeout-baseline-ci-review",
+          "p25-closeout-historical-checkpoint-deviation"
+        ],
+        "summary": "Current retrospective P1/P2 predecessor acceptance after independent /root/p25_closeout_predecessors review. Original acceptance times remain unrecorded; scoped historical checkpoint deviation applies. Frozen IDs/quotas, current replacements/behaviors and 263+417 mappings passed."
+      },
+      {
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "id": "p25-closeout-strict-P2.5",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "recordedAt": "2026-10-11T05:35:31.815713+00:00",
+        "result": "passed",
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
+        "exitCode": 0,
+        "durationSeconds": 13.879,
+        "summary": "60 fixtures / 0 warnings / 0 unmet; recorded formal acceptance accepted."
+      },
+      {
+        "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "id": "p25-closeout-final-independent-review",
+        "kind": "review",
+        "requirementIds": [
+          "P2.5/PHASE-CHECKPOINT",
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/SYNC-MERGED-DESIGN",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "recordedAt": "2026-10-11T05:36:10.608870+00:00",
+        "result": "passed",
+        "reviewer": "/root/p25_closeout_verifier",
+        "decision": "passed",
+        "evidenceRefs": ["p25-closeout-strict-P2.5"],
+        "scope": "Final independent read-only review of exact closeout artifacts, baseline, accepted ledger and canonical plan scoped exception.",
+        "summary": "Independent strict 60 fixtures /0 warnings /0 unmet. Current 44 artifact hashes/fingerprint and baseline44 git-show bytes verified. All gate/deviation/localCi/predecessor refs resolve; 11 gates accepted. Current retrospective P1/P2 and /root delegated acceptance distinct from user personal signature. P3 blocked and production trio pending; diff check PASS."
       }
     ],
     "p3Trio": [
@@ -28558,7 +28907,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       }
     ],
     "p3StartStatus": "blocked",
-    "scope": "Design and private permanent test-only executable helper integrated locally on main; formal delegated review and local CI equivalence do not grant P3/P4. Production Query migration is out of scope.",
+    "scope": "P2.5 design/specs accepted by current delegated integrator with local integration and workflow-equivalent CI; historical checkpoint deviation retained. P3/P4 not authorized; production Query migration remains pending.",
     "localCi": {
       "status": "passed",
       "kind": "local-workflow-equivalent",
@@ -28569,6 +28918,15 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       "requiredLaneScope": "P2.5 local diff requires Web, Ops, Media Contract and Handbook Contract; source path classifiers confirmed. Remote publication includes 230 earlier local commits and requires all contexts.",
       "backendIntegration": "Not claimed; anonymous smoke fixtures and explicitly skipped live probes are scoped evidence.",
       "githubActionsStatus": "not-run-target-unpublished",
+      "acceptanceEvidencePolicy": "Actual local workflow-equivalent CI is eligible without push or remote merge. Completed P1/P2/P2.5 historical checkpoint gaps are resolved only through the explicit scoped closeout deviation; future phases retain before-start green checkpoints.",
+      "policyRevision": {
+        "id": "acceptance-without-push-2026-10-11",
+        "requestedBy": "user",
+        "instruction": "验收标准中去掉push",
+        "reason": "Remove remote publication as an acceptance prerequisite; preserve verification strength and recorded history.",
+        "requirementRefs": ["plan §5.1", "plan §6.7", "plan §6.11"],
+        "impact": "Local workflow-equivalent green CI and local integration commits are eligible acceptance evidence. No phase acceptance, before-start checkpoint or remote execution is manufactured."
+      },
       "remoteMainSha": "7a70883ec1c9abf06954f02dfd1fd956f4b400cc",
       "unpublishedCommitCount": 230,
       "evidenceRefs": [
@@ -28617,9 +28975,270 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "Intermediate Linux smoke hung after printed PASS because npm wrapper left Vite alive; interrupted exit143 preserved, direct Vite subprocess shutdown and Linux exit0 regression verified.",
         "Intermediate Knip rejected standalone helper as unused; real workflow execution and exact Knip executable entry added, no ignore.",
         "Initial Ops selftests failed ADR headings; required template repaired and 22/22 reverified.",
-        "P2.5 check after artifact revision update rejected stale/missing evidence; actual new command/review records refreshed, 51 fixtures /0 warnings /0 unmet verified."
-      ]
-    }
+        "P2.5 check after artifact revision update rejected stale/missing evidence; actual new command/review records refreshed, 51 fixtures /0 warnings /0 unmet verified.",
+        "Closeout strict initial run failed with 11 stale evidence requirements because Python artifact path ordering differed from canonical JavaScript localeCompare; corrected fingerprint using canonical algorithm without changing guards; final strict accepted with 60 fixtures /0 warnings /0 unmet."
+      ],
+      "closeoutPolicyRevision": {
+        "id": "p25-closeout-2026-10-11",
+        "instruction": "/subagents 收尾p2.5",
+        "delegatedReviewer": "/root",
+        "requirementRefs": ["plan §5.1", "plan §6.11"],
+        "scope": "Completed P1/P2/P2.5 acceptance only; no P3/P4 execution authorization.",
+        "historicalCheckpointException": "For completed P1/P2/P2.5 only, accept the missing historical before-start checkpoint as an explicit deviation and establish a verified committed green rollback baseline now. Preserve the original gap; do not backdate compliance. Record current predecessor and gate acceptance separately. Future phase starts require green immutable checkpoints before implementation. No P3/P4 authorization or technical/quota/production red-green waiver."
+      }
+    },
+    "closeoutBaseline": {
+      "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+      "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+      "artifacts": [
+        {
+          "path": ".github/workflows/web.yml",
+          "sha256": "2d4d1790d5dc75c788aa38411bf013e15d0c25411c27611c383a7dfaa86df04f"
+        },
+        {
+          "path": "DESIGN.md",
+          "sha256": "e738da9d8b819f123a1e4b38563216fc4b6bef87b37cbc584ba0d4f7862df6ff"
+        },
+        {
+          "path": "apps/api/openapi.public.yaml",
+          "sha256": "879efcbe0ff3ab0a07ae250696128ad719848a707614c79b8a087cf688aed59a"
+        },
+        {
+          "path": "apps/web/.dependency-cruiser.cjs",
+          "sha256": "6fd632daa50b78711d7aa2da8728db9f13522287c611e77fda60b97493ebe8c5"
+        },
+        {
+          "path": "apps/web/eslint.config.js",
+          "sha256": "2dc34cdd9e667e3418e2a3d65b1a3433e0f02d94b0fcd4c080c4750a4d0162af"
+        },
+        {
+          "path": "apps/web/knip.config.ts",
+          "sha256": "aaad2075feaf905ce9021cd50d9c1e7891f38f9d9733ac73000f17cd7195b4f2"
+        },
+        {
+          "path": "apps/web/knip.jsonc",
+          "sha256": "f2556227711f34fb660fe834be41d5ea21ffac4ca73150d8ab1c0a5fa7dcd09f"
+        },
+        {
+          "path": "apps/web/knip.production.config.ts",
+          "sha256": "dcd269490751aa371ad6f8cf2d4687829010b06a9a5828905d0c2ce3bb08a219"
+        },
+        {
+          "path": "apps/web/package-lock.json",
+          "sha256": "dda0ff57b1e01452681902500a26b3dd810c2fc7481f3aaf8e768dd4ba6668c1"
+        },
+        {
+          "path": "apps/web/package.json",
+          "sha256": "202ac5d26dfbeda461365b5aead61353afa87ffbfbf1cd9b47c0a7f410ec9bf0"
+        },
+        {
+          "path": "apps/web/scripts/accessibilitySmoke.ts",
+          "sha256": "50fcfc4717f4363fad327b194b166ee9b979a1e07a1168ca3a3ab74f9154a8db"
+        },
+        {
+          "path": "apps/web/scripts/checkFrontendMigrationLedger.ts",
+          "sha256": "ff8de648e13f16b4f1143156a760241d8f3253a64a4454e2621945ad61640d42"
+        },
+        {
+          "path": "apps/web/scripts/knipGovernanceManifest.json",
+          "sha256": "80167cb4762a8fccf1999a1d393dfe8d58d76e57bf055d06053e3afdb858a753"
+        },
+        {
+          "path": "apps/web/scripts/smokeSupport.contract.spec.ts",
+          "sha256": "c3f4e10a22d4f9e4f023108cdb8ff8a983fde588803c7b79b565f7c403767d0a"
+        },
+        {
+          "path": "apps/web/scripts/smokeSupport.ts",
+          "sha256": "e74fd062940d49394baafa145ca5d9fe66a5bfc6e2150ecc5640384102942007"
+        },
+        {
+          "path": "apps/web/scripts/userRouteSmoke.ts",
+          "sha256": "51ec36f33e6212842f35bb45b51e3cadcc6249e75aba75099d61c38d9fc97d35"
+        },
+        {
+          "path": "apps/web/src/api/workspaceEventStream.ts",
+          "sha256": "0804f5be9cc65adf96b1de9c9089a4b9f3220005aff448897dfeb672347f2956"
+        },
+        {
+          "path": "apps/web/src/core/CONTEXT.md",
+          "sha256": "7d269f5623e0e273718cf9a614761a1cf22c143e6c243d384fd54d15fa9ae0b5"
+        },
+        {
+          "path": "apps/web/src/core/query/queryClient.ts",
+          "sha256": "0c14e86c68fbc5b1ac581b5136a62f2fc348b3ca5555c0231c81c38eeb209d91"
+        },
+        {
+          "path": "apps/web/src/core/query/queryDefaults.ts",
+          "sha256": "e74f2c97c3cb0a09546d6504c8634d61808101ba6ccd7268bbc327c68fdfb274"
+        },
+        {
+          "path": "apps/web/src/features/board/CONTEXT.md",
+          "sha256": "69b19a9be5d390d9eeb17f980b5510e8a81778120459bbc5267e20aeef9cf626"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardCacheTiming.contract.spec.ts",
+          "sha256": "32c9ce2699407a51939262971654afb65c3c354e967afcaf886bc8d4e3a88a7b"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
+          "sha256": "76527fb0ada7470c721823aafe7ec97eadc74b8391960ff7980fcb6fbcfb90ef"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardFocusControls.contract.spec.ts",
+          "sha256": "85876ea84a552553fea7ac7ad639475954371218f9090ae3816af9f4634a5742"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardRevisionConflict.contract.spec.ts",
+          "sha256": "9eaa7c84e8177b3eca4c754af31e9900a33586c3eaf5b12ea21ddce09abc845e"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts",
+          "sha256": "f3c66be6871488d94cc2940c2ee336b5cfe1965447d1d2ad3d9b4263c01f827f"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+          "sha256": "16a529db9b96738d9a81eae537e802f915993a600bf2aadaf2f65ee772f307ec"
+        },
+        {
+          "path": "apps/web/src/features/board/application/sync/boardSync.ts",
+          "sha256": "9e7e7d01e0167c1d6ce6b0aacfc40cad5fd962cbfd8620d4c4b5970c5be7203f"
+        },
+        {
+          "path": "apps/web/src/features/board/infrastructure/api/boardsResource.ts",
+          "sha256": "3f9a8c1a7aa9a34933ce55cd11c5e437fe860744d6571dd3305118a4da668111"
+        },
+        {
+          "path": "apps/web/src/features/board/presentation/catalog/galleryController.ts",
+          "sha256": "74224c5fb4fd14324e65d6eecab34a86c871080e60c932c0c7142ebb8a0cbb59"
+        },
+        {
+          "path": "apps/web/src/features/board/testing/syncDesignHarness.ts",
+          "sha256": "efc0af403390d08367d2d62a0fae699c3f73f03490b225e6e75d1a563b989652"
+        },
+        {
+          "path": "apps/web/src/features/board/testing/syncFixtures.ts",
+          "sha256": "d6d2f53820a3df7c5c217a3c8ae082da925fc7a46cc8dcb6084e5b6843001417"
+        },
+        {
+          "path": "apps/web/src/features/canvas/application/board-session/autosavePolicy.ts",
+          "sha256": "874eb9c6ec61c7474927a3c03842673b1b6674a2a4ecd11d3458c2b9c357c4e7"
+        },
+        {
+          "path": "apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts",
+          "sha256": "dd556c62870434fa57599d9f1163df2e56447c040059755487c3d1fbcacca49e"
+        },
+        {
+          "path": "apps/web/src/features/canvas/application/execution/workspace/canvasTaskContractMapping.ts",
+          "sha256": "c6b3dc620cbeb37a4aaa9ce70392ce23f0df3ff76799257f4f06a4f7eb635f9d"
+        },
+        {
+          "path": "apps/web/src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+          "sha256": "757496fa6dfb2fe712dfc56801a8d62b6888fdf0712ef186a8a2907c56896db8"
+        },
+        {
+          "path": "apps/web/tsconfig.test-node.json",
+          "sha256": "dd7ce06fe0f8995088f12e6a974403a85bb0bae08a727f035d560757d451a47e"
+        },
+        {
+          "path": "apps/web/tsconfig.test.json",
+          "sha256": "be3b98d0ea5597a3e7fa0f7cbc9a28c776b8f4ed2e57366b5617e2745d43a159"
+        },
+        {
+          "path": "apps/web/vite.config.ts",
+          "sha256": "d09a4104c85bf7dd12526b430a19a6f82d8a5492e56f83fcb9a0f96d1353b4ee"
+        },
+        {
+          "path": "docs/adr/0014-board-sync-query-ownership.md",
+          "sha256": "812ebea0b67a98d9af8451535df08067a3c494bb258903cca829c886a8fbbdb4"
+        },
+        {
+          "path": "docs/frontend-seam-inventory.md",
+          "sha256": "33385367d7079318f48559e5cbbcbb3ad1abaf632e9df910cc5dc7a35b9ef12e"
+        },
+        {
+          "path": "scripts/ci-legacy-media-zero-scan-test.sh",
+          "sha256": "d4640938c0382c2dcc4da59dde8aea196833d9bf4511a7c3e452778b24cc9bf9"
+        },
+        {
+          "path": "scripts/ci-legacy-media-zero-scan.sh",
+          "sha256": "02650dcf5b5315d70377c5363670913287d1948992f44f71848213707c2e299d"
+        },
+        {
+          "path": "scripts/ci-workflow-contract-check.go",
+          "sha256": "a53d574229a3f804b5339eb34320c3962fda4d4e4545dffd28c3d12043e14625"
+        }
+      ],
+      "ciEvidenceRefs": [
+        "p25-formal-quality-generated",
+        "p25-formal-quality-style",
+        "p25-formal-quality-typecheck",
+        "p25-formal-quality-build",
+        "p25-formal-quality-affected",
+        "p25-formal-quality-strict-p1",
+        "p25-formal-quality-strict-p2",
+        "p25-formal-final-lint",
+        "p25-formal-final-sync-specs",
+        "p25-formal-final-node-typecheck",
+        "p25-formal-browser-linux-smoke",
+        "p25-formal-browser-accessibility",
+        "p25-formal-workflow-normal",
+        "p25-formal-workflow-production",
+        "p25-formal-workflow-smoke-contract",
+        "p25-formal-workflow-workflow",
+        "p25-formal-workflow-actionlint",
+        "p25-formal-media-workflow",
+        "p25-formal-media-fixture",
+        "p25-formal-media-scan",
+        "p25-formal-ops-0",
+        "p25-formal-ops-2",
+        "p25-formal-ops-3",
+        "p25-formal-ops-4",
+        "p25-formal-ops-5",
+        "p25-formal-ops-6",
+        "p25-formal-ops-7",
+        "p25-formal-ops-8",
+        "p25-formal-ops-9",
+        "p25-formal-ops-10",
+        "p25-formal-ops-11",
+        "p25-formal-ops-12",
+        "p25-formal-ops-13",
+        "p25-formal-ops-14",
+        "p25-formal-ops-selftests",
+        "p25-formal-main-integration",
+        "p25-formal-final-independent-review"
+      ],
+      "scope": "Current committed green local-workflow-equivalent baseline for completed P1/P2/P2.5 closeout. Not a historical before-start checkpoint; later closeout docs/checker have their own current fingerprint."
+    },
+    "predecessorAcceptance": [
+      {
+        "phaseId": "P1",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "accepted",
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:34:00.560624+00:00",
+        "rollbackCheckpoint": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "evidenceRefs": [
+          "p25-closeout-predecessor-acceptance",
+          "p25-closeout-strict-P1",
+          "p25-closeout-historical-checkpoint-deviation"
+        ],
+        "scope": "Current retrospective acceptance, not original before-start or completion signoff."
+      },
+      {
+        "phaseId": "P2",
+        "verificationStatus": "passed",
+        "acceptanceStatus": "accepted",
+        "acceptedBy": "/root",
+        "acceptedAt": "2026-10-11T05:34:00.560624+00:00",
+        "rollbackCheckpoint": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
+        "evidenceRefs": [
+          "p25-closeout-predecessor-acceptance",
+          "p25-closeout-strict-P2",
+          "p25-closeout-historical-checkpoint-deviation"
+        ],
+        "scope": "Current retrospective acceptance, not original before-start or completion signoff."
+      }
+    ]
   }
 }
 ```

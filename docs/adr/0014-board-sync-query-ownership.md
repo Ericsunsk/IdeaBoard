@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 owner: Board
 decision_date: 2026-10-11
 supersedes: none
@@ -9,13 +9,13 @@ supersedes: none
 
 ## Context
 
-计划 §3.4 / §5.7 要求六项 Sync 决策分别由 plan owner 接受，设计和永久 regression specs 合并后才能启动 P3。本 ADR 是待接受的设计；本地验证、plan-owner acceptance、merge 与 CI 是独立状态。执行状态及证据只记录在 [canonical migration ledger](../architecture/frontend-contract-inventory.md) 的 `behaviors` 与 `syncDesign`，本文不替代 acceptance 或授予 P3 启动权限。
+计划 §3.4 / §5.7 要求六项 Sync 决策分别由 plan owner 接受，设计和永久 regression specs 合并后才能启动 P3。本 ADR 的设计已由本轮收尾指令授权的具名 integrator `/root` 接受；本地验证、plan-owner acceptance、merge 与 CI 是独立状态。执行状态及证据只记录在 [canonical migration ledger](../architecture/frontend-contract-inventory.md) 的 `behaviors` 与 `syncDesign`，本文不替代 acceptance 或授予 P3 启动权限。
 
 `features/board/testing/syncDesignHarness.ts` 是永久 specs 使用的 private test-only executable design harness，通过真实 TanStack Query observers、HTTP adapter 和 workspace SSE subscription 保存 thin-slice spike 结论。它未接入 production repository，也未导出到 production barrel；其绿色结果证明设计行为，不证明 P3 production Query 迁移完成。当前 production catalog 与 document state 仍由 `application/catalog`、`application/sync` 和 persistence store 管理；P3 才迁移 server snapshot ownership。
 
 [ADR-0006](./0006-board-optimistic-revision-concurrency.md) 已 deprecated，仅 optimistic revision concurrency invariant 仍有效；它记录的 `base_revision` / `new_revision` wire encoding 已废弃。当前 `If-Match` / HTTP 409 contract 来自 `apps/api/openapi.public.yaml`、`DESIGN.md` 和 `features/board/infrastructure/api/boardsResource.ts`，本 ADR 不改变该 wire contract。
 
-下表的 spec 路径以 `apps/web/src/features/` 为前缀。每项 verification 引用 canonical ledger 中对应 `behaviors[id].evidence` / `verifiedRun` 和 `syncDesign.evidence`；对应 gate 的 acceptance 仍待 plan owner 独立记录。
+下表的 spec 路径以 `apps/web/src/features/` 为前缀。每项 verification 引用 canonical ledger 中对应 `behaviors[id].evidence` / `verifiedRun` 和 `syncDesign.evidence`；对应 gate 的 delegated acceptance 已在 canonical ledger 分别记录。
 
 ## Decision
 
@@ -30,7 +30,7 @@ P3 目标：TanStack Query 拥有 catalog list 和每个 board 的 server docume
 | Scenario / observable check | `selection port owns the scope: resolution fails closed before any network call`：抛出 `BoardWorkspaceUnavailableError` 且 request 为零；`keeps local draft edits separate from the cached server document`：local draft 改变而 Query document 保持 server 内容；`never regresses the cached document revision on an older server read`：旧 response 不降低缓存 revision；workspace-navigation race 见下方冻结 trio |
 | Verification evidence       | `behaviors[id=sync-design/source-of-truth]`；`syncDesign.evidence`；gate `P2.5/SYNC-SOT`                                                                                                                                                                                                                                                                                                                            |
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts`                                                                                                                                                                                                                                                                                                        |
-| Acceptance                  | Pending plan-owner acceptance；production Query ownership 待 P3                                                                                                                                                                                                                                                                                                                                                     |
+| Acceptance                  | Accepted by delegated integrator `/root`; see canonical gate evidence；production Query ownership 待 P3                                                                                                                                                                                                                                                                                                             |
 
 ### 2. Stale/gc timing
 
@@ -43,7 +43,7 @@ catalog list 使用 `accountScoped` preset（stale 15s）；document 继承 glob
 | Scenario / observable check | `catalog list rides accountScoped() 15s freshness across navigation` 与 `per-board document stays at 5s freshness across navigation`：fresh navigation 不新增 HTTP request，跨 stale boundary 后重新读取；`retains inactive snapshots for 10m and collects them at the inherited gc boundary`：10m 前 cache 保留，边界后移除并在返回时重新读取 |
 | Verification evidence       | `behaviors[id=sync-design/freshness-gc]`；`syncDesign.evidence`；gate `P2.5/SYNC-CACHE-TIMING`                                                                                                                                                                                                                                                 |
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardCacheTiming.contract.spec.ts`                                                                                                                                                                                                                                     |
-| Acceptance                  | Pending plan-owner acceptance；production options 待 P3                                                                                                                                                                                                                                                                                        |
+| Acceptance                  | Accepted by delegated integrator `/root`; see canonical gate evidence；production options 待 P3                                                                                                                                                                                                                                                |
 
 ### 3. Focus/refetch controls
 
@@ -56,7 +56,7 @@ global `refetchOnWindowFocus` 保持 `false`。gallery 的 visible touch 经 5s 
 | Scenario / observable check | `coalesces a visible double-touch into a single explicit invalidate`：hydrate 一次；`never fetches while the tab stays hidden`：hidden 时没有新增 hydrate；`flushes the pending save when the document hides` 与 `binds the hidden visibility event to the pending save`：仅触发 handler 或真实 visibility event 后 `save({ silent: true })` 恰好一次；测试恢复原 `visibilityState` property |
 | Verification evidence       | `behaviors[id=sync-design/focus-refetch]`；`syncDesign.evidence`；gate `P2.5/SYNC-FOCUS`                                                                                                                                                                                                                                                                                                     |
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardFocusControls.contract.spec.ts`                                                                                                                                                                                                                                                                                 |
-| Acceptance                  | Pending plan-owner acceptance；现有 production 行为的 regression evidence 与 P3 Query binding 分开记录                                                                                                                                                                                                                                                                                       |
+| Acceptance                  | Accepted by delegated integrator `/root`; see canonical gate evidence；现有 production 行为的 regression evidence 与 P3 Query binding 分开记录                                                                                                                                                                                                                                               |
 
 ### 4. SSE-to-Query mapping
 
@@ -69,7 +69,7 @@ SSE 仅提供 invalidation signal。`board.document_replaced` 经 500ms coalesce
 | Scenario / observable check | `invalidates the document on document_replaced with 500ms coalesce`：500ms 前不 refetch，多帧仅新增一次 HTTP read；`drops document_replaced frames at or below the local revision`：旧/重复 frames 不 refetch；`marks draft-dirty boards stale without refetching or overwriting the draft`：stale 为 true，request count 与 draft 保持；member/share/gap active scenarios 分别断言 list-only、document removal、scope isolation 与 `setQueryData` 未调用 |
 | Verification evidence       | `behaviors[id=sync-design/sse-broadcast]`；`syncDesign.evidence`；gate `P2.5/SYNC-SSE`                                                                                                                                                                                                                                                                                                                                                                    |
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts`                                                                                                                                                                                                                                                                                                                                                 |
-| Acceptance                  | Pending plan-owner acceptance；production invalidator 待 P3                                                                                                                                                                                                                                                                                                                                                                                               |
+| Acceptance                  | Accepted by delegated integrator `/root`; see canonical gate evidence；production invalidator 待 P3                                                                                                                                                                                                                                                                                                                                                       |
 
 ### 5. Revision coexistence 与 404
 
@@ -84,7 +84,7 @@ document PUT 404 不触发 create 或 upsert，保留 local draft 和已有 base
 | Scenario / observable check | `keeps the draft and the conflict status on 409, then converges on explicit reload`：409 后 draft/base revision 保留，reload 后采用 remote winner；`preserves the $label draft when the document PUT returns 404`：两种 revision 状态下单次 PUT、无 POST/upsert、draft/revision 保留；`preserves drafts on document GET 404 until a complete list confirms remote absence`：GET 404 hydrate 失败且保留两类 draft，完整 list absence 后仅 synced board 被移除 |
 | Verification evidence       | `behaviors[id=sync-design/revision-conflict]`；`syncDesign.evidence`；gate `P2.5/SYNC-REVISION`                                                                                                                                                                                                                                                                                                                                                              |
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts`                                                                                                                                                                                                                                                                                                                                              |
-| Acceptance                  | Pending plan-owner acceptance；当前 transport regression 不能替代 P3 production Query integration verification                                                                                                                                                                                                                                                                                                                                               |
+| Acceptance                  | Accepted by delegated integrator `/root`; see canonical gate evidence；当前 transport regression 不能替代 P3 production Query integration verification                                                                                                                                                                                                                                                                                                       |
 
 ### 6. Local-draft overlay precedence
 
@@ -97,7 +97,7 @@ local-newer draft 优先于旧 remote snapshot；显式 rollback 或 `preserveLo
 | Scenario / observable check | `lets the local-newer draft win over an older remote snapshot`：local name/content 保留；`lets an explicit rollback converge to the remote snapshot`：remote name/content 替换；`keeps never-synced offline creations and drops deleted-elsewhere boards`：offline 保留且 synced absence 移除；`freezes the overlay to the captured scope: a workspace switch drops the late response`：hydrate 失败且新 scope 内容保持 |
 | Verification evidence       | `behaviors[id=sync-design/draft-overlay-precedence]`；`syncDesign.evidence`；gate `P2.5/SYNC-DRAFT-PRECEDENCE`                                                                                                                                                                                                                                                                                                          |
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardDraftOverlay.contract.spec.ts`                                                                                                                                                                                                                                                                                                             |
-| Acceptance                  | Pending plan-owner acceptance；现有 store regression 与 P3 Query binding 分开记录                                                                                                                                                                                                                                                                                                                                       |
+| Acceptance                  | Accepted by delegated integrator `/root`; see canonical gate evidence；现有 store regression 与 P3 Query binding 分开记录                                                                                                                                                                                                                                                                                               |
 
 ### P3 red/green trio 冻结
 
@@ -120,8 +120,8 @@ npm run test:run -- src/features/board/application/sync/boardRevisionConflict.co
 
 ## Consequences
 
-`search`、`canvas` 与 `library` 保持 Query ban。六项 decision 的 local verification、独立 review 和 plan-owner acceptance 必须在 canonical ledger 分开记录；所有 P2.5 exit gates 接受并合并后才能启动 P3。新的 board key root、freshness/gc policy、focus path、SSE snapshot payload、revision wire encoding 或 draft precedence 变化都触发设计 review；后续 accepted ADR 应明确 supersede 本记录。
+`search`、`canvas` 与 `library` 保持 Query ban。六项 decision 的 local verification、独立 review 和 plan-owner acceptance 必须在 canonical ledger 分开记录；所有 P2.5 exit gates 接受并合并后才能启动 P3。新的 board key root、freshness/gc policy、focus path、SSE snapshot payload、revision wire encoding 或 draft precedence 变化都触发设计 review；后续变更应通过新 ADR 明确 supersede 本记录。
 
 ## Status
 
-Proposed。六项设计的受委托独立 review 已通过；named plan-owner acceptance、历史 before-start green CI checkpoint 与前置 phase 验收仍需在 canonical ledger 完成。设计及永久 specs 已进入本地 `main`；private executable test helper 保存 spike 结论，production Query 迁移仍未合入。
+Accepted。六项设计的独立 review 和具名 delegated acceptance 已完成；P1/P2 前置验收、本地等价 CI 和当前 committed green rollback baseline 均在 canonical ledger 登记。已完成阶段的 historical before-start checkpoint 缺口作为 scoped deviation 保留，不倒填历史通过。设计及永久 specs 已进入本地 `main`；private executable test helper 保存 spike 结论，production Query 迁移仍为 P3 pending，P3 尚未授权启动。
