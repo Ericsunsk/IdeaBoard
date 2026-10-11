@@ -1,5 +1,17 @@
 # ExecPlans
 
+## P4 Audit Repair (2026-10-12)
+
+- Goal: Resolve the P4 diff review findings without changing runtime behavior or claiming formal phase acceptance.
+- Scope: Align the Admin toast boundary documentation/check with its tested contract; rerun current-revision P4 behavior specs and replace stale `verifiedRun` records; reconcile Admin shared bridge-shim inventory prose and the generated active Seam/report shim sets; record P4 verification and limitations here. No unrelated P4 refactors or push.
+- Success criteria: The feedback guard has a positive adapter-consumer canary and negative bypass cases; P4 behavior evidence names current commands/results; shim status descriptions match the current inventory/report; formal acceptance remains pending.
+- Risks: Do not overstate toast enforcement, retroactively treat old P0 runs as P4 evidence, or rewrite frozen IDs, quotas, or historical phase records.
+- Rollback: Revert only this repair's targeted checker, context, plan, and ledger edits; preserve the P4 implementation and prior historical evidence.
+- Results: Current-revision Admin behavior specs passed (3 specs / 24 tests); the feedback boundary self-test and source scan passed (8 cases / 453 Admin sources); P1 ledger remains green (0 unmet). The four stale P4 `verifiedRun` records now point to the current targeted command and explicitly do not claim formal acceptance or a committed checkpoint. Admin shared bridge-shim prose now distinguishes the retired 70-shim temporary set from canonical shared paths. Active Seam measurements were refreshed from the current dependency graph, and all 113 stale shim declarations plus their retired consumer edges were removed from the active inventory; the generated report now records zero active shim files.
+- Verification: `npm run lint:admin-feedback-boundary`, `npm run test:run -- src/features/admin/users/session/commands.contract.spec.ts src/features/admin/users/session/commandsInvalidation.contract.spec.ts src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts`, `npm run test:typecheck`, `npm run lint:dependencies -- --strict --phase=P1`, `npm run lint:migration-ledger`, `npm run lint:shim-ttl`, seam schema self-test, targeted Prettier checks, and `git diff --check` passed. Strict all-active Seam acceptance still reports the existing 210 non-batch advisory deep edges; this is not claimed as a P4 pass.
+- Limitations: P4 formal acceptance, CI, and a committed green checkpoint remain pending. Inventory/report formatting was normalized with Prettier after the generated measurement refresh; no unrelated document content was removed.
+- Status: COMPLETE locally; formal P4 acceptance remains pending.
+
 ## P3 审计修复（2026-10-11）
 
 - Goal: 按用户“依次修复”指令完成 P3 审计的六项缺口修复与独立复核。

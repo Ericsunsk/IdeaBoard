@@ -2,7 +2,7 @@ import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../test/toast'
-import AdminLoginPage from '../../admin/pages/login/AdminLoginPage.vue'
+import AdminLoginPage from '../../admin/app/login/AdminLoginPage.vue'
 import LoginAuthPanel from '../components/LoginAuthPanel.vue'
 import UserAuthCallbackPage from './UserAuthCallbackPage.vue'
 
@@ -54,7 +54,7 @@ vi.mock('../../../core/composables/useSiteBranding', () => ({
 
 vi.mock('../../../core/composables/useAppToast')
 
-vi.mock('../../admin/pages/login/useAdminLoginFeedback', () => ({
+vi.mock('../../admin/app/login/useAdminLoginFeedback', () => ({
   useAdminLoginFeedback: () => ({
     failed: vi.fn(),
     nonAdminAccount: vi.fn(),

@@ -150,7 +150,15 @@ const ACRONYM_RUNS = ['API', 'SSE', 'URL', 'DTO', 'HTTP', 'IO']
 const VAGUE_VUE_SUFFIXES = ['View', 'Manager', 'Service']
 const ROLE_SUFFIXES = ['Manager', 'Helper', 'Util', 'Data']
 
-const legacyAllowances: Record<string, string> = {}
+const legacyAllowances: Record<string, string> = {
+  // Accepted shared regroup variance (owner ruling 2026-10-11): session keeps
+  // per-scope subdirs, ui keeps group dirs, core stays flat. These stems repeat
+  // their immediate group dir by design; renaming would churn the accepted tree.
+  'features/admin/shared/session/brand/brandLogoResource.ts': 'admin: brand scope resource repeats brand group dir by design',
+  'features/admin/shared/session/brand/brandLogos.ts': 'admin: brand vocabulary repeats brand group dir by design',
+  'features/admin/shared/ui/chart/chart.ts': 'admin: chart primitive repeats chart group dir by design',
+  'features/admin/users/session/sessionCommands.ts': 'admin: session commands repeat session zone by design',
+}
 
 /** Permanent documented keeps: src-relative dir path -> ownership reason. */
 const keptGenericOwnership: Record<string, string> = {
@@ -165,13 +173,13 @@ const keptGenericOwnership: Record<string, string> = {
 
 /** Permanent documented keeps: pre-existing `*Data` modules (rule 15). */
 const keptRoleSuffixOwnership: Record<string, string> = {
-  'features/admin/statistics/useUsageStatisticsData.ts':
+  'features/admin/statistics/session/useUsageStatisticsData.ts':
     'admin: usage statistics data composable (pre-existing; new *Data modules banned)',
-  'features/admin/monitor/application/demoData.ts':
+  'features/admin/monitor/session/demoData.ts':
     'admin: monitor demo fixture (pre-existing; new *Data modules banned)',
-  'features/admin/models/domain/catalogData.ts':
+  'features/admin/models/core/catalogData.ts':
     'admin: model catalog reference data (pre-existing; new *Data modules banned)',
-  'features/admin/credits/pricing/demoData.ts':
+  'features/admin/credits/core/pricing/demoData.ts':
     'admin: pricing demo fixture (pre-existing; new *Data modules banned)',
 }
 
@@ -180,20 +188,20 @@ const keptLegacyUrlFields = new Set([
   'api/sessionUserType.ts:User.avatar',
   'api/upload.ts:UploadAvatarMetadata.avatar',
   'features/workspace/selection/workspaceResource.ts:PrincipalSummary.avatar',
-  'features/admin/users/resource.ts:AdminUserListItem.avatar',
+  'features/admin/users/session/resource.ts:AdminUserListItem.avatar',
   'test/factories/admin.ts:AdminListItemOverrides.avatar',
   'test/factories/admin.ts:ControlUserPayloadOverrides.avatar',
 ])
 const keptComposableFamilies: Record<string, string> = {
-  'features/admin/settings/shared/useSettingsFeedback.ts':
+  'features/admin/settings/session/useSettingsFeedback.ts':
     'admin: settings feedback composable family',
-  'features/admin/monitor/application/useAdminMonitorFeedback.ts':
+  'features/admin/monitor/session/useAdminMonitorFeedback.ts':
     'admin: task feedback composable family',
 }
 
 /** Permanent documented keeps: multi-family types.ts files. */
 const keptMultiFamilyTypes: Record<string, string> = {
-  'features/admin/payments/stripe-settings/types.ts':
+  'features/admin/settings/session/payment/types.ts':
     'admin: stripe configuration/summary/input families',
 }
 
@@ -719,6 +727,11 @@ function checkSymbolAlignmentSource(
   if (fileName.endsWith('.shim.ts')) return null
   if (!/^use[A-Z]/.test(fileName) || fileName.endsWith('.spec.ts')) return null
   if (Object.hasOwn(keptComposableFamilies, relativePath)) return null
+  // P4 compatibility shims (same-name legacy-path bridges, TTL delete-after-P5
+  // owner p4-admin-shared) are pure `export * from` re-exports, not declarations.
+  // They carry the moved module's stem and re-export only; symbol-alignment
+  // judges declarations, not bridges.
+  if (source.includes('compatibility shim') && /export\s+\*\s+from/.test(source)) return null
   const stem = fileName.split('.')[0] ?? ''
   if (collectExportedSymbols(source).has(stem)) return null
   return {
@@ -1025,14 +1038,14 @@ function runSelfTest(): void {
     [
       'role-suffix-spec-mirror-exempt',
       checkRoleSuffix(
-        'features/admin/models/domain/catalogData.unit.spec.ts',
+        'features/admin/models/core/catalogData.unit.spec.ts',
         'catalogData.unit.spec.ts',
       ),
       null,
     ],
     [
       'role-suffix-kept-data',
-      checkRoleSuffix('features/admin/models/domain/catalogData.ts', 'catalogData.ts'),
+      checkRoleSuffix('features/admin/models/core/catalogData.ts', 'catalogData.ts'),
       null,
     ],
     [
@@ -1303,7 +1316,7 @@ function runSelfTest(): void {
     [
       'url-suffix-kept-shape-exempt',
       collectUrlSuffixWarnings(
-        'features/admin/users/resource.ts',
+        'features/admin/users/session/resource.ts',
         'resource.ts',
         'export interface AdminUserListItem {\n  avatar: string\n}\n',
       ),
@@ -1312,7 +1325,7 @@ function runSelfTest(): void {
     [
       'url-suffix-existing-file-new-owner-warns',
       collectUrlSuffixWarnings(
-        'features/admin/users/resource.ts',
+        'features/admin/users/session/resource.ts',
         'resource.ts',
         'export type AdminUserListItem = { avatar: string }; export interface NewUser { image: string; avatar?: string | null }',
       ).length,
@@ -1321,7 +1334,7 @@ function runSelfTest(): void {
     [
       'url-suffix-existing-owner-new-member-warns',
       collectUrlSuffixWarnings(
-        'features/admin/users/resource.ts',
+        'features/admin/users/session/resource.ts',
         'resource.ts',
         'export type AdminUserListItem = { avatar: string; image: string }',
       ).length,
@@ -1339,7 +1352,7 @@ function runSelfTest(): void {
     [
       'url-suffix-nested-owner-not-exempt',
       collectUrlSuffixWarnings(
-        'features/admin/users/resource.ts',
+        'features/admin/users/session/resource.ts',
         'resource.ts',
         'export type AdminUserListItem = { details: { avatar: string } }',
       ).length,

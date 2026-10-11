@@ -149,14 +149,14 @@ const RULES: Rule[] = [
   {
     kind: 'opt-in',
     label: 'AdminSwitch track',
-    rel: 'features/admin/shared/components/AdminSwitch.vue',
+    rel: 'features/admin/shared/ui/form/AdminSwitch.vue',
     pattern: /\bh-5\b/,
     fix: 'keep the 20px track but carry `hit-target-32`, or grow the track to `h-8`',
   },
   {
     kind: 'opt-in',
     label: 'admin tab trigger',
-    rel: 'features/admin/shared/components/AdminTabsTrigger.vue',
+    rel: 'features/admin/shared/ui/tabs/AdminTabsTrigger.vue',
     pattern: /\bh-7\b/,
     fix: 'keep `h-7` inside the h-9 rail and carry `hit-target-32-inline`',
   },
@@ -177,7 +177,7 @@ const RULES: Rule[] = [
   {
     kind: 'opt-in',
     label: 'task filter pill',
-    rel: 'features/admin/monitor/presentation/components/TaskEventsCard.vue',
+    rel: 'features/admin/monitor/ui/components/TaskEventsCard.vue',
     pattern: /\bpy-0\.5\b/,
     fix: 'carry `hit-target-32-inline` on the pill so the dense chip rail keeps its density',
   },
@@ -185,7 +185,7 @@ const RULES: Rule[] = [
     // Was `opt-in` on `!size-7`; the compact icon button is now `!size-8`.
     kind: 'required',
     label: 'compact admin icon button',
-    rel: 'features/admin/shared/lib/uiClasses.ts',
+    rel: 'features/admin/shared/core/uiClasses.ts',
     // Pinned to the compact-button token, not a bare `!size-8` occurrence, so the
     // rule still says something if a *different* token in this large module
     // happens to be 8x8.
@@ -214,7 +214,7 @@ const RULES: Rule[] = [
   {
     kind: 'required',
     label: 'admin settings section navigation',
-    rel: 'features/admin/settings/shared/components/AdminSettingsOnThisPage.vue',
+    rel: 'features/admin/settings/ui/pages/AdminSettingsOnThisPage.vue',
     pattern: /<button\b[^>]*\bclass="[^"]*\bmin-h-8\b/,
     fix: 'keep `min-h-8` on the section navigation button',
   },

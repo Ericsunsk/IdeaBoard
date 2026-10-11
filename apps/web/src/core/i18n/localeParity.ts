@@ -19,7 +19,7 @@ export function leafPaths(obj: unknown, prefix = ''): string[] {
   return out
 }
 
-export function bundleShapeMap(
+function bundleShapeMap(
   obj: unknown,
   prefix = '',
   map = new Map<string, string>(),

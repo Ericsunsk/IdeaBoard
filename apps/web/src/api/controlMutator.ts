@@ -12,7 +12,7 @@ import { orvalMutator } from './orvalMutator'
 // functions through its own resource/adapter boundary, never this module
 // directly. The prefix literal is intentionally module-private: Admin
 // feature URL building owns its own copy at
-// `features/admin/shared/lib/controlTransport.ts` (#863 keeps Admin-only
+// `features/admin/shared/core/controlTransport.ts` (#863 keeps Admin-only
 // control helpers out of `shared`, and `shared` cannot import that module
 // without violating the shared-not-to-features boundary).
 const CONTROL_API_PREFIX = '/control/v1'

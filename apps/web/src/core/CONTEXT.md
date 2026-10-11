@@ -1,6 +1,6 @@
 # Core Context
 
-> P1b move: horizontal contracts relocated from `src/shared/CONTEXT.md`. `src/shared/CONTEXT.md` remains as a one-phase pointer; this file is the horizontal source of truth.
+> P1b move: horizontal contracts relocated from `src/shared/CONTEXT.md`. `src/shared/CONTEXT.md` remains as the record that the one-phase shims are deleted (P4, all 109 P1 shims); this file is the horizontal source of truth.
 
 `src/core` owns horizontal primitives and infrastructure runtime; the directory is not entirely pure. `src/api`, `src/theme`, `src/lib` and `src/components` are horizontal roots with the same dependency-direction contract. HTTP and generated client policy live in [API Context](../api/CONTEXT.md).
 Horizontal roots have zero runtime or type-only imports of concrete features. Contract specs may read feature source text to verify tokens without importing feature modules. Feature-owned account chrome and legal links are not horizontal primitives.
@@ -41,7 +41,7 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 | Surface                                                                                                                                                                 | Rule                                                                                                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | User surfaces (`features/workspace`, `features/account`, `features/auth`, `features/board`, `features/canvas`, `features/search`, `features/library`, `features/legal`) | User-visible copy lives only in `core/i18n` locale bundles and is referenced by key. `en` is canonical; `zh-CN` / `es` / `ko` must match it exactly in keys and shape (`localeParity`, enforced by `lint:locale-parity`).                                                                                                     |
-| Admin/ops surfaces (`features/admin/*`)                                                                                                                                 | zh-only colocated messages: literals live next to the feedback factory or presenter that owns them (pattern: `features/admin/payments/messages.ts`); never wrapped in fake `t()` calls and never added to locale bundles. Admin toast adapters in `features/admin/shared/lib/toast.ts` use `core/composables/useAppToast.ts`. |
+| Admin/ops surfaces (`features/admin/*`)                                                                                                                                 | zh-only colocated messages: literals live next to the feedback factory or presenter that owns them (pattern: `features/admin/credits/ui/orders/messages.ts`); never wrapped in fake `t()` calls and never added to locale bundles. Admin toast adapters in `features/admin/shared/session/feedback/toast.ts` use `core/composables/useAppToast.ts`. |
 
 - `lint:user-copy` (`scripts/checkUserCopyLocale.ts` + `scripts/user-copy-locale-allowlist.json`) guards the boundary: CJK outside `features/admin` fails unless a reviewed allowlist entry marks it a true exception (protocol matchers, endonyms, backend-shaped test fixtures, admin-only shared helpers).
 - New user-surface strings ship with all four locale bundles in the same change; never land a partial translation.
@@ -49,7 +49,7 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 ## Feedback Factory Map (per-surface split, intentional)
 
 - User surfaces own one `*Feedback` factory each over `useAppToast` + locale keys: account `useProfileFeedback`, auth `useAuthFeedback`, board `createBoardFeedback`/`useBoardFeedback`, canvas `createCanvasFeedback`/`useCanvasFeedback`, library delete/remove confirmations in `components/confirmations.ts` over `useUserConfirmDialog`.
-- Admin verticals own one factory each over `useAdminToast` + colocated zh messages: credits billing ops, reward codes, model catalog/gateway config, monitor task result/cancellation, admin login, stripe settings/payment orders, prompt config, settings (branding/access/media-upload/outbound/mail/search-provider/logo-file), storage, users.
+- Admin verticals own one factory each over `useAdminToast` + colocated zh messages: credits billing ops, reward codes, model catalog/gateway config, monitor task result/cancellation, admin login, stripe settings/payment orders, prompt config, settings (branding/access/media-upload/outbound/mail/search-provider/logo-file/storage/payment), users.
 - Factories never cross surfaces (no shared generic factory, no user-copy in admin factories, no zh literals in user factories); confirm dialogs split the same way (`UserConfirmDialog` + `useUserConfirmDialog` for user surfaces, `AdminConfirmDialog` for admin).
 
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)
@@ -91,6 +91,6 @@ The following migration items are the canonical Query acceptance backlog, reloca
 
 ## Non-goals
 
-- No feature-to-feature coupling through horizontal roots; only the reviewed legacy `shared/*.shim.ts` paths may forward to feature destinations for one phase.
+- No feature-to-feature coupling through horizontal roots; the reviewed legacy `shared/*.shim.ts` paths forwarded to feature destinations for one phase and are now deleted (P4, all 109 P1 shims).
 - No Pinia or extra global stores.
 - No backend SKU/pricing knowledge in `core/contracts`.

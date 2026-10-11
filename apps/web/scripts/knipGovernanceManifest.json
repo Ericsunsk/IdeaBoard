@@ -5886,130 +5886,122 @@
         "evidence": ["src/features/account/index.ts#accountPrimaryActionButtonClass"]
       }
     },
-    "src/features/admin/credits/pricing/billableCatalogResource.ts": {
+    "src/features/admin/credits/session/pricing/billableCatalogResource.ts": {
       "deleteArchivedBillableItem": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/pricing/billableCatalogResource.contract.spec.ts"]
+        "evidence": ["src/features/admin/credits/session/pricing/billableCatalogResource.contract.spec.ts"]
       },
       "setBillableItemAvailability": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/pricing/billableCatalogResource.contract.spec.ts"]
+        "evidence": ["src/features/admin/credits/session/pricing/billableCatalogResource.contract.spec.ts"]
       },
       "publishBillableItemPrices": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/pricing/billableCatalogResource.contract.spec.ts"]
+        "evidence": ["src/features/admin/credits/session/pricing/billableCatalogResource.contract.spec.ts"]
       }
     },
-    "src/features/admin/credits/pricing/modelPoolResource.ts": {
+    "src/features/admin/credits/session/pricing/modelPoolResource.ts": {
       "fetchAdminModelPool": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/pricing/modelPoolResource.contract.spec.ts"]
+        "evidence": ["src/features/admin/credits/session/pricing/modelPoolResource.contract.spec.ts"]
       },
       "replaceAdminModelPool": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/pricing/modelPoolResource.contract.spec.ts"]
+        "evidence": ["src/features/admin/credits/session/pricing/modelPoolResource.contract.spec.ts"]
       }
     },
-    "src/features/admin/credits/rewards/rewardCodeTime.ts": {
+    "src/features/admin/credits/core/rewards/rewardCodeTime.ts": {
       "pickerDateToShanghaiDateTimeInput": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/rewards/rewardCodeTime.unit.spec.ts"]
+        "evidence": ["src/features/admin/credits/core/rewards/rewardCodeTime.unit.spec.ts"]
       }
     },
-    "src/features/admin/credits/shared/feedback.ts": {
+    "src/features/admin/credits/session/shared/feedback.ts": {
       "createAdminCreditsBillingOperationsFeedback": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/credits/shared/feedback.unit.spec.ts"]
+        "evidence": ["src/features/admin/credits/session/shared/feedback.unit.spec.ts"]
       }
     },
-    "src/features/admin/credits/wallets/index.ts": {
-      "AdminUserWalletDialog": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/credits/wallets/index.ts#AdminUserWalletDialog"
-        ]
-      }
-    },
-    "src/features/admin/models/domain/catalogData.ts": {
+    "src/features/admin/models/core/catalogData.ts": {
       "observedOnSaleMargins": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/models/domain/catalogData.unit.spec.ts"]
+        "evidence": ["src/features/admin/models/core/catalogData.unit.spec.ts"]
       },
       "formatObservedMargin": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/models/domain/catalogData.unit.spec.ts"]
+        "evidence": ["src/features/admin/models/core/catalogData.unit.spec.ts"]
       }
     },
-    "src/features/admin/monitor/application/useMonitorTimeline.ts": {
+    "src/features/admin/monitor/session/useMonitorTimeline.ts": {
       "formatXAxisTime": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/application/useMonitorTimeline.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/session/useMonitorTimeline.unit.spec.ts"]
       },
       "calculateTimelineYScale": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/application/useMonitorTimeline.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/session/useMonitorTimeline.unit.spec.ts"]
       }
     },
-    "src/features/admin/monitor/domain/taskResultPresentation.ts": {
+    "src/features/admin/monitor/core/taskResultPresentation.ts": {
       "getTaskResultImageUrl": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/domain/taskResultPresentation.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/core/taskResultPresentation.unit.spec.ts"]
       },
       "getTaskDuration": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/domain/taskResultPresentation.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/core/taskResultPresentation.unit.spec.ts"]
       },
       "getTaskSanitizedError": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/domain/taskResultPresentation.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/core/taskResultPresentation.unit.spec.ts"]
       }
     },
-    "src/features/admin/monitor/infrastructure/resource.ts": {
+    "src/features/admin/monitor/resource.ts": {
       "ADMIN_TASK_LIST_QUERY_KEY": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/infrastructure/resource.contract.spec.ts"]
+        "evidence": ["src/features/admin/monitor/resource.contract.spec.ts"]
       },
       "ADMIN_MONITOR_QUERY_KEY": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/infrastructure/resource.contract.spec.ts"]
+        "evidence": ["src/features/admin/monitor/resource.contract.spec.ts"]
       },
       "encodeTaskListCursor": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/infrastructure/resource.contract.spec.ts"]
+        "evidence": ["src/features/admin/monitor/resource.contract.spec.ts"]
       },
       "getAdminTaskList": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/infrastructure/resource.contract.spec.ts"]
+        "evidence": ["src/features/admin/monitor/resource.contract.spec.ts"]
       },
       "getAdminTaskDetail": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/infrastructure/resource.contract.spec.ts"]
+        "evidence": ["src/features/admin/monitor/resource.contract.spec.ts"]
       },
       "AdminMonitorListItem": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/application/useAdminMonitor.contract.spec.ts"]
+        "evidence": ["src/features/admin/monitor/session/useAdminMonitor.contract.spec.ts"]
       }
     },
-    "src/features/admin/monitor/presentation/columns.ts": {
+    "src/features/admin/monitor/ui/columns.ts": {
       "getTaskServiceSlug": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/presentation/columns.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/ui/columns.unit.spec.ts"]
       },
       "getTaskServiceIcon": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/presentation/columns.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/ui/columns.unit.spec.ts"]
       },
       "TASK_MESSAGE_MAX_LENGTH": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/presentation/columns.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/ui/columns.unit.spec.ts"]
       },
       "getTaskMessageText": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/presentation/columns.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/ui/columns.unit.spec.ts"]
       },
       "getTaskResultPreview": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/monitor/presentation/columns.unit.spec.ts"]
+        "evidence": ["src/features/admin/monitor/ui/columns.unit.spec.ts"]
       }
     },
     "src/features/admin/prompts/core/promptVariables.ts": {
@@ -6032,10 +6024,10 @@
         ]
       }
     },
-    "src/features/admin/prompts/workspace.ts": {
+    "src/features/admin/prompts/session/workspace.ts": {
       "createAdminPromptConfigWorkspace": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/prompts/workspace.contract.spec.ts"]
+        "evidence": ["src/features/admin/prompts/session/workspace.contract.spec.ts"]
       }
     },
     "src/features/admin/routePaths.ts": {
@@ -6124,1097 +6116,1127 @@
         ]
       }
     },
-    "src/features/admin/settings/access/useAccessSettings.ts": {
+    "src/features/admin/settings/session/access/useAccessSettings.ts": {
       "validateRateLimitSettings": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/settings/shared/settingsValidation.unit.spec.ts"]
+        "evidence": ["src/features/admin/settings/session/settingsValidation.unit.spec.ts"]
       }
     },
-    "src/features/admin/settings/upload/useMediaUploadSettings.ts": {
+    "src/features/admin/settings/session/upload/useMediaUploadSettings.ts": {
       "DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/settings/shared/settingsValidation.unit.spec.ts"]
+        "evidence": ["src/features/admin/settings/session/settingsValidation.unit.spec.ts"]
       },
       "normalizeMediaUploadSetting": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/settings/shared/settingsValidation.unit.spec.ts"]
+        "evidence": ["src/features/admin/settings/session/settingsValidation.unit.spec.ts"]
       },
       "validateMediaUploadSetting": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/settings/shared/settingsValidation.unit.spec.ts"]
+        "evidence": ["src/features/admin/settings/session/settingsValidation.unit.spec.ts"]
       }
     },
-    "src/features/admin/shared/components/AdminAlert.vue": {
+    "src/features/admin/shared/ui/feedback/AdminAlert.vue": {
       "AdminAlertSeverity": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminAlert.vue#AdminAlertSeverity"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/feedback/AdminAlert.vue#AdminAlertSeverity"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminBadge.vue": {
+    "src/features/admin/shared/ui/AdminBadge.vue": {
       "AdminBadgeVariant": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminBadge.vue#AdminBadgeVariant"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/AdminBadge.vue#AdminBadgeVariant"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminButton.vue": {
+    "src/features/admin/shared/ui/AdminButton.vue": {
       "AdminButtonSize": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminButton.vue#AdminButtonSize"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/AdminButton.vue#AdminButtonSize"
         ]
       },
       "AdminButtonVariant": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminButton.vue#AdminButtonVariant"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/AdminButton.vue#AdminButtonVariant"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminDialogShell.vue": {
+    "src/features/admin/shared/ui/shell/AdminDialogShell.vue": {
       "AdminDialogContentLayout": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminDialogShell.vue#AdminDialogContentLayout"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/shell/AdminDialogShell.vue#AdminDialogContentLayout"
         ]
       },
       "AdminDialogSize": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminDialogShell.vue#AdminDialogSize"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/shell/AdminDialogShell.vue#AdminDialogSize"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminFormField.vue": {
+    "src/features/admin/shared/ui/form/AdminFormField.vue": {
       "AdminFormFieldSlotProps": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminFormField.vue#AdminFormFieldSlotProps"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/form/AdminFormField.vue#AdminFormFieldSlotProps"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminOptionFilter.vue": {
+    "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue": {
       "AdminOptionFilterOption": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminOptionFilter.vue#AdminOptionFilterOption"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue#AdminOptionFilterOption"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminRowActionsPopover.vue": {
+    "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue": {
       "AdminRowActionItem": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminRowActionsPopover.vue#AdminRowActionItem"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue#AdminRowActionItem"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminSelect.vue": {
+    "src/features/admin/shared/ui/form/AdminSelect.vue": {
       "SelectOptionItem": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminSelect.vue#SelectOptionItem"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/form/AdminSelect.vue#SelectOptionItem"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminStatusPill.vue": {
+    "src/features/admin/shared/ui/feedback/AdminStatusPill.vue": {
       "AdminStatusPillVariant": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminStatusPill.vue#AdminStatusPillVariant"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/feedback/AdminStatusPill.vue#AdminStatusPillVariant"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminSubNavigationLayout.vue": {
+    "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue": {
       "AdminSubNavigationItem": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminSubNavigationLayout.vue#AdminSubNavigationItem"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue#AdminSubNavigationItem"
         ]
       }
     },
-    "src/features/admin/shared/components/AdminTable.vue": {
+    "src/features/admin/shared/ui/table/AdminTable.vue": {
       "AdminTableRowClickEvent": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminTable.vue#AdminTableRowClickEvent"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/table/AdminTable.vue#AdminTableRowClickEvent"
         ]
       },
       "AdminTableRowCollapseEvent": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminTable.vue#AdminTableRowCollapseEvent"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/table/AdminTable.vue#AdminTableRowCollapseEvent"
         ]
       },
       "AdminTableRowEvent": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminTable.vue#AdminTableRowEvent"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/table/AdminTable.vue#AdminTableRowEvent"
         ]
       },
       "AdminTableRowExpandEvent": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/AdminTable.vue#AdminTableRowExpandEvent"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/table/AdminTable.vue#AdminTableRowExpandEvent"
         ]
       }
     },
-    "src/features/admin/shared/components/SwitchRow.vue": {
+    "src/features/admin/shared/ui/table/adminTableAtoms.ts": {
+      "AdminTableHeader": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      },
+      "AdminTableBody": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      },
+      "AdminTableFooter": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      },
+      "AdminTableRow": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      },
+      "AdminTableHead": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      },
+      "AdminTableCell": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      },
+      "AdminTableCaption": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+      }
+    },
+    "src/features/admin/shared/ui/form/SwitchRow.vue": {
       "AdminSwitchRowPillSize": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/components/SwitchRow.vue#AdminSwitchRowPillSize"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/form/SwitchRow.vue#AdminSwitchRowPillSize"
         ]
       }
     },
-    "src/features/admin/shared/components/adminTabsAtoms.ts": {
+    "src/features/admin/shared/ui/tabs/adminTabsAtoms.ts": {
       "AdminTabsContent": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/shared/components/AdminTabs.component.spec.ts"]
+        "evidence": ["src/features/admin/shared/ui/tabs/AdminTabs.component.spec.ts"]
       }
     },
-    "src/features/admin/shared/composables/useAdminCollectionQuery.ts": {
+    "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts": {
       "useAdminCollectionQuery": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminCollectionQuery.ts#useAdminCollectionQuery"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useAdminCollectionQuery.ts#useAdminCollectionQuery"
         ]
       }
     },
-    "src/features/admin/shared/composables/useAdminConfirm.ts": {
+    "src/features/admin/shared/session/feedback/useAdminConfirm.ts": {
       "AdminConfirmIntent": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#AdminConfirmIntent"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmIntent"
         ]
       },
       "AdminConfirmOptions": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#AdminConfirmOptions"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmOptions"
         ]
       },
       "AdminConfirmPort": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#AdminConfirmPort"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmPort"
         ]
       },
       "AdminConfirmReasonSpec": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#AdminConfirmReasonSpec"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmReasonSpec"
         ]
       },
       "AdminConfirmRequest": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#AdminConfirmRequest"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmRequest"
         ]
       },
       "AdminConfirmState": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#AdminConfirmState"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmState"
         ]
       },
       "activeAdminConfirm": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#activeAdminConfirm"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#activeAdminConfirm"
         ]
       },
       "readConfirmReason": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#readConfirmReason"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#readConfirmReason"
         ]
       },
       "useAdminConfirm": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminConfirm.ts#useAdminConfirm"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#useAdminConfirm"
         ]
       }
     },
-    "src/features/admin/shared/composables/useAdminCursorCollection.ts": {
+    "src/features/admin/shared/session/collection/useAdminCursorCollection.ts": {
       "useAdminCursorCollection": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAdminCursorCollection.ts#useAdminCursorCollection"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useAdminCursorCollection.ts#useAdminCursorCollection"
         ]
       }
     },
-    "src/features/admin/shared/composables/useAnomalyRadar.ts": {
+    "src/features/admin/shared/session/useAnomalyRadar.ts": {
       "useAnomalyRadar": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useAnomalyRadar.ts#useAnomalyRadar"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/useAnomalyRadar.ts#useAnomalyRadar"
         ]
       }
     },
-    "src/features/admin/shared/composables/useOptimisticToggle.ts": {
+    "src/features/admin/shared/session/collection/useOptimisticToggle.ts": {
       "OptimisticToggleFeedback": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useOptimisticToggle.ts#OptimisticToggleFeedback"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useOptimisticToggle.ts#OptimisticToggleFeedback"
         ]
       },
       "OptimisticToggleMutate": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useOptimisticToggle.ts#OptimisticToggleMutate"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useOptimisticToggle.ts#OptimisticToggleMutate"
         ]
       },
       "useOptimisticToggle": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useOptimisticToggle.ts#useOptimisticToggle"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useOptimisticToggle.ts#useOptimisticToggle"
         ]
       }
     },
-    "src/features/admin/shared/composables/usePagePagination.ts": {
+    "src/features/admin/shared/session/collection/usePagePagination.ts": {
       "usePagePagination": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/usePagePagination.ts#usePagePagination"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/usePagePagination.ts#usePagePagination"
         ]
       }
     },
-    "src/features/admin/shared/composables/useQueryPolling.ts": {
+    "src/features/admin/shared/session/collection/useQueryPolling.ts": {
       "useQueryPolling": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useQueryPolling.ts#useQueryPolling"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useQueryPolling.ts#useQueryPolling"
         ]
       }
     },
-    "src/features/admin/shared/composables/useRefetchOnClose.ts": {
+    "src/features/admin/shared/session/collection/useRefetchOnClose.ts": {
       "useRefetchOnClose": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/composables/useRefetchOnClose.ts#useRefetchOnClose"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/collection/useRefetchOnClose.ts#useRefetchOnClose"
         ]
       }
     },
-    "src/features/admin/shared/lib/anomalyRules.ts": {
+    "src/features/admin/shared/session/anomalyRules.ts": {
       "AdminAnomalyItem": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/anomalyRules.ts#AdminAnomalyItem"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/anomalyRules.ts#AdminAnomalyItem"
         ]
       },
       "AdminAnomalySeverity": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/anomalyRules.ts#AdminAnomalySeverity"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/anomalyRules.ts#AdminAnomalySeverity"
         ]
       },
       "AdminAnomalySource": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/anomalyRules.ts#AdminAnomalySource"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/anomalyRules.ts#AdminAnomalySource"
         ]
       },
       "buildAdminAnomalyItems": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/anomalyRules.ts#buildAdminAnomalyItems"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/anomalyRules.ts#buildAdminAnomalyItems"
         ]
       }
     },
-    "src/features/admin/shared/lib/cellClasses.ts": {
+    "src/features/admin/shared/core/cellClasses.ts": {
       "adminInlineJumpClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellClasses.ts#adminInlineJumpClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellClasses.ts#adminInlineJumpClass"
         ]
       },
       "adminMonoClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellClasses.ts#adminMonoClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellClasses.ts#adminMonoClass"
         ]
       },
       "adminNumericCellClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellClasses.ts#adminNumericCellClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellClasses.ts#adminNumericCellClass"
         ]
       },
       "adminTruncateCellClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellClasses.ts#adminTruncateCellClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellClasses.ts#adminTruncateCellClass"
         ]
       }
     },
-    "src/features/admin/shared/lib/cellPlaceholders.ts": {
+    "src/features/admin/shared/core/cellPlaceholders.ts": {
       "ADMIN_IDENTITY_EMPTY": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellPlaceholders.ts#ADMIN_IDENTITY_EMPTY"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellPlaceholders.ts#ADMIN_IDENTITY_EMPTY"
         ]
       },
       "ADMIN_NUMERIC_EMPTY": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellPlaceholders.ts#ADMIN_NUMERIC_EMPTY"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellPlaceholders.ts#ADMIN_NUMERIC_EMPTY"
         ]
       },
       "AdminEmptyKind": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellPlaceholders.ts#AdminEmptyKind"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellPlaceholders.ts#AdminEmptyKind"
         ]
       },
       "emptyPlaceholder": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/cellPlaceholders.ts#emptyPlaceholder"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/cellPlaceholders.ts#emptyPlaceholder"
         ]
       }
     },
-    "src/features/admin/shared/lib/chart.ts": {
+    "src/features/admin/shared/ui/chart/chart.ts": {
       "adminChartLegend": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#adminChartLegend"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#adminChartLegend"
         ]
       },
       "adminChartPlugins": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#adminChartPlugins"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#adminChartPlugins"
         ]
       },
       "adminChartStrokeWidth": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#adminChartStrokeWidth"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#adminChartStrokeWidth"
         ]
       },
       "adminChartTheme": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#adminChartTheme"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#adminChartTheme"
         ]
       },
       "defineAdminChartBubblePointStyle": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartBubblePointStyle"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartBubblePointStyle"
         ]
       },
       "defineAdminChartCountScale": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartCountScale"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartCountScale"
         ]
       },
       "defineAdminChartDurationScale": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartDurationScale"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartDurationScale"
         ]
       },
       "defineAdminChartOptions": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartOptions"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartOptions"
         ]
       },
       "defineAdminChartPercentScale": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartPercentScale"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartPercentScale"
         ]
       },
       "defineAdminChartPointClipStyle": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartPointClipStyle"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartPointClipStyle"
         ]
       },
       "defineAdminChartTooltip": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#defineAdminChartTooltip"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#defineAdminChartTooltip"
         ]
       },
       "getAdminChartBubbleHoverRadius": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#getAdminChartBubbleHoverRadius"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#getAdminChartBubbleHoverRadius"
         ]
       },
       "getAdminChartBubbleRadius": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#getAdminChartBubbleRadius"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#getAdminChartBubbleRadius"
         ]
       },
       "useAdminChartReady": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/chart.ts#useAdminChartReady"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/chart/chart.ts#useAdminChartReady"
         ]
       }
     },
-    "src/features/admin/shared/lib/confirmSettingsSave.ts": {
+    "src/features/admin/shared/session/feedback/confirmSettingsSave.ts": {
       "ADMIN_PROBE_OPERATOR_REASON": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#ADMIN_PROBE_OPERATOR_REASON"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#ADMIN_PROBE_OPERATOR_REASON"
         ]
       },
       "ADMIN_REASON_REQUIRED_MESSAGE": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#ADMIN_REASON_REQUIRED_MESSAGE"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#ADMIN_REASON_REQUIRED_MESSAGE"
         ]
       },
       "ADMIN_REVERSIBLE_DEFAULT_REASON": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#ADMIN_REVERSIBLE_DEFAULT_REASON"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#ADMIN_REVERSIBLE_DEFAULT_REASON"
         ]
       },
       "AdminConfirmRisk": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#AdminConfirmRisk"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#AdminConfirmRisk"
         ]
       },
       "confirmSettingsSave": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#confirmSettingsSave"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#confirmSettingsSave"
         ]
       },
       "readReversibleReason": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#readReversibleReason"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#readReversibleReason"
         ]
       },
       "requireDestructiveReason": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/confirmSettingsSave.ts#requireDestructiveReason"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#requireDestructiveReason"
         ]
       }
     },
-    "src/features/admin/shared/lib/controlCopy.ts": {
+    "src/features/admin/shared/core/controlCopy.ts": {
       "ControlErrorMessages": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlCopy.ts#ControlErrorMessages"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlCopy.ts#ControlErrorMessages"
         ]
       },
       "withControlCopy": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlCopy.ts#withControlCopy"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlCopy.ts#withControlCopy"
         ]
       }
     },
-    "src/features/admin/shared/lib/controlGuidance.ts": {
+    "src/features/admin/shared/core/controlGuidance.ts": {
       "ADMIN_CONTROL_UNAVAILABLE_CODE": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlGuidance.ts#ADMIN_CONTROL_UNAVAILABLE_CODE"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlGuidance.ts#ADMIN_CONTROL_UNAVAILABLE_CODE"
         ]
       },
       "AdminControlUnavailableError": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlGuidance.ts#AdminControlUnavailableError"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlGuidance.ts#AdminControlUnavailableError"
         ]
       },
       "adminControlUnavailable": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlGuidance.ts#adminControlUnavailable"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlGuidance.ts#adminControlUnavailable"
         ]
       }
     },
-    "src/features/admin/shared/lib/controlMutation.ts": {
+    "src/features/admin/shared/core/controlMutation.ts": {
       "ControlError": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#ControlError"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#ControlError"
         ]
       },
       "ControlErrorMessages": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#ControlErrorMessages"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#ControlErrorMessages"
         ]
       },
       "ControlMutationOptions": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#ControlMutationOptions"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#ControlMutationOptions"
         ]
       },
       "buildControlMutationHeaders": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#buildControlMutationHeaders"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#buildControlMutationHeaders"
         ]
       },
       "buildRoutineControlMutationHeaders": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#buildRoutineControlMutationHeaders"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#buildRoutineControlMutationHeaders"
         ]
       },
       "createControlError": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#createControlError"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#createControlError"
         ]
       },
       "mapControlError": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#mapControlError"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#mapControlError"
         ]
       },
       "readControlErrorCode": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#readControlErrorCode"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#readControlErrorCode"
         ]
       },
       "readControlRequestId": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#readControlRequestId"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#readControlRequestId"
         ]
       },
       "requireOperatorReason": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlMutation.ts#requireOperatorReason"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#requireOperatorReason"
         ]
       }
     },
-    "src/features/admin/shared/lib/controlResource.ts": {
+    "src/features/admin/shared/core/controlResource.ts": {
       "LoadControlSettingOptions": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlResource.ts#LoadControlSettingOptions"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlResource.ts#LoadControlSettingOptions"
         ]
       },
       "loadControlSetting": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/controlResource.ts#loadControlSetting"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlResource.ts#loadControlSetting"
         ]
       }
     },
-    "src/features/admin/shared/lib/reconcileStableRows.ts": {
+    "src/features/admin/shared/core/reconcileStableRows.ts": {
       "reconcileStableRows": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/reconcileStableRows.ts#reconcileStableRows"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/reconcileStableRows.ts#reconcileStableRows"
         ]
       }
     },
-    "src/features/admin/shared/lib/secretSchema.ts": {
+    "src/features/admin/shared/core/secretSchema.ts": {
       "secretField": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/secretSchema.ts#secretField"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/secretSchema.ts#secretField"
         ]
       }
     },
-    "src/features/admin/shared/lib/serviceAdminMeta.ts": {
+    "src/features/admin/shared/core/serviceAdminMeta.ts": {
       "ADMIN_SERVICE_GROUPS": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/serviceAdminMeta.ts#ADMIN_SERVICE_GROUPS"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/serviceAdminMeta.ts#ADMIN_SERVICE_GROUPS"
         ]
       },
       "AdminServiceGroupKey": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/serviceAdminMeta.ts#AdminServiceGroupKey"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/serviceAdminMeta.ts#AdminServiceGroupKey"
         ]
       },
       "AdminServiceGroupMeta": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/serviceAdminMeta.ts#AdminServiceGroupMeta"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/serviceAdminMeta.ts#AdminServiceGroupMeta"
         ]
       },
       "AdminServiceMeta": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/serviceAdminMeta.ts#AdminServiceMeta"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/serviceAdminMeta.ts#AdminServiceMeta"
         ]
       },
       "getAdminServiceGroupMeta": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/serviceAdminMeta.ts#getAdminServiceGroupMeta"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/serviceAdminMeta.ts#getAdminServiceGroupMeta"
         ]
       },
       "getAdminServiceMeta": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/serviceAdminMeta.ts#getAdminServiceMeta"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/serviceAdminMeta.ts#getAdminServiceMeta"
         ]
       }
     },
-    "src/features/admin/shared/lib/tableColumns.ts": {
+    "src/features/admin/shared/core/tableColumns.ts": {
       "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/tableColumns.ts#ADMIN_TABLE_EXPANDER_COLUMN_WIDTH"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/tableColumns.ts#ADMIN_TABLE_EXPANDER_COLUMN_WIDTH"
         ]
       },
       "ADMIN_TABLE_MORE_COLUMN_WIDTH": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/tableColumns.ts#ADMIN_TABLE_MORE_COLUMN_WIDTH"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/tableColumns.ts#ADMIN_TABLE_MORE_COLUMN_WIDTH"
         ]
       }
     },
-    "src/features/admin/shared/lib/taskMetricTokens.ts": {
+    "src/features/admin/shared/core/taskMetricTokens.ts": {
       "TaskMetricDefinition": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#TaskMetricDefinition"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#TaskMetricDefinition"
         ]
       },
       "TaskMetricKey": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#TaskMetricKey"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#TaskMetricKey"
         ]
       },
       "TaskMetricStatsSnapshot": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#TaskMetricStatsSnapshot"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#TaskMetricStatsSnapshot"
         ]
       },
       "TaskStatus": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#TaskStatus"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#TaskStatus"
         ]
       },
       "getTaskMetricByStatus": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#getTaskMetricByStatus"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#getTaskMetricByStatus"
         ]
       },
       "monitorChartSpecs": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#monitorChartSpecs"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#monitorChartSpecs"
         ]
       },
       "taskMetricDefinitions": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/taskMetricTokens.ts#taskMetricDefinitions"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/taskMetricTokens.ts#taskMetricDefinitions"
         ]
       }
     },
-    "src/features/admin/shared/lib/timeRange.ts": {
+    "src/features/admin/shared/session/timeRange.ts": {
       "AdminTimeRangeBucket": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/timeRange.ts#AdminTimeRangeBucket"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/timeRange.ts#AdminTimeRangeBucket"
         ]
       },
       "AdminTimeRangeOption": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/timeRange.ts#AdminTimeRangeOption"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/timeRange.ts#AdminTimeRangeOption"
         ]
       },
       "buildAdminTimeRangeBuckets": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/timeRange.ts#buildAdminTimeRangeBuckets"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/timeRange.ts#buildAdminTimeRangeBuckets"
         ]
       },
       "pickAdminTimeRangeOptions": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/timeRange.ts#pickAdminTimeRangeOptions"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/timeRange.ts#pickAdminTimeRangeOptions"
         ]
       },
       "shouldShowAdminTimeRangeTick": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/timeRange.ts#shouldShowAdminTimeRangeTick"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/timeRange.ts#shouldShowAdminTimeRangeTick"
         ]
       }
     },
-    "src/features/admin/shared/lib/toast.ts": {
+    "src/features/admin/shared/session/feedback/toast.ts": {
       "AdminToastPort": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/toast.ts#AdminToastPort"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/toast.ts#AdminToastPort"
         ]
       },
       "formatAdminApiError": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/toast.ts#formatAdminApiError"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/toast.ts#formatAdminApiError"
         ]
       },
       "formatAdminDisplayError": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/toast.ts#formatAdminDisplayError"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/toast.ts#formatAdminDisplayError"
         ]
       },
       "useAdminToast": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/toast.ts#useAdminToast"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/toast.ts#useAdminToast"
         ]
       }
     },
-    "src/features/admin/shared/lib/uiClasses.ts": {
+    "src/features/admin/shared/core/uiClasses.ts": {
       "adminAnomalyPopoverClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminAnomalyPopoverClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminAnomalyPopoverClass"
         ]
       },
       "adminChartCanvasClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminChartCanvasClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminChartCanvasClass"
         ]
       },
       "adminChartGridClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminChartGridClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminChartGridClass"
         ]
       },
       "adminCompactIconButtonClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminCompactIconButtonClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminCompactIconButtonClass"
         ]
       },
       "adminDashboardRootClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDashboardRootClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDashboardRootClass"
         ]
       },
       "adminDialogChromeClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeClass"
         ]
       },
       "adminDialogChromeCloseClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeCloseClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeCloseClass"
         ]
       },
       "adminDialogChromeContentClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeContentClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeContentClass"
         ]
       },
       "adminDialogChromeFooterClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeFooterClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeFooterClass"
         ]
       },
       "adminDialogChromeHeaderClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeHeaderClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeHeaderClass"
         ]
       },
       "adminDialogChromeHeaderSplitClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeHeaderSplitClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeHeaderSplitClass"
         ]
       },
       "adminDialogChromeTitleClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogChromeTitleClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogChromeTitleClass"
         ]
       },
       "adminDialogFooterActionsClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogFooterActionsClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogFooterActionsClass"
         ]
       },
       "adminDialogFormBodyClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogFormBodyClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogFormBodyClass"
         ]
       },
       "adminDialogHeaderClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogHeaderClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogHeaderClass"
         ]
       },
       "adminDialogHeaderContentClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogHeaderContentClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogHeaderContentClass"
         ]
       },
       "adminDialogHeaderSplitClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogHeaderSplitClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogHeaderSplitClass"
         ]
       },
       "adminDialogScrollableBodyClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogScrollableBodyClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogScrollableBodyClass"
         ]
       },
       "adminDialogTitleClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminDialogTitleClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminDialogTitleClass"
         ]
       },
       "adminEmptyStateClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminEmptyStateClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminEmptyStateClass"
         ]
       },
       "adminFramedIconButtonClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminFramedIconButtonClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminFramedIconButtonClass"
         ]
       },
       "adminInputChromeClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminInputChromeClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminInputChromeClass"
         ]
       },
       "adminLogoButtonClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminLogoButtonClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminLogoButtonClass"
         ]
       },
       "adminSummaryGridClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminSummaryGridClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminSummaryGridClass"
         ]
       },
       "adminSurfacePanelClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminSurfacePanelClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminSurfacePanelClass"
         ]
       },
       "adminSurfacePanelViewportClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminSurfacePanelViewportClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminSurfacePanelViewportClass"
         ]
       },
       "adminSurfaceRootViewportClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminSurfaceRootViewportClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminSurfaceRootViewportClass"
         ]
       },
       "adminSurfaceScrollContentClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminSurfaceScrollContentClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminSurfaceScrollContentClass"
         ]
       },
       "adminSurfaceToolbarClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminSurfaceToolbarClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminSurfaceToolbarClass"
         ]
       },
       "adminTableCardClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTableCardClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTableCardClass"
         ]
       },
       "adminTableClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTableClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTableClass"
         ]
       },
       "adminTableFooterClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTableFooterClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTableFooterClass"
         ]
       },
       "adminTableFrameClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTableFrameClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTableFrameClass"
         ]
       },
       "adminTableRowActionButtonClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTableRowActionButtonClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTableRowActionButtonClass"
         ]
       },
       "adminTableStyle": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTableStyle"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTableStyle"
         ]
       },
       "adminTextButtonClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminTextButtonClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminTextButtonClass"
         ]
       },
       "adminToolbarMetricClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminToolbarMetricClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminToolbarMetricClass"
         ]
       },
       "adminToolbarPageLabelClass": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/lib/uiClasses.ts#adminToolbarPageLabelClass"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/uiClasses.ts#adminToolbarPageLabelClass"
         ]
       }
     },
-    "src/features/admin/shared/logos/brandLogoResource.ts": {
+    "src/features/admin/shared/session/brand/brandLogoResource.ts": {
       "createAdminBrandLogoResource": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/shared/logos/brandLogoResource.unit.spec.ts"]
+        "evidence": ["src/features/admin/shared/session/brand/brandLogoResource.unit.spec.ts"]
       }
     },
-    "src/features/admin/shared/logos/brandLogos.ts": {
+    "src/features/admin/shared/session/brand/brandLogos.ts": {
       "ADMIN_BRAND_CATEGORIES": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#ADMIN_BRAND_CATEGORIES"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#ADMIN_BRAND_CATEGORIES"
         ]
       },
       "ALL_ADMIN_BRAND_LOGOS": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#ALL_ADMIN_BRAND_LOGOS"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#ALL_ADMIN_BRAND_LOGOS"
         ]
       },
       "AdminBrandCategory": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#AdminBrandCategory"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#AdminBrandCategory"
         ]
       },
       "AdminBrandCategoryKey": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#AdminBrandCategoryKey"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#AdminBrandCategoryKey"
         ]
       },
       "AdminBrandLogoItem": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#AdminBrandLogoItem"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#AdminBrandLogoItem"
         ]
       },
       "AdminBrandLogoKey": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#AdminBrandLogoKey"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#AdminBrandLogoKey"
         ]
       },
       "AdminBrandLogoScope": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#AdminBrandLogoScope"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#AdminBrandLogoScope"
         ]
       },
       "adminBrandLogoMap": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#adminBrandLogoMap"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#adminBrandLogoMap"
         ]
       },
       "adminBrandLogoProxyUrl": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#adminBrandLogoProxyUrl"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#adminBrandLogoProxyUrl"
         ]
       },
       "detectAdminBrandLogoKey": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#detectAdminBrandLogoKey"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#detectAdminBrandLogoKey"
         ]
       },
       "getAdminBrandLogo": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#getAdminBrandLogo"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#getAdminBrandLogo"
         ]
       },
       "getAdminBrandLogoOverride": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#getAdminBrandLogoOverride"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#getAdminBrandLogoOverride"
         ]
       },
       "replaceAdminBrandLogoOverrides": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#replaceAdminBrandLogoOverrides"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#replaceAdminBrandLogoOverrides"
         ]
       },
       "resolveModelBrandLogo": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/brandLogos.ts#resolveModelBrandLogo"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#resolveModelBrandLogo"
         ]
       }
     },
-    "src/features/admin/shared/logos/useBrandLogoOverrides.ts": {
+    "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts": {
       "useBrandLogoOverrides": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/logos/useBrandLogoOverrides.ts#useBrandLogoOverrides"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/useBrandLogoOverrides.ts#useBrandLogoOverrides"
         ]
       }
     },
@@ -7226,46 +7248,46 @@
         ]
       }
     },
-    "src/features/admin/shared/validation/actionReasonContract.ts": {
+    "src/features/admin/shared/core/actionReasonContract.ts": {
       "AdminActionReasonValidation": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/validation/actionReasonContract.ts#AdminActionReasonValidation"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/actionReasonContract.ts#AdminActionReasonValidation"
         ]
       },
       "MAX_ADMIN_ACTION_REASON_LENGTH": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/validation/actionReasonContract.ts#MAX_ADMIN_ACTION_REASON_LENGTH"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/actionReasonContract.ts#MAX_ADMIN_ACTION_REASON_LENGTH"
         ]
       },
       "validateAdminActionReason": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/validation/actionReasonContract.ts#validateAdminActionReason"
+          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/actionReasonContract.ts#validateAdminActionReason"
         ]
       }
     },
-    "src/features/admin/users/resource.ts": {
+    "src/features/admin/users/session/resource.ts": {
       "mapControlUserToListItem": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/users/resource.unit.spec.ts"]
+        "evidence": ["src/features/admin/users/session/resource.unit.spec.ts"]
       },
       "buildListControlUsersParams": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/users/resource.unit.spec.ts"]
+        "evidence": ["src/features/admin/users/session/resource.unit.spec.ts"]
       }
     },
-    "src/features/admin/users/useUsersFeedback.ts": {
+    "src/features/admin/users/session/useUsersFeedback.ts": {
       "createAdminUsersFeedback": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/users/useUsersFeedback.unit.spec.ts"]
+        "evidence": ["src/features/admin/users/session/useUsersFeedback.unit.spec.ts"]
       }
     },
-    "src/features/admin/users/view.ts": {
+    "src/features/admin/users/core/view.ts": {
       "getUserInitial": {
         "kind": "test-contract",
-        "evidence": ["src/features/admin/users/view.unit.spec.ts"]
+        "evidence": ["src/features/admin/users/core/view.unit.spec.ts"]
       }
     },
     "src/features/auth/components/auth-fields/index.ts": {
@@ -20597,56 +20619,56 @@
       "kind": "retained-public-or-test-support",
       "evidence": ["src/core/seo/routeSeo.unit.spec.ts", "src/shared/seo/seoStaticHtml.shim.ts"]
     },
-    "src/features/admin/credits/health/testing.ts": {
+    "src/features/admin/credits/session/health/testing.ts": {
       "kind": "test-support",
       "evidence": [
-        "src/features/admin/credits/health/AdminCreditHealthPage.component.spec.ts",
-        "src/features/admin/credits/health/resource.contract.spec.ts",
-        "src/features/admin/credits/health/runHistoryResource.contract.spec.ts",
-        "src/features/admin/credits/presentation/AdminCreditsBillingLayout.component.spec.ts"
+        "src/features/admin/credits/ui/health/AdminCreditHealthPage.component.spec.ts",
+        "src/features/admin/credits/session/health/resource.contract.spec.ts",
+        "src/features/admin/credits/session/health/runHistoryResource.contract.spec.ts",
+        "src/features/admin/credits/ui/AdminCreditsBillingLayout.component.spec.ts"
       ]
     },
-    "src/features/admin/credits/pricing/testing.ts": {
+    "src/features/admin/credits/session/pricing/testing.ts": {
       "kind": "test-support",
       "evidence": [
-        "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
-        "src/features/admin/credits/pricing/adminBillingPricingPagePool.component.spec.ts",
-        "src/features/admin/credits/pricing/billableCatalogResource.contract.spec.ts"
+        "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/adminBillingPricingPagePool.component.spec.ts",
+        "src/features/admin/credits/session/pricing/billableCatalogResource.contract.spec.ts"
       ]
     },
-    "src/features/admin/credits/shared/AdminActionReasonDialog.vue": {
+    "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/credits/shared/AdminActionReasonDialog.component.spec.ts"]
+      "evidence": ["src/features/admin/credits/ui/shared/AdminActionReasonDialog.component.spec.ts"]
     },
-    "src/features/admin/settings/shared/testing.ts": {
+    "src/features/admin/settings/session/testing.ts": {
       "kind": "test-support",
       "evidence": [
-        "src/features/admin/settings/outbound/AdminOutboundPolicyCard.component.spec.ts",
-        "src/features/admin/settings/outbound/useOutboundPolicy.unit.spec.ts",
-        "src/features/admin/settings/pages/AdminSettingsUnifiedPage.component.spec.ts"
+        "src/features/admin/settings/ui/cards/outbound/AdminOutboundPolicyCard.component.spec.ts",
+        "src/features/admin/settings/session/outbound/useOutboundPolicy.unit.spec.ts",
+        "src/features/admin/settings/ui/pages/AdminSettingsUnifiedPage.component.spec.ts"
       ]
     },
-    "src/features/admin/shared/components/AdminTableCaption.vue": {
+    "src/features/admin/shared/ui/table/AdminTableCaption.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/shared/components/adminTableAtoms.ts"]
+      "evidence": ["src/features/admin/shared/ui/table/adminTableAtoms.ts"]
     },
-    "src/features/admin/shared/components/AdminTableFooter.vue": {
+    "src/features/admin/shared/ui/table/AdminTableFooter.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/shared/components/adminTableAtoms.ts"]
+      "evidence": ["src/features/admin/shared/ui/table/adminTableAtoms.ts"]
     },
-    "src/features/admin/shared/components/adminPopoverAtoms.ts": {
+    "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/shared/components/AdminPopover.component.spec.ts"]
+      "evidence": ["src/features/admin/shared/ui/popover/AdminPopover.component.spec.ts"]
     },
-    "src/features/admin/shared/components/adminTableAtoms.ts": {
+    "src/features/admin/shared/ui/table/adminTableAtoms.ts": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/shared/components/AdminTable.component.spec.ts"]
+      "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
     },
-    "src/features/admin/shared/validation/actionReasonContract.ts": {
+    "src/features/admin/shared/core/actionReasonContract.ts": {
       "kind": "retained-public-or-test-support",
       "evidence": [
-        "src/features/admin/credits/shared/AdminActionReasonDialog.vue",
-        "src/features/admin/shared/validation/actionReasonContract.unit.spec.ts"
+        "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue",
+        "src/features/admin/shared/core/actionReasonContract.unit.spec.ts"
       ]
     },
     "src/features/board/testing/factories.ts": {
@@ -20705,20 +20727,20 @@
       "evidence": [
         "src/core/composables/useAsyncAction.unit.spec.ts",
         "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
-        "src/features/admin/payments/stripe-settings/StripeSettingsDialog.component.spec.ts",
-        "src/features/admin/prompts/workspace.contract.spec.ts",
-        "src/features/admin/settings/pages/AdminSettingsUnifiedPage.component.spec.ts",
-        "src/features/admin/storage/workspace.contract.spec.ts"
+        "src/features/admin/settings/ui/cards/payment/StripeSettingsDialog.component.spec.ts",
+        "src/features/admin/prompts/session/workspace.contract.spec.ts",
+        "src/features/admin/settings/ui/pages/AdminSettingsUnifiedPage.component.spec.ts",
+        "src/features/admin/settings/session/storage/workspace.contract.spec.ts"
       ]
     },
     "src/test/domOrder.ts": {
       "kind": "test-support",
       "evidence": [
         "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-        "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
-        "src/features/admin/monitor/presentation/AdminTaskResultDialog.component.spec.ts",
-        "src/features/admin/storage/pages/AdminStoragePage.component.spec.ts",
-        "src/features/admin/users/AdminUsersPage.component.spec.ts"
+        "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
+        "src/features/admin/monitor/ui/AdminTaskResultDialog.component.spec.ts",
+        "src/features/admin/settings/ui/cards/storage/AdminStoragePage.component.spec.ts",
+        "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts"
       ]
     },
     "src/test/factories/admin.ts": {
@@ -20731,11 +20753,11 @@
         "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
         "src/features/account/ui/dialog/AccountDialogHost.component.spec.ts",
         "src/features/account/ui/profile/ProfilePane.component.spec.ts",
-        "src/features/admin/payments/orders/paymentOrderResource.contract.spec.ts",
-        "src/features/admin/users/AdminUsersPage.component.spec.ts",
-        "src/features/admin/users/commands.contract.spec.ts",
-        "src/features/admin/users/commandsInvalidation.contract.spec.ts",
-        "src/features/admin/users/view.unit.spec.ts",
+        "src/features/admin/credits/session/orders/paymentOrderResource.contract.spec.ts",
+        "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
+        "src/features/admin/users/session/commands.contract.spec.ts",
+        "src/features/admin/users/session/commandsInvalidation.contract.spec.ts",
+        "src/features/admin/users/core/view.unit.spec.ts",
         "src/features/auth/session/authSession.contract.spec.ts",
         "src/features/auth/session/browserSessionTransition.contract.spec.ts",
         "src/features/auth/session/identityCacheReset.contract.spec.ts",
@@ -20757,38 +20779,38 @@
         "src/api/workspaceEventStream.contract.spec.ts",
         "src/api/workspaceTasks.contract.spec.ts",
         "src/api/workspaceUpload.contract.spec.ts",
-        "src/features/admin/credits/health/AdminCreditHealthPage.component.spec.ts",
-        "src/features/admin/credits/health/testing.ts",
-        "src/features/admin/credits/health/resource.contract.spec.ts",
-        "src/features/admin/credits/presentation/AdminCreditsBillingLayout.component.spec.ts",
-        "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
-        "src/features/admin/credits/pricing/testing.ts",
-        "src/features/admin/credits/pricing/adminBillingPricingPagePool.component.spec.ts",
-        "src/features/admin/credits/pricing/billableCatalogResource.contract.spec.ts",
-        "src/features/admin/credits/pricing/modelPoolResource.contract.spec.ts",
+        "src/features/admin/credits/ui/health/AdminCreditHealthPage.component.spec.ts",
+        "src/features/admin/credits/session/health/testing.ts",
+        "src/features/admin/credits/session/health/resource.contract.spec.ts",
+        "src/features/admin/credits/ui/AdminCreditsBillingLayout.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
+        "src/features/admin/credits/session/pricing/testing.ts",
+        "src/features/admin/credits/ui/pricing/adminBillingPricingPagePool.component.spec.ts",
+        "src/features/admin/credits/session/pricing/billableCatalogResource.contract.spec.ts",
+        "src/features/admin/credits/session/pricing/modelPoolResource.contract.spec.ts",
         "src/features/admin/models/infrastructure/adminGatewayResource.contract.spec.ts",
-        "src/features/admin/models/presentation/pages/AdminModelsPage.component.spec.ts",
-        "src/features/admin/payments/orders/paymentOrderResource.contract.spec.ts",
-        "src/features/admin/payments/stripe-settings/resource.contract.spec.ts",
-        "src/features/admin/prompts/pages/AdminPromptConfigPage.component.spec.ts",
-        "src/features/admin/prompts/resource.contract.spec.ts",
-        "src/features/admin/settings/access/AdminLoginLockoutEditor.component.spec.ts",
-        "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.component.spec.ts",
-        "src/features/admin/settings/branding/AdminBrandingCard.component.spec.ts",
-        "src/features/admin/settings/image-library/searchProviderResource.contract.spec.ts",
-        "src/features/admin/settings/mail/resource.contract.spec.ts",
-        "src/features/admin/settings/oauth/resource.contract.spec.ts",
-        "src/features/admin/settings/outbound/AdminOutboundPolicyCard.component.spec.ts",
-        "src/features/admin/settings/shared/testing.ts",
-        "src/features/admin/settings/outbound/useOutboundPolicy.unit.spec.ts",
-        "src/features/admin/settings/pages/AdminSettingsUnifiedPage.component.spec.ts",
-        "src/features/admin/settings/payment/AdminPaymentSettingsCard.component.spec.ts",
-        "src/features/admin/settings/shared/useSettingsLifecycle.unit.spec.ts",
-        "src/features/admin/settings/support-channels/resource.contract.spec.ts",
-        "src/features/admin/settings/upload/AdminUploadConcurrencyFooter.component.spec.ts",
-        "src/features/admin/storage/resource.contract.spec.ts",
-        "src/features/admin/users/AdminUsersPage.component.spec.ts",
-        "src/features/admin/users/api.contract.spec.ts",
+        "src/features/admin/models/ui/pages/AdminModelsPage.component.spec.ts",
+        "src/features/admin/credits/session/orders/paymentOrderResource.contract.spec.ts",
+        "src/features/admin/settings/session/payment/resource.contract.spec.ts",
+        "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.component.spec.ts",
+        "src/features/admin/prompts/session/resource.contract.spec.ts",
+        "src/features/admin/settings/ui/cards/access/AdminLoginLockoutEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/access/AdminRegistrationRateLimitEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.component.spec.ts",
+        "src/features/admin/settings/session/image-library/searchProviderResource.contract.spec.ts",
+        "src/features/admin/settings/session/mail/resource.contract.spec.ts",
+        "src/features/admin/settings/session/oauth/resource.contract.spec.ts",
+        "src/features/admin/settings/ui/cards/outbound/AdminOutboundPolicyCard.component.spec.ts",
+        "src/features/admin/settings/session/testing.ts",
+        "src/features/admin/settings/session/outbound/useOutboundPolicy.unit.spec.ts",
+        "src/features/admin/settings/ui/pages/AdminSettingsUnifiedPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/payment/AdminPaymentSettingsCard.component.spec.ts",
+        "src/features/admin/settings/session/useSettingsLifecycle.unit.spec.ts",
+        "src/features/admin/settings/session/support-channels/resource.contract.spec.ts",
+        "src/features/admin/settings/ui/cards/upload/AdminUploadConcurrencyFooter.component.spec.ts",
+        "src/features/admin/settings/session/storage/resource.contract.spec.ts",
+        "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
+        "src/features/admin/users/session/api.contract.spec.ts",
         "src/features/auth/components/authModalsMotion.component.spec.ts",
         "src/features/canvas/application/execution/workspace/useCanvasExecutionWorkspace.unit.spec.ts",
         "src/features/library/session/workspace.contract.spec.ts",
@@ -20825,78 +20847,78 @@
         "src/features/account/ui/usage/UsagePane.component.spec.ts",
         "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
         "src/features/admin/app/AdminLayout.component.spec.ts",
-        "src/features/admin/credits/health/AdminCreditHealthPage.component.spec.ts",
-        "src/features/admin/credits/health/resource.contract.spec.ts",
-        "src/features/admin/credits/presentation/AdminCreditsBillingLayout.component.spec.ts",
-        "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
-        "src/features/admin/credits/pricing/BillingPricingTable.component.spec.ts",
-        "src/features/admin/credits/pricing/BillingStatusCell.component.spec.ts",
-        "src/features/admin/credits/pricing/ModelPoolEditorPanel.component.spec.ts",
-        "src/features/admin/credits/pricing/adminBillingPricingPagePool.component.spec.ts",
-        "src/features/admin/credits/rewards/AdminRewardCodesPage.component.spec.ts",
-        "src/features/admin/credits/rewards/RewardCodeFormDialog.component.spec.ts",
-        "src/features/admin/credits/rewards/RewardCodePlaintextDialog.component.spec.ts",
-        "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.component.spec.ts",
-        "src/features/admin/credits/shared/AdminActionReasonDialog.component.spec.ts",
-        "src/features/admin/credits/wallets/AdminUserWalletDialog.component.spec.ts",
-        "src/features/admin/credits/wallets/components/walletComponents.unit.spec.ts",
-        "src/features/admin/models/application/useAdminModelCatalogWorkspace.contract.spec.ts",
-        "src/features/admin/models/presentation/controls/AdminModelFilter.browser.spec.ts",
-        "src/features/admin/models/presentation/controls/AdminModelFilter.component.spec.ts",
-        "src/features/admin/models/presentation/controls/ObservedStatsPanel.component.spec.ts",
-        "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.component.spec.ts",
-        "src/features/admin/models/presentation/dialog/AdminModelAddDialog.component.spec.ts",
-        "src/features/admin/models/presentation/dialog/AdminModelEditDialog.component.spec.ts",
-        "src/features/admin/models/presentation/pages/AdminModelsPage.component.spec.ts",
-        "src/features/admin/monitor/presentation/AdminTaskResultDialog.component.spec.ts",
-        "src/features/admin/monitor/presentation/TaskResultCell.component.spec.ts",
-        "src/features/admin/monitor/presentation/TaskStatusCell.component.spec.ts",
-        "src/features/admin/monitor/presentation/components/TaskControlToolbar.browser.spec.ts",
-        "src/features/admin/monitor/presentation/components/TaskControlToolbar.component.spec.ts",
-        "src/features/admin/monitor/presentation/components/monitorComponents.unit.spec.ts",
-        "src/features/admin/monitor/presentation/pages/AdminMonitorPage.component.spec.ts",
-        "src/features/admin/payments/orders/AdminPaymentOrdersPage.component.spec.ts",
-        "src/features/admin/payments/stripe-settings/StripeSettingsDialog.component.spec.ts",
-        "src/features/admin/prompts/pages/AdminPromptConfigPage.component.spec.ts",
-        "src/features/admin/settings/access/AdminLoginLockoutEditor.component.spec.ts",
-        "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.component.spec.ts",
-        "src/features/admin/settings/branding/AdminBrandingCard.component.spec.ts",
-        "src/features/admin/settings/image-library/AdminImageProvidersTable.component.spec.ts",
-        "src/features/admin/settings/mail/AdminMailConfigCard.component.spec.ts",
-        "src/features/admin/settings/oauth/AdminOAuthLoginCard.component.spec.ts",
-        "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.component.spec.ts",
-        "src/features/admin/settings/outbound/AdminOutboundPolicyCard.component.spec.ts",
-        "src/features/admin/settings/pages/AdminSettingsUnifiedPage.component.spec.ts",
-        "src/features/admin/settings/payment/AdminPaymentSettingsCard.component.spec.ts",
-        "src/features/admin/settings/shared/SettingEditorCard.component.spec.ts",
-        "src/features/admin/settings/shared/components/AdminSettingsOnThisPage.component.spec.ts",
-        "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.component.spec.ts",
-        "src/features/admin/settings/upload/AdminUploadConcurrencyFooter.component.spec.ts",
-        "src/features/admin/shared/components/AdminConfirmDialog.component.spec.ts",
-        "src/features/admin/shared/components/AdminDialogActions.component.spec.ts",
-        "src/features/admin/shared/components/AdminDialogShell.component.spec.ts",
-        "src/features/admin/shared/components/AdminDrawer.component.spec.ts",
-        "src/features/admin/shared/components/AdminEditorActions.component.spec.ts",
-        "src/features/admin/shared/components/AdminFormField.unit.spec.ts",
-        "src/features/admin/shared/components/AdminLogoPickerPopover.component.spec.ts",
-        "src/features/admin/shared/components/AdminMono.component.spec.ts",
-        "src/features/admin/shared/components/AdminNumberInput.component.spec.ts",
-        "src/features/admin/shared/components/AdminOptionFilter.browser.spec.ts",
-        "src/features/admin/shared/components/AdminOptionFilter.component.spec.ts",
-        "src/features/admin/shared/components/AdminPopover.component.spec.ts",
-        "src/features/admin/shared/components/AdminRefreshButton.component.spec.ts",
-        "src/features/admin/shared/components/AdminRowActionsPopover.component.spec.ts",
-        "src/features/admin/shared/components/AdminStatusPill.component.spec.ts",
-        "src/features/admin/shared/components/AdminSurfaceFrame.component.spec.ts",
-        "src/features/admin/shared/components/AdminSwitch.component.spec.ts",
-        "src/features/admin/shared/components/AdminTable.component.spec.ts",
-        "src/features/admin/shared/components/AdminTabs.component.spec.ts",
-        "src/features/admin/shared/components/AdminToolbarSearch.component.spec.ts",
-        "src/features/admin/shared/components/SwitchRow.component.spec.ts",
-        "src/features/admin/storage/components/AdminStorageEditorDialog.component.spec.ts",
-        "src/features/admin/storage/components/AdminStorageTable.component.spec.ts",
-        "src/features/admin/storage/pages/AdminStoragePage.component.spec.ts",
-        "src/features/admin/users/AdminUsersPage.component.spec.ts",
+        "src/features/admin/credits/ui/health/AdminCreditHealthPage.component.spec.ts",
+        "src/features/admin/credits/session/health/resource.contract.spec.ts",
+        "src/features/admin/credits/ui/AdminCreditsBillingLayout.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/BillingPricingTable.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/BillingStatusCell.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/ModelPoolEditorPanel.component.spec.ts",
+        "src/features/admin/credits/ui/pricing/adminBillingPricingPagePool.component.spec.ts",
+        "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
+        "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.component.spec.ts",
+        "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.component.spec.ts",
+        "src/features/admin/credits/ui/rewards/RewardCodeRedemptionsDialog.component.spec.ts",
+        "src/features/admin/credits/ui/shared/AdminActionReasonDialog.component.spec.ts",
+        "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.component.spec.ts",
+        "src/features/admin/credits/ui/wallets/components/walletComponents.unit.spec.ts",
+        "src/features/admin/models/session/useAdminModelCatalogWorkspace.contract.spec.ts",
+        "src/features/admin/models/ui/controls/AdminModelFilter.browser.spec.ts",
+        "src/features/admin/models/ui/controls/AdminModelFilter.component.spec.ts",
+        "src/features/admin/models/ui/controls/ObservedStatsPanel.component.spec.ts",
+        "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.component.spec.ts",
+        "src/features/admin/models/ui/dialog/AdminModelAddDialog.component.spec.ts",
+        "src/features/admin/models/ui/dialog/AdminModelEditDialog.component.spec.ts",
+        "src/features/admin/models/ui/pages/AdminModelsPage.component.spec.ts",
+        "src/features/admin/monitor/ui/AdminTaskResultDialog.component.spec.ts",
+        "src/features/admin/monitor/ui/TaskResultCell.component.spec.ts",
+        "src/features/admin/monitor/ui/TaskStatusCell.component.spec.ts",
+        "src/features/admin/monitor/ui/components/TaskControlToolbar.browser.spec.ts",
+        "src/features/admin/monitor/ui/components/TaskControlToolbar.component.spec.ts",
+        "src/features/admin/monitor/ui/components/monitorComponents.unit.spec.ts",
+        "src/features/admin/monitor/ui/pages/AdminMonitorPage.component.spec.ts",
+        "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/payment/StripeSettingsDialog.component.spec.ts",
+        "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/access/AdminLoginLockoutEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/access/AdminRegistrationRateLimitEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/image-library/AdminImageProvidersTable.component.spec.ts",
+        "src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/oauth/AdminOAuthLoginCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/oauth/OAuthProviderSettingsDialog.component.spec.ts",
+        "src/features/admin/settings/ui/cards/outbound/AdminOutboundPolicyCard.component.spec.ts",
+        "src/features/admin/settings/ui/pages/AdminSettingsUnifiedPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/payment/AdminPaymentSettingsCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/SettingEditorCard.component.spec.ts",
+        "src/features/admin/settings/ui/pages/AdminSettingsOnThisPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/support-channels/AdminSupportChannelsEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/upload/AdminUploadConcurrencyFooter.component.spec.ts",
+        "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
+        "src/features/admin/shared/ui/shell/AdminDialogActions.component.spec.ts",
+        "src/features/admin/shared/ui/shell/AdminDialogShell.component.spec.ts",
+        "src/features/admin/shared/ui/shell/AdminDrawer.component.spec.ts",
+        "src/features/admin/shared/ui/shell/AdminEditorActions.component.spec.ts",
+        "src/features/admin/shared/ui/form/AdminFormField.unit.spec.ts",
+        "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.component.spec.ts",
+        "src/features/admin/shared/ui/AdminMono.component.spec.ts",
+        "src/features/admin/shared/ui/form/AdminNumberInput.component.spec.ts",
+        "src/features/admin/shared/ui/toolbar/AdminOptionFilter.browser.spec.ts",
+        "src/features/admin/shared/ui/toolbar/AdminOptionFilter.component.spec.ts",
+        "src/features/admin/shared/ui/popover/AdminPopover.component.spec.ts",
+        "src/features/admin/shared/ui/toolbar/AdminRefreshButton.component.spec.ts",
+        "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.component.spec.ts",
+        "src/features/admin/shared/ui/feedback/AdminStatusPill.component.spec.ts",
+        "src/features/admin/shared/ui/shell/AdminSurfaceFrame.component.spec.ts",
+        "src/features/admin/shared/ui/form/AdminSwitch.component.spec.ts",
+        "src/features/admin/shared/ui/table/AdminTable.component.spec.ts",
+        "src/features/admin/shared/ui/tabs/AdminTabs.component.spec.ts",
+        "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.component.spec.ts",
+        "src/features/admin/shared/ui/form/SwitchRow.component.spec.ts",
+        "src/features/admin/settings/ui/cards/storage/AdminStorageEditorDialog.component.spec.ts",
+        "src/features/admin/settings/ui/cards/storage/AdminStorageTable.component.spec.ts",
+        "src/features/admin/settings/ui/cards/storage/AdminStoragePage.component.spec.ts",
+        "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
         "src/features/auth/components/UserAuthModals.component.spec.ts",
         "src/features/auth/components/auth-fields/authFields.component.spec.ts",
         "src/features/auth/components/authModalsMotion.component.spec.ts",
@@ -20952,21 +20974,21 @@
         "src/core/i18n/fourLocaleServiceCopy.contract.spec.ts",
         "src/core/i18n/userLocale.unit.spec.ts",
         "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
-        "src/features/admin/credits/health/AdminCreditHealthPage.component.spec.ts",
-        "src/features/admin/credits/rewards/AdminRewardCodesPage.component.spec.ts",
-        "src/features/admin/payments/orders/AdminPaymentOrdersPage.component.spec.ts",
-        "src/features/admin/settings/access/AdminLoginLockoutEditor.component.spec.ts",
-        "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.component.spec.ts",
-        "src/features/admin/settings/branding/AdminBrandingCard.component.spec.ts",
-        "src/features/admin/settings/oauth/AdminOAuthLoginCard.component.spec.ts",
-        "src/features/admin/settings/outbound/AdminOutboundPolicyCard.component.spec.ts",
-        "src/features/admin/settings/pages/AdminSettingsUnifiedPage.component.spec.ts",
-        "src/features/admin/settings/payment/AdminPaymentSettingsCard.component.spec.ts",
-        "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.component.spec.ts",
-        "src/features/admin/settings/upload/AdminUploadConcurrencyFooter.component.spec.ts",
-        "src/features/admin/storage/pages/AdminStoragePage.component.spec.ts",
-        "src/features/admin/storage/useStorageProfileEditor.unit.spec.ts",
-        "src/features/admin/users/AdminUsersPage.component.spec.ts",
+        "src/features/admin/credits/ui/health/AdminCreditHealthPage.component.spec.ts",
+        "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
+        "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/access/AdminLoginLockoutEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/access/AdminRegistrationRateLimitEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/oauth/AdminOAuthLoginCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/outbound/AdminOutboundPolicyCard.component.spec.ts",
+        "src/features/admin/settings/ui/pages/AdminSettingsUnifiedPage.component.spec.ts",
+        "src/features/admin/settings/ui/cards/payment/AdminPaymentSettingsCard.component.spec.ts",
+        "src/features/admin/settings/ui/cards/support-channels/AdminSupportChannelsEditor.component.spec.ts",
+        "src/features/admin/settings/ui/cards/upload/AdminUploadConcurrencyFooter.component.spec.ts",
+        "src/features/admin/settings/ui/cards/storage/AdminStoragePage.component.spec.ts",
+        "src/features/admin/settings/session/storage/useStorageProfileEditor.unit.spec.ts",
+        "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
         "src/features/auth/components/UserAuthModals.component.spec.ts",
         "src/features/auth/components/authModalsMotion.component.spec.ts",
         "src/features/auth/pages/oauthFlow.component.spec.ts",

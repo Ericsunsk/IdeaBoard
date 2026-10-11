@@ -103,7 +103,7 @@ function withI18n<C>(options?: RenderOptions<C>): RenderOptions<C> {
   }
 }
 
-export function createUser(options?: UserEventSetupOptions) {
+function createUser(options?: UserEventSetupOptions) {
   return userEvent.setup(options)
 }
 

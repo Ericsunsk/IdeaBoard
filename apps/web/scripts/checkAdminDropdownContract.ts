@@ -34,7 +34,7 @@ const SRC_ROOT = join(import.meta.dirname, '..', 'src')
  * It used to be `features/admin/shared`, which only contains the *wrappers*.
  * `role="listbox"` is declared by whoever renders the option list, i.e. by the
  * consumers, and consumers live in the admin verticals
- * (`admin/models/presentation/controls/`, `admin/monitor/presentation/components/`,
+ * (`admin/models/ui/controls/`, `admin/monitor/ui/components/`,
  * …). Two of them had already re-introduced the exact widget the check was
  * written to prevent — see section 2.
  */
@@ -145,7 +145,7 @@ function missingListboxModelMarkers(source: string): string[] {
 /* ------------------------------------------------------------------ */
 
 /**
- * Scope: `features/admin/shared/components` only.
+ * Scope: `features/admin/shared/ui` only.
  *
  * These files *are* the wrappers, so a Popover and a Select in one file is
  * genuinely two primitives fighting over one trigger. A route page is a
@@ -154,7 +154,7 @@ function missingListboxModelMarkers(source: string): string[] {
  * not signal. The listbox assertions live in section 2, which runs over the
  * whole tree precisely because the consumers are not wrappers.
  */
-const wrapperComponents = listVueFiles(join(ADMIN_SHARED, 'components'))
+const wrapperComponents = listVueFiles(join(ADMIN_SHARED, 'ui'))
 
 const dropdownComponents = wrapperComponents.filter((file) =>
   DROPDOWN_PRIMITIVE.test(stripComments(readFileSync(file, 'utf8'))),
@@ -248,13 +248,13 @@ for (const rel of Object.keys(LISTBOX_IMPLEMENTATIONS)) {
 /* 3. Geometry must come from the shared skin, not be re-inlined         */
 /* ------------------------------------------------------------------ */
 
-const skinFile = join(ADMIN_SHARED, 'lib/adminSelectSkin.ts')
+const skinFile = join(ADMIN_SHARED, 'core/adminSelectSkin.ts')
 const skin = readFileSync(skinFile, 'utf8')
 
 const skinConsumers = [...listVueFiles(ADMIN_ROOT), skinFile]
 for (const file of skinConsumers) {
   const rel = relOf(file)
-  if (rel.endsWith('lib/adminSelectSkin.ts')) continue
+  if (rel.endsWith('core/adminSelectSkin.ts')) continue
   const source = readFileSync(file, 'utf8')
   if (!/from ['"].*adminSelectSkin/.test(source)) continue
 
@@ -278,15 +278,15 @@ const requiredSkinPieces = ['focus-visible:ring-2', 'rounded-lg', 'ADMIN_SELECT_
 for (const piece of requiredSkinPieces) {
   if (!skin.includes(piece)) {
     violations.push(
-      `lib/adminSelectSkin.ts: missing \`${piece}\`. Every dropdown trigger must expose a visible focus indicator.`,
+      `core/adminSelectSkin.ts: missing \`${piece}\`. Every dropdown trigger must expose a visible focus indicator.`,
     )
   }
 }
 
-const optionFilter = readFileSync(join(ADMIN_SHARED, 'components/AdminOptionFilter.vue'), 'utf8')
+const optionFilter = readFileSync(join(ADMIN_SHARED, 'ui/toolbar/AdminOptionFilter.vue'), 'utf8')
 if (!/AdminSelect/.test(optionFilter)) {
   violations.push(
-    'components/AdminOptionFilter.vue: must build on AdminSelect so the filter dropdown inherits the full keyboard model.',
+    'ui/toolbar/AdminOptionFilter.vue: must build on AdminSelect so the filter dropdown inherits the full keyboard model.',
   )
 }
 
@@ -307,15 +307,15 @@ for (const file of listVueFiles(UI_SELECT)) {
   }
 }
 
-const adminSelect = readFileSync(join(ADMIN_SHARED, 'components/AdminSelect.vue'), 'utf8')
+const adminSelect = readFileSync(join(ADMIN_SHARED, 'ui/form/AdminSelect.vue'), 'utf8')
 if (!/from '@\/components\/ui\/select'/.test(adminSelect)) {
   violations.push(
-    'components/AdminSelect.vue: must mount `@/components/ui/select` instead of reka directly, so both surfaces share one keyboard model.',
+    'ui/form/AdminSelect.vue: must mount `@/components/ui/select` instead of reka directly, so both surfaces share one keyboard model.',
   )
 }
 if (/\bfrom 'reka-ui'/.test(adminSelect)) {
   violations.push(
-    'components/AdminSelect.vue: must not import reka Select parts directly; go through `@/components/ui/select`.',
+    'ui/form/AdminSelect.vue: must not import reka Select parts directly; go through `@/components/ui/select`.',
   )
 }
 

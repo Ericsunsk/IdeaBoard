@@ -17,8 +17,8 @@ import UserConfirmDialog from '../core/components/UserConfirmDialog.vue'
 import {
   activeAdminConfirm,
   useAdminConfirm,
-} from '../features/admin/shared/composables/useAdminConfirm'
-import AdminConfirmDialog from '../features/admin/shared/components/AdminConfirmDialog.vue'
+} from '../features/admin/shared/session/feedback/useAdminConfirm'
+import AdminConfirmDialog from '../features/admin/shared/ui/feedback/AdminConfirmDialog.vue'
 import { dialogMotionTransitionName } from '../core/motion/dialogMotion'
 
 declare module 'vitest/internal/browser' {

@@ -174,10 +174,10 @@ function scanBoardDeepImports(
  * have kept the rule green while it was blind.
  */
 const routePageFixtureDirs = [
-  'src/features/admin/pages',
-  'src/features/admin/users',
-  'src/features/admin/settings/pages',
-  'src/features/admin/credits/health',
+  'src/features/admin/app',
+  'src/features/admin/users/ui/table',
+  'src/features/admin/settings/ui/pages',
+  'src/features/admin/credits/ui/orders',
   'src/features/workspace/layout',
 ] as const
 

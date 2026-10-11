@@ -15,7 +15,7 @@ const app = 'src/app/style.css'
 const tokens = 'src/theme/tokens/'
 const chrome = 'src/theme/atoms/page-chrome.css'
 const round = 'src/theme/atoms/round-control.css'
-const bridge = 'src/features/admin/shared/lib/adminThemeTokens.ts'
+const bridge = 'src/features/admin/shared/core/adminThemeTokens.ts'
 
 const requiredTokens = [
   '--color-scrollbar-thumb',

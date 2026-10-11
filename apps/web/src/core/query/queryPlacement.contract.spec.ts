@@ -23,7 +23,7 @@ function buildImportFixture(name: string, importer: string, source: string): Pla
 const allowedFixtures: PlacementFixture[] = [
   ...[
     ['account resource', 'src/features/account/session/credits/resource.ts'],
-    ['admin resource', 'src/features/admin/statistics/resource.ts'],
+    ['admin resource', 'src/features/admin/statistics/session/resource.ts'],
     ['workspace selection', 'src/features/workspace/session/selection.ts'],
     ['shared singleton', 'src/shared/query/queryClient.ts'],
     ['P1 core singleton', 'src/core/query/queryClient.ts'],

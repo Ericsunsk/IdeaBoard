@@ -4,13 +4,13 @@ import type { AdminNavigationKey } from './navigationMeta'
 import { ADMIN_CREDIT_PRICING_PATH, ADMIN_ROOT_PATH } from '../routePaths'
 
 const adminPageComponents = {
-  users: () => import('../users/AdminUsersPage.vue'),
-  credits: () => import('../credits/presentation/AdminCreditsBillingLayout.vue'),
-  statistics: () => import('../statistics/pages/AdminStatisticsPage.vue'),
-  monitor: () => import('../monitor/presentation/pages/AdminMonitorPage.vue'),
-  models: () => import('../models/presentation/pages/AdminModelsPage.vue'),
-  'feature-prompts': () => import('../prompts/pages/AdminPromptConfigPage.vue'),
-  settings: () => import('../settings/pages/AdminSettingsUnifiedPage.vue'),
+  users: () => import('../users/ui/table/AdminUsersPage.vue'),
+  credits: () => import('../credits/ui/AdminCreditsBillingLayout.vue'),
+  statistics: () => import('../statistics/ui/views/AdminStatisticsPage.vue'),
+  monitor: () => import('../monitor/ui/pages/AdminMonitorPage.vue'),
+  models: () => import('../models/ui/pages/AdminModelsPage.vue'),
+  'feature-prompts': () => import('../prompts/ui/pages/AdminPromptConfigPage.vue'),
+  settings: () => import('../settings/ui/pages/AdminSettingsUnifiedPage.vue'),
 } satisfies Record<AdminNavigationKey, RouteRecordRaw['component']>
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -25,7 +25,7 @@ export const adminRoutes: RouteRecordRaw[] = [
       {
         path: 'login',
         name: 'AdminLogin',
-        component: () => import('../pages/login/AdminLoginPage.vue'),
+        component: () => import('./login/AdminLoginPage.vue'),
         meta: { guest: true },
       },
       ...adminNavigationRouteDefs
@@ -45,24 +45,24 @@ export const adminRoutes: RouteRecordRaw[] = [
           {
             path: 'pricing',
             name: 'AdminCreditPricing',
-            component: () => import('../credits/pricing/AdminBillingPricingPage.vue'),
+            component: () => import('../credits/ui/pricing/AdminBillingPricingPage.vue'),
             meta: { requiresAuth: true, title: '功能定价' },
           },
           {
             path: 'health',
             name: 'AdminCreditHealth',
-            component: () => import('../credits/health/AdminCreditHealthPage.vue'),
+            component: () => import('../credits/ui/health/AdminCreditHealthPage.vue'),
             meta: { requiresAuth: true, title: '账本健康' },
           },
           {
             path: 'reward-codes',
             name: 'AdminRewardCodes',
-            component: () => import('../credits/rewards/AdminRewardCodesPage.vue'),
+            component: () => import('../credits/ui/rewards/AdminRewardCodesPage.vue'),
           },
           {
             path: 'payment-orders',
             name: 'AdminPaymentOrders',
-            component: () => import('../payments/orders/AdminPaymentOrdersPage.vue'),
+            component: () => import('../credits/ui/orders/AdminPaymentOrdersPage.vue'),
             meta: { requiresAuth: true, title: '支付订单' },
           },
         ],

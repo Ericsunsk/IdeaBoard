@@ -26,8 +26,8 @@ const CARD_SURFACE_FILES = [
   'components/ui/card/Card.vue',
   'core/components/ChartCard.vue',
   'core/components/RangedLineChartCard.vue',
-  'features/admin/shared/components/AdminChartCard.vue',
-  'features/admin/shared/components/AdminRangedLineChartCard.vue',
+  'features/admin/shared/ui/chart/AdminChartCard.vue',
+  'features/admin/shared/ui/chart/AdminRangedLineChartCard.vue',
   'features/workspace/pages/WorkspaceShareJoinPage.vue',
 ]
 

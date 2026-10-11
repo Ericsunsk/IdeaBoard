@@ -16,7 +16,7 @@
     "bundle:visualize": "ANALYZE=true vite build",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:locale-parity && npm run lint:style-governance && npm run lint:retirement-replacements && npm run lint:theme-contract && npm run lint:card-elevation && npm run lint:admin-dropdown && npm run lint:touch-target && npm run lint:naming-governance && npm run lint:p0-governance && npm run lint:migration-ledger && npm run lint:import-boundaries && npm run lint:dependencies && npm run lint:admin-form-validation && npm run lint:duplication && npm run lint:knip && npm run lint:shim-ttl && npm run api:surface:check && npm run audit:complexity",
+    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:locale-parity && npm run lint:style-governance && npm run lint:retirement-replacements && npm run lint:theme-contract && npm run lint:card-elevation && npm run lint:admin-dropdown && npm run lint:admin-feedback-boundary && npm run lint:touch-target && npm run lint:naming-governance && npm run lint:p0-governance && npm run lint:migration-ledger && npm run lint:import-boundaries && npm run lint:dependencies && npm run lint:admin-form-validation && npm run lint:duplication && npm run lint:knip && npm run lint:shim-ttl && npm run api:surface:check && npm run audit:complexity",
     "lint:user-copy": "tsx scripts/checkUserCopyLocale.ts",
     "lint:locale-parity": "tsx scripts/checkLocaleParity.ts",
     "lint:import-boundaries": "tsx scripts/checkEslintImportBoundaries.ts",
@@ -49,6 +49,7 @@
     "quality:check": "npm run format:check && npm run lint && npm run test:typecheck && npm run test:run && npm run build",
     "quality:full": "npm run quality:check && npm run lint:style && npm run api:check-generated && npm run test:browser && npm run test:accessibility",
     "lint:admin-dropdown": "tsx scripts/checkAdminDropdownContract.ts",
+    "lint:admin-feedback-boundary": "tsx scripts/checkAdminFeedbackBoundary.ts",
     "lint:touch-target": "tsx scripts/checkTouchTargetContract.ts",
     "lint:retirement-replacements": "tsx scripts/checkRetirementReplacements.ts",
     "lint:theme-contract": "tsx scripts/checkThemeContractRetirements.ts"

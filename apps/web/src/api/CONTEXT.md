@@ -15,7 +15,7 @@ P1b relocates the generated subtree opaquely from `src/shared/api/generated-quer
 
 - Generator baseline: `apps/api/openapi.public.yaml` + `apps/api/openapi.control.yaml` via `npm run api:generate`; drift gate `npm run api:check-generated` (`apps/web/scripts/checkApiGeneratedDrift.ts`); mutators `orvalMutator.ts` / `publicMutator.ts` / `controlMutator.ts` live in `src/api/`.
 - Rules: (1) no hand edits to generated contents; (2) no relocation outside P1b; P1b updates hard-coded Orval/drift/cruiser/purity/governance paths in the same change (plan §5.5 P1b / §10.4).
-- Consumers: all imports use the new `src/api/*` paths; shims at `src/shared/api/*.shim.ts` preserve the old specifiers for one phase. Shared-internal relative wrappers (`api/*`, `core/composables`) and feature resource/adapter absolute imports (`account`, `admin/*`, `board`, `library`, `search`, `workspace` selection snapshot) are canonical; route pages/components must not import generated code directly (via resource/adapter only).
+- Consumers: all imports use the new `src/api/*` paths; the shims at `src/shared/api/*.shim.ts` preserved the old specifiers for one phase and are now deleted (P4, all 109 P1 shims). Shared-internal relative wrappers (`api/*`, `core/composables`) and feature resource/adapter absolute imports (`account`, `admin/*`, `board`, `library`, `search`, `workspace` selection snapshot) are canonical; route pages/components must not import generated code directly (via resource/adapter only).
 
 ## Public Seams
 

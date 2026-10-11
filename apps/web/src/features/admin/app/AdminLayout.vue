@@ -63,7 +63,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { authTransport, useUserStore } from '../../auth'
-import AdminConfirmDialog from '../shared/components/AdminConfirmDialog.vue'
+import { AdminConfirmDialog } from '../shared'
 import AdminSidebar from './AdminSidebar.vue'
 import AdminHeaderBar from './AdminHeaderBar.vue'
 import {
@@ -72,7 +72,7 @@ import {
   resolveAdminPageTitle,
 } from './navigation'
 import { ADMIN_CREDITS_PATH, ADMIN_LOGIN_PATH, isPathUnderRoute } from '../routePaths'
-import { useBrandLogoOverrides } from '../shared/logos/useBrandLogoOverrides'
+import { useBrandLogoOverrides } from '../shared'
 import { useAdminStickyTitle } from './useAdminStickyTitle'
 
 const route = useRoute()

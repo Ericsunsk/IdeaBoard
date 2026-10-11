@@ -4,7 +4,7 @@ P0 freeze, 2026-10-10. Checkpoint: `70e5758eddad32b588eaf641d1a470848283b0d4`.
 
 This document's schema-validated JSON block is the single source of truth for current/public and future entry contracts. Status changes and consumer rewrites must be reviewed atomically. Planned records are not accepted entries.
 
-- 406 records: 273 active (254 canonical, 19 cascading), 3 planned, 130 retired. P1 relocations preserve legacy exports and declare actual public subpaths; all 109 P1 compatibility shims have one-phase TTL and p1-lane deletion ownership. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P3 2026-10-11 deleted the workspace context shim (TTL expired, zero importers verified). P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
+- 406 records: 274 active (255 canonical, 19 cascading), 2 planned, 130 retired. P1 relocations preserve legacy exports and declare actual public subpaths; the historical P1 compatibility shims have been retired from the current tree; no active shim files remain. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P3 2026-10-11 deleted the workspace context shim (TTL expired, zero importers verified). P4 2026-10-11 activates the sole Admin shared barrel `shared/index.ts` and relocates 68 shared subpaths to core/session/ui. The 70 temporary Admin shared bridge shims were retired early after zero importers were verified; current vertical consumers use the shared barrel or canonical deep paths, and no P4 Admin bridge shims remain. P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
 - Hypothetical API/theme root wrappers are replaced by direct public subpaths actually consumed today. CSS/token files move with the theme directory and remain governed by existing token contracts; no runtime barrel is introduced for CSS.
 - Explicit ownership scopes define external edges; nested scopes overlap intentionally and their totals must not be summed. For pure single-file entries ownership is exactly that file. The Board Canvas port owns Board, so private Board reexports do not count as outbound.
 - Frozen targets preserve source export/import behavior. Composite Admin/Canvas/account entries expose explicitly mapped exports and redirect the frozen external source consumers. Internal consumers remain within their owning scope; API/generated paths retain their P1a carve-out.
@@ -115,18 +115,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/client.shim.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 12,
       "measuredFanOut": 4,
-      "targetFanIn": 13,
+      "targetFanIn": 12,
       "targetFanOut": 4,
-      "shims": ["src/shared/api/client.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -245,122 +240,122 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
+          "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/modelPoolResource.ts",
+          "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/resource.ts",
+          "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/rewardCodeRedemptionResource.ts",
+          "from": "src/features/admin/credits/session/rewards/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/shared/api.ts",
+          "from": "src/features/admin/credits/session/rewards/rewardCodeRedemptionResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
+          "from": "src/features/admin/credits/session/shared/api.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/models/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
+          "from": "src/features/admin/prompts/session/api.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/api.ts",
+          "from": "src/features/admin/settings/session/access/useAccessSettings.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/access/useAccessSettings.ts",
+          "from": "src/features/admin/settings/session/branding/useBrandingSettings.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
+          "from": "src/features/admin/settings/session/image-library/searchProviderResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/image-library/searchProviderResource.ts",
+          "from": "src/features/admin/settings/session/mail/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/mail/resource.ts",
+          "from": "src/features/admin/settings/session/oauth/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/resource.ts",
+          "from": "src/features/admin/settings/session/outbound/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/outbound/resource.ts",
+          "from": "src/features/admin/settings/session/payment/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
+          "from": "src/features/admin/settings/session/storage/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
+          "from": "src/features/admin/settings/session/support/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/upload/useMediaUploadSettings.ts",
+          "from": "src/features/admin/settings/session/upload/useMediaUploadSettings.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/controlMutation.ts",
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.vue",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/controlResource.ts",
+          "from": "src/features/admin/shared/core/controlMutation.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/resource.ts",
+          "from": "src/features/admin/shared/core/controlResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/resource.ts",
+          "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/api.ts",
+          "from": "src/features/admin/users/session/api.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -393,18 +388,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/contractKernel.shim.ts",
-          "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 41,
+      "measuredFanIn": 40,
       "measuredFanOut": 2,
-      "targetFanIn": 41,
+      "targetFanIn": 40,
       "targetFanOut": 2,
-      "shims": ["src/shared/api/contractKernel.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -584,12 +574,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
+          "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
           "to": "src/api/generated-query/control/control-billing/control-billing.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/modelPoolResource.ts",
+          "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
           "to": "src/api/generated-query/control/control-billing/control-billing.ts",
           "kind": "runtime"
         }
@@ -978,17 +968,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/resource.ts",
+          "from": "src/features/admin/credits/session/rewards/resource.ts",
           "to": "src/api/generated-query/control/control-credits/control-credits.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/rewardCodeRedemptionResource.ts",
+          "from": "src/features/admin/credits/session/rewards/rewardCodeRedemptionResource.ts",
           "to": "src/api/generated-query/control/control-credits/control-credits.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/shared/api.ts",
+          "from": "src/features/admin/credits/session/shared/api.ts",
           "to": "src/api/generated-query/control/control-credits/control-credits.ts",
           "kind": "runtime"
         }
@@ -1911,12 +1901,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
+          "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/api/generated-query/control/control-payments/control-payments.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
+          "from": "src/features/admin/settings/session/payment/resource.ts",
           "to": "src/api/generated-query/control/control-payments/control-payments.ts",
           "kind": "runtime"
         }
@@ -2203,67 +2193,67 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
+          "from": "src/features/admin/models/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/api.ts",
+          "from": "src/features/admin/prompts/session/api.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/access/useAccessSettings.ts",
+          "from": "src/features/admin/settings/session/access/useAccessSettings.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
+          "from": "src/features/admin/settings/session/branding/useBrandingSettings.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/image-library/searchProviderResource.ts",
+          "from": "src/features/admin/settings/session/image-library/searchProviderResource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/mail/resource.ts",
+          "from": "src/features/admin/settings/session/mail/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/outbound/resource.ts",
+          "from": "src/features/admin/settings/session/outbound/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
+          "from": "src/features/admin/settings/session/storage/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/upload/useMediaUploadSettings.ts",
+          "from": "src/features/admin/settings/session/support/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/settings/session/upload/useMediaUploadSettings.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/resource.ts",
+          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/resource.ts",
+          "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         }
@@ -4728,7 +4718,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/generated-query/control/control-tasks/control-tasks.ts",
           "kind": "runtime"
         }
@@ -4913,17 +4903,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/resource.ts",
+          "from": "src/features/admin/settings/session/oauth/resource.ts",
           "to": "src/api/generated-query/control/control-users/control-users.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/api.ts",
+          "from": "src/features/admin/users/session/api.ts",
           "to": "src/api/generated-query/control/control-users/control-users.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/resource.ts",
+          "from": "src/features/admin/users/session/resource.ts",
           "to": "src/api/generated-query/control/control-users/control-users.ts",
           "kind": "runtime"
         }
@@ -10199,7 +10189,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/mail/resource.ts",
+          "from": "src/features/admin/settings/session/mail/resource.ts",
           "to": "src/api/generated-query/control/model/controlMailConfigRequest.ts",
           "kind": "type-only"
         }
@@ -10256,7 +10246,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/resource.ts",
+          "from": "src/features/admin/settings/session/oauth/resource.ts",
           "to": "src/api/generated-query/control/model/controlOAuthProviderSummary.ts",
           "kind": "type-only"
         }
@@ -10308,7 +10298,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/resource.ts",
+          "from": "src/features/admin/settings/session/oauth/resource.ts",
           "to": "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts",
           "kind": "type-only"
         }
@@ -10360,7 +10350,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
+          "from": "src/features/admin/settings/session/payment/resource.ts",
           "to": "src/api/generated-query/control/model/controlStripeConfigRequest.ts",
           "kind": "type-only"
         }
@@ -10412,7 +10402,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/generated-query/control/model/controlTaskEnvelope.ts",
           "kind": "type-only"
         }
@@ -10496,52 +10486,52 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/rewards/resource.ts",
+          "from": "src/features/admin/credits/core/wallets/creditCommandContract.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/rewards/rewardCodeRedemptionResource.ts",
+          "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/shared/api.ts",
+          "from": "src/features/admin/credits/session/rewards/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/wallets/creditCommandContract.ts",
+          "from": "src/features/admin/credits/session/rewards/rewardCodeRedemptionResource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/wallets/resource.ts",
+          "from": "src/features/admin/credits/session/shared/api.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/credits/session/wallets/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/statistics/resource.ts",
+          "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/users/resource.ts",
+          "from": "src/features/admin/users/session/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/users/resource.unit.spec.ts",
+          "from": "src/features/admin/users/session/resource.unit.spec.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         }
@@ -11702,7 +11692,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
+          "from": "src/features/admin/settings/session/support/resource.ts",
           "to": "src/api/generated-query/control/model/supportChannelKind.ts",
           "kind": "runtime"
         }
@@ -11759,7 +11749,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
+          "from": "src/features/admin/settings/session/support/resource.ts",
           "to": "src/api/generated-query/control/model/supportChannelsSetting.ts",
           "kind": "type-only"
         }
@@ -20363,12 +20353,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/resource.ts",
+          "from": "src/features/admin/credits/session/rewards/resource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/api.ts",
+          "from": "src/features/admin/users/session/api.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -20396,18 +20386,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/idempotencyKey.shim.ts",
-          "to": "src/api/idempotencyKey.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 12,
       "measuredFanOut": 0,
-      "targetFanIn": 13,
+      "targetFanIn": 12,
       "targetFanOut": 0,
-      "shims": ["src/shared/api/idempotencyKey.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -20641,18 +20626,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/mediaAssetDelivery.shim.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 27,
+      "measuredFanIn": 26,
       "measuredFanOut": 4,
-      "targetFanIn": 27,
+      "targetFanIn": 26,
       "targetFanOut": 4,
-      "shims": ["src/shared/api/mediaAssetDelivery.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -20863,18 +20843,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/mediaWorkspaceScope.shim.ts",
-          "to": "src/api/mediaWorkspaceScope.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/api/mediaWorkspaceScope.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -20985,21 +20960,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/api/sessionUserType.shim.ts",
-          "to": "src/api/sessionUserType.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/factories/user.ts",
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 15,
+      "measuredFanIn": 14,
       "measuredFanOut": 0,
-      "targetFanIn": 15,
+      "targetFanIn": 14,
       "targetFanOut": 0,
-      "shims": ["src/shared/api/sessionUserType.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21036,42 +21006,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/findingQueueResource.ts",
+          "from": "src/features/admin/credits/core/health/reconciliationRunPresentation.unit.spec.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/reconciliationRunPresentation.unit.spec.ts",
+          "from": "src/features/admin/credits/session/health/findingQueueResource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/runHistoryResource.ts",
+          "from": "src/features/admin/credits/session/health/runHistoryResource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
+          "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
+          "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.component.spec.ts",
+          "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.component.spec.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/resource.ts",
+          "from": "src/features/admin/users/session/resource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
         },
@@ -21084,18 +21054,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/stripUndefined.shim.ts",
-          "to": "src/api/stripUndefined.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 11,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 0,
-      "shims": ["src/shared/api/stripUndefined.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21180,18 +21145,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/api/upload.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/upload.shim.ts",
-          "to": "src/api/upload.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 10,
       "measuredFanOut": 7,
-      "targetFanIn": 11,
+      "targetFanIn": 10,
       "targetFanOut": 7,
-      "shims": ["src/shared/api/upload.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21367,18 +21327,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/session/browserSessionTransition.ts",
           "to": "src/api/userSession.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/userSession.shim.ts",
-          "to": "src/api/userSession.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 3,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 3,
-      "shims": ["src/shared/api/userSession.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21467,18 +21422,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceEventStream.shim.ts",
-          "to": "src/api/workspaceEventStream.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 10,
       "measuredFanOut": 4,
-      "targetFanIn": 11,
+      "targetFanIn": 10,
       "targetFanOut": 4,
-      "shims": ["src/shared/api/workspaceEventStream.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21649,18 +21599,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskContract.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/api/workspaceTaskContract.shim.ts",
-          "to": "src/api/workspaceTaskContract.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 2,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 2,
-      "shims": ["src/shared/api/workspaceTaskContract.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21808,18 +21753,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
           "to": "src/api/workspaceTaskTransport.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceTaskTransport.shim.ts",
-          "to": "src/api/workspaceTaskTransport.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 7,
       "measuredFanOut": 5,
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 5,
-      "shims": ["src/shared/api/workspaceTaskTransport.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21903,18 +21843,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskWaiter.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceTaskWaiter.shim.ts",
-          "to": "src/api/workspaceTaskWaiter.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 5,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 5,
-      "shims": ["src/shared/api/workspaceTaskWaiter.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -21973,18 +21908,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/utils/opaqueIds.unit.spec.ts",
           "to": "src/api/workspaceTasks.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/api/workspaceTasks.shim.ts",
-          "to": "src/api/workspaceTasks.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 3,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 3,
-      "shims": ["src/shared/api/workspaceTasks.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -22160,9 +22090,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 13,
+      "measuredFanOut": 14,
       "targetFanIn": 1,
-      "targetFanOut": 13,
+      "targetFanOut": 14,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -22183,6 +22113,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/utils/storage.ts",
         "src/features/admin/app/navigationMeta.ts",
         "src/features/admin/app/routes.ts",
+        "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
         "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
         "src/features/workspace/routePaths.ts",
@@ -22253,7 +22184,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminBadge.vue",
+          "from": "src/features/admin/shared/ui/AdminBadge.vue",
           "to": "src/components/ui/badge/index.ts",
           "kind": "runtime"
         }
@@ -22350,7 +22281,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminButton.vue",
+          "from": "src/features/admin/shared/ui/AdminButton.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -22408,11 +22339,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 24,
+      "measuredFanIn": 25,
       "measuredFanOut": 6,
-      "targetFanIn": 24,
+      "targetFanIn": 25,
       "targetFanOut": 6,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -22650,32 +22586,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
+          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelEditDialog.vue",
+          "from": "src/features/admin/models/ui/dialog/AdminModelEditDialog.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
+          "from": "src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
+          "from": "src/features/admin/settings/ui/cards/oauth/OAuthProviderSettingsDialog.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
+          "from": "src/features/admin/settings/ui/cards/payment/StripeSettingsDialog.vue",
           "to": "src/components/ui/form/index.ts",
           "kind": "runtime"
         }
@@ -22745,7 +22681,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminInput.vue",
+          "from": "src/features/admin/shared/ui/form/AdminInput.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
@@ -22773,11 +22709,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 10,
       "measuredFanOut": 5,
-      "targetFanIn": 9,
+      "targetFanIn": 10,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -22866,7 +22807,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/shared/components/AdminSelect.vue",
+          "from": "src/features/admin/shared/ui/form/AdminSelect.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
         },
@@ -22994,7 +22935,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminInput.vue",
+          "from": "src/features/admin/shared/ui/form/AdminInput.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
@@ -23055,18 +22996,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/auth/adminAccess.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/auth/adminAccess.shim.ts",
-          "to": "src/core/auth/adminAccess.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 0,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 0,
-      "shims": ["src/shared/auth/adminAccess.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -23111,18 +23047,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/session/transport.ts",
           "to": "src/core/auth/client.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/auth/client.shim.ts",
-          "to": "src/core/auth/client.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 4,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 4,
-      "shims": ["src/shared/auth/client.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -23173,22 +23104,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
-          "to": "src/core/auth/oauthProviders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/core/auth/oauthProviders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/logo.ts",
+          "from": "src/features/admin/settings/session/oauth/resource.ts",
           "to": "src/core/auth/oauthProviders.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/settings/oauth/resource.ts",
+          "from": "src/features/admin/settings/ui/cards/oauth/AdminOAuthLoginCard.vue",
+          "to": "src/core/auth/oauthProviders.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/oauth/OAuthProviderSettingsDialog.vue",
+          "to": "src/core/auth/oauthProviders.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/oauth/logo.ts",
           "to": "src/core/auth/oauthProviders.ts",
           "kind": "type-only"
         },
@@ -23201,18 +23132,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/session/transport.ts",
           "to": "src/core/auth/oauthProviders.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/auth/oauthProviders.shim.ts",
-          "to": "src/core/auth/oauthProviders.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/auth/oauthProviders.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -23272,18 +23198,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/components/auth-fields/useAuthForm.ts",
           "to": "src/core/auth/passwordPolicy.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/auth/passwordPolicy.shim.ts",
-          "to": "src/core/auth/passwordPolicy.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 1,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 1,
-      "shims": ["src/shared/auth/passwordPolicy.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -23441,18 +23362,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/session/browserSessionTransition.ts",
           "to": "src/core/auth/sessionPolicy.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/auth/sessionPolicy.shim.ts",
-          "to": "src/core/auth/sessionPolicy.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 1,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 1,
-      "shims": ["src/shared/auth/sessionPolicy.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -23533,164 +23449,154 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
+          "from": "src/features/admin/credits/ui/health/AdminCreditFindingQueue.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
+          "from": "src/features/admin/credits/ui/health/AdminCreditHealthPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
+          "from": "src/features/admin/credits/ui/health/AdminCreditRunHistoryDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/ModelPoolEditorPanel.vue",
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
+          "from": "src/features/admin/credits/ui/orders/PaymentOrderDetailDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.vue",
+          "from": "src/features/admin/credits/ui/pricing/BillingPricingTable.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
+          "from": "src/features/admin/credits/ui/pricing/ModelPoolEditorPanel.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.vue",
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/components/WalletAdjustPanel.vue",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeRedemptionsDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/components/WalletOverviewCard.vue",
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
+          "from": "src/features/admin/credits/ui/wallets/components/WalletAdjustPanel.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
+          "from": "src/features/admin/credits/ui/wallets/components/WalletLedgerTable.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
+          "from": "src/features/admin/credits/ui/wallets/components/WalletOverviewCard.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
+          "from": "src/features/admin/models/ui/pages/AdminModelsPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
+          "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
+          "from": "src/features/admin/settings/ui/cards/image-library/AdminImageProvidersTable.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
+          "from": "src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
+          "from": "src/features/admin/settings/ui/cards/oauth/AdminOAuthLoginCard.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/payment/AdminPaymentSettingsCard.vue",
+          "from": "src/features/admin/settings/ui/cards/payment/AdminPaymentSettingsCard.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
+          "from": "src/features/admin/settings/ui/cards/storage/AdminStoragePage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/upload/AdminUploadConcurrencyFooter.vue",
+          "from": "src/features/admin/settings/ui/cards/storage/AdminStorageTable.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminDialogActions.vue",
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminEditorActions.vue",
+          "from": "src/features/admin/settings/ui/cards/upload/AdminUploadConcurrencyFooter.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
+          "from": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
+          "from": "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/pages/AdminStoragePage.vue",
+          "from": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/ActionButton.shim.ts",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/ActionButton.shim.ts",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "type-only"
         },
         {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
@@ -23698,11 +23604,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 33,
+      "measuredFanIn": 32,
       "measuredFanOut": 5,
-      "targetFanIn": 33,
+      "targetFanIn": 32,
       "targetFanOut": 5,
-      "shims": ["src/shared/components/ActionButton.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -23765,21 +23671,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminChartCard.vue",
-          "to": "src/core/components/ChartCard.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/ChartCard.shim.ts",
+          "from": "src/features/admin/shared/ui/chart/AdminChartCard.vue",
           "to": "src/core/components/ChartCard.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 2,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 2,
-      "shims": ["src/shared/components/ChartCard.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -23824,26 +23725,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/shared/components/AdminChartCard.vue",
-          "to": "src/core/components/ChartPanel.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/components/ChartPanel.shim.ts",
-          "to": "src/core/components/ChartPanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/ChartPanel.shim.ts",
+          "from": "src/features/admin/shared/ui/chart/AdminChartCard.vue",
           "to": "src/core/components/ChartPanel.vue",
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 1,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 1,
-      "shims": ["src/shared/components/ChartPanel.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -23885,26 +23776,21 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/components/TaskEventsCard.vue",
+          "from": "src/features/admin/monitor/ui/components/TaskEventsCard.vue",
           "to": "src/core/components/ChartRenderer.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/core/components/ChartRenderer.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/ChartRenderer.shim.ts",
+          "from": "src/features/admin/statistics/ui/views/AdminStatisticsPage.vue",
           "to": "src/core/components/ChartRenderer.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 3,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 3,
-      "shims": ["src/shared/components/ChartRenderer.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -23958,23 +23844,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/components/DataTableColumn.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/DataTableColumn.shim.ts",
-          "to": "src/core/components/DataTableColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/DataTableColumn.shim.ts",
-          "to": "src/core/components/DataTableColumn.vue",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 1,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 1,
-      "shims": ["src/shared/components/DataTableColumn.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24038,23 +23914,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/components/DataTableFrame.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/DataTableFrame.shim.ts",
-          "to": "src/core/components/DataTableFrame.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/DataTableFrame.shim.ts",
-          "to": "src/core/components/DataTableFrame.vue",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 3,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 3,
-      "shims": ["src/shared/components/DataTableFrame.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24118,23 +23984,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/core/components/IbFormField.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/IbFormField.shim.ts",
-          "to": "src/core/components/IbFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/IbFormField.shim.ts",
-          "to": "src/core/components/IbFormField.vue",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 3,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 3,
-      "shims": ["src/shared/components/IbFormField.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24180,26 +24036,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
-          "to": "src/core/components/RangedLineChartCard.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/shared/components/RangedLineChartCard.shim.ts",
-          "to": "src/core/components/RangedLineChartCard.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/RangedLineChartCard.shim.ts",
+          "from": "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue",
           "to": "src/core/components/RangedLineChartCard.vue",
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 7,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 7,
-      "shims": ["src/shared/components/RangedLineChartCard.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24254,26 +24100,21 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/components/SiteBrandLogo.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/core/components/SiteBrandLogo.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/SiteBrandLogo.shim.ts",
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/components/SiteBrandLogo.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/components/SiteBrandLogo.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24320,26 +24161,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminStatusPill.vue",
+          "from": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
           "to": "src/core/components/StatusBadge.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/StatusBadge.shim.ts",
-          "to": "src/core/components/StatusBadge.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/StatusBadge.shim.ts",
-          "to": "src/core/components/StatusBadge.vue",
-          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 3,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 3,
-      "shims": ["src/shared/components/StatusBadge.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24393,18 +24224,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
           "to": "src/core/components/StudioName.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/StudioName.shim.ts",
-          "to": "src/core/components/StudioName.vue",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 1,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 1,
-      "shims": ["src/shared/components/StudioName.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24446,21 +24272,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/UserConfirmDialog.shim.ts",
-          "to": "src/core/components/UserConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 6,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 6,
-      "shims": ["src/shared/components/UserConfirmDialog.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24504,21 +24325,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/shared/components/AdminFormField.vue",
+          "from": "src/features/admin/shared/ui/form/AdminFormField.vue",
           "to": "src/core/components/formFieldContract.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/components/formFieldContract.shim.ts",
-          "to": "src/core/components/formFieldContract.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/components/formFieldContract.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -24560,36 +24376,31 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.vue",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.vue",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.ts",
+          "from": "src/features/admin/models/session/useAdminModelCatalogWorkspace.ts",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useTaskResultDetail.ts",
+          "from": "src/features/admin/monitor/session/useTaskResultDetail.ts",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/core/composables/useAppClipboard.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useAppClipboard.shim.ts",
+          "from": "src/features/admin/settings/ui/cards/oauth/OAuthProviderSettingsDialog.vue",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": ["src/shared/composables/useAppClipboard.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -24646,7 +24457,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/session/feedback/toast.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -24701,21 +24512,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/composables/useAppToast.shim.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/toast.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 18,
+      "measuredFanIn": 17,
       "measuredFanOut": 1,
-      "targetFanIn": 18,
+      "targetFanIn": 17,
       "targetFanOut": 1,
-      "shims": ["src/shared/composables/useAppToast.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -24782,32 +24588,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/workspace.contract.spec.ts",
+          "from": "src/features/admin/prompts/session/workspace.contract.spec.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/workspace.ts",
+          "from": "src/features/admin/prompts/session/workspace.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/useStorageContext.ts",
+          "from": "src/features/admin/settings/session/storage/useStorageContext.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/useStorageProfileEditor.ts",
+          "from": "src/features/admin/settings/session/storage/useStorageProfileEditor.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/workspace.contract.spec.ts",
+          "from": "src/features/admin/settings/session/storage/workspace.contract.spec.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/storage/workspace.ts",
+          "from": "src/features/admin/settings/session/storage/workspace.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "type-only"
         },
@@ -24830,18 +24636,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/layout/WorkspaceLayout.vue",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useAsyncAction.shim.ts",
-          "to": "src/core/composables/useAsyncAction.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 17,
+      "measuredFanIn": 16,
       "measuredFanOut": 1,
-      "targetFanIn": 17,
+      "targetFanIn": 16,
       "targetFanOut": 1,
-      "shims": ["src/shared/composables/useAsyncAction.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -24902,7 +24703,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/composables/useLogoutRedirect.ts",
           "kind": "runtime"
         },
@@ -24915,18 +24716,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
           "to": "src/core/composables/useLogoutRedirect.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useLogoutRedirect.shim.ts",
-          "to": "src/core/composables/useLogoutRedirect.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 1,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 1,
-      "shims": ["src/shared/composables/useLogoutRedirect.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -24961,18 +24757,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/core/composables/useMenuTriggerFocusRestore.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useMenuTriggerFocusRestore.shim.ts",
-          "to": "src/core/composables/useMenuTriggerFocusRestore.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 1,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 1,
-      "shims": ["src/shared/composables/useMenuTriggerFocusRestore.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25011,12 +24802,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminDialogShell.vue",
+          "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/components/AdminDrawer.vue",
+          "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -25041,23 +24832,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/shared/composables/useOverlayInteractionLifecycle.shim.ts",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/overlayInteractionLifecycle.contract.spec.ts",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 10,
       "measuredFanOut": 1,
-      "targetFanIn": 11,
+      "targetFanIn": 10,
       "targetFanOut": 1,
-      "shims": [
-        "src/shared/composables/useOverlayInteractionLifecycle.shim.ts"
-      ],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25145,12 +24929,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
+          "from": "src/features/admin/settings/session/branding/useBrandingSettings.ts",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
         },
@@ -25163,18 +24947,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/legal/components/PublicLegalPage.vue",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useSiteBranding.shim.ts",
-          "to": "src/core/composables/useSiteBranding.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 8,
       "measuredFanOut": 5,
-      "targetFanIn": 9,
+      "targetFanIn": 8,
       "targetFanOut": 5,
-      "shims": ["src/shared/composables/useSiteBranding.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25329,12 +25108,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.component.spec.ts",
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.component.spec.ts",
           "to": "src/core/composables/useSupportChannels.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.vue",
           "to": "src/core/composables/useSupportChannels.ts",
           "kind": "runtime"
         },
@@ -25347,18 +25126,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
           "to": "src/core/composables/useSupportChannels.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/composables/useSupportChannels.shim.ts",
-          "to": "src/core/composables/useSupportChannels.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 10,
+      "measuredFanIn": 9,
       "measuredFanOut": 6,
-      "targetFanIn": 10,
+      "targetFanIn": 9,
       "targetFanOut": 6,
-      "shims": ["src/shared/composables/useSupportChannels.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25430,18 +25204,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/ui/confirmations.ts",
           "to": "src/core/composables/useUserConfirmDialog.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/composables/useUserConfirmDialog.shim.ts",
-          "to": "src/core/composables/useUserConfirmDialog.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 1,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 1,
-      "shims": ["src/shared/composables/useUserConfirmDialog.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25505,37 +25274,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/findingQueueResource.ts",
+          "from": "src/features/admin/credits/session/health/findingQueueResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/runHistoryResource.ts",
+          "from": "src/features/admin/credits/session/health/runHistoryResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/resource.ts",
+          "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/displayPolicy.ts",
+          "from": "src/features/admin/credits/session/wallets/resource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
+          "from": "src/features/admin/monitor/core/displayPolicy.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/composables/usePagePagination.ts",
+          "from": "src/features/admin/shared/session/collection/usePagePagination.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/resource.ts",
+          "from": "src/features/admin/users/session/resource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
         },
@@ -25553,18 +25322,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/config/pagination.shim.ts",
-          "to": "src/core/config/pagination.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 15,
       "measuredFanOut": 0,
-      "targetFanIn": 16,
+      "targetFanIn": 15,
       "targetFanOut": 0,
-      "shims": ["src/shared/config/pagination.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25641,12 +25405,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultImages.ts",
+          "from": "src/features/admin/monitor/core/taskResultImages.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -25689,18 +25453,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/config/runtimeUrls.shim.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 19,
+      "measuredFanIn": 18,
       "measuredFanOut": 0,
-      "targetFanIn": 19,
+      "targetFanIn": 18,
       "targetFanOut": 0,
-      "shims": ["src/shared/config/runtimeUrls.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25804,18 +25563,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/session/freshness.ts",
           "to": "src/core/config/timing.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/config/timing.shim.ts",
-          "to": "src/core/config/timing.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/config/timing.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25906,7 +25660,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/constants/media.ts",
           "kind": "runtime"
         },
@@ -25914,18 +25668,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/editing/browserAdapter.ts",
           "to": "src/core/constants/media.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/constants/media.shim.ts",
-          "to": "src/core/constants/media.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": ["src/shared/constants/media.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -25988,7 +25737,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/image-library/searchProviderTypes.ts",
+          "from": "src/features/admin/settings/session/image-library/searchProviderTypes.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
         },
@@ -26041,18 +25790,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/externalImageProviders.shim.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 12,
       "measuredFanOut": 0,
-      "targetFanIn": 13,
+      "targetFanIn": 12,
       "targetFanOut": 0,
-      "shims": ["src/shared/domain/externalImageProviders.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -26110,32 +25854,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/core/contracts/generationContract.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolEditorPanel.vue",
-          "to": "src/core/contracts/generationContract.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
-          "to": "src/core/contracts/generationContract.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/billableCatalogTypes.ts",
+          "from": "src/features/admin/credits/core/pricing/billableCatalogTypes.ts",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/pricing/modelPoolResource.ts",
+          "from": "src/features/admin/credits/core/pricing/serviceResolutionCatalog.contract.spec.ts",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/serviceResolutionCatalog.contract.spec.ts",
+          "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
+          "to": "src/core/contracts/generationContract.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
+          "to": "src/core/contracts/generationContract.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/BillingPriceDialog.vue",
+          "to": "src/core/contracts/generationContract.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/ModelPoolEditorPanel.vue",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         },
@@ -26228,18 +25972,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/nodes/workflows/PromptNode.vue",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/generationContract.shim.ts",
-          "to": "src/core/contracts/generationContract.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 24,
+      "measuredFanIn": 23,
       "measuredFanOut": 0,
-      "targetFanIn": 24,
+      "targetFanIn": 23,
       "targetFanOut": 0,
-      "shims": ["src/shared/domain/generationContract.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -26381,7 +26120,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/serviceResolutionCatalog.contract.spec.ts",
+          "from": "src/features/admin/credits/core/pricing/serviceResolutionCatalog.contract.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/core/featurePromptMeta.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/prompts/core/featurePromptMeta.unit.spec.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
         },
@@ -26396,22 +26145,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/featurePromptMeta.ts",
+          "from": "src/features/admin/prompts/session/workspace.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/prompts/featurePromptMeta.unit.spec.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/workspace.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/lib/serviceAdminMeta.ts",
+          "from": "src/features/admin/shared/core/serviceAdminMeta.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
         },
@@ -26519,18 +26258,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.vue",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/imageServices.shim.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 30,
+      "measuredFanIn": 29,
       "measuredFanOut": 0,
-      "targetFanIn": 30,
+      "targetFanIn": 29,
       "targetFanOut": 0,
-      "shims": ["src/shared/domain/imageServices.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -26721,18 +26455,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/errors/errorCatalog.shim.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 31,
+      "measuredFanIn": 30,
       "measuredFanOut": 1,
-      "targetFanIn": 31,
+      "targetFanIn": 30,
       "targetFanOut": 1,
-      "shims": ["src/shared/errors/errorCatalog.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -26845,42 +26574,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
+          "from": "src/features/admin/credits/core/pricing/billingPricingColumns.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/billingPricingColumns.ts",
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersTable.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
+          "from": "src/features/admin/credits/ui/orders/PaymentOrderDetailDialog.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
+          "from": "src/features/admin/credits/ui/pricing/BillingPriceDialog.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/usageStatisticsTooltipText.ts",
+          "from": "src/features/admin/statistics/core/usageStatisticsTooltipText.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -26893,18 +26622,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/formatters.shim.ts",
-          "to": "src/core/i18n/formatters.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 22,
+      "measuredFanIn": 21,
       "measuredFanOut": 2,
-      "targetFanIn": 22,
+      "targetFanIn": 21,
       "targetFanOut": 2,
-      "shims": ["src/shared/i18n/formatters.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -27120,37 +26844,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.component.spec.ts",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.component.spec.ts",
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.component.spec.ts",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultPresentation.ts",
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/monitor/core/taskResultPresentation.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/AdminUsersPage.component.spec.ts",
+          "from": "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27535,11 +27259,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/i18n/index.shim.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -27555,11 +27274,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 118,
+      "measuredFanIn": 117,
       "measuredFanOut": 5,
-      "targetFanIn": 118,
+      "targetFanIn": 117,
       "targetFanOut": 5,
-      "shims": ["src/shared/i18n/index.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -27658,18 +27377,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/i18n/userLocale.ts",
           "to": "src/core/i18n/localeCore.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/localeCore.shim.ts",
-          "to": "src/core/i18n/localeCore.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": ["src/shared/i18n/localeCore.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -27800,18 +27514,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/core/i18n/locales/en/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/locales/en/index.shim.ts",
-          "to": "src/core/i18n/locales/en/index.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
-      "shims": ["src/shared/i18n/locales/en/index.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -27856,18 +27565,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/i18n/localeParity.unit.spec.ts",
           "to": "src/core/i18n/locales/es/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/locales/es/index.shim.ts",
-          "to": "src/core/i18n/locales/es/index.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/i18n/locales/es/index.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -27912,18 +27616,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/i18n/localeParity.unit.spec.ts",
           "to": "src/core/i18n/locales/ko/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/locales/ko/index.shim.ts",
-          "to": "src/core/i18n/locales/ko/index.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/i18n/locales/ko/index.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -27968,18 +27667,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/i18n/localeParity.unit.spec.ts",
           "to": "src/core/i18n/locales/zh-CN/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/locales/zh-CN/index.shim.ts",
-          "to": "src/core/i18n/locales/zh-CN/index.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/i18n/locales/zh-CN/index.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28051,47 +27745,47 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
+          "from": "src/features/admin/credits/core/wallets/creditCommandContract.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.vue",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeRedemptionsDialog.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/components/WalletAdjustPanel.vue",
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
+          "from": "src/features/admin/credits/ui/wallets/components/WalletAdjustPanel.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/components/WalletOverviewCard.vue",
+          "from": "src/features/admin/credits/ui/wallets/components/WalletLedgerTable.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/creditCommandContract.ts",
+          "from": "src/features/admin/credits/ui/wallets/components/WalletOverviewCard.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/view.ts",
+          "from": "src/features/admin/users/core/view.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -28119,18 +27813,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/userIdeaCurrency.shim.ts",
-          "to": "src/core/i18n/userIdeaCurrency.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 22,
+      "measuredFanIn": 21,
       "measuredFanOut": 1,
-      "targetFanIn": 22,
+      "targetFanIn": 21,
       "targetFanOut": 1,
-      "shims": ["src/shared/i18n/userIdeaCurrency.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28207,22 +27896,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.component.spec.ts",
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.component.spec.ts",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.component.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.component.spec.ts",
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.component.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/AdminUsersPage.component.spec.ts",
+          "from": "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
@@ -28245,18 +27934,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/i18n/userLocale.shim.ts",
-          "to": "src/core/i18n/userLocale.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 18,
+      "measuredFanIn": 17,
       "measuredFanOut": 6,
-      "targetFanIn": 18,
+      "targetFanIn": 17,
       "targetFanOut": 6,
-      "shims": ["src/shared/i18n/userLocale.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28385,21 +28069,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/interaction/interactiveControlState.shim.ts",
-          "to": "src/core/interaction/interactiveControlState.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/theme/composables/themeKeyboard.contract.spec.ts",
           "to": "src/core/interaction/interactiveControlState.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 10,
+      "measuredFanIn": 9,
       "measuredFanOut": 0,
-      "targetFanIn": 10,
+      "targetFanIn": 9,
       "targetFanOut": 0,
-      "shims": ["src/shared/interaction/interactiveControlState.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28468,18 +28147,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/ui/LibraryFolderContextMenu.vue",
           "to": "src/core/interaction/menuKeyboardNavigation.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/interaction/menuKeyboardNavigation.shim.ts",
-          "to": "src/core/interaction/menuKeyboardNavigation.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/interaction/menuKeyboardNavigation.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28523,26 +28197,21 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/lib/brandMark.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/core/lib/brandMark.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/lib/brandMark.shim.ts",
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/lib/brandMark.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/lib/brandMark.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28604,32 +28273,32 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/chart.ts",
+          "from": "src/features/admin/shared/ui/chart/chart.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/usageStatisticsChartBase.ts",
+          "from": "src/features/admin/statistics/core/usageStatisticsChartBase.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/statistics/usageStatisticsModelHealthCharts.ts",
+          "from": "src/features/admin/statistics/ui/charts/usageStatisticsModelHealthCharts.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/usageStatisticsQualityTrendCharts.ts",
+          "from": "src/features/admin/statistics/ui/charts/usageStatisticsQualityTrendCharts.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/useUsageStatisticsCharts.ts",
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
@@ -28637,18 +28306,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/lib/chartPrimitives.shim.ts",
-          "to": "src/core/lib/chartPrimitives.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 12,
       "measuredFanOut": 3,
-      "targetFanIn": 13,
+      "targetFanIn": 12,
       "targetFanOut": 3,
-      "shims": ["src/shared/lib/chartPrimitives.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28780,21 +28444,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/timeRange.ts",
-          "to": "src/core/lib/chartTimeRange.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/lib/chartTimeRange.shim.ts",
+          "from": "src/features/admin/shared/session/timeRange.ts",
           "to": "src/core/lib/chartTimeRange.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
-      "shims": ["src/shared/lib/chartTimeRange.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28877,18 +28536,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/overlays/CanvasSelectionGroupActionButton.vue",
           "to": "src/core/lib/pageChrome.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/lib/pageChrome.shim.ts",
-          "to": "src/core/lib/pageChrome.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
-      "shims": ["src/shared/lib/pageChrome.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -28939,7 +28593,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/media/imageAssetPipeline.ts",
           "kind": "runtime"
         },
@@ -28952,18 +28606,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/editing/useFlowImageUploadActions.ts",
           "to": "src/core/media/imageAssetPipeline.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/media/imageAssetPipeline.shim.ts",
-          "to": "src/core/media/imageAssetPipeline.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 6,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 6,
-      "shims": ["src/shared/media/imageAssetPipeline.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29052,18 +28701,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/screens/useCanvasImageLightbox.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/media/imageDimensions.shim.ts",
-          "to": "src/core/media/imageDimensions.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/media/imageDimensions.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29173,18 +28817,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts",
           "to": "src/core/media/mediaRef.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/media/mediaRef.shim.ts",
-          "to": "src/core/media/mediaRef.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 12,
       "measuredFanOut": 1,
-      "targetFanIn": 13,
+      "targetFanIn": 12,
       "targetFanOut": 1,
-      "shims": ["src/shared/media/mediaRef.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29270,18 +28909,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/ui/pages/SearchPage.vue",
           "to": "src/core/media/visionIngressPolicy.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/media/visionIngressPolicy.shim.ts",
-          "to": "src/core/media/visionIngressPolicy.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 2,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 2,
-      "shims": ["src/shared/media/visionIngressPolicy.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29370,21 +29004,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/chart.ts",
-          "to": "src/core/motion/chartMotion.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/motion/chartMotion.shim.ts",
+          "from": "src/features/admin/shared/ui/chart/chart.ts",
           "to": "src/core/motion/chartMotion.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 2,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 2,
-      "shims": ["src/shared/motion/chartMotion.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29419,21 +29048,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/shared/motion/dialogMotion.shim.ts",
-          "to": "src/core/motion/dialogMotion.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/core/motion/dialogMotion.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 1,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 1,
-      "shims": ["src/shared/motion/dialogMotion.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29480,18 +29104,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/motion/motionPolicy.shim.ts",
-          "to": "src/core/motion/motionPolicy.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 0,
-      "shims": ["src/shared/motion/motionPolicy.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29583,18 +29202,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/overlays/CanvasSelectionGroupActionButton.vue",
           "to": "src/core/motion/popoverMotion.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/motion/popoverMotion.shim.ts",
-          "to": "src/core/motion/popoverMotion.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 2,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 2,
-      "shims": ["src/shared/motion/popoverMotion.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29716,18 +29330,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/board-session/repository.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/query/queryClient.shim.ts",
-          "to": "src/core/query/queryClient.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 15,
       "measuredFanOut": 1,
-      "targetFanIn": 16,
+      "targetFanIn": 15,
       "targetFanOut": 1,
-      "shims": ["src/shared/query/queryClient.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29801,42 +29410,42 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
+          "from": "src/features/admin/credits/session/health/resource.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/resource.ts",
+          "from": "src/features/admin/credits/session/health/useCreditRunDetail.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/useCreditRunDetail.ts",
+          "from": "src/features/admin/credits/session/wallets/resource.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/resource.ts",
+          "from": "src/features/admin/credits/ui/health/AdminCreditFindingQueue.vue",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
+          "from": "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
+          "from": "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/resource.ts",
+          "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -29854,18 +29463,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/query/queryDefaults.shim.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 19,
+      "measuredFanIn": 18,
       "measuredFanOut": 0,
-      "targetFanIn": 19,
+      "targetFanIn": 18,
       "targetFanOut": 0,
-      "shims": ["src/shared/query/queryDefaults.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -29961,18 +29565,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/image-workflow/useImageWorkflowExecution.ts",
           "to": "src/core/query/taskResult.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/query/taskResult.shim.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 8,
       "measuredFanOut": 1,
-      "targetFanIn": 9,
+      "targetFanIn": 8,
       "targetFanOut": 1,
-      "shims": ["src/shared/query/taskResult.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30045,7 +29644,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/resource.ts",
+          "from": "src/features/admin/credits/session/wallets/resource.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
         },
@@ -30058,18 +29657,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/query/userCreditsInvalidation.shim.ts",
-          "to": "src/core/query/userCreditsInvalidation.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/query/userCreditsInvalidation.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30131,17 +29725,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
+          "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -30189,18 +29783,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/router/queryParams.shim.ts",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 15,
+      "measuredFanIn": 14,
       "measuredFanOut": 1,
-      "targetFanIn": 15,
+      "targetFanIn": 14,
       "targetFanOut": 1,
-      "shims": ["src/shared/router/queryParams.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30260,18 +29849,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/seo/seoStaticHtml.ts",
           "to": "src/core/seo/routeSeo.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/seo/routeSeo.shim.ts",
-          "to": "src/core/seo/routeSeo.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/seo/routeSeo.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30374,18 +29958,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/core/seo/routeSeo.unit.spec.ts",
           "to": "src/core/seo/seoStaticHtml.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/seo/seoStaticHtml.shim.ts",
-          "to": "src/core/seo/seoStaticHtml.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 1,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 1,
-      "shims": ["src/shared/seo/seoStaticHtml.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30434,7 +30013,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
         },
@@ -30537,18 +30116,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/auth.shim.ts",
-          "to": "src/core/utils/auth.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 27,
+      "measuredFanIn": 26,
       "measuredFanOut": 4,
-      "targetFanIn": 27,
+      "targetFanIn": 26,
       "targetFanOut": 4,
-      "shims": ["src/shared/utils/auth.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30677,21 +30251,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderPresentation.ts",
-          "to": "src/core/utils/currency.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/currency.shim.ts",
+          "from": "src/features/admin/credits/core/orders/paymentOrderPresentation.ts",
           "to": "src/core/utils/currency.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 2,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 2,
-      "shims": ["src/shared/utils/currency.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30750,36 +30319,31 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/reconciliationRunPresentation.ts",
+          "from": "src/features/admin/credits/core/health/reconciliationRunPresentation.ts",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useTaskResultDetail.ts",
+          "from": "src/features/admin/monitor/core/taskResultPresentation.ts",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultPresentation.ts",
+          "from": "src/features/admin/monitor/session/useTaskResultDetail.ts",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/view.ts",
-          "to": "src/core/utils/dateTime.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/dateTime.shim.ts",
+          "from": "src/features/admin/users/core/view.ts",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 2,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 2,
-      "shims": ["src/shared/utils/dateTime.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30855,27 +30419,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/shared/format.ts",
+          "from": "src/features/admin/credits/core/shared/format.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultPresentation.ts",
+          "from": "src/features/admin/monitor/core/taskResultPresentation.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/session/feedback/toast.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
+          "from": "src/features/admin/statistics/ui/views/AdminStatisticsPage.vue",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
@@ -30893,18 +30457,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/workspace/canvasTaskCancellation.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/errorMessages.shim.ts",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 11,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/errorMessages.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -30974,18 +30533,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/auth/components/auth-fields/useAuthForm.ts",
           "to": "src/core/utils/formValidation.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/formValidation.shim.ts",
-          "to": "src/core/utils/formValidation.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/formValidation.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31036,17 +30590,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
+          "from": "src/features/admin/credits/core/wallets/creditCommandContract.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/wallets/creditCommandContract.ts",
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.vue",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.vue",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
         },
@@ -31084,18 +30638,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/ids.shim.ts",
-          "to": "src/core/utils/ids.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 11,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/ids.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31151,12 +30700,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
+          "from": "src/features/admin/settings/session/useSettingsFeedback.ts",
           "to": "src/core/utils/imageUploadSupport.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/shared/useSettingsFeedback.ts",
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/utils/imageUploadSupport.ts",
           "kind": "runtime"
         },
@@ -31174,18 +30723,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/editing/useFlowImageUploadActions.unit.spec.ts",
           "to": "src/core/utils/imageUploadSupport.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/imageUploadSupport.shim.ts",
-          "to": "src/core/utils/imageUploadSupport.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 7,
       "measuredFanOut": 2,
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 2,
-      "shims": ["src/shared/utils/imageUploadSupport.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31307,18 +30851,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/tools/retouch/ui/shared/Slider.vue",
           "to": "src/core/utils/number.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/number.shim.ts",
-          "to": "src/core/utils/number.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 15,
       "measuredFanOut": 0,
-      "targetFanIn": 16,
+      "targetFanIn": 15,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/number.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31398,18 +30937,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/opaqueIds.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/opaqueIds.shim.ts",
-          "to": "src/core/utils/opaqueIds.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 8,
       "measuredFanOut": 0,
-      "targetFanIn": 9,
+      "targetFanIn": 8,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/opaqueIds.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31485,18 +31019,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/polling.shim.ts",
-          "to": "src/core/utils/polling.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/polling.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31622,18 +31151,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/storage.shim.ts",
-          "to": "src/core/utils/storage.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 15,
+      "measuredFanIn": 14,
       "measuredFanOut": 0,
-      "targetFanIn": 15,
+      "targetFanIn": 14,
       "targetFanOut": 0,
-      "shims": ["src/shared/utils/storage.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -31747,18 +31271,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/workspaceId.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/utils/workspaceId.shim.ts",
-          "to": "src/core/utils/workspaceId.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 8,
       "measuredFanOut": 1,
-      "targetFanIn": 9,
+      "targetFanIn": 8,
       "targetFanOut": 1,
-      "shims": ["src/shared/utils/workspaceId.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -32380,18 +31899,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/SupportChannelQr.shim.ts",
-          "to": "src/features/account/ui/chrome/SupportChannelQr.vue",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 9,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 9,
-      "shims": ["src/shared/components/SupportChannelQr.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -32445,11 +31959,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/components/UserAccountMenu.shim.ts",
-          "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "kind": "runtime"
@@ -32460,11 +31969,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 14,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 14,
-      "shims": ["src/shared/components/UserAccountMenu.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -32506,18 +32015,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/components/UserCreditBalanceButton.shim.ts",
-          "to": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 2,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 2,
-      "shims": ["src/shared/components/UserCreditBalanceButton.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -32708,18 +32212,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/components/userAccountMenu.types.shim.ts",
-          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/components/userAccountMenu.types.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -32875,7 +32374,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/admin/credits/wallets/index.ts",
       "kind": "canonical",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p4-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -32894,9 +32393,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 31,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "admin vertical seam; cross-vertical consumer AdminUsersPage (users vertical). Per plan, vertical index exists only for cross-vertical consumers.",
+      "retirementPhase": "P4",
+      "deletionOwner": "p4-lane",
+      "notes": "Retired P4: wallets barrel deleted audit-clean (zero importers verified; sole consumer AdminUsersPage now imports credits/ui/wallets/AdminUserWalletDialog.vue directly). Frozen record preserves pre-deletion consumer/export evidence.",
       "sourcePaths": ["src/features/admin/credits/wallets/index.ts"],
       "targetPath": "src/features/admin/credits/wallets/index.ts",
       "ownershipScope": ["src/features/admin/credits/wallets/"],
@@ -32948,36 +32447,31 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/admin/prompts/core/filtering.unit.spec.ts",
+          "to": "src/features/admin/prompts/core/promptVariables.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/prompts/core/promptVariables.unit.spec.ts",
           "to": "src/features/admin/prompts/core/promptVariables.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/filtering.unit.spec.ts",
+          "from": "src/features/admin/prompts/session/workspace.ts",
           "to": "src/features/admin/prompts/core/promptVariables.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/workspace.ts",
-          "to": "src/features/admin/prompts/core/promptVariables.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/workspace.ts",
+          "from": "src/features/admin/prompts/session/workspace.ts",
           "to": "src/features/admin/prompts/core/promptVariables.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/shared/domain/serviceRegistry.shim.ts",
-          "to": "src/features/admin/prompts/core/promptVariables.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 1,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 1,
-      "shims": ["src/shared/domain/serviceRegistry.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -33025,6 +32519,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
+          "to": "src/features/admin/routePaths.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/app/navigation.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
@@ -33040,17 +32539,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.component.spec.ts",
+          "from": "src/features/admin/credits/ui/AdminCreditsBillingLayout.component.spec.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue",
-          "to": "src/features/admin/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/credits/ui/AdminCreditsBillingLayout.vue",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
@@ -33060,12 +32554,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/anomalyRules.ts",
+          "from": "src/features/admin/shared/session/anomalyRules.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/anomalyRules.unit.spec.ts",
+          "from": "src/features/admin/shared/session/anomalyRules.unit.spec.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
@@ -33083,18 +32577,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.unit.spec.ts",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/constants/routePaths.shim.ts",
-          "to": "src/features/admin/routePaths.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 17,
+      "measuredFanIn": 16,
       "measuredFanOut": 1,
-      "targetFanIn": 17,
+      "targetFanIn": 16,
       "targetFanOut": 1,
-      "shims": ["src/shared/constants/routePaths.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -33195,7 +32684,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": ["src/core/auth/routePolicy.ts"]
     },
     {
-      "path": "src/features/admin/shared/components/AdminAlert.vue",
+      "path": "src/features/admin/shared/core/actionReasonContract.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -33206,5040 +32695,43 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
+          "from": "src/features/admin/shared/core/actionReasonContract.unit.spec.ts",
+          "to": "src/features/admin/shared/core/actionReasonContract.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolEditorPanel.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletOverviewCard.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/components/AdminAlert.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 20,
-      "measuredFanOut": 2,
-      "targetFanIn": 20,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminAlert.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminAlert.vue",
-      "ownershipScope": ["src/features/admin/shared/components/AdminAlert.vue"],
-      "publicExports": ["AdminAlertSeverity", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminBadge.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/shared/components/adminControlsAdapter.unit.spec.ts",
-          "to": "src/features/admin/shared/components/AdminBadge.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/components/AdminBadge.vue",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/actionReasonContract.ts",
           "kind": "runtime"
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 3,
-      "targetFanIn": 2,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminBadge.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminBadge.vue",
-      "ownershipScope": ["src/features/admin/shared/components/AdminBadge.vue"],
-      "publicExports": ["AdminBadgeVariant", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/components/ui/badge/index.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminButton.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskControlToolbar.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminTable.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/adminControlsAdapter.unit.spec.ts",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminButton.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 28,
-      "measuredFanOut": 4,
-      "targetFanIn": 28,
-      "targetFanOut": 4,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminButton.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminButton.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminButton.vue"
-      ],
-      "publicExports": ["AdminButtonSize", "AdminButtonVariant", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/components/ui/button/buttonChrome.ts",
-        "src/components/ui/button/index.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminChartCard.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/components/AdminChartCard.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 2,
-      "targetFanIn": 1,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminChartCard.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminChartCard.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminChartCard.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/components/ChartCard.vue",
-        "src/core/components/ChartPanel.vue"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 2,
-      "targetFanIn": 3,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminCollectionPageShell.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminCollectionPageShell.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/features/admin/shared/components/AdminPagerControls.vue",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminColumn.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminTable.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminColumn.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 15,
       "measuredFanOut": 0,
-      "targetFanIn": 15,
+      "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminColumn.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminColumn.vue",
+      "sourcePaths": ["src/features/admin/shared/core/actionReasonContract.ts"],
+      "targetPath": "src/features/admin/shared/core/actionReasonContract.ts",
       "ownershipScope": [
-        "src/features/admin/shared/components/AdminColumn.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminLayout.vue",
-          "to": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminConfirmDialog.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 3,
-      "targetFanIn": 2,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminConfirmDialog.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminConfirmDialog.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs",
-        "src/features/admin/shared/composables/useAdminConfirm.ts",
-        "src/features/admin/shared/lib/toast.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminDialogActions.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelEditDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/components/PromptConfigEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminDialogActions.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 11,
-      "measuredFanOut": 2,
-      "targetFanIn": 11,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminDialogActions.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminDialogActions.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminDialogActions.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/components/ActionButton.vue",
-        "src/features/admin/shared/components/AdminButton.vue"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminDialogShell.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelEditDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/components/PromptConfigEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminDialogShell.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 18,
-      "measuredFanOut": 5,
-      "targetFanIn": 18,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminDialogShell.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminDialogShell.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminDialogShell.vue"
+        "src/features/admin/shared/core/actionReasonContract.ts"
       ],
       "publicExports": [
-        "AdminDialogContentLayout",
-        "AdminDialogSize",
-        "default"
+        "AdminActionReasonValidation",
+        "MAX_ADMIN_ACTION_REASON_LENGTH",
+        "validateAdminActionReason"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/vue/index.js",
-        "src/core/composables/useOverlayInteractionLifecycle.ts",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminDrawer.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminDrawer.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminDrawer.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminDrawer.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 3,
-      "targetFanIn": 2,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminDrawer.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminDrawer.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminDrawer.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/reka-ui/dist/index.cjs",
-        "src/core/composables/useOverlayInteractionLifecycle.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminEditorActions.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/settings/access/AdminLoginLockoutEditor.vue",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.vue",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/AdminOutboundPolicyCard.vue",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminEditorActions.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 7,
-      "measuredFanOut": 1,
-      "targetFanIn": 7,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminEditorActions.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminEditorActions.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminEditorActions.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["src/core/components/ActionButton.vue"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminEmptyState.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 15,
-      "measuredFanOut": 2,
-      "targetFanIn": 15,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminEmptyState.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminEmptyState.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminEmptyState.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vue/index.js"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminFilterPopover.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminFilterPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminFilterPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminFilterPopover.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 5,
-      "targetFanIn": 3,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminFilterPopover.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminFilterPopover.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminFilterPopover.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/adminSelectSkin.ts",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminFormField.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonField.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletAdjustPanel.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminLoginLockoutEditor.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/AdminOutboundPolicyCard.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminFormField.unit.spec.ts",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminFormField.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 13,
-      "measuredFanOut": 2,
-      "targetFanIn": 13,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminFormField.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminFormField.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminFormField.vue"
-      ],
-      "publicExports": ["AdminFormFieldSlotProps", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/core/components/formFieldContract.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminInput.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogGatewayPanel.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogIdentityPanel.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogSpecsPanel.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminLoginLockoutEditor.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/upload/AdminUploadConcurrencyFooter.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/adminControlsAdapter.unit.spec.ts",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminInput.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 18,
-      "measuredFanOut": 5,
-      "targetFanIn": 18,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminInput.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminInput.vue",
-      "ownershipScope": ["src/features/admin/shared/components/AdminInput.vue"],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/components/ui/input/index.ts",
-        "src/components/ui/spinner/index.ts",
-        "src/features/admin/shared/lib/uiClasses.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 8,
-      "targetFanIn": 1,
-      "targetFanOut": 8,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminLogoCropDialog.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminLogoCropDialog.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vue-advanced-cropper/dist/index.cjs.js",
-        "node_modules/vue-advanced-cropper/dist/style.css",
-        "node_modules/vue/index.js",
-        "src/core/components/ActionButton.vue",
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/features/admin/shared/components/AdminDialogShell.vue",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoPickerPopover.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/pages/AdminStoragePage.vue",
-          "to": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 6,
-      "targetFanIn": 3,
-      "targetFanOut": 6,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminLogoPickerPopover.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminLogoPickerPopover.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/toast.ts",
-        "src/features/admin/shared/logos/brandLogoResource.ts",
-        "src/features/admin/shared/logos/brandLogos.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminMono.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingServiceCell.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolSummaryCell.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/TaskResultCell.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminMono.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminMono.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 9,
-      "measuredFanOut": 3,
-      "targetFanIn": 9,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminMono.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminMono.vue",
-      "ownershipScope": ["src/features/admin/shared/components/AdminMono.vue"],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/cellClasses.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminNumberInput.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletAdjustPanel.vue",
-          "to": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminNumberInput.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 3,
-      "targetFanIn": 5,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminNumberInput.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminNumberInput.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminNumberInput.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/uiClasses.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminOptionFilter.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/components/AdminOptionFilter.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminOptionFilter.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminOptionFilter.browser.spec.ts",
-          "to": "src/features/admin/shared/components/AdminOptionFilter.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminOptionFilter.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminOptionFilter.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 4,
-      "measuredFanOut": 2,
-      "targetFanIn": 4,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminOptionFilter.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminOptionFilter.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminOptionFilter.vue"
-      ],
-      "publicExports": ["AdminOptionFilterOption", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/components/AdminSelect.vue"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminPagerControls.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-          "to": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 3,
-      "targetFanIn": 5,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminPagerControls.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminPagerControls.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminPagerControls.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminPopover.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/components/AdminPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/adminPopoverAtoms.ts",
-          "to": "src/features/admin/shared/components/AdminPopover.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 1,
-      "targetFanIn": 2,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminPopover.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminPopover.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminPopover.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/reka-ui/dist/index.cjs"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminPopoverContent.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/components/AdminPopoverContent.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/adminPopoverAtoms.ts",
-          "to": "src/features/admin/shared/components/AdminPopoverContent.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 3,
-      "targetFanIn": 2,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminPopoverContent.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminPopoverContent.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminPopoverContent.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/vue/index.js",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminPopoverTrigger.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/components/AdminPopoverTrigger.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/adminPopoverAtoms.ts",
-          "to": "src/features/admin/shared/components/AdminPopoverTrigger.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 1,
-      "targetFanIn": 2,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminPopoverTrigger.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminPopoverTrigger.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminPopoverTrigger.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/reka-ui/dist/index.cjs"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 1,
-      "targetFanIn": 1,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminRangedLineChartCard.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminRangedLineChartCard.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["src/core/components/RangedLineChartCard.vue"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminRefreshButton.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/components/AdminRefreshButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
-          "to": "src/features/admin/shared/components/AdminRefreshButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminRefreshButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminRefreshButton.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminRefreshButton.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 4,
-      "measuredFanOut": 1,
-      "targetFanIn": 4,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminRefreshButton.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminRefreshButton.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminRefreshButton.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/@iconoir/vue/dist/index.js"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminResourceToolbar.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminResourceToolbar.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminResourceToolbar.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 2,
-      "targetFanIn": 2,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminResourceToolbar.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminResourceToolbar.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminResourceToolbar.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminRowActionsPopover.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 2,
-      "targetFanIn": 3,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminRowActionsPopover.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminRowActionsPopover.vue"
-      ],
-      "publicExports": ["AdminRowActionItem", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/vue/index.js"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminSelect.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolEditorPanel.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/controls/AdminModelFilter.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskControlToolbar.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminOptionFilter.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminSelect.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 11,
-      "measuredFanOut": 5,
-      "targetFanIn": 11,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminSelect.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminSelect.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminSelect.vue"
-      ],
-      "publicExports": ["SelectOptionItem", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/components/ui/select/index.ts",
-        "src/features/admin/shared/lib/adminSelectSkin.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 5,
-      "targetFanIn": 2,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminSettingsDialogFrame.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminSettingsDialogFrame.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/features/admin/shared/components/AdminAlert.vue",
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/features/admin/shared/components/AdminDialogShell.vue",
-        "src/features/admin/shared/components/AdminSpinner.vue",
-        "src/features/admin/shared/lib/uiClasses.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminSpinner.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/AdminOutboundPolicyCard.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/payment/AdminPaymentSettingsCard.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminTable.vue",
-          "to": "src/features/admin/shared/components/AdminSpinner.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 11,
-      "measuredFanOut": 2,
-      "targetFanIn": 11,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminSpinner.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminSpinner.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminSpinner.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminStatusPill.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingStatusCell.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletOverviewCard.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/controls/ObservedStatsPanel.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogReferencePanel.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/TaskStatusCell.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/AdminOutboundPolicyCard.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/payment/AdminPaymentSettingsCard.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminStatusPill.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/components/SwitchRow.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 24,
-      "measuredFanOut": 1,
-      "targetFanIn": 24,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminStatusPill.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminStatusPill.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminStatusPill.vue"
-      ],
-      "publicExports": ["AdminStatusPillVariant", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["src/core/components/StatusBadge.vue"]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminSubNavigationLayout.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue",
-          "to": "src/features/admin/shared/components/AdminSubNavigationLayout.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 3,
-      "targetFanIn": 1,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminSubNavigationLayout.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminSubNavigationLayout.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminSubNavigationLayout.vue"
-      ],
-      "publicExports": ["AdminSubNavigationItem", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue-router/index.cjs",
-        "src/features/admin/shared/components/adminTabsAtoms.ts",
-        "src/features/admin/shared/composables/useAdminSubHeaderTarget.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminSummaryCard.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/components/AdminSummaryCard.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 0,
-      "targetFanIn": 1,
-      "targetFanOut": 0,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminSummaryCard.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminSummaryCard.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminSummaryCard.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminSwitch.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolEditorPanel.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSwitch.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/SwitchRow.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/components/AdminSwitch.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 13,
-      "measuredFanOut": 3,
-      "targetFanIn": 13,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminSwitch.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminSwitch.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminSwitch.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/vue/index.js",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminTable.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminTable.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminTable.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 14,
-      "measuredFanOut": 13,
-      "targetFanIn": 14,
-      "targetFanOut": 13,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminTable.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminTable.vue",
-      "ownershipScope": ["src/features/admin/shared/components/AdminTable.vue"],
-      "publicExports": [
-        "AdminTableRowClickEvent",
-        "AdminTableRowCollapseEvent",
-        "AdminTableRowEvent",
-        "AdminTableRowExpandEvent",
-        "default"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vue-i18n/index.js",
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/features/admin/shared/components/AdminColumn.vue",
-        "src/features/admin/shared/components/AdminSpinner.vue",
-        "src/features/admin/shared/components/AdminTableBody.vue",
-        "src/features/admin/shared/components/AdminTableCell.vue",
-        "src/features/admin/shared/components/AdminTableEmpty.vue",
-        "src/features/admin/shared/components/AdminTableHead.vue",
-        "src/features/admin/shared/components/AdminTableHeader.vue",
-        "src/features/admin/shared/components/AdminTableRow.vue",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminTablePanel.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTablePanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTablePanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSurfaceFrame.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminTablePanel.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 2,
-      "targetFanIn": 3,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminTablePanel.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminTablePanel.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminTablePanel.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/components/AdminSurfaceFrame.vue"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminTextarea.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonField.vue",
-          "to": "src/features/admin/shared/components/AdminTextarea.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/components/PromptConfigEditorDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTextarea.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/AdminOutboundPolicyCard.vue",
-          "to": "src/features/admin/shared/components/AdminTextarea.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/components/AdminTextarea.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 4,
-      "measuredFanOut": 3,
-      "targetFanIn": 4,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/AdminTextarea.vue"],
-      "targetPath": "src/features/admin/shared/components/AdminTextarea.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminTextarea.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/lib/uiClasses.ts",
-        "src/lib/utils.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskControlToolbar.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminToolbarSearch.component.spec.ts",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 9,
-      "measuredFanOut": 3,
-      "targetFanIn": 9,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminToolbarSearch.vue"
-      ],
-      "targetPath": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-      "ownershipScope": [
-        "src/features/admin/shared/components/AdminToolbarSearch.vue"
-      ],
-      "publicExports": ["default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/features/admin/shared/components/AdminInput.vue"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/components/SwitchRow.vue",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/BillingStatusCell.vue",
-          "to": "src/features/admin/shared/components/SwitchRow.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/components/SwitchRow.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/components/SwitchRow.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/SwitchRow.component.spec.ts",
-          "to": "src/features/admin/shared/components/SwitchRow.vue",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 4,
-      "measuredFanOut": 2,
-      "targetFanIn": 4,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/components/SwitchRow.vue"],
-      "targetPath": "src/features/admin/shared/components/SwitchRow.vue",
-      "ownershipScope": ["src/features/admin/shared/components/SwitchRow.vue"],
-      "publicExports": ["AdminSwitchRowPillSize", "default"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/features/admin/shared/components/AdminStatusPill.vue",
-        "src/features/admin/shared/components/AdminSwitch.vue"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.ts",
-          "to": "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "to": "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 3,
-      "targetFanIn": 2,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useAdminCollectionQuery.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useAdminCollectionQuery.ts"
-      ],
-      "publicExports": ["useAdminCollectionQuery"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/vue/index.js",
-        "src/core/query/queryDefaults.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useAdminConfirm.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodeRowActions.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskCancel.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminConfirmDialog.component.spec.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/composables/useAdminConfirm.unit.spec.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/lib/confirmSettingsSave.unit.spec.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/storage/pages/AdminStoragePage.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/useStorageContext.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/storage/workspace.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/commands.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/context.contract.spec.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/context.ts",
-          "to": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "kind": "type-only"
-        }
-      ],
-      "measuredFanIn": 21,
-      "measuredFanOut": 1,
-      "targetFanIn": 21,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useAdminConfirm.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useAdminConfirm.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useAdminConfirm.ts"
-      ],
-      "publicExports": [
-        "AdminConfirmIntent",
-        "AdminConfirmOptions",
-        "AdminConfirmPort",
-        "AdminConfirmReasonSpec",
-        "AdminConfirmRequest",
-        "AdminConfirmState",
-        "activeAdminConfirm",
-        "readConfirmReason",
-        "useAdminConfirm"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/vue/index.js"]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodeList.ts",
-          "to": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/resource.ts",
-          "to": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 6,
-      "measuredFanOut": 4,
-      "targetFanIn": 6,
-      "targetFanOut": 4,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useAdminCursorCollection.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useAdminCursorCollection.ts"
-      ],
-      "publicExports": ["useAdminCursorCollection"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/vue/index.js",
-        "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-        "src/features/admin/shared/composables/useCursorPagination.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useAnomalyRadar.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/composables/useAnomalyRadar.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 5,
-      "targetFanIn": 1,
-      "targetFanOut": 5,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useAnomalyRadar.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useAnomalyRadar.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useAnomalyRadar.ts"
-      ],
-      "publicExports": ["useAnomalyRadar"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/features/admin/monitor/infrastructure/resource.ts",
-        "src/features/admin/shared/composables/useQueryPolling.ts",
-        "src/features/admin/shared/lib/anomalyRules.ts",
-        "src/features/admin/statistics/resource.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodeRowActions.ts",
-          "to": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/composables/useOptimisticToggle.unit.spec.ts",
-          "to": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/workspace.ts",
-          "to": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 1,
-      "targetFanIn": 5,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useOptimisticToggle.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useOptimisticToggle.ts"
-      ],
-      "publicExports": [
-        "OptimisticToggleFeedback",
-        "OptimisticToggleMutate",
-        "useOptimisticToggle"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/vue/index.js"]
-    },
-    {
-      "path": "src/features/admin/shared/composables/usePagePagination.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/composables/usePagePagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/composables/usePagePagination.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/composables/usePagePagination.unit.spec.ts",
-          "to": "src/features/admin/shared/composables/usePagePagination.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 2,
-      "targetFanIn": 3,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/usePagePagination.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/usePagePagination.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/usePagePagination.ts"
-      ],
-      "publicExports": ["usePagePagination"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vue/index.js",
-        "src/core/config/pagination.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useQueryPolling.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/composables/useQueryPolling.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskRuntimeSnapshot.ts",
-          "to": "src/features/admin/shared/composables/useQueryPolling.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/composables/useAnomalyRadar.ts",
-          "to": "src/features/admin/shared/composables/useQueryPolling.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 2,
-      "targetFanIn": 3,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useQueryPolling.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useQueryPolling.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useQueryPolling.ts"
-      ],
-      "publicExports": ["useQueryPolling"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@vueuse/core/dist/index.js",
-        "node_modules/vue/index.js"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/composables/useRefetchOnClose.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
-          "to": "src/features/admin/shared/composables/useRefetchOnClose.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/payment/AdminPaymentSettingsCard.vue",
-          "to": "src/features/admin/shared/composables/useRefetchOnClose.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 1,
-      "targetFanIn": 2,
-      "targetFanOut": 1,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": [
-        "src/features/admin/shared/composables/useRefetchOnClose.ts"
-      ],
-      "targetPath": "src/features/admin/shared/composables/useRefetchOnClose.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/composables/useRefetchOnClose.ts"
-      ],
-      "publicExports": ["useRefetchOnClose"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/vue/index.js"]
-    },
-    {
-      "path": "src/features/admin/shared/index.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "planned",
-      "owner": "p4-lane",
-      "activationPhase": "P4",
-      "scope": "cross-feature",
-      "exportStyle": "explicit frozen source export mapping",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/app/AdminLayout.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPriceDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingServiceCell.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingStatusCell.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingStatusCell.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolEditorPanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/ModelPoolSummaryCell.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/modelPoolResource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeFormDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/rewardCodeRedemptionResource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodeList.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodeRowActions.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodesFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/AdminActionReasonField.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/api.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/feedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/AdminUserWalletDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletAdjustPanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/wallets/components/WalletOverviewCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/controls/AdminModelCardBody.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/controls/AdminModelFilter.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/controls/ObservedStatsPanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.component.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelEditDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogGatewayPanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogIdentityPanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogReferencePanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogSpecsPanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/demoData.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminMonitor.contract.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminMonitorFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskCancel.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskRuntimeSnapshot.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/domain/status.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/infrastructure/resource.contract.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/TaskResultCell.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/TaskStatusCell.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskControlToolbar.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskEventsCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/monitorComponents.unit.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/useAdminLoginFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/payments/orders/PaymentOrderDetailDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/useStripeSettingsFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/useStripeSettingsFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/prompts/api.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/components/PromptConfigEditorDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/featurePromptMeta.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/usePromptConfigFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminLoginLockoutEditor.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/AdminRegistrationRateLimitEditor.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/useAccessSettings.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/searchProviderResource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/logo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/AdminOutboundPolicyCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/payment/AdminPaymentSettingsCard.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/shared/useSettingsFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/upload/AdminUploadConcurrencyFooter.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/upload/useMediaUploadSettings.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsChartBase.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsModelHealthCharts.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsQualityTrendCharts.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/useUsageStatisticsCharts.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/useUsageStatisticsData.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/meta.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/pages/AdminStoragePage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/storage/useStorageContext.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/storage/useStorageFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/workspace.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/workspace.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/api.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/commands.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/commands.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/context.contract.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/context.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/sessionCommands.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/useUsersFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 125,
-      "measuredFanOut": 56,
-      "targetFanIn": 125,
-      "targetFanOut": 56,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Sole horizontal Admin seam (§10 target tree). Verticals gain index.ts only for cross-vertical consumers.",
-      "sourcePaths": [
-        "src/features/admin/shared/components/AdminAlert.vue",
-        "src/features/admin/shared/components/AdminBadge.vue",
-        "src/features/admin/shared/components/AdminButton.vue",
-        "src/features/admin/shared/components/AdminChartCard.vue",
-        "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-        "src/features/admin/shared/components/AdminColumn.vue",
-        "src/features/admin/shared/components/AdminConfirmDialog.vue",
-        "src/features/admin/shared/components/AdminDialogActions.vue",
-        "src/features/admin/shared/components/AdminDialogShell.vue",
-        "src/features/admin/shared/components/AdminDrawer.vue",
-        "src/features/admin/shared/components/AdminEditorActions.vue",
-        "src/features/admin/shared/components/AdminEmptyState.vue",
-        "src/features/admin/shared/components/AdminFilterPopover.vue",
-        "src/features/admin/shared/components/AdminFormField.vue",
-        "src/features/admin/shared/components/AdminInput.vue",
-        "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-        "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-        "src/features/admin/shared/components/AdminMono.vue",
-        "src/features/admin/shared/components/AdminNumberInput.vue",
-        "src/features/admin/shared/components/AdminOptionFilter.vue",
-        "src/features/admin/shared/components/AdminPagerControls.vue",
-        "src/features/admin/shared/components/AdminPopover.vue",
-        "src/features/admin/shared/components/AdminPopoverContent.vue",
-        "src/features/admin/shared/components/AdminPopoverTrigger.vue",
-        "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
-        "src/features/admin/shared/components/AdminRefreshButton.vue",
-        "src/features/admin/shared/components/AdminResourceToolbar.vue",
-        "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-        "src/features/admin/shared/components/AdminSelect.vue",
-        "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-        "src/features/admin/shared/components/AdminSpinner.vue",
-        "src/features/admin/shared/components/AdminStatusPill.vue",
-        "src/features/admin/shared/components/AdminSubNavigationLayout.vue",
-        "src/features/admin/shared/components/AdminSummaryCard.vue",
-        "src/features/admin/shared/components/AdminSwitch.vue",
-        "src/features/admin/shared/components/AdminTable.vue",
-        "src/features/admin/shared/components/AdminTablePanel.vue",
-        "src/features/admin/shared/components/AdminTextarea.vue",
-        "src/features/admin/shared/components/AdminToolbarSearch.vue",
-        "src/features/admin/shared/components/SwitchRow.vue",
-        "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-        "src/features/admin/shared/composables/useAdminConfirm.ts",
-        "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-        "src/features/admin/shared/composables/useAnomalyRadar.ts",
-        "src/features/admin/shared/composables/useOptimisticToggle.ts",
-        "src/features/admin/shared/composables/usePagePagination.ts",
-        "src/features/admin/shared/composables/useQueryPolling.ts",
-        "src/features/admin/shared/composables/useRefetchOnClose.ts",
-        "src/features/admin/shared/lib/anomalyRules.ts",
-        "src/features/admin/shared/lib/cellClasses.ts",
-        "src/features/admin/shared/lib/cellPlaceholders.ts",
-        "src/features/admin/shared/lib/chart.ts",
-        "src/features/admin/shared/lib/confirmSettingsSave.ts",
-        "src/features/admin/shared/lib/controlCopy.ts",
-        "src/features/admin/shared/lib/controlGuidance.ts",
-        "src/features/admin/shared/lib/controlMutation.ts",
-        "src/features/admin/shared/lib/controlResource.ts",
-        "src/features/admin/shared/lib/reconcileStableRows.ts",
-        "src/features/admin/shared/lib/secretSchema.ts",
-        "src/features/admin/shared/lib/serviceAdminMeta.ts",
-        "src/features/admin/shared/lib/tableColumns.ts",
-        "src/features/admin/shared/lib/taskMetricTokens.ts",
-        "src/features/admin/shared/lib/timeRange.ts",
-        "src/features/admin/shared/lib/toast.ts",
-        "src/features/admin/shared/lib/uiClasses.ts",
-        "src/features/admin/shared/logos/brandLogos.ts",
-        "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": [
         "src/features/admin/shared/validation/actionReasonContract.ts"
-      ],
-      "targetPath": "src/features/admin/shared/index.ts",
-      "ownershipScope": ["src/features/admin/shared/"],
-      "sourceOwnershipScope": ["src/features/admin/shared/"],
-      "publicExports": [
-        "ADMIN_CONTROL_UNAVAILABLE_CODE",
-        "ADMIN_IDENTITY_EMPTY",
-        "ADMIN_NUMERIC_EMPTY",
-        "ADMIN_PROBE_OPERATOR_REASON",
-        "ADMIN_SERVICE_GROUPS",
-        "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
-        "ADMIN_TABLE_MORE_COLUMN_WIDTH",
-        "ALL_ADMIN_BRAND_LOGOS",
-        "AdminAlert",
-        "AdminAnomalyItem",
-        "AdminBadge",
-        "AdminButton",
-        "AdminChartCard",
-        "AdminCollectionPageShell",
-        "AdminColumn",
-        "AdminConfirmDialog",
-        "AdminConfirmPort",
-        "AdminDialogActions",
-        "AdminDialogShell",
-        "AdminDrawer",
-        "AdminEditorActions",
-        "AdminEmptyState",
-        "AdminFilterPopover",
-        "AdminFormField",
-        "AdminInput",
-        "AdminLogoCropDialog",
-        "AdminLogoPickerPopover",
-        "AdminMono",
-        "AdminNumberInput",
-        "AdminOptionFilter",
-        "AdminPagerControls",
-        "AdminPopover",
-        "AdminPopoverContent",
-        "AdminPopoverTrigger",
-        "AdminRangedLineChartCard",
-        "AdminRefreshButton",
-        "AdminResourceToolbar",
-        "AdminRowActionsPopover",
-        "AdminSelect",
-        "AdminServiceGroupKey",
-        "AdminSettingsDialogFrame",
-        "AdminSpinner",
-        "AdminStatusPill",
-        "AdminStatusPillVariant",
-        "AdminSubNavigationLayout",
-        "AdminSummaryCard",
-        "AdminSwitch",
-        "AdminTable",
-        "AdminTablePanel",
-        "AdminTableRowCollapseEvent",
-        "AdminTableRowExpandEvent",
-        "AdminTextarea",
-        "AdminTimeRangeOption",
-        "AdminToastPort",
-        "AdminToolbarSearch",
-        "ControlMutationOptions",
-        "SwitchRow",
-        "TaskMetricDefinition",
-        "TaskMetricStatsSnapshot",
-        "TaskStatus",
-        "adminAnomalyPopoverClass",
-        "adminBrandLogoMap",
-        "adminChartCanvasClass",
-        "adminChartGridClass",
-        "adminChartLegend",
-        "adminChartPlugins",
-        "adminChartStrokeWidth",
-        "adminChartTheme",
-        "adminCompactIconButtonClass",
-        "adminControlUnavailable",
-        "adminDashboardRootClass",
-        "adminDialogFooterActionsClass",
-        "adminDialogHeaderContentClass",
-        "adminDialogTitleClass",
-        "adminEmptyStateClass",
-        "adminFramedIconButtonClass",
-        "adminInlineJumpClass",
-        "adminLogoButtonClass",
-        "adminSummaryGridClass",
-        "adminTableCardClass",
-        "adminTableClass",
-        "adminTableFooterClass",
-        "adminTableFrameClass",
-        "adminTableRowActionButtonClass",
-        "adminTableStyle",
-        "adminTextButtonClass",
-        "buildAdminTimeRangeBuckets",
-        "buildControlMutationHeaders",
-        "buildRoutineControlMutationHeaders",
-        "confirmSettingsSave",
-        "createControlError",
-        "defineAdminChartBubblePointStyle",
-        "defineAdminChartCountScale",
-        "defineAdminChartDurationScale",
-        "defineAdminChartOptions",
-        "defineAdminChartPercentScale",
-        "defineAdminChartPointClipStyle",
-        "defineAdminChartTooltip",
-        "emptyPlaceholder",
-        "formatAdminApiError",
-        "formatAdminDisplayError",
-        "getAdminBrandLogo",
-        "getAdminBrandLogoOverride",
-        "getAdminChartBubbleHoverRadius",
-        "getAdminChartBubbleRadius",
-        "getAdminServiceGroupMeta",
-        "getAdminServiceMeta",
-        "getTaskMetricByStatus",
-        "loadControlSetting",
-        "monitorChartSpecs",
-        "pickAdminTimeRangeOptions",
-        "reconcileStableRows",
-        "requireDestructiveReason",
-        "requireOperatorReason",
-        "resolveModelBrandLogo",
-        "secretField",
-        "shouldShowAdminTimeRangeTick",
-        "taskMetricDefinitions",
-        "useAdminChartReady",
-        "useAdminCollectionQuery",
-        "useAdminConfirm",
-        "useAdminCursorCollection",
-        "useAdminToast",
-        "useAnomalyRadar",
-        "useBrandLogoOverrides",
-        "useOptimisticToggle",
-        "usePagePagination",
-        "useQueryPolling",
-        "useRefetchOnClose",
-        "validateAdminActionReason",
-        "withControlCopy"
-      ],
-      "exportMappings": [
-        {
-          "source": "src/features/admin/shared/components/AdminAlert.vue",
-          "name": "default",
-          "exportedAs": "AdminAlert"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminBadge.vue",
-          "name": "default",
-          "exportedAs": "AdminBadge"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminButton.vue",
-          "name": "default",
-          "exportedAs": "AdminButton"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminChartCard.vue",
-          "name": "default",
-          "exportedAs": "AdminChartCard"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-          "name": "default",
-          "exportedAs": "AdminCollectionPageShell"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminColumn.vue",
-          "name": "default",
-          "exportedAs": "AdminColumn"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-          "name": "default",
-          "exportedAs": "AdminConfirmDialog"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminDialogActions.vue",
-          "name": "default",
-          "exportedAs": "AdminDialogActions"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "name": "default",
-          "exportedAs": "AdminDialogShell"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminDrawer.vue",
-          "name": "default",
-          "exportedAs": "AdminDrawer"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminEditorActions.vue",
-          "name": "default",
-          "exportedAs": "AdminEditorActions"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminEmptyState.vue",
-          "name": "default",
-          "exportedAs": "AdminEmptyState"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminFilterPopover.vue",
-          "name": "default",
-          "exportedAs": "AdminFilterPopover"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminFormField.vue",
-          "name": "default",
-          "exportedAs": "AdminFormField"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminInput.vue",
-          "name": "default",
-          "exportedAs": "AdminInput"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-          "name": "default",
-          "exportedAs": "AdminLogoCropDialog"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-          "name": "default",
-          "exportedAs": "AdminLogoPickerPopover"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminMono.vue",
-          "name": "default",
-          "exportedAs": "AdminMono"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "name": "default",
-          "exportedAs": "AdminNumberInput"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminOptionFilter.vue",
-          "name": "default",
-          "exportedAs": "AdminOptionFilter"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "name": "default",
-          "exportedAs": "AdminPagerControls"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminPopover.vue",
-          "name": "default",
-          "exportedAs": "AdminPopover"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminPopoverContent.vue",
-          "name": "default",
-          "exportedAs": "AdminPopoverContent"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminPopoverTrigger.vue",
-          "name": "default",
-          "exportedAs": "AdminPopoverTrigger"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminRangedLineChartCard.vue",
-          "name": "default",
-          "exportedAs": "AdminRangedLineChartCard"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminRefreshButton.vue",
-          "name": "default",
-          "exportedAs": "AdminRefreshButton"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminResourceToolbar.vue",
-          "name": "default",
-          "exportedAs": "AdminResourceToolbar"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminRowActionsPopover.vue",
-          "name": "default",
-          "exportedAs": "AdminRowActionsPopover"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminSelect.vue",
-          "name": "default",
-          "exportedAs": "AdminSelect"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "name": "default",
-          "exportedAs": "AdminSettingsDialogFrame"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminSpinner.vue",
-          "name": "default",
-          "exportedAs": "AdminSpinner"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "name": "AdminStatusPillVariant",
-          "exportedAs": "AdminStatusPillVariant"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminStatusPill.vue",
-          "name": "default",
-          "exportedAs": "AdminStatusPill"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminSubNavigationLayout.vue",
-          "name": "default",
-          "exportedAs": "AdminSubNavigationLayout"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminSummaryCard.vue",
-          "name": "default",
-          "exportedAs": "AdminSummaryCard"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminSwitch.vue",
-          "name": "default",
-          "exportedAs": "AdminSwitch"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminTable.vue",
-          "name": "AdminTableRowCollapseEvent",
-          "exportedAs": "AdminTableRowCollapseEvent"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminTable.vue",
-          "name": "AdminTableRowExpandEvent",
-          "exportedAs": "AdminTableRowExpandEvent"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminTable.vue",
-          "name": "default",
-          "exportedAs": "AdminTable"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminTablePanel.vue",
-          "name": "default",
-          "exportedAs": "AdminTablePanel"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminTextarea.vue",
-          "name": "default",
-          "exportedAs": "AdminTextarea"
-        },
-        {
-          "source": "src/features/admin/shared/components/AdminToolbarSearch.vue",
-          "name": "default",
-          "exportedAs": "AdminToolbarSearch"
-        },
-        {
-          "source": "src/features/admin/shared/components/SwitchRow.vue",
-          "name": "default",
-          "exportedAs": "SwitchRow"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useAdminCollectionQuery.ts",
-          "name": "useAdminCollectionQuery",
-          "exportedAs": "useAdminCollectionQuery"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "name": "AdminConfirmPort",
-          "exportedAs": "AdminConfirmPort"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useAdminConfirm.ts",
-          "name": "useAdminConfirm",
-          "exportedAs": "useAdminConfirm"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useAdminCursorCollection.ts",
-          "name": "useAdminCursorCollection",
-          "exportedAs": "useAdminCursorCollection"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useAnomalyRadar.ts",
-          "name": "useAnomalyRadar",
-          "exportedAs": "useAnomalyRadar"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useOptimisticToggle.ts",
-          "name": "useOptimisticToggle",
-          "exportedAs": "useOptimisticToggle"
-        },
-        {
-          "source": "src/features/admin/shared/composables/usePagePagination.ts",
-          "name": "usePagePagination",
-          "exportedAs": "usePagePagination"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useQueryPolling.ts",
-          "name": "useQueryPolling",
-          "exportedAs": "useQueryPolling"
-        },
-        {
-          "source": "src/features/admin/shared/composables/useRefetchOnClose.ts",
-          "name": "useRefetchOnClose",
-          "exportedAs": "useRefetchOnClose"
-        },
-        {
-          "source": "src/features/admin/shared/lib/anomalyRules.ts",
-          "name": "AdminAnomalyItem",
-          "exportedAs": "AdminAnomalyItem"
-        },
-        {
-          "source": "src/features/admin/shared/lib/cellClasses.ts",
-          "name": "adminInlineJumpClass",
-          "exportedAs": "adminInlineJumpClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "name": "ADMIN_IDENTITY_EMPTY",
-          "exportedAs": "ADMIN_IDENTITY_EMPTY"
-        },
-        {
-          "source": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "name": "ADMIN_NUMERIC_EMPTY",
-          "exportedAs": "ADMIN_NUMERIC_EMPTY"
-        },
-        {
-          "source": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "name": "emptyPlaceholder",
-          "exportedAs": "emptyPlaceholder"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "adminChartLegend",
-          "exportedAs": "adminChartLegend"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "adminChartPlugins",
-          "exportedAs": "adminChartPlugins"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "adminChartStrokeWidth",
-          "exportedAs": "adminChartStrokeWidth"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "adminChartTheme",
-          "exportedAs": "adminChartTheme"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartBubblePointStyle",
-          "exportedAs": "defineAdminChartBubblePointStyle"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartCountScale",
-          "exportedAs": "defineAdminChartCountScale"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartDurationScale",
-          "exportedAs": "defineAdminChartDurationScale"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartOptions",
-          "exportedAs": "defineAdminChartOptions"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartPercentScale",
-          "exportedAs": "defineAdminChartPercentScale"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartPointClipStyle",
-          "exportedAs": "defineAdminChartPointClipStyle"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "defineAdminChartTooltip",
-          "exportedAs": "defineAdminChartTooltip"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "getAdminChartBubbleHoverRadius",
-          "exportedAs": "getAdminChartBubbleHoverRadius"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "getAdminChartBubbleRadius",
-          "exportedAs": "getAdminChartBubbleRadius"
-        },
-        {
-          "source": "src/features/admin/shared/lib/chart.ts",
-          "name": "useAdminChartReady",
-          "exportedAs": "useAdminChartReady"
-        },
-        {
-          "source": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "name": "ADMIN_PROBE_OPERATOR_REASON",
-          "exportedAs": "ADMIN_PROBE_OPERATOR_REASON"
-        },
-        {
-          "source": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "name": "confirmSettingsSave",
-          "exportedAs": "confirmSettingsSave"
-        },
-        {
-          "source": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "name": "requireDestructiveReason",
-          "exportedAs": "requireDestructiveReason"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlCopy.ts",
-          "name": "withControlCopy",
-          "exportedAs": "withControlCopy"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlGuidance.ts",
-          "name": "ADMIN_CONTROL_UNAVAILABLE_CODE",
-          "exportedAs": "ADMIN_CONTROL_UNAVAILABLE_CODE"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlGuidance.ts",
-          "name": "adminControlUnavailable",
-          "exportedAs": "adminControlUnavailable"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlMutation.ts",
-          "name": "ControlMutationOptions",
-          "exportedAs": "ControlMutationOptions"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlMutation.ts",
-          "name": "buildControlMutationHeaders",
-          "exportedAs": "buildControlMutationHeaders"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlMutation.ts",
-          "name": "buildRoutineControlMutationHeaders",
-          "exportedAs": "buildRoutineControlMutationHeaders"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlMutation.ts",
-          "name": "createControlError",
-          "exportedAs": "createControlError"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlMutation.ts",
-          "name": "requireOperatorReason",
-          "exportedAs": "requireOperatorReason"
-        },
-        {
-          "source": "src/features/admin/shared/lib/controlResource.ts",
-          "name": "loadControlSetting",
-          "exportedAs": "loadControlSetting"
-        },
-        {
-          "source": "src/features/admin/shared/lib/reconcileStableRows.ts",
-          "name": "reconcileStableRows",
-          "exportedAs": "reconcileStableRows"
-        },
-        {
-          "source": "src/features/admin/shared/lib/secretSchema.ts",
-          "name": "secretField",
-          "exportedAs": "secretField"
-        },
-        {
-          "source": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-          "name": "ADMIN_SERVICE_GROUPS",
-          "exportedAs": "ADMIN_SERVICE_GROUPS"
-        },
-        {
-          "source": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-          "name": "AdminServiceGroupKey",
-          "exportedAs": "AdminServiceGroupKey"
-        },
-        {
-          "source": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-          "name": "getAdminServiceGroupMeta",
-          "exportedAs": "getAdminServiceGroupMeta"
-        },
-        {
-          "source": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-          "name": "getAdminServiceMeta",
-          "exportedAs": "getAdminServiceMeta"
-        },
-        {
-          "source": "src/features/admin/shared/lib/tableColumns.ts",
-          "name": "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
-          "exportedAs": "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH"
-        },
-        {
-          "source": "src/features/admin/shared/lib/tableColumns.ts",
-          "name": "ADMIN_TABLE_MORE_COLUMN_WIDTH",
-          "exportedAs": "ADMIN_TABLE_MORE_COLUMN_WIDTH"
-        },
-        {
-          "source": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "name": "TaskMetricDefinition",
-          "exportedAs": "TaskMetricDefinition"
-        },
-        {
-          "source": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "name": "TaskMetricStatsSnapshot",
-          "exportedAs": "TaskMetricStatsSnapshot"
-        },
-        {
-          "source": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "name": "TaskStatus",
-          "exportedAs": "TaskStatus"
-        },
-        {
-          "source": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "name": "getTaskMetricByStatus",
-          "exportedAs": "getTaskMetricByStatus"
-        },
-        {
-          "source": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "name": "monitorChartSpecs",
-          "exportedAs": "monitorChartSpecs"
-        },
-        {
-          "source": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "name": "taskMetricDefinitions",
-          "exportedAs": "taskMetricDefinitions"
-        },
-        {
-          "source": "src/features/admin/shared/lib/timeRange.ts",
-          "name": "AdminTimeRangeOption",
-          "exportedAs": "AdminTimeRangeOption"
-        },
-        {
-          "source": "src/features/admin/shared/lib/timeRange.ts",
-          "name": "buildAdminTimeRangeBuckets",
-          "exportedAs": "buildAdminTimeRangeBuckets"
-        },
-        {
-          "source": "src/features/admin/shared/lib/timeRange.ts",
-          "name": "pickAdminTimeRangeOptions",
-          "exportedAs": "pickAdminTimeRangeOptions"
-        },
-        {
-          "source": "src/features/admin/shared/lib/timeRange.ts",
-          "name": "shouldShowAdminTimeRangeTick",
-          "exportedAs": "shouldShowAdminTimeRangeTick"
-        },
-        {
-          "source": "src/features/admin/shared/lib/toast.ts",
-          "name": "AdminToastPort",
-          "exportedAs": "AdminToastPort"
-        },
-        {
-          "source": "src/features/admin/shared/lib/toast.ts",
-          "name": "formatAdminApiError",
-          "exportedAs": "formatAdminApiError"
-        },
-        {
-          "source": "src/features/admin/shared/lib/toast.ts",
-          "name": "formatAdminDisplayError",
-          "exportedAs": "formatAdminDisplayError"
-        },
-        {
-          "source": "src/features/admin/shared/lib/toast.ts",
-          "name": "useAdminToast",
-          "exportedAs": "useAdminToast"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminAnomalyPopoverClass",
-          "exportedAs": "adminAnomalyPopoverClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminChartCanvasClass",
-          "exportedAs": "adminChartCanvasClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminChartGridClass",
-          "exportedAs": "adminChartGridClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminCompactIconButtonClass",
-          "exportedAs": "adminCompactIconButtonClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminDashboardRootClass",
-          "exportedAs": "adminDashboardRootClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminDialogFooterActionsClass",
-          "exportedAs": "adminDialogFooterActionsClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminDialogHeaderContentClass",
-          "exportedAs": "adminDialogHeaderContentClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminDialogTitleClass",
-          "exportedAs": "adminDialogTitleClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminEmptyStateClass",
-          "exportedAs": "adminEmptyStateClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminFramedIconButtonClass",
-          "exportedAs": "adminFramedIconButtonClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminLogoButtonClass",
-          "exportedAs": "adminLogoButtonClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminSummaryGridClass",
-          "exportedAs": "adminSummaryGridClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTableCardClass",
-          "exportedAs": "adminTableCardClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTableClass",
-          "exportedAs": "adminTableClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTableFooterClass",
-          "exportedAs": "adminTableFooterClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTableFrameClass",
-          "exportedAs": "adminTableFrameClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTableRowActionButtonClass",
-          "exportedAs": "adminTableRowActionButtonClass"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTableStyle",
-          "exportedAs": "adminTableStyle"
-        },
-        {
-          "source": "src/features/admin/shared/lib/uiClasses.ts",
-          "name": "adminTextButtonClass",
-          "exportedAs": "adminTextButtonClass"
-        },
-        {
-          "source": "src/features/admin/shared/logos/brandLogos.ts",
-          "name": "ALL_ADMIN_BRAND_LOGOS",
-          "exportedAs": "ALL_ADMIN_BRAND_LOGOS"
-        },
-        {
-          "source": "src/features/admin/shared/logos/brandLogos.ts",
-          "name": "adminBrandLogoMap",
-          "exportedAs": "adminBrandLogoMap"
-        },
-        {
-          "source": "src/features/admin/shared/logos/brandLogos.ts",
-          "name": "getAdminBrandLogo",
-          "exportedAs": "getAdminBrandLogo"
-        },
-        {
-          "source": "src/features/admin/shared/logos/brandLogos.ts",
-          "name": "getAdminBrandLogoOverride",
-          "exportedAs": "getAdminBrandLogoOverride"
-        },
-        {
-          "source": "src/features/admin/shared/logos/brandLogos.ts",
-          "name": "resolveModelBrandLogo",
-          "exportedAs": "resolveModelBrandLogo"
-        },
-        {
-          "source": "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
-          "name": "useBrandLogoOverrides",
-          "exportedAs": "useBrandLogoOverrides"
-        },
-        {
-          "source": "src/features/admin/shared/validation/actionReasonContract.ts",
-          "name": "validateAdminActionReason",
-          "exportedAs": "validateAdminActionReason"
-        }
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "fs",
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/@testing-library/vue/dist/index.js",
-        "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
-        "node_modules/@vueuse/core/dist/index.js",
-        "node_modules/chart.js/dist/chart.cjs",
-        "node_modules/reka-ui/dist/index.cjs",
-        "node_modules/valibot/dist/index.mjs",
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue-advanced-cropper/dist/index.cjs.js",
-        "node_modules/vue-advanced-cropper/dist/style.css",
-        "node_modules/vue-i18n/index.js",
-        "node_modules/vue-router/index.cjs",
-        "node_modules/vue/index.js",
-        "path",
-        "src/api/contractKernel.ts",
-        "src/api/generated-query/control/control-platform/control-platform.ts",
-        "src/components/ui/badge/index.ts",
-        "src/components/ui/button/buttonChrome.ts",
-        "src/components/ui/button/index.ts",
-        "src/components/ui/input/index.ts",
-        "src/components/ui/select/index.ts",
-        "src/components/ui/spinner/index.ts",
-        "src/core/components/ActionButton.vue",
-        "src/core/components/ChartCard.vue",
-        "src/core/components/ChartPanel.vue",
-        "src/core/components/RangedLineChartCard.vue",
-        "src/core/components/StatusBadge.vue",
-        "src/core/components/formFieldContract.ts",
-        "src/core/composables/useAppToast.ts",
-        "src/core/composables/useOverlayInteractionLifecycle.ts",
-        "src/core/config/pagination.ts",
-        "src/core/config/runtimeUrls.ts",
-        "src/core/contracts/imageServices.ts",
-        "src/core/lib/chartPrimitives.ts",
-        "src/core/lib/chartTimeRange.ts",
-        "src/core/motion/chartMotion.ts",
-        "src/core/query/queryDefaults.ts",
-        "src/core/utils/errorMessages.ts",
-        "src/features/admin/monitor/infrastructure/resource.ts",
-        "src/features/admin/routePaths.ts",
-        "src/features/admin/statistics/resource.ts",
-        "src/lib/utils.ts",
-        "src/shared/assets/oauth/discord.svg",
-        "src/shared/assets/oauth/github.svg",
-        "src/shared/assets/oauth/google.svg",
-        "src/shared/assets/search-providers/pexels.svg",
-        "src/shared/assets/search-providers/unsplash.svg",
-        "src/shared/assets/storage-vendors/alibabacloud.svg",
-        "src/shared/assets/storage-vendors/amazons3.svg",
-        "src/shared/assets/storage-vendors/cloudflare.svg",
-        "src/shared/assets/storage-vendors/minio.svg",
-        "src/shared/assets/storage-vendors/tencentcloud.ico",
-        "src/test/render.ts",
-        "src/theme/composables/useTheme.ts"
       ]
     },
     {
-      "path": "src/features/admin/shared/lib/anomalyRules.ts",
+      "path": "src/features/admin/shared/core/cellClasses.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -38250,90 +32742,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/lib/anomalyRules.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/composables/useAnomalyRadar.ts",
-          "to": "src/features/admin/shared/lib/anomalyRules.ts",
+          "from": "src/features/admin/shared/core/cellClasses.unit.spec.ts",
+          "to": "src/features/admin/shared/core/cellClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/anomalyRules.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/anomalyRules.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/cellClasses.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/AdminMono.vue",
+          "to": "src/features/admin/shared/core/cellClasses.ts",
           "kind": "runtime"
         }
       ],
       "measuredFanIn": 3,
-      "measuredFanOut": 3,
-      "targetFanIn": 3,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/anomalyRules.ts"],
-      "targetPath": "src/features/admin/shared/lib/anomalyRules.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/anomalyRules.ts"],
-      "publicExports": [
-        "AdminAnomalyItem",
-        "AdminAnomalySeverity",
-        "AdminAnomalySource",
-        "buildAdminAnomalyItems"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/features/admin/monitor/infrastructure/resource.ts",
-        "src/features/admin/statistics/resource.ts",
-        "src/features/workspace/routePaths.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/lib/cellClasses.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/lib/cellClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminMono.vue",
-          "to": "src/features/admin/shared/lib/cellClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/cellClasses.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/cellClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/lib/cellClasses.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/cellClasses.ts"],
-      "targetPath": "src/features/admin/shared/lib/cellClasses.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/cellClasses.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/cellClasses.ts"],
+      "targetPath": "src/features/admin/shared/core/cellClasses.ts",
+      "ownershipScope": ["src/features/admin/shared/core/cellClasses.ts"],
       "publicExports": [
         "adminInlineJumpClass",
         "adminMonoClass",
@@ -38341,10 +32776,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "adminTruncateCellClass"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/cellClasses.ts"]
     },
     {
-      "path": "src/features/admin/shared/lib/cellPlaceholders.ts",
+      "path": "src/features/admin/shared/core/cellPlaceholders.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -38355,53 +32791,28 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/wallets/components/WalletLedgerTable.vue",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
+          "from": "src/features/admin/shared/core/cellPlaceholders.unit.spec.ts",
+          "to": "src/features/admin/shared/core/cellPlaceholders.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/TaskResultCell.vue",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/cellPlaceholders.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/lib/cellPlaceholders.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/cellPlaceholders.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/cellPlaceholders.ts"],
-      "targetPath": "src/features/admin/shared/lib/cellPlaceholders.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/cellPlaceholders.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/cellPlaceholders.ts"],
+      "targetPath": "src/features/admin/shared/core/cellPlaceholders.ts",
+      "ownershipScope": ["src/features/admin/shared/core/cellPlaceholders.ts"],
       "publicExports": [
         "ADMIN_IDENTITY_EMPTY",
         "ADMIN_NUMERIC_EMPTY",
@@ -38409,100 +32820,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "emptyPlaceholder"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
-    },
-    {
-      "path": "src/features/admin/shared/lib/chart.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/chart.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/chartMotion.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsChartBase.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsModelHealthCharts.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsQualityTrendCharts.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/useUsageStatisticsCharts.ts",
-          "to": "src/features/admin/shared/lib/chart.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 8,
-      "measuredFanOut": 6,
-      "targetFanIn": 8,
-      "targetFanOut": 6,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/chart.ts"],
-      "targetPath": "src/features/admin/shared/lib/chart.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/chart.ts"],
-      "publicExports": [
-        "adminChartLegend",
-        "adminChartPlugins",
-        "adminChartStrokeWidth",
-        "adminChartTheme",
-        "defineAdminChartBubblePointStyle",
-        "defineAdminChartCountScale",
-        "defineAdminChartDurationScale",
-        "defineAdminChartOptions",
-        "defineAdminChartPercentScale",
-        "defineAdminChartPointClipStyle",
-        "defineAdminChartTooltip",
-        "getAdminChartBubbleHoverRadius",
-        "getAdminChartBubbleRadius",
-        "useAdminChartReady"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/chart.js/dist/chart.cjs",
-        "node_modules/vue/index.js",
-        "src/core/lib/chartPrimitives.ts",
-        "src/core/motion/chartMotion.ts",
-        "src/features/admin/shared/lib/adminThemeTokens.ts",
-        "src/theme/composables/useTheme.ts"
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/cellPlaceholders.ts"
       ]
     },
     {
-      "path": "src/features/admin/shared/lib/confirmSettingsSave.ts",
+      "path": "src/features/admin/shared/core/controlCopy.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -38513,212 +32837,37 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
+          "from": "src/features/admin/shared/core/controlResource.ts",
+          "to": "src/features/admin/shared/core/controlCopy.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/useRewardCodeRowActions.ts",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.ts",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.component.spec.ts",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/confirmSettingsSave.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/workspace.ts",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/commands.ts",
-          "to": "src/features/admin/shared/lib/confirmSettingsSave.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/controlCopy.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
-      "measuredFanOut": 2,
-      "targetFanIn": 11,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/confirmSettingsSave.ts"],
-      "targetPath": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/lib/confirmSettingsSave.ts"
-      ],
-      "publicExports": [
-        "ADMIN_PROBE_OPERATOR_REASON",
-        "ADMIN_REASON_REQUIRED_MESSAGE",
-        "ADMIN_REVERSIBLE_DEFAULT_REASON",
-        "AdminConfirmRisk",
-        "confirmSettingsSave",
-        "readReversibleReason",
-        "requireDestructiveReason"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/features/admin/shared/composables/useAdminConfirm.ts",
-        "src/features/admin/shared/lib/toast.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/lib/controlCopy.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/modelPoolResource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/api.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/useAccessSettings.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/searchProviderResource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/upload/useMediaUploadSettings.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/controlResource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/resource.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/api.ts",
-          "to": "src/features/admin/shared/lib/controlCopy.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 18,
+      "measuredFanIn": 2,
       "measuredFanOut": 1,
-      "targetFanIn": 18,
+      "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/controlCopy.ts"],
-      "targetPath": "src/features/admin/shared/lib/controlCopy.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/controlCopy.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/controlCopy.ts"],
+      "targetPath": "src/features/admin/shared/core/controlCopy.ts",
+      "ownershipScope": ["src/features/admin/shared/core/controlCopy.ts"],
       "publicExports": ["ControlErrorMessages", "withControlCopy"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/features/admin/shared/lib/controlMutation.ts"
-      ]
+        "src/features/admin/shared/core/controlMutation.ts"
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/controlCopy.ts"]
     },
     {
-      "path": "src/features/admin/shared/lib/controlGuidance.ts",
+      "path": "src/features/admin/shared/core/controlGuidance.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -38729,58 +32878,56 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.contract.spec.ts",
-          "to": "src/features/admin/shared/lib/controlGuidance.ts",
+          "from": "src/features/admin/monitor/resource.ts",
+          "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
-          "to": "src/features/admin/shared/lib/controlGuidance.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
-          "to": "src/features/admin/shared/lib/controlGuidance.ts",
+          "from": "src/features/admin/shared/session/brand/brandLogoResource.ts",
+          "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/brandLogoResource.ts",
-          "to": "src/features/admin/shared/lib/controlGuidance.ts",
+          "from": "src/features/admin/shared/session/brand/brandLogoResource.unit.spec.ts",
+          "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/brandLogoResource.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/controlGuidance.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
-          "to": "src/features/admin/shared/lib/controlGuidance.ts",
+          "from": "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
+          "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/controlGuidance.ts"],
-      "targetPath": "src/features/admin/shared/lib/controlGuidance.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/controlGuidance.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/controlGuidance.ts"],
+      "targetPath": "src/features/admin/shared/core/controlGuidance.ts",
+      "ownershipScope": ["src/features/admin/shared/core/controlGuidance.ts"],
       "publicExports": [
         "ADMIN_CONTROL_UNAVAILABLE_CODE",
         "AdminControlUnavailableError",
         "adminControlUnavailable"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/controlGuidance.ts"
+      ]
     },
     {
-      "path": "src/features/admin/shared/lib/controlMutation.ts",
+      "path": "src/features/admin/shared/core/controlMutation.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -38791,143 +32938,43 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/pricing/billableCatalogResource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
+          "from": "src/features/admin/shared/core/controlCopy.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/modelPoolResource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/rewardCodeRedemptionResource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/shared/api.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/paymentOrderApiAdapter.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/api.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/access/useAccessSettings.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/searchProviderResource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/outbound/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/upload/useMediaUploadSettings.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/controlCopy.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/controlCopy.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
+          "from": "src/features/admin/shared/core/controlCopy.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/shared/lib/controlMutation.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
+          "from": "src/features/admin/shared/core/controlMutation.unit.spec.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/controlResource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
+          "from": "src/features/admin/shared/core/controlResource.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/storage/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/resource.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/users/api.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/sessionCommands.ts",
-          "to": "src/features/admin/shared/lib/controlMutation.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 23,
+      "measuredFanIn": 4,
       "measuredFanOut": 1,
-      "targetFanIn": 23,
+      "targetFanIn": 4,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/controlMutation.ts"],
-      "targetPath": "src/features/admin/shared/lib/controlMutation.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/controlMutation.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/controlMutation.ts"],
+      "targetPath": "src/features/admin/shared/core/controlMutation.ts",
+      "ownershipScope": ["src/features/admin/shared/core/controlMutation.ts"],
       "publicExports": [
         "ControlError",
         "ControlErrorMessages",
@@ -38941,67 +32988,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "requireOperatorReason"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["src/api/contractKernel.ts"]
-    },
-    {
-      "path": "src/features/admin/shared/lib/controlResource.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/payments/stripe-settings/resource.ts",
-          "to": "src/features/admin/shared/lib/controlResource.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/resource.ts",
-          "to": "src/features/admin/shared/lib/controlResource.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/resource.ts",
-          "to": "src/features/admin/shared/lib/controlResource.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/resource.ts",
-          "to": "src/features/admin/shared/lib/controlResource.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/resource.ts",
-          "to": "src/features/admin/shared/lib/controlResource.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 3,
-      "targetFanIn": 5,
-      "targetFanOut": 3,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/controlResource.ts"],
-      "targetPath": "src/features/admin/shared/lib/controlResource.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/controlResource.ts"],
-      "publicExports": ["LoadControlSettingOptions", "loadControlSetting"],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/api/contractKernel.ts",
-        "src/features/admin/shared/lib/controlCopy.ts",
+      "targetFanOutTargets": ["src/api/contractKernel.ts"],
+      "sourceOwnershipScope": [
         "src/features/admin/shared/lib/controlMutation.ts"
       ]
     },
     {
-      "path": "src/features/admin/shared/lib/reconcileStableRows.ts",
+      "path": "src/features/admin/shared/core/controlResource.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39012,46 +33005,79 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/lib/reconcileStableRows.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/lib/reconcileStableRows.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/reconcileStableRows.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/reconcileStableRows.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/pages/AdminStoragePage.vue",
-          "to": "src/features/admin/shared/lib/reconcileStableRows.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/controlResource.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 1,
+      "measuredFanOut": 3,
+      "targetFanIn": 1,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/core/controlResource.ts"],
+      "targetPath": "src/features/admin/shared/core/controlResource.ts",
+      "ownershipScope": ["src/features/admin/shared/core/controlResource.ts"],
+      "publicExports": ["LoadControlSettingOptions", "loadControlSetting"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/api/contractKernel.ts",
+        "src/features/admin/shared/core/controlCopy.ts",
+        "src/features/admin/shared/core/controlMutation.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/controlResource.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/core/reconcileStableRows.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/core/reconcileStableRows.unit.spec.ts",
+          "to": "src/features/admin/shared/core/reconcileStableRows.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/reconcileStableRows.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/reconcileStableRows.ts"],
-      "targetPath": "src/features/admin/shared/lib/reconcileStableRows.ts",
+      "sourcePaths": ["src/features/admin/shared/core/reconcileStableRows.ts"],
+      "targetPath": "src/features/admin/shared/core/reconcileStableRows.ts",
       "ownershipScope": [
-        "src/features/admin/shared/lib/reconcileStableRows.ts"
+        "src/features/admin/shared/core/reconcileStableRows.ts"
       ],
       "publicExports": ["reconcileStableRows"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/reconcileStableRows.ts"
+      ]
     },
     {
-      "path": "src/features/admin/shared/lib/secretSchema.ts",
+      "path": "src/features/admin/shared/core/secretSchema.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39062,44 +33088,35 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/lib/secretSchema.ts",
+          "from": "src/features/admin/shared/core/secretSchema.unit.spec.ts",
+          "to": "src/features/admin/shared/core/secretSchema.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/lib/secretSchema.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/lib/secretSchema.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/secretSchema.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/secretSchema.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/secretSchema.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 2,
       "measuredFanOut": 1,
-      "targetFanIn": 4,
+      "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/secretSchema.ts"],
-      "targetPath": "src/features/admin/shared/lib/secretSchema.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/secretSchema.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/secretSchema.ts"],
+      "targetPath": "src/features/admin/shared/core/secretSchema.ts",
+      "ownershipScope": ["src/features/admin/shared/core/secretSchema.ts"],
       "publicExports": ["secretField"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["node_modules/valibot/dist/index.mjs"]
+      "targetFanOutTargets": ["node_modules/valibot/dist/index.mjs"],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/secretSchema.ts"]
     },
     {
-      "path": "src/features/admin/shared/lib/serviceAdminMeta.ts",
+      "path": "src/features/admin/shared/core/serviceAdminMeta.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39110,33 +33127,23 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/pricing/BillingServiceCell.vue",
-          "to": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/demoData.ts",
-          "to": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/featurePromptMeta.ts",
-          "to": "src/features/admin/shared/lib/serviceAdminMeta.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/serviceAdminMeta.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 1,
       "measuredFanOut": 1,
-      "targetFanIn": 3,
+      "targetFanIn": 1,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/serviceAdminMeta.ts"],
-      "targetPath": "src/features/admin/shared/lib/serviceAdminMeta.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/serviceAdminMeta.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/serviceAdminMeta.ts"],
+      "targetPath": "src/features/admin/shared/core/serviceAdminMeta.ts",
+      "ownershipScope": ["src/features/admin/shared/core/serviceAdminMeta.ts"],
       "publicExports": [
         "ADMIN_SERVICE_GROUPS",
         "AdminServiceGroupKey",
@@ -39146,10 +33153,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "getAdminServiceMeta"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": ["src/core/contracts/imageServices.ts"]
+      "targetFanOutTargets": ["src/core/contracts/imageServices.ts"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/serviceAdminMeta.ts"
+      ]
     },
     {
-      "path": "src/features/admin/shared/lib/tableColumns.ts",
+      "path": "src/features/admin/shared/core/tableColumns.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39160,67 +33170,38 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
+          "from": "src/features/admin/shared/core/tableColumns.unit.spec.ts",
+          "to": "src/features/admin/shared/core/tableColumns.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/tableColumns.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/lib/tableColumns.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/tableColumns.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/tableColumns.ts"],
-      "targetPath": "src/features/admin/shared/lib/tableColumns.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/tableColumns.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/tableColumns.ts"],
+      "targetPath": "src/features/admin/shared/core/tableColumns.ts",
+      "ownershipScope": ["src/features/admin/shared/core/tableColumns.ts"],
       "publicExports": [
         "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
         "ADMIN_TABLE_MORE_COLUMN_WIDTH"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/tableColumns.ts"]
     },
     {
-      "path": "src/features/admin/shared/lib/taskMetricTokens.ts",
+      "path": "src/features/admin/shared/core/taskMetricTokens.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39231,88 +33212,33 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/application/useAdminMonitor.contract.spec.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
+          "from": "src/features/admin/monitor/resource.ts",
+          "to": "src/features/admin/shared/core/taskMetricTokens.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/monitor/application/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
+          "from": "src/features/admin/shared/core/taskMetricTokens.unit.spec.ts",
+          "to": "src/features/admin/shared/core/taskMetricTokens.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/domain/status.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskEventsCard.vue",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/monitorComponents.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/taskMetricTokens.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/usageStatisticsQualityTrendCharts.ts",
-          "to": "src/features/admin/shared/lib/taskMetricTokens.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/taskMetricTokens.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 3,
       "measuredFanOut": 1,
-      "targetFanIn": 12,
+      "targetFanIn": 3,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/taskMetricTokens.ts"],
-      "targetPath": "src/features/admin/shared/lib/taskMetricTokens.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/taskMetricTokens.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/taskMetricTokens.ts"],
+      "targetPath": "src/features/admin/shared/core/taskMetricTokens.ts",
+      "ownershipScope": ["src/features/admin/shared/core/taskMetricTokens.ts"],
       "publicExports": [
         "TaskMetricDefinition",
         "TaskMetricKey",
@@ -39324,11 +33250,14 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/features/admin/shared/lib/adminThemeTokens.ts"
+        "src/features/admin/shared/core/adminThemeTokens.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/taskMetricTokens.ts"
       ]
     },
     {
-      "path": "src/features/admin/shared/lib/timeRange.ts",
+      "path": "src/features/admin/shared/core/uiClasses.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39339,491 +33268,83 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/shared/lib/timeRange.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/timeRange.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/usageStatisticsQualityTrendCharts.ts",
-          "to": "src/features/admin/shared/lib/timeRange.ts",
+          "from": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/useUsageStatisticsCharts.ts",
-          "to": "src/features/admin/shared/lib/timeRange.ts",
+          "from": "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/useUsageStatisticsData.ts",
-          "to": "src/features/admin/shared/lib/timeRange.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 4,
-      "measuredFanOut": 2,
-      "targetFanIn": 4,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/timeRange.ts"],
-      "targetPath": "src/features/admin/shared/lib/timeRange.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/timeRange.ts"],
-      "publicExports": [
-        "AdminTimeRangeBucket",
-        "AdminTimeRangeOption",
-        "buildAdminTimeRangeBuckets",
-        "pickAdminTimeRangeOptions",
-        "shouldShowAdminTimeRangeTick"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/lib/chartTimeRange.ts",
-        "src/features/admin/statistics/resource.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/lib/toast.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/form/AdminTextarea.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/pricing/adminBillingPricingPagePool.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminSurfaceFrame.component.spec.ts",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminSurfaceFrame.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/RewardCodePlaintextDialog.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/rewards/useRewardCodesFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/shared/feedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.contract.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/application/useAdminMonitorFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/useAdminLoginFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/useStripeSettingsFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/useStripeSettingsFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/payments/useStripeSettingsFeedback.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/usePromptConfigFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/mail/AdminMailConfigCard.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/AdminOAuthLoginCard.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/OAuthProviderSettingsDialog.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/payment/AdminPaymentSettingsCard.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/shared/useSettingsFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/shared/useSettingsFeedback.unit.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminConfirmDialog.component.spec.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminConfirmDialog.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/lib/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/useStorageFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/useUsersFeedback.ts",
-          "to": "src/features/admin/shared/lib/toast.ts",
+          "from": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 39,
-      "measuredFanOut": 2,
-      "targetFanIn": 39,
-      "targetFanOut": 2,
-      "shims": [],
-      "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/toast.ts"],
-      "targetPath": "src/features/admin/shared/lib/toast.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/toast.ts"],
-      "publicExports": [
-        "AdminToastPort",
-        "formatAdminApiError",
-        "formatAdminDisplayError",
-        "useAdminToast"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "src/core/composables/useAppToast.ts",
-        "src/core/utils/errorMessages.ts"
-      ]
-    },
-    {
-      "path": "src/features/admin/shared/lib/uiClasses.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditFindingQueue.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditHealthPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/health/AdminCreditRunHistoryDialog.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/AdminBillingPricingPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/pricing/BillingPricingTable.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/AdminRewardCodesPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/rewards/RewardCodeRedemptionsDialog.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskActivityTable.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/components/TaskEventsCard.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/payments/orders/AdminPaymentOrdersTable.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/support-channels/AdminSupportChannelsEditor.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminCollectionPageShell.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminDialogShell.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminFilterPopover.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminInput.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoCropDialog.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminNumberInput.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminPagerControls.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminResourceToolbar.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSettingsDialogFrame.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSurfaceFrame.component.spec.ts",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminSurfaceFrame.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminTextarea.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/pages/AdminStatisticsPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageEditorDialog.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/components/AdminStorageTable.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUserBanDialog.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/AdminUsersPage.vue",
-          "to": "src/features/admin/shared/lib/uiClasses.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 36,
+      "measuredFanIn": 13,
       "measuredFanOut": 0,
-      "targetFanIn": 36,
+      "targetFanIn": 13,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/lib/uiClasses.ts"],
-      "targetPath": "src/features/admin/shared/lib/uiClasses.ts",
-      "ownershipScope": ["src/features/admin/shared/lib/uiClasses.ts"],
+      "sourcePaths": ["src/features/admin/shared/core/uiClasses.ts"],
+      "targetPath": "src/features/admin/shared/core/uiClasses.ts",
+      "ownershipScope": ["src/features/admin/shared/core/uiClasses.ts"],
       "publicExports": [
         "adminAnomalyPopoverClass",
         "adminChartCanvasClass",
@@ -39865,10 +33386,1785 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "adminToolbarPageLabelClass"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/uiClasses.ts"]
     },
     {
-      "path": "src/features/admin/shared/logos/brandLogos.ts",
+      "path": "src/features/admin/shared/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-admin-shared",
+      "activationPhase": "P4",
+      "scope": "cross-feature",
+      "exportStyle": "explicit frozen source export mapping",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/app/AdminHeaderBar.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/AdminHeaderBar.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/app/AdminLayout.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/app/login/useAdminLoginFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/rewardCodeRedemptionResource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/useRewardCodeList.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/useRewardCodeRowActions.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/useRewardCodesFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/shared/api.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/shared/feedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/AdminCreditsBillingLayout.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/health/AdminCreditFindingQueue.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/health/AdminCreditHealthPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/health/AdminCreditRunHistoryDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/health/AdminCreditRunHistoryDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/orders/AdminPaymentOrdersTable.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/orders/PaymentOrderDetailDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/BillingPriceDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/BillingPricingTable.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/BillingServiceCell.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/BillingStatusCell.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/BillingStatusCell.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/ModelPoolEditorPanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/ModelPoolSummaryCell.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeRedemptionsDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/RewardCodeRedemptionsDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/shared/AdminActionReasonField.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/shared/invalidBorder.browser.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletAdjustPanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletLedgerTable.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletOverviewCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/session/useAdminModelCatalogFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/session/useAdminModelCatalogWorkspace.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/controls/AdminModelCardBody.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/controls/AdminModelFilter.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/controls/ObservedStatsPanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.component.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/AdminModelAddDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/AdminModelEditDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/components/CatalogGatewayPanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/components/CatalogIdentityPanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/components/CatalogReferencePanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/components/CatalogSpecsPanel.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/pages/AdminModelsPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/core/status.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/resource.contract.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/demoData.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminMonitor.contract.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminMonitorFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminTaskCancel.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useAdminTaskRuntimeSnapshot.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useMonitorDemo.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useMonitorDemo.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/TaskResultCell.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/TaskStatusCell.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/columns.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/columns.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/components/TaskActivityTable.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/components/TaskControlToolbar.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/components/TaskEventsCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/components/monitorComponents.unit.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/core/featurePromptMeta.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/session/api.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/session/usePromptConfigFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/ui/editors/PromptConfigEditorDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/core/storage/meta.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/access/useAccessSettings.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/branding/useBrandingSettings.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/image-library/searchProviderResource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/mail/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/oauth/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/outbound/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/payment/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/payment/useStripeSettingsFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/payment/useStripeSettingsFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/useStorageContext.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/useStorageFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/workspace.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/workspace.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/settings/session/support/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/upload/useMediaUploadSettings.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/useSettingsFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/access/AdminLoginLockoutEditor.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/access/AdminRegistrationRateLimitEditor.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/image-library/AdminImageProvidersTable.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/oauth/AdminOAuthLoginCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/oauth/OAuthProviderSettingsDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/oauth/logo.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/outbound/AdminOutboundPolicyCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/payment/AdminPaymentSettingsCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/payment/StripeSettingsDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/storage/AdminStorageEditorDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/storage/AdminStoragePage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/storage/AdminStorageTable.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/support/AdminSupportChannelsEditor.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/upload/AdminUploadConcurrencyFooter.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/core/usageStatisticsChartBase.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/session/useUsageStatisticsData.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/ui/charts/usageStatisticsModelHealthCharts.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/ui/charts/usageStatisticsQualityTrendCharts.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/ui/views/AdminStatisticsPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/session/api.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/session/commands.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/session/commands.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/session/context.contract.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/session/context.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/users/session/resource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/session/sessionCommands.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/session/useUsersFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/ui/dialog/AdminUserBanDialog.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/ui/table/AdminUsersPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 126,
+      "measuredFanOut": 48,
+      "targetFanIn": 126,
+      "targetFanOut": 48,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Sole horizontal Admin seam (§10 target tree). Verticals gain index.ts only for cross-vertical consumers. P4 2026-10-11 reshaped the shared lane to core/session/ui and retired the 70 temporary legacy-path bridge shims after zero importers were verified; vertical consumers now use the shared/index.ts barrel or canonical deep paths. lint:shim-ttl counts *.shim.ts only; no P4 Admin bridge shims remain in the inventory.",
+      "sourcePaths": [
+        "src/features/admin/shared/core/actionReasonContract.ts",
+        "src/features/admin/shared/core/adminSelectSkin.ts",
+        "src/features/admin/shared/core/adminThemeTokens.ts",
+        "src/features/admin/shared/core/cellClasses.ts",
+        "src/features/admin/shared/core/cellPlaceholders.ts",
+        "src/features/admin/shared/core/controlCopy.ts",
+        "src/features/admin/shared/core/controlGuidance.ts",
+        "src/features/admin/shared/core/controlMutation.ts",
+        "src/features/admin/shared/core/controlResource.ts",
+        "src/features/admin/shared/core/controlTransport.ts",
+        "src/features/admin/shared/core/reconcileStableRows.ts",
+        "src/features/admin/shared/core/secretSchema.ts",
+        "src/features/admin/shared/core/serviceAdminMeta.ts",
+        "src/features/admin/shared/core/tableColumns.ts",
+        "src/features/admin/shared/core/taskMetricTokens.ts",
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/features/admin/shared/session/anomalyRules.ts",
+        "src/features/admin/shared/session/brand/brandLogoResource.ts",
+        "src/features/admin/shared/session/brand/brandLogos.ts",
+        "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
+        "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+        "src/features/admin/shared/session/collection/useAdminCursorCollection.ts",
+        "src/features/admin/shared/session/collection/useCursorPagination.ts",
+        "src/features/admin/shared/session/collection/useOptimisticToggle.ts",
+        "src/features/admin/shared/session/collection/usePagePagination.ts",
+        "src/features/admin/shared/session/collection/useQueryPolling.ts",
+        "src/features/admin/shared/session/collection/useRefetchOnClose.ts",
+        "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+        "src/features/admin/shared/session/feedback/toast.ts",
+        "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+        "src/features/admin/shared/session/timeRange.ts",
+        "src/features/admin/shared/session/useAdminSubHeaderTarget.ts",
+        "src/features/admin/shared/session/useAnomalyRadar.ts",
+        "src/features/admin/shared/ui/AdminBadge.vue",
+        "src/features/admin/shared/ui/AdminButton.vue",
+        "src/features/admin/shared/ui/AdminColumn.vue",
+        "src/features/admin/shared/ui/AdminMono.vue",
+        "src/features/admin/shared/ui/AdminSpinner.vue",
+        "src/features/admin/shared/ui/chart/AdminChartCard.vue",
+        "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue",
+        "src/features/admin/shared/ui/chart/chart.ts",
+        "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+        "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+        "src/features/admin/shared/ui/feedback/AdminEmptyState.vue",
+        "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+        "src/features/admin/shared/ui/form/AdminFormField.vue",
+        "src/features/admin/shared/ui/form/AdminInput.vue",
+        "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+        "src/features/admin/shared/ui/form/AdminSelect.vue",
+        "src/features/admin/shared/ui/form/AdminSwitch.vue",
+        "src/features/admin/shared/ui/form/AdminTextarea.vue",
+        "src/features/admin/shared/ui/form/SwitchRow.vue",
+        "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+        "src/features/admin/shared/ui/popover/AdminPopover.vue",
+        "src/features/admin/shared/ui/popover/AdminPopoverContent.vue",
+        "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue",
+        "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts",
+        "src/features/admin/shared/ui/serviceIcons.ts",
+        "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
+        "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
+        "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+        "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+        "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
+        "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+        "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+        "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue",
+        "src/features/admin/shared/ui/shell/AdminSummaryCard.vue",
+        "src/features/admin/shared/ui/shell/AdminSurfaceFrame.vue",
+        "src/features/admin/shared/ui/table/AdminTable.vue",
+        "src/features/admin/shared/ui/table/AdminTableBody.vue",
+        "src/features/admin/shared/ui/table/AdminTableCaption.vue",
+        "src/features/admin/shared/ui/table/AdminTableCell.vue",
+        "src/features/admin/shared/ui/table/AdminTableEmpty.vue",
+        "src/features/admin/shared/ui/table/AdminTableFooter.vue",
+        "src/features/admin/shared/ui/table/AdminTableHead.vue",
+        "src/features/admin/shared/ui/table/AdminTableHeader.vue",
+        "src/features/admin/shared/ui/table/AdminTablePanel.vue",
+        "src/features/admin/shared/ui/table/AdminTableRow.vue",
+        "src/features/admin/shared/ui/table/adminTableAtoms.ts",
+        "src/features/admin/shared/ui/tabs/AdminTabs.vue",
+        "src/features/admin/shared/ui/tabs/AdminTabsContent.vue",
+        "src/features/admin/shared/ui/tabs/AdminTabsList.vue",
+        "src/features/admin/shared/ui/tabs/AdminTabsTrigger.vue",
+        "src/features/admin/shared/ui/tabs/adminTabsAtoms.ts",
+        "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue",
+        "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+        "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+        "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+        "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
+        "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue",
+        "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue"
+      ],
+      "targetPath": "src/features/admin/shared/index.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/core/",
+        "src/features/admin/shared/index.ts",
+        "src/features/admin/shared/session/",
+        "src/features/admin/shared/ui/"
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/"],
+      "publicExports": [
+        "ADMIN_BRAND_CATEGORIES",
+        "ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY",
+        "ADMIN_CONTROL_UNAVAILABLE_CODE",
+        "ADMIN_IDENTITY_EMPTY",
+        "ADMIN_NUMERIC_EMPTY",
+        "ADMIN_PROBE_OPERATOR_REASON",
+        "ADMIN_REASON_REQUIRED_MESSAGE",
+        "ADMIN_REVERSIBLE_DEFAULT_REASON",
+        "ADMIN_SELECT_SIDE_OFFSET",
+        "ADMIN_SERVICE_GROUPS",
+        "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
+        "ADMIN_TABLE_MORE_COLUMN_WIDTH",
+        "ALL_ADMIN_BRAND_LOGOS",
+        "AdminActionReasonValidation",
+        "AdminAlert",
+        "AdminAlertSeverity",
+        "AdminAnomalyItem",
+        "AdminAnomalySeverity",
+        "AdminAnomalySource",
+        "AdminBadge",
+        "AdminBadgeVariant",
+        "AdminBrandCategory",
+        "AdminBrandCategoryKey",
+        "AdminBrandLogoItem",
+        "AdminBrandLogoKey",
+        "AdminBrandLogoScope",
+        "AdminButton",
+        "AdminButtonSize",
+        "AdminButtonVariant",
+        "AdminChartCard",
+        "AdminCollectionPageShell",
+        "AdminColumn",
+        "AdminConfirmDialog",
+        "AdminConfirmIntent",
+        "AdminConfirmOptions",
+        "AdminConfirmPort",
+        "AdminConfirmReasonSpec",
+        "AdminConfirmRequest",
+        "AdminConfirmRisk",
+        "AdminConfirmState",
+        "AdminControlUnavailableError",
+        "AdminCursorValue",
+        "AdminDialogActions",
+        "AdminDialogContentLayout",
+        "AdminDialogShell",
+        "AdminDialogSize",
+        "AdminDrawer",
+        "AdminEditorActions",
+        "AdminEmptyKind",
+        "AdminEmptyState",
+        "AdminFilterPopover",
+        "AdminFormField",
+        "AdminFormFieldSlotProps",
+        "AdminInput",
+        "AdminLogoCropDialog",
+        "AdminLogoPickerPopover",
+        "AdminMono",
+        "AdminNumberInput",
+        "AdminOptionFilter",
+        "AdminOptionFilterOption",
+        "AdminPagerControls",
+        "AdminPopover",
+        "AdminPopoverContent",
+        "AdminPopoverTrigger",
+        "AdminRangedLineChartCard",
+        "AdminRefreshButton",
+        "AdminResourceToolbar",
+        "AdminRowActionItem",
+        "AdminRowActionsPopover",
+        "AdminSelect",
+        "AdminServiceGroupKey",
+        "AdminServiceGroupMeta",
+        "AdminServiceMeta",
+        "AdminSettingsDialogFrame",
+        "AdminSpinner",
+        "AdminStatusPill",
+        "AdminStatusPillVariant",
+        "AdminSubNavigationItem",
+        "AdminSubNavigationLayout",
+        "AdminSummaryCard",
+        "AdminSwitch",
+        "AdminSwitchRowPillSize",
+        "AdminTable",
+        "AdminTableBody",
+        "AdminTableCaption",
+        "AdminTableCell",
+        "AdminTableFooter",
+        "AdminTableHead",
+        "AdminTableHeader",
+        "AdminTablePanel",
+        "AdminTableRow",
+        "AdminTableRowClickEvent",
+        "AdminTableRowCollapseEvent",
+        "AdminTableRowEvent",
+        "AdminTableRowExpandEvent",
+        "AdminTabs",
+        "AdminTabsContent",
+        "AdminTabsList",
+        "AdminTabsTrigger",
+        "AdminTextarea",
+        "AdminTimeRangeBucket",
+        "AdminTimeRangeOption",
+        "AdminToastPort",
+        "AdminToolbarSearch",
+        "ApiResponseAdminBrandLogoOverrideList",
+        "CONTROL_API_PREFIX",
+        "ControlError",
+        "ControlErrorMessages",
+        "ControlMutationOptions",
+        "LoadControlSettingOptions",
+        "MAX_ADMIN_ACTION_REASON_LENGTH",
+        "OptimisticToggleFeedback",
+        "OptimisticToggleMutate",
+        "SelectOptionItem",
+        "SwitchRow",
+        "TaskMetricDefinition",
+        "TaskMetricKey",
+        "TaskMetricStatsSnapshot",
+        "TaskStatus",
+        "activeAdminConfirm",
+        "adminAnomalyPopoverClass",
+        "adminBrandLogoMap",
+        "adminBrandLogoProxyUrl",
+        "adminChartCanvasClass",
+        "adminChartGridClass",
+        "adminChartLegend",
+        "adminChartPlugins",
+        "adminChartStrokeWidth",
+        "adminChartTheme",
+        "adminCompactIconButtonClass",
+        "adminControlUnavailable",
+        "adminDarkThemeTokenFallbacks",
+        "adminDashboardRootClass",
+        "adminDialogChromeClass",
+        "adminDialogChromeCloseClass",
+        "adminDialogChromeContentClass",
+        "adminDialogChromeFooterClass",
+        "adminDialogChromeHeaderClass",
+        "adminDialogChromeHeaderSplitClass",
+        "adminDialogChromeTitleClass",
+        "adminDialogFooterActionsClass",
+        "adminDialogFormBodyClass",
+        "adminDialogHeaderClass",
+        "adminDialogHeaderContentClass",
+        "adminDialogHeaderSplitClass",
+        "adminDialogScrollableBodyClass",
+        "adminDialogTitleClass",
+        "adminEmptyStateClass",
+        "adminFramedIconButtonClass",
+        "adminInlineJumpClass",
+        "adminInputChromeClass",
+        "adminLogoButtonClass",
+        "adminMonoClass",
+        "adminNumericCellClass",
+        "adminSelectContentClass",
+        "adminSelectItemCheckClass",
+        "adminSelectItemClass",
+        "adminSelectItemCompactClass",
+        "adminSelectItemIndicatorClass",
+        "adminSelectPanelClass",
+        "adminSelectTriggerActiveClass",
+        "adminSelectTriggerClass",
+        "adminSelectTriggerCompactClass",
+        "adminSelectTriggerIconClass",
+        "adminSelectViewportClass",
+        "adminSummaryGridClass",
+        "adminSurfacePanelClass",
+        "adminSurfacePanelViewportClass",
+        "adminSurfaceRootViewportClass",
+        "adminSurfaceScrollContentClass",
+        "adminSurfaceToolbarClass",
+        "adminTableCardClass",
+        "adminTableClass",
+        "adminTableFooterClass",
+        "adminTableFrameClass",
+        "adminTableRowActionButtonClass",
+        "adminTableStyle",
+        "adminTextButtonClass",
+        "adminThemeTokenFallbacks",
+        "adminToolbarMetricClass",
+        "adminToolbarPageLabelClass",
+        "adminTruncateCellClass",
+        "buildAdminAnomalyItems",
+        "buildAdminTimeRangeBuckets",
+        "buildControlMutationHeaders",
+        "buildRoutineControlMutationHeaders",
+        "confirmSettingsSave",
+        "createAdminBrandLogoResource",
+        "createControlError",
+        "defineAdminChartBubblePointStyle",
+        "defineAdminChartCountScale",
+        "defineAdminChartDurationScale",
+        "defineAdminChartOptions",
+        "defineAdminChartPercentScale",
+        "defineAdminChartPointClipStyle",
+        "defineAdminChartTooltip",
+        "detectAdminBrandLogoKey",
+        "emptyPlaceholder",
+        "formatAdminApiError",
+        "formatAdminDisplayError",
+        "getAdminBrandLogo",
+        "getAdminBrandLogoOverride",
+        "getAdminChartBubbleHoverRadius",
+        "getAdminChartBubbleRadius",
+        "getAdminServiceGroupMeta",
+        "getAdminServiceMeta",
+        "getServiceIcon",
+        "getTaskMetricByStatus",
+        "hydrateAdminBrandLogoOverrides",
+        "loadControlSetting",
+        "mapControlError",
+        "monitorChartSpecs",
+        "pickAdminTimeRangeOptions",
+        "readConfirmReason",
+        "readControlErrorCode",
+        "readControlRequestId",
+        "readReversibleReason",
+        "reconcileStableRows",
+        "replaceAdminBrandLogoOverrides",
+        "requireDestructiveReason",
+        "requireOperatorReason",
+        "resolveModelBrandLogo",
+        "secretField",
+        "shouldShowAdminTimeRangeTick",
+        "taskMetricDefinitions",
+        "useAdminBrandLogoResource",
+        "useAdminChartReady",
+        "useAdminCollectionQuery",
+        "useAdminConfirm",
+        "useAdminCursorCollection",
+        "useAdminSubHeaderTarget",
+        "useAdminToast",
+        "useAnomalyRadar",
+        "useBrandLogoOverrides",
+        "useCursorPagination",
+        "useOptimisticToggle",
+        "usePagePagination",
+        "useQueryPolling",
+        "useRefetchOnClose",
+        "validateAdminActionReason",
+        "withControlCopy"
+      ],
+      "exportMappings": [
+        {
+          "source": "src/features/admin/shared/core/actionReasonContract.ts",
+          "name": "validateAdminActionReason",
+          "exportedAs": "validateAdminActionReason"
+        },
+        {
+          "source": "src/features/admin/shared/core/cellClasses.ts",
+          "name": "adminInlineJumpClass",
+          "exportedAs": "adminInlineJumpClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/cellPlaceholders.ts",
+          "name": "ADMIN_IDENTITY_EMPTY",
+          "exportedAs": "ADMIN_IDENTITY_EMPTY"
+        },
+        {
+          "source": "src/features/admin/shared/core/cellPlaceholders.ts",
+          "name": "ADMIN_NUMERIC_EMPTY",
+          "exportedAs": "ADMIN_NUMERIC_EMPTY"
+        },
+        {
+          "source": "src/features/admin/shared/core/cellPlaceholders.ts",
+          "name": "emptyPlaceholder",
+          "exportedAs": "emptyPlaceholder"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlCopy.ts",
+          "name": "withControlCopy",
+          "exportedAs": "withControlCopy"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlGuidance.ts",
+          "name": "ADMIN_CONTROL_UNAVAILABLE_CODE",
+          "exportedAs": "ADMIN_CONTROL_UNAVAILABLE_CODE"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlGuidance.ts",
+          "name": "adminControlUnavailable",
+          "exportedAs": "adminControlUnavailable"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlMutation.ts",
+          "name": "ControlMutationOptions",
+          "exportedAs": "ControlMutationOptions"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlMutation.ts",
+          "name": "buildControlMutationHeaders",
+          "exportedAs": "buildControlMutationHeaders"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlMutation.ts",
+          "name": "buildRoutineControlMutationHeaders",
+          "exportedAs": "buildRoutineControlMutationHeaders"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlMutation.ts",
+          "name": "createControlError",
+          "exportedAs": "createControlError"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlMutation.ts",
+          "name": "requireOperatorReason",
+          "exportedAs": "requireOperatorReason"
+        },
+        {
+          "source": "src/features/admin/shared/core/controlResource.ts",
+          "name": "loadControlSetting",
+          "exportedAs": "loadControlSetting"
+        },
+        {
+          "source": "src/features/admin/shared/core/reconcileStableRows.ts",
+          "name": "reconcileStableRows",
+          "exportedAs": "reconcileStableRows"
+        },
+        {
+          "source": "src/features/admin/shared/core/secretSchema.ts",
+          "name": "secretField",
+          "exportedAs": "secretField"
+        },
+        {
+          "source": "src/features/admin/shared/core/serviceAdminMeta.ts",
+          "name": "ADMIN_SERVICE_GROUPS",
+          "exportedAs": "ADMIN_SERVICE_GROUPS"
+        },
+        {
+          "source": "src/features/admin/shared/core/serviceAdminMeta.ts",
+          "name": "AdminServiceGroupKey",
+          "exportedAs": "AdminServiceGroupKey"
+        },
+        {
+          "source": "src/features/admin/shared/core/serviceAdminMeta.ts",
+          "name": "getAdminServiceGroupMeta",
+          "exportedAs": "getAdminServiceGroupMeta"
+        },
+        {
+          "source": "src/features/admin/shared/core/serviceAdminMeta.ts",
+          "name": "getAdminServiceMeta",
+          "exportedAs": "getAdminServiceMeta"
+        },
+        {
+          "source": "src/features/admin/shared/core/tableColumns.ts",
+          "name": "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
+          "exportedAs": "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH"
+        },
+        {
+          "source": "src/features/admin/shared/core/tableColumns.ts",
+          "name": "ADMIN_TABLE_MORE_COLUMN_WIDTH",
+          "exportedAs": "ADMIN_TABLE_MORE_COLUMN_WIDTH"
+        },
+        {
+          "source": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "name": "TaskMetricDefinition",
+          "exportedAs": "TaskMetricDefinition"
+        },
+        {
+          "source": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "name": "TaskMetricStatsSnapshot",
+          "exportedAs": "TaskMetricStatsSnapshot"
+        },
+        {
+          "source": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "name": "TaskStatus",
+          "exportedAs": "TaskStatus"
+        },
+        {
+          "source": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "name": "getTaskMetricByStatus",
+          "exportedAs": "getTaskMetricByStatus"
+        },
+        {
+          "source": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "name": "monitorChartSpecs",
+          "exportedAs": "monitorChartSpecs"
+        },
+        {
+          "source": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "name": "taskMetricDefinitions",
+          "exportedAs": "taskMetricDefinitions"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminAnomalyPopoverClass",
+          "exportedAs": "adminAnomalyPopoverClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminChartCanvasClass",
+          "exportedAs": "adminChartCanvasClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminChartGridClass",
+          "exportedAs": "adminChartGridClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminCompactIconButtonClass",
+          "exportedAs": "adminCompactIconButtonClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminDashboardRootClass",
+          "exportedAs": "adminDashboardRootClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminDialogFooterActionsClass",
+          "exportedAs": "adminDialogFooterActionsClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminDialogHeaderContentClass",
+          "exportedAs": "adminDialogHeaderContentClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminDialogTitleClass",
+          "exportedAs": "adminDialogTitleClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminEmptyStateClass",
+          "exportedAs": "adminEmptyStateClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminFramedIconButtonClass",
+          "exportedAs": "adminFramedIconButtonClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminLogoButtonClass",
+          "exportedAs": "adminLogoButtonClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminSummaryGridClass",
+          "exportedAs": "adminSummaryGridClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTableCardClass",
+          "exportedAs": "adminTableCardClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTableClass",
+          "exportedAs": "adminTableClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTableFooterClass",
+          "exportedAs": "adminTableFooterClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTableFrameClass",
+          "exportedAs": "adminTableFrameClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTableRowActionButtonClass",
+          "exportedAs": "adminTableRowActionButtonClass"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTableStyle",
+          "exportedAs": "adminTableStyle"
+        },
+        {
+          "source": "src/features/admin/shared/core/uiClasses.ts",
+          "name": "adminTextButtonClass",
+          "exportedAs": "adminTextButtonClass"
+        },
+        {
+          "source": "src/features/admin/shared/session/anomalyRules.ts",
+          "name": "AdminAnomalyItem",
+          "exportedAs": "AdminAnomalyItem"
+        },
+        {
+          "source": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "name": "ALL_ADMIN_BRAND_LOGOS",
+          "exportedAs": "ALL_ADMIN_BRAND_LOGOS"
+        },
+        {
+          "source": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "name": "adminBrandLogoMap",
+          "exportedAs": "adminBrandLogoMap"
+        },
+        {
+          "source": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "name": "getAdminBrandLogo",
+          "exportedAs": "getAdminBrandLogo"
+        },
+        {
+          "source": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "name": "getAdminBrandLogoOverride",
+          "exportedAs": "getAdminBrandLogoOverride"
+        },
+        {
+          "source": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "name": "resolveModelBrandLogo",
+          "exportedAs": "resolveModelBrandLogo"
+        },
+        {
+          "source": "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
+          "name": "useBrandLogoOverrides",
+          "exportedAs": "useBrandLogoOverrides"
+        },
+        {
+          "source": "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+          "name": "useAdminCollectionQuery",
+          "exportedAs": "useAdminCollectionQuery"
+        },
+        {
+          "source": "src/features/admin/shared/session/collection/useAdminCursorCollection.ts",
+          "name": "useAdminCursorCollection",
+          "exportedAs": "useAdminCursorCollection"
+        },
+        {
+          "source": "src/features/admin/shared/session/collection/useOptimisticToggle.ts",
+          "name": "useOptimisticToggle",
+          "exportedAs": "useOptimisticToggle"
+        },
+        {
+          "source": "src/features/admin/shared/session/collection/usePagePagination.ts",
+          "name": "usePagePagination",
+          "exportedAs": "usePagePagination"
+        },
+        {
+          "source": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+          "name": "useQueryPolling",
+          "exportedAs": "useQueryPolling"
+        },
+        {
+          "source": "src/features/admin/shared/session/collection/useRefetchOnClose.ts",
+          "name": "useRefetchOnClose",
+          "exportedAs": "useRefetchOnClose"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "name": "ADMIN_PROBE_OPERATOR_REASON",
+          "exportedAs": "ADMIN_PROBE_OPERATOR_REASON"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "name": "confirmSettingsSave",
+          "exportedAs": "confirmSettingsSave"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "name": "requireDestructiveReason",
+          "exportedAs": "requireDestructiveReason"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/toast.ts",
+          "name": "AdminToastPort",
+          "exportedAs": "AdminToastPort"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/toast.ts",
+          "name": "formatAdminApiError",
+          "exportedAs": "formatAdminApiError"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/toast.ts",
+          "name": "formatAdminDisplayError",
+          "exportedAs": "formatAdminDisplayError"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/toast.ts",
+          "name": "useAdminToast",
+          "exportedAs": "useAdminToast"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "name": "AdminConfirmPort",
+          "exportedAs": "AdminConfirmPort"
+        },
+        {
+          "source": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "name": "useAdminConfirm",
+          "exportedAs": "useAdminConfirm"
+        },
+        {
+          "source": "src/features/admin/shared/session/timeRange.ts",
+          "name": "AdminTimeRangeOption",
+          "exportedAs": "AdminTimeRangeOption"
+        },
+        {
+          "source": "src/features/admin/shared/session/timeRange.ts",
+          "name": "buildAdminTimeRangeBuckets",
+          "exportedAs": "buildAdminTimeRangeBuckets"
+        },
+        {
+          "source": "src/features/admin/shared/session/timeRange.ts",
+          "name": "pickAdminTimeRangeOptions",
+          "exportedAs": "pickAdminTimeRangeOptions"
+        },
+        {
+          "source": "src/features/admin/shared/session/timeRange.ts",
+          "name": "shouldShowAdminTimeRangeTick",
+          "exportedAs": "shouldShowAdminTimeRangeTick"
+        },
+        {
+          "source": "src/features/admin/shared/session/useAnomalyRadar.ts",
+          "name": "useAnomalyRadar",
+          "exportedAs": "useAnomalyRadar"
+        },
+        {
+          "source": "src/features/admin/shared/ui/AdminBadge.vue",
+          "name": "default",
+          "exportedAs": "AdminBadge"
+        },
+        {
+          "source": "src/features/admin/shared/ui/AdminButton.vue",
+          "name": "default",
+          "exportedAs": "AdminButton"
+        },
+        {
+          "source": "src/features/admin/shared/ui/AdminColumn.vue",
+          "name": "default",
+          "exportedAs": "AdminColumn"
+        },
+        {
+          "source": "src/features/admin/shared/ui/AdminMono.vue",
+          "name": "default",
+          "exportedAs": "AdminMono"
+        },
+        {
+          "source": "src/features/admin/shared/ui/AdminSpinner.vue",
+          "name": "default",
+          "exportedAs": "AdminSpinner"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/AdminChartCard.vue",
+          "name": "default",
+          "exportedAs": "AdminChartCard"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue",
+          "name": "default",
+          "exportedAs": "AdminRangedLineChartCard"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "adminChartLegend",
+          "exportedAs": "adminChartLegend"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "adminChartPlugins",
+          "exportedAs": "adminChartPlugins"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "adminChartStrokeWidth",
+          "exportedAs": "adminChartStrokeWidth"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "adminChartTheme",
+          "exportedAs": "adminChartTheme"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartBubblePointStyle",
+          "exportedAs": "defineAdminChartBubblePointStyle"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartCountScale",
+          "exportedAs": "defineAdminChartCountScale"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartDurationScale",
+          "exportedAs": "defineAdminChartDurationScale"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartOptions",
+          "exportedAs": "defineAdminChartOptions"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartPercentScale",
+          "exportedAs": "defineAdminChartPercentScale"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartPointClipStyle",
+          "exportedAs": "defineAdminChartPointClipStyle"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "defineAdminChartTooltip",
+          "exportedAs": "defineAdminChartTooltip"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "getAdminChartBubbleHoverRadius",
+          "exportedAs": "getAdminChartBubbleHoverRadius"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "getAdminChartBubbleRadius",
+          "exportedAs": "getAdminChartBubbleRadius"
+        },
+        {
+          "source": "src/features/admin/shared/ui/chart/chart.ts",
+          "name": "useAdminChartReady",
+          "exportedAs": "useAdminChartReady"
+        },
+        {
+          "source": "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+          "name": "default",
+          "exportedAs": "AdminAlert"
+        },
+        {
+          "source": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "name": "default",
+          "exportedAs": "AdminConfirmDialog"
+        },
+        {
+          "source": "src/features/admin/shared/ui/feedback/AdminEmptyState.vue",
+          "name": "default",
+          "exportedAs": "AdminEmptyState"
+        },
+        {
+          "source": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+          "name": "AdminStatusPillVariant",
+          "exportedAs": "AdminStatusPillVariant"
+        },
+        {
+          "source": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+          "name": "default",
+          "exportedAs": "AdminStatusPill"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/AdminFormField.vue",
+          "name": "default",
+          "exportedAs": "AdminFormField"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "name": "default",
+          "exportedAs": "AdminInput"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+          "name": "default",
+          "exportedAs": "AdminNumberInput"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/AdminSelect.vue",
+          "name": "default",
+          "exportedAs": "AdminSelect"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+          "name": "default",
+          "exportedAs": "AdminSwitch"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/AdminTextarea.vue",
+          "name": "default",
+          "exportedAs": "AdminTextarea"
+        },
+        {
+          "source": "src/features/admin/shared/ui/form/SwitchRow.vue",
+          "name": "default",
+          "exportedAs": "SwitchRow"
+        },
+        {
+          "source": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+          "name": "default",
+          "exportedAs": "AdminLogoPickerPopover"
+        },
+        {
+          "source": "src/features/admin/shared/ui/popover/AdminPopover.vue",
+          "name": "default",
+          "exportedAs": "AdminPopover"
+        },
+        {
+          "source": "src/features/admin/shared/ui/popover/AdminPopoverContent.vue",
+          "name": "default",
+          "exportedAs": "AdminPopoverContent"
+        },
+        {
+          "source": "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue",
+          "name": "default",
+          "exportedAs": "AdminPopoverTrigger"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
+          "name": "default",
+          "exportedAs": "AdminCollectionPageShell"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
+          "name": "default",
+          "exportedAs": "AdminDialogActions"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "name": "default",
+          "exportedAs": "AdminDialogShell"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+          "name": "default",
+          "exportedAs": "AdminDrawer"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
+          "name": "default",
+          "exportedAs": "AdminEditorActions"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+          "name": "default",
+          "exportedAs": "AdminLogoCropDialog"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "name": "default",
+          "exportedAs": "AdminSettingsDialogFrame"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue",
+          "name": "default",
+          "exportedAs": "AdminSubNavigationLayout"
+        },
+        {
+          "source": "src/features/admin/shared/ui/shell/AdminSummaryCard.vue",
+          "name": "default",
+          "exportedAs": "AdminSummaryCard"
+        },
+        {
+          "source": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "name": "AdminTableRowCollapseEvent",
+          "exportedAs": "AdminTableRowCollapseEvent"
+        },
+        {
+          "source": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "name": "AdminTableRowExpandEvent",
+          "exportedAs": "AdminTableRowExpandEvent"
+        },
+        {
+          "source": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "name": "default",
+          "exportedAs": "AdminTable"
+        },
+        {
+          "source": "src/features/admin/shared/ui/table/AdminTablePanel.vue",
+          "name": "default",
+          "exportedAs": "AdminTablePanel"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue",
+          "name": "default",
+          "exportedAs": "AdminFilterPopover"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+          "name": "default",
+          "exportedAs": "AdminOptionFilter"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+          "name": "default",
+          "exportedAs": "AdminPagerControls"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+          "name": "default",
+          "exportedAs": "AdminRefreshButton"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
+          "name": "default",
+          "exportedAs": "AdminResourceToolbar"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue",
+          "name": "default",
+          "exportedAs": "AdminRowActionsPopover"
+        },
+        {
+          "source": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+          "name": "default",
+          "exportedAs": "AdminToolbarSearch"
+        }
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "fs",
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/chart.js/dist/chart.cjs",
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/valibot/dist/index.mjs",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue-advanced-cropper/dist/index.cjs.js",
+        "node_modules/vue-advanced-cropper/dist/style.css",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue-router/index.cjs",
+        "node_modules/vue/index.js",
+        "path",
+        "src/api/contractKernel.ts",
+        "src/api/generated-query/control/control-platform/control-platform.ts",
+        "src/components/ui/badge/index.ts",
+        "src/components/ui/button/buttonChrome.ts",
+        "src/components/ui/button/index.ts",
+        "src/components/ui/input/index.ts",
+        "src/components/ui/select/index.ts",
+        "src/components/ui/spinner/index.ts",
+        "src/core/assets/oauth/discord.svg",
+        "src/core/assets/oauth/google.svg",
+        "src/core/components/ActionButton.vue",
+        "src/core/components/ChartCard.vue",
+        "src/core/components/ChartPanel.vue",
+        "src/core/components/RangedLineChartCard.vue",
+        "src/core/components/StatusBadge.vue",
+        "src/core/components/formFieldContract.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/config/pagination.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/contracts/imageServices.ts",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/lib/chartTimeRange.ts",
+        "src/core/motion/chartMotion.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/utils/errorMessages.ts",
+        "src/features/admin/monitor/resource.ts",
+        "src/features/admin/routePaths.ts",
+        "src/features/admin/statistics/session/resource.ts",
+        "src/lib/utils.ts",
+        "src/test/render.ts",
+        "src/theme/composables/useTheme.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/anomalyRules.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39879,73 +35175,103 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/models/presentation/controls/AdminModelCardBody.vue",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/anomalyRules.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/dialog/AdminModelAddDialog.vue",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/anomalyRules.unit.spec.ts",
+          "to": "src/features/admin/shared/session/anomalyRules.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/dialog/components/CatalogReferencePanel.vue",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/image-library/AdminImageProvidersTable.vue",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/settings/oauth/logo.ts",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoPickerPopover.component.spec.ts",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/components/AdminLogoPickerPopover.vue",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/logos/brandLogoResource.ts",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/logos/brandLogoResource.unit.spec.ts",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/logos/brandLogos.unit.spec.ts",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/storage/meta.ts",
-          "to": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/useAnomalyRadar.ts",
+          "to": "src/features/admin/shared/session/anomalyRules.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 3,
+      "measuredFanOut": 3,
+      "targetFanIn": 3,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/session/anomalyRules.ts"],
+      "targetPath": "src/features/admin/shared/session/anomalyRules.ts",
+      "ownershipScope": ["src/features/admin/shared/session/anomalyRules.ts"],
+      "publicExports": [
+        "AdminAnomalyItem",
+        "AdminAnomalySeverity",
+        "AdminAnomalySource",
+        "buildAdminAnomalyItems"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/admin/monitor/resource.ts",
+        "src/features/admin/routePaths.ts",
+        "src/features/admin/statistics/session/resource.ts"
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/anomalyRules.ts"]
+    },
+    {
+      "path": "src/features/admin/shared/session/brand/brandLogos.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/brand/brandLogoResource.ts",
+          "to": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/brand/brandLogoResource.unit.spec.ts",
+          "to": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/brand/brandLogos.unit.spec.ts",
+          "to": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.component.spec.ts",
+          "to": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+          "to": "src/features/admin/shared/session/brand/brandLogos.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 6,
       "measuredFanOut": 14,
-      "targetFanIn": 11,
+      "targetFanIn": 6,
       "targetFanOut": 14,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
-      "sourcePaths": ["src/features/admin/shared/logos/brandLogos.ts"],
-      "targetPath": "src/features/admin/shared/logos/brandLogos.ts",
-      "ownershipScope": ["src/features/admin/shared/logos/brandLogos.ts"],
+      "sourcePaths": ["src/features/admin/shared/session/brand/brandLogos.ts"],
+      "targetPath": "src/features/admin/shared/session/brand/brandLogos.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/brand/brandLogos.ts"
+      ],
       "publicExports": [
         "ADMIN_BRAND_CATEGORIES",
         "ALL_ADMIN_BRAND_LOGOS",
@@ -39969,7 +35295,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/assets/oauth/discord.svg",
         "src/core/assets/oauth/google.svg",
         "src/core/config/runtimeUrls.ts",
-        "src/features/admin/shared/lib/controlTransport.ts",
+        "src/features/admin/shared/core/controlTransport.ts",
         "src/features/admin/shared/ui/assets/oauth/github.svg",
         "src/features/admin/shared/ui/assets/search-providers/pexels.svg",
         "src/features/admin/shared/ui/assets/search-providers/unsplash.svg",
@@ -39978,10 +35304,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/admin/shared/ui/assets/storage-vendors/cloudflare.svg",
         "src/features/admin/shared/ui/assets/storage-vendors/minio.svg",
         "src/features/admin/shared/ui/assets/storage-vendors/tencentcloud.ico"
-      ]
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/logos/brandLogos.ts"]
     },
     {
-      "path": "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
+      "path": "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -39992,8 +35319,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/app/AdminLayout.vue",
-          "to": "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
           "kind": "runtime"
         }
       ],
@@ -40002,16 +35329,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanIn": 1,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
       "sourcePaths": [
-        "src/features/admin/shared/logos/useBrandLogoOverrides.ts"
+        "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts"
       ],
-      "targetPath": "src/features/admin/shared/logos/useBrandLogoOverrides.ts",
+      "targetPath": "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts",
       "ownershipScope": [
-        "src/features/admin/shared/logos/useBrandLogoOverrides.ts"
+        "src/features/admin/shared/session/brand/useBrandLogoOverrides.ts"
       ],
       "publicExports": ["useBrandLogoOverrides"],
       "surfaceSeverity": "warn",
@@ -40019,8 +35346,1760 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/core/query/queryDefaults.ts",
-        "src/features/admin/shared/lib/controlGuidance.ts",
-        "src/features/admin/shared/logos/brandLogoResource.ts"
+        "src/features/admin/shared/core/controlGuidance.ts",
+        "src/features/admin/shared/session/brand/brandLogoResource.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/logos/useBrandLogoOverrides.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/collection/useAdminCursorCollection.ts",
+          "to": "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts"
+      ],
+      "publicExports": ["useAdminCollectionQuery"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/vue/index.js",
+        "src/core/query/queryDefaults.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useAdminCollectionQuery.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/collection/useAdminCursorCollection.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/collection/useAdminCursorCollection.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 4,
+      "targetFanIn": 1,
+      "targetFanOut": 4,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/collection/useAdminCursorCollection.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/collection/useAdminCursorCollection.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/collection/useAdminCursorCollection.ts"
+      ],
+      "publicExports": ["useAdminCursorCollection"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/session/collection/useAdminCollectionQuery.ts",
+        "src/features/admin/shared/session/collection/useCursorPagination.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useAdminCursorCollection.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/collection/useOptimisticToggle.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/collection/useOptimisticToggle.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/collection/useOptimisticToggle.unit.spec.ts",
+          "to": "src/features/admin/shared/session/collection/useOptimisticToggle.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/collection/useOptimisticToggle.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/collection/useOptimisticToggle.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/collection/useOptimisticToggle.ts"
+      ],
+      "publicExports": [
+        "OptimisticToggleFeedback",
+        "OptimisticToggleMutate",
+        "useOptimisticToggle"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useOptimisticToggle.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/collection/usePagePagination.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/collection/usePagePagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/collection/usePagePagination.unit.spec.ts",
+          "to": "src/features/admin/shared/session/collection/usePagePagination.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/collection/usePagePagination.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/collection/usePagePagination.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/collection/usePagePagination.ts"
+      ],
+      "publicExports": ["usePagePagination"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/core/config/pagination.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/usePagePagination.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/useAnomalyRadar.ts",
+          "to": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/collection/useQueryPolling.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/collection/useQueryPolling.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/collection/useQueryPolling.ts"
+      ],
+      "publicExports": ["useQueryPolling"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/vue/index.js"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useQueryPolling.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/collection/useRefetchOnClose.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/collection/useRefetchOnClose.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/collection/useRefetchOnClose.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/collection/useRefetchOnClose.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/collection/useRefetchOnClose.ts"
+      ],
+      "publicExports": ["useRefetchOnClose"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useRefetchOnClose.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/feedback/confirmSettingsSave.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/feedback/confirmSettingsSave.ts"
+      ],
+      "publicExports": [
+        "ADMIN_PROBE_OPERATOR_REASON",
+        "ADMIN_REASON_REQUIRED_MESSAGE",
+        "ADMIN_REVERSIBLE_DEFAULT_REASON",
+        "AdminConfirmRisk",
+        "confirmSettingsSave",
+        "readReversibleReason",
+        "requireDestructiveReason"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/admin/shared/session/feedback/toast.ts",
+        "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/lib/confirmSettingsSave.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/feedback/toast.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/pricing/adminBillingPricingPagePool.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/session/useAdminModelCatalogWorkspace.contract.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/ui/pages/AdminModelsPage.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/payment/useStripeSettingsFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/useSettingsFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/image-library/AdminImageProvidersTable.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/oauth/OAuthProviderSettingsDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/ui/cards/payment/StripeSettingsDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 18,
+      "measuredFanOut": 2,
+      "targetFanIn": 18,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/session/feedback/toast.ts"],
+      "targetPath": "src/features/admin/shared/session/feedback/toast.ts",
+      "ownershipScope": ["src/features/admin/shared/session/feedback/toast.ts"],
+      "publicExports": [
+        "AdminToastPort",
+        "formatAdminApiError",
+        "formatAdminDisplayError",
+        "useAdminToast"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/core/composables/useAppToast.ts",
+        "src/core/utils/errorMessages.ts"
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/toast.ts"]
+    },
+    {
+      "path": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/useAdminConfirm.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 7,
+      "measuredFanOut": 1,
+      "targetFanIn": 7,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
+      ],
+      "targetPath": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
+      ],
+      "publicExports": [
+        "AdminConfirmIntent",
+        "AdminConfirmOptions",
+        "AdminConfirmPort",
+        "AdminConfirmReasonSpec",
+        "AdminConfirmRequest",
+        "AdminConfirmState",
+        "activeAdminConfirm",
+        "readConfirmReason",
+        "useAdminConfirm"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useAdminConfirm.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/session/timeRange.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/timeRange.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/timeRange.unit.spec.ts",
+          "to": "src/features/admin/shared/session/timeRange.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/session/timeRange.ts"],
+      "targetPath": "src/features/admin/shared/session/timeRange.ts",
+      "ownershipScope": ["src/features/admin/shared/session/timeRange.ts"],
+      "publicExports": [
+        "AdminTimeRangeBucket",
+        "AdminTimeRangeOption",
+        "buildAdminTimeRangeBuckets",
+        "pickAdminTimeRangeOptions",
+        "shouldShowAdminTimeRangeTick"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/core/lib/chartTimeRange.ts",
+        "src/features/admin/statistics/session/resource.ts"
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/timeRange.ts"]
+    },
+    {
+      "path": "src/features/admin/shared/session/useAnomalyRadar.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/session/useAnomalyRadar.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 5,
+      "targetFanIn": 1,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/session/useAnomalyRadar.ts"],
+      "targetPath": "src/features/admin/shared/session/useAnomalyRadar.ts",
+      "ownershipScope": [
+        "src/features/admin/shared/session/useAnomalyRadar.ts"
+      ],
+      "publicExports": ["useAnomalyRadar"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/monitor/resource.ts",
+        "src/features/admin/shared/session/anomalyRules.ts",
+        "src/features/admin/shared/session/collection/useQueryPolling.ts",
+        "src/features/admin/statistics/session/resource.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/composables/useAnomalyRadar.ts"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/AdminBadge.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/AdminBadge.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminBadge.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/AdminBadge.vue"],
+      "targetPath": "src/features/admin/shared/ui/AdminBadge.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/AdminBadge.vue"],
+      "publicExports": ["AdminBadgeVariant", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/components/ui/badge/index.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminBadge.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/AdminButton.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+          "to": "src/features/admin/shared/ui/AdminButton.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 8,
+      "measuredFanOut": 4,
+      "targetFanIn": 8,
+      "targetFanOut": 4,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/AdminButton.vue"],
+      "targetPath": "src/features/admin/shared/ui/AdminButton.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/AdminButton.vue"],
+      "publicExports": ["AdminButtonSize", "AdminButtonVariant", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/components/ui/button/buttonChrome.ts",
+        "src/components/ui/button/index.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminButton.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/AdminColumn.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/AdminColumn.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTable.component.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminColumn.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "to": "src/features/admin/shared/ui/AdminColumn.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 0,
+      "targetFanIn": 3,
+      "targetFanOut": 0,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/AdminColumn.vue"],
+      "targetPath": "src/features/admin/shared/ui/AdminColumn.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/AdminColumn.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminColumn.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/AdminMono.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/AdminMono.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/AdminMono.component.spec.ts",
+          "to": "src/features/admin/shared/ui/AdminMono.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/AdminMono.vue"],
+      "targetPath": "src/features/admin/shared/ui/AdminMono.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/AdminMono.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/core/cellClasses.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminMono.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/AdminSpinner.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/AdminSpinner.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "to": "src/features/admin/shared/ui/AdminSpinner.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "to": "src/features/admin/shared/ui/AdminSpinner.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
+      "targetFanIn": 3,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/AdminSpinner.vue"],
+      "targetPath": "src/features/admin/shared/ui/AdminSpinner.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/AdminSpinner.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminSpinner.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/chart/AdminChartCard.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/chart/AdminChartCard.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 2,
+      "targetFanIn": 1,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/chart/AdminChartCard.vue"],
+      "targetPath": "src/features/admin/shared/ui/chart/AdminChartCard.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/chart/AdminChartCard.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/core/components/ChartCard.vue",
+        "src/core/components/ChartPanel.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminChartCard.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["src/core/components/RangedLineChartCard.vue"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminRangedLineChartCard.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/chart/chart.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/chart/chartMotion.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 6,
+      "targetFanIn": 3,
+      "targetFanOut": 6,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/chart/chart.ts"],
+      "targetPath": "src/features/admin/shared/ui/chart/chart.ts",
+      "ownershipScope": ["src/features/admin/shared/ui/chart/chart.ts"],
+      "publicExports": [
+        "adminChartLegend",
+        "adminChartPlugins",
+        "adminChartStrokeWidth",
+        "adminChartTheme",
+        "defineAdminChartBubblePointStyle",
+        "defineAdminChartCountScale",
+        "defineAdminChartDurationScale",
+        "defineAdminChartOptions",
+        "defineAdminChartPercentScale",
+        "defineAdminChartPointClipStyle",
+        "defineAdminChartTooltip",
+        "getAdminChartBubbleHoverRadius",
+        "getAdminChartBubbleRadius",
+        "useAdminChartReady"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/chart.js/dist/chart.cjs",
+        "node_modules/vue/index.js",
+        "src/core/lib/chartPrimitives.ts",
+        "src/core/motion/chartMotion.ts",
+        "src/features/admin/shared/core/adminThemeTokens.ts",
+        "src/theme/composables/useTheme.ts"
+      ],
+      "sourceOwnershipScope": ["src/features/admin/shared/lib/chart.ts"]
+    },
+    {
+      "path": "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "to": "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/feedback/AdminAlert.vue"],
+      "targetPath": "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/feedback/AdminAlert.vue"
+      ],
+      "publicExports": ["AdminAlertSeverity", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminAlert.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/p1ThemeContracts.browser.spec.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 3,
+      "targetFanIn": 3,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/reka-ui/dist/index.cjs",
+        "src/features/admin/shared/session/feedback/toast.ts",
+        "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminConfirmDialog.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/feedback/AdminEmptyState.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminEmptyState.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 2,
+      "targetFanIn": 1,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/feedback/AdminEmptyState.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/feedback/AdminEmptyState.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/feedback/AdminEmptyState.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue/index.js"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminEmptyState.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminStatusPill.component.spec.ts",
+          "to": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/form/SwitchRow.vue",
+          "to": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 1,
+      "targetFanIn": 3,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/feedback/AdminStatusPill.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/feedback/AdminStatusPill.vue"
+      ],
+      "publicExports": ["AdminStatusPillVariant", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["src/core/components/StatusBadge.vue"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminStatusPill.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/AdminFormField.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/AdminFormField.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/form/AdminFormField.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminFormField.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/AdminFormField.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/AdminFormField.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/form/AdminFormField.vue"
+      ],
+      "publicExports": ["AdminFormFieldSlotProps", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/core/components/formFieldContract.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminFormField.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/AdminInput.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/adminControlsAdapter.unit.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+          "to": "src/features/admin/shared/ui/form/AdminInput.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 5,
+      "targetFanIn": 3,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/AdminInput.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/AdminInput.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/form/AdminInput.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/components/ui/input/index.ts",
+        "src/components/ui/spinner/index.ts",
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminInput.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/form/AdminNumberInput.component.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/AdminNumberInput.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/AdminNumberInput.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/form/AdminNumberInput.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminNumberInput.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/AdminSelect.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/AdminSelect.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+          "to": "src/features/admin/shared/ui/form/AdminSelect.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 5,
+      "targetFanIn": 2,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/AdminSelect.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/AdminSelect.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/form/AdminSelect.vue"],
+      "publicExports": ["SelectOptionItem", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue/index.js",
+        "src/components/ui/select/index.ts",
+        "src/features/admin/shared/core/adminSelectSkin.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminSelect.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/form/AdminSwitch.component.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/form/SwitchRow.vue",
+          "to": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 3,
+      "targetFanIn": 3,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/AdminSwitch.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/form/AdminSwitch.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue/index.js",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminSwitch.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/AdminTextarea.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/AdminTextarea.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 3,
+      "targetFanIn": 1,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/AdminTextarea.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/AdminTextarea.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/form/AdminTextarea.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminTextarea.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/form/SwitchRow.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/form/SwitchRow.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/form/SwitchRow.component.spec.ts",
+          "to": "src/features/admin/shared/ui/form/SwitchRow.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/form/SwitchRow.vue"],
+      "targetPath": "src/features/admin/shared/ui/form/SwitchRow.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/form/SwitchRow.vue"],
+      "publicExports": ["AdminSwitchRowPillSize", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/admin/shared/ui/feedback/AdminStatusPill.vue",
+        "src/features/admin/shared/ui/form/AdminSwitch.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/SwitchRow.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.component.spec.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 6,
+      "targetFanIn": 2,
+      "targetFanOut": 6,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/session/brand/brandLogoResource.ts",
+        "src/features/admin/shared/session/brand/brandLogos.ts",
+        "src/features/admin/shared/session/feedback/toast.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminLogoPickerPopover.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/popover/AdminPopover.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminPopover.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminPopover.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/popover/AdminPopover.vue"],
+      "targetPath": "src/features/admin/shared/ui/popover/AdminPopover.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/popover/AdminPopover.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/reka-ui/dist/index.cjs"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminPopover.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/popover/AdminPopoverContent.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminPopoverContent.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminPopoverContent.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/popover/AdminPopoverContent.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/popover/AdminPopoverContent.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/popover/AdminPopoverContent.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue/index.js",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminPopoverContent.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts",
+          "to": "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/reka-ui/dist/index.cjs"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminPopoverTrigger.vue"
       ]
     },
     {
@@ -40035,22 +37114,22 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/pricing/BillingServiceCell.vue",
+          "from": "src/features/admin/credits/ui/pricing/BillingServiceCell.vue",
           "to": "src/features/admin/shared/ui/serviceIcons.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
+          "from": "src/features/admin/monitor/ui/columns.ts",
           "to": "src/features/admin/shared/ui/serviceIcons.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/prompts/pages/AdminPromptConfigPage.vue",
+          "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue",
           "to": "src/features/admin/shared/ui/serviceIcons.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/shared/domain/serviceIcons.shim.ts",
+          "from": "src/features/admin/shared/index.ts",
           "to": "src/features/admin/shared/ui/serviceIcons.ts",
           "kind": "runtime"
         }
@@ -40059,7 +37138,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "measuredFanOut": 3,
       "targetFanIn": 4,
       "targetFanOut": 3,
-      "shims": ["src/shared/domain/serviceIcons.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -40076,7 +37155,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ]
     },
     {
-      "path": "src/features/admin/shared/validation/actionReasonContract.ts",
+      "path": "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
       "kind": "canonical",
       "confidence": "high",
       "status": "active",
@@ -40087,39 +37166,858 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/credits/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/validation/actionReasonContract.ts",
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 2,
+      "targetFanIn": 1,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminCollectionPageShell.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/validation/actionReasonContract.unit.spec.ts",
-          "to": "src/features/admin/shared/validation/actionReasonContract.ts",
+          "from": "src/features/admin/shared/ui/shell/AdminDialogActions.component.spec.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
           "kind": "runtime"
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 0,
+      "measuredFanOut": 2,
       "targetFanIn": 2,
-      "targetFanOut": 0,
+      "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "1 phase (default)",
+      "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
-      "deletionOwner": null,
+      "deletionOwner": "p4-admin-shared",
       "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
       "sourcePaths": [
-        "src/features/admin/shared/validation/actionReasonContract.ts"
+        "src/features/admin/shared/ui/shell/AdminDialogActions.vue"
       ],
-      "targetPath": "src/features/admin/shared/validation/actionReasonContract.ts",
+      "targetPath": "src/features/admin/shared/ui/shell/AdminDialogActions.vue",
       "ownershipScope": [
-        "src/features/admin/shared/validation/actionReasonContract.ts"
+        "src/features/admin/shared/ui/shell/AdminDialogActions.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/core/components/ActionButton.vue",
+        "src/features/admin/shared/ui/AdminButton.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminDialogActions.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminDialogShell.component.spec.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+          "to": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "to": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 5,
+      "targetFanIn": 4,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminDialogShell.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminDialogShell.vue"
       ],
       "publicExports": [
-        "AdminActionReasonValidation",
-        "MAX_ADMIN_ACTION_REASON_LENGTH",
-        "validateAdminActionReason"
+        "AdminDialogContentLayout",
+        "AdminDialogSize",
+        "default"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": []
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue/index.js",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/features/admin/shared/core/uiClasses.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminDialogShell.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminDrawer.component.spec.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/shell/AdminDrawer.vue"],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/shell/AdminDrawer.vue"],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/reka-ui/dist/index.cjs",
+        "src/core/composables/useOverlayInteractionLifecycle.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminDrawer.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminEditorActions.component.spec.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminEditorActions.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminEditorActions.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminEditorActions.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["src/core/components/ActionButton.vue"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminEditorActions.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 8,
+      "targetFanIn": 1,
+      "targetFanOut": 8,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue-advanced-cropper/dist/index.cjs.js",
+        "node_modules/vue-advanced-cropper/dist/style.css",
+        "node_modules/vue/index.js",
+        "src/core/components/ActionButton.vue",
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/features/admin/shared/ui/AdminButton.vue",
+        "src/features/admin/shared/ui/shell/AdminDialogShell.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminLogoCropDialog.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 5,
+      "targetFanIn": 1,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/features/admin/shared/ui/AdminButton.vue",
+        "src/features/admin/shared/ui/AdminSpinner.vue",
+        "src/features/admin/shared/ui/feedback/AdminAlert.vue",
+        "src/features/admin/shared/ui/shell/AdminDialogShell.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminSettingsDialogFrame.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 3,
+      "targetFanIn": 1,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue"
+      ],
+      "publicExports": ["AdminSubNavigationItem", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue-router/index.cjs",
+        "src/features/admin/shared/session/useAdminSubHeaderTarget.ts",
+        "src/features/admin/shared/ui/tabs/adminTabsAtoms.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminSubNavigationLayout.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/shell/AdminSummaryCard.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/shell/AdminSummaryCard.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 0,
+      "targetFanIn": 1,
+      "targetFanOut": 0,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/shell/AdminSummaryCard.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/shell/AdminSummaryCard.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/shell/AdminSummaryCard.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminSummaryCard.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/table/AdminTable.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTable.component.spec.ts",
+          "to": "src/features/admin/shared/ui/table/AdminTable.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 13,
+      "targetFanIn": 2,
+      "targetFanOut": 13,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/table/AdminTable.vue"],
+      "targetPath": "src/features/admin/shared/ui/table/AdminTable.vue",
+      "ownershipScope": ["src/features/admin/shared/ui/table/AdminTable.vue"],
+      "publicExports": [
+        "AdminTableRowClickEvent",
+        "AdminTableRowCollapseEvent",
+        "AdminTableRowEvent",
+        "AdminTableRowExpandEvent",
+        "default"
+      ],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/ui/AdminButton.vue",
+        "src/features/admin/shared/ui/AdminColumn.vue",
+        "src/features/admin/shared/ui/AdminSpinner.vue",
+        "src/features/admin/shared/ui/table/AdminTableBody.vue",
+        "src/features/admin/shared/ui/table/AdminTableCell.vue",
+        "src/features/admin/shared/ui/table/AdminTableEmpty.vue",
+        "src/features/admin/shared/ui/table/AdminTableHead.vue",
+        "src/features/admin/shared/ui/table/AdminTableHeader.vue",
+        "src/features/admin/shared/ui/table/AdminTableRow.vue",
+        "src/lib/utils.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminTable.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/table/AdminTablePanel.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/table/AdminTablePanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminSurfaceFrame.component.spec.ts",
+          "to": "src/features/admin/shared/ui/table/AdminTablePanel.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": ["src/features/admin/shared/ui/table/AdminTablePanel.vue"],
+      "targetPath": "src/features/admin/shared/ui/table/AdminTablePanel.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/table/AdminTablePanel.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/ui/shell/AdminSurfaceFrame.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminTablePanel.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 5,
+      "targetFanIn": 1,
+      "targetFanOut": 5,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/core/adminSelectSkin.ts",
+        "src/features/admin/shared/core/uiClasses.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminFilterPopover.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.browser.spec.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.component.spec.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
+      "targetFanIn": 3,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue"
+      ],
+      "publicExports": ["AdminOptionFilterOption", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/ui/form/AdminSelect.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminOptionFilter.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue",
+          "to": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminPagerControls.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/features/admin/shared/ui/AdminButton.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminPagerControls.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.component.spec.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": ["node_modules/@iconoir/vue/dist/index.js"],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminRefreshButton.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 2,
+      "targetFanIn": 1,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/vue/index.js",
+        "src/features/admin/shared/core/uiClasses.ts"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminResourceToolbar.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.component.spec.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue"
+      ],
+      "publicExports": ["AdminRowActionItem", "default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/reka-ui/dist/index.cjs",
+        "node_modules/vue/index.js"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminRowActionsPopover.vue"
+      ]
+    },
+    {
+      "path": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "p4-lane",
+      "activationPhase": "pre-P0",
+      "scope": "cross-feature",
+      "exportStyle": "current AST exports",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.component.spec.ts",
+          "to": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "2 phases — delete after P5",
+      "retirementPhase": null,
+      "deletionOwner": "p4-admin-shared",
+      "notes": "Current source public subpath; target mapping is frozen in the corresponding planned record.",
+      "sourcePaths": [
+        "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue"
+      ],
+      "targetPath": "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue",
+      "ownershipScope": [
+        "src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue"
+      ],
+      "publicExports": ["default"],
+      "surfaceSeverity": "warn",
+      "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "src/features/admin/shared/ui/AdminButton.vue",
+        "src/features/admin/shared/ui/form/AdminInput.vue"
+      ],
+      "sourceOwnershipScope": [
+        "src/features/admin/shared/components/AdminToolbarSearch.vue"
+      ]
     },
     {
       "path": "src/features/auth/components/auth-fields/index.ts",
@@ -40269,12 +38167,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/sessionCommands.ts",
+          "from": "src/features/admin/users/session/sessionCommands.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -40285,6 +38183,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/canvas/presentation/pages/CanvasPage.vue",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -40339,10 +38242,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 28,
-      "measuredFanOut": 41,
-      "targetFanIn": 28,
-      "targetFanOut": 41,
+      "measuredFanIn": 29,
+      "measuredFanOut": 47,
+      "targetFanIn": 29,
+      "targetFanOut": 47,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40384,12 +38287,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "src/api/mediaAssetDelivery.ts",
+        "src/api/mediaAssetMetadata.ts",
         "src/api/sessionUserType.ts",
         "src/api/userSession.ts",
+        "src/api/workspaceEventStream.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -40415,9 +38322,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/utils/auth.ts",
         "src/core/utils/formValidation.ts",
         "src/core/utils/storage.ts",
-        "src/features/admin/pages/login/AdminLoginPage.vue",
+        "src/features/admin/app/login/AdminLoginPage.vue",
+        "src/features/legal/routePaths.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
+        "src/test/deferred.ts",
         "src/test/factories/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
@@ -40444,9 +38353,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 6,
+      "measuredFanOut": 0,
       "targetFanIn": 1,
-      "targetFanOut": 6,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40545,14 +38454,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "resolveWorkflowNodeOutputStatus"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/valibot/dist/index.mjs",
-        "node_modules/vitest/dist/index.js",
-        "src/core/contracts/generationContract.ts",
-        "src/core/media/mediaRef.ts",
-        "src/core/utils/number.ts",
-        "src/features/board/core/schema/stateSchema.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/core/index.ts",
@@ -40647,9 +38549,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 14,
-      "measuredFanOut": 7,
+      "measuredFanOut": 0,
       "targetFanIn": 14,
-      "targetFanOut": 7,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40753,15 +38655,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "resolveWorkflowNodeOutputStatus"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/valibot/dist/index.mjs",
-        "node_modules/vitest/dist/index.js",
-        "src/core/contracts/generationContract.ts",
-        "src/core/media/mediaRef.ts",
-        "src/core/utils/number.ts",
-        "src/core/utils/opaqueIds.ts",
-        "src/features/board/testing/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/core/media/index.ts",
@@ -40781,9 +38675,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 3,
+      "measuredFanOut": 0,
       "targetFanIn": 1,
-      "targetFanOut": 3,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40794,11 +38688,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": ["src/features/board/domain/media/"],
       "publicExports": ["rebuildBoardMediaRefs"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "src/features/board/core/document/nodes.ts",
-        "src/features/board/testing/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/core/schema/index.ts",
@@ -40818,9 +38708,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 9,
+      "measuredFanOut": 0,
       "targetFanIn": 1,
-      "targetFanOut": 9,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40836,17 +38726,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "parseBoardStateEnvelopeContract"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/valibot/dist/index.mjs",
-        "node_modules/vitest/dist/index.js",
-        "src/core/contracts/generationContract.ts",
-        "src/core/utils/opaqueIds.ts",
-        "src/features/board/core/document/latestBoardState.ts",
-        "src/features/board/core/document/nodeRegistry.ts",
-        "src/features/board/core/document/nodes.ts",
-        "src/features/board/core/document/promptAspectRatio.ts",
-        "src/features/board/testing/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/index.ts",
@@ -41111,9 +38991,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 48,
-      "measuredFanOut": 47,
+      "measuredFanOut": 52,
       "targetFanIn": 48,
-      "targetFanOut": 47,
+      "targetFanOut": 52,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -41323,6 +39203,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -41334,6 +39215,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/api/idempotencyKey.ts",
         "src/api/stripUndefined.ts",
         "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -41359,15 +39241,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/repository.ts",
         "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
+        "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
-        "src/theme/dialogMask.ts"
+        "src/theme/dialogMask.ts",
+        "vitest/browser"
       ]
     },
     {
@@ -41888,9 +39773,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 95,
-      "measuredFanOut": 47,
+      "measuredFanOut": 52,
       "targetFanIn": 95,
-      "targetFanOut": 47,
+      "targetFanOut": 52,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -41988,6 +39873,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -41999,6 +39885,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/api/idempotencyKey.ts",
         "src/api/stripUndefined.ts",
         "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -42024,15 +39911,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/canvas/application/board-session/autosavePolicy.ts",
+        "src/features/canvas/application/board-session/repository.ts",
         "src/features/canvas/application/board-session/useBoardAutosave.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
+        "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
-        "src/theme/dialogMask.ts"
+        "src/theme/dialogMask.ts",
+        "vitest/browser"
       ]
     },
     {
@@ -42058,9 +39948,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 11,
+      "measuredFanOut": 0,
       "targetFanIn": 2,
-      "targetFanOut": 11,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42115,19 +40005,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "useBoardRepository"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/core/utils/auth.ts",
-        "src/core/utils/ids.ts",
-        "src/core/utils/storage.ts",
-        "src/features/board/session/adapters/boardsResource.ts",
-        "src/features/board/session/persistence/index.ts",
-        "src/features/board/session/sync/boardSync.ts",
-        "src/features/board/testing/index.ts",
-        "src/features/workspace/index.ts",
-        "src/test/factories/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/session/persistence/index.ts",
@@ -42152,6 +40030,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/board/session/catalog/commands.ts",
+          "to": "src/features/board/session/persistence/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
           "to": "src/features/board/session/persistence/index.ts",
           "kind": "runtime"
         },
@@ -42196,10 +40079,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
-      "measuredFanOut": 5,
-      "targetFanIn": 11,
-      "targetFanOut": 5,
+      "measuredFanIn": 12,
+      "measuredFanOut": 0,
+      "targetFanIn": 12,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42224,13 +40107,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "setBoardState"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "src/core/utils/storage.ts",
-        "src/features/board/core/index.ts",
-        "src/features/board/session/catalog/scope.ts",
-        "src/features/board/testing/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/session/preview/index.ts",
@@ -42280,9 +40157,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 7,
-      "measuredFanOut": 12,
+      "measuredFanOut": 0,
       "targetFanIn": 7,
-      "targetFanOut": 12,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42299,20 +40176,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "renderBoardPreviewDataUrl"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/core/config/runtimeUrls.ts",
-        "src/core/lib/chartPrimitives.ts",
-        "src/core/utils/number.ts",
-        "src/core/utils/storage.ts",
-        "src/features/board/core/index.ts",
-        "src/features/board/session/catalog/boards.ts",
-        "src/features/board/session/persistence/index.ts",
-        "src/features/board/session/sync/boardSync.ts",
-        "src/features/board/testing/index.ts",
-        "src/theme/composables/useTheme.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/session/share-join/index.ts",
@@ -42332,9 +40196,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 6,
+      "measuredFanOut": 0,
       "targetFanIn": 1,
-      "targetFanOut": 6,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42345,14 +40209,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": ["src/features/board/application/collaboration/"],
       "publicExports": ["JoinSharedBoardResult", "joinSharedBoardByToken"],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/vitest/dist/index.js",
-        "src/core/i18n/index.ts",
-        "src/features/board/core/index.ts",
-        "src/features/board/session/adapters/boardsResource.ts",
-        "src/features/board/session/catalog/repository.ts",
-        "src/features/workspace/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/session/sync/index.ts",
@@ -42377,9 +40234,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 24,
+      "measuredFanOut": 0,
       "targetFanIn": 2,
-      "targetFanOut": 24,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42405,32 +40262,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "syncRestoreBoardToServer"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/api/stripUndefined.ts",
-        "src/api/workspaceEventStream.ts",
-        "src/core/errors/errorCatalog.ts",
-        "src/core/query/queryClient.ts",
-        "src/core/query/queryDefaults.ts",
-        "src/core/utils/auth.ts",
-        "src/features/board/core/index.ts",
-        "src/features/board/session/adapters/boardsResource.ts",
-        "src/features/board/session/catalog/boards.ts",
-        "src/features/board/session/catalog/repository.ts",
-        "src/features/board/session/catalog/scope.ts",
-        "src/features/board/session/persistence/index.ts",
-        "src/features/board/session/preview/index.ts",
-        "src/features/board/testing/factories.ts",
-        "src/features/board/testing/index.ts",
-        "src/features/board/testing/syncDesignHarness.ts",
-        "src/features/board/testing/syncFixtures.ts",
-        "src/features/board/ui/gallery/controller.ts",
-        "src/features/canvas/application/board-session/autosavePolicy.ts",
-        "src/features/canvas/application/board-session/useBoardAutosave.ts",
-        "src/features/workspace/index.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/board/testing/index.ts",
@@ -42495,9 +40327,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 10,
-      "measuredFanOut": 8,
+      "measuredFanOut": 3,
       "targetFanIn": 10,
-      "targetFanOut": 8,
+      "targetFanOut": 3,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42517,13 +40349,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-        "src/api/workspaceEventStream.ts",
-        "src/core/query/queryClient.ts",
-        "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
         "src/features/board/core/index.ts",
-        "src/features/board/session/adapters/boardsResource.ts",
         "src/features/workspace/index.ts"
       ]
     },
@@ -42545,9 +40372,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 27,
+      "measuredFanOut": 0,
       "targetFanIn": 1,
-      "targetFanOut": 27,
+      "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42573,35 +40400,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "useCatalog"
       ],
       "surfaceSeverity": "warn",
-      "targetFanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vitest/dist/index.js",
-        "node_modules/vue-i18n/index.js",
-        "node_modules/vue-router/index.cjs",
-        "node_modules/vue/index.js",
-        "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
-        "src/components/ui/dialog/index.ts",
-        "src/components/ui/dropdown-menu/index.ts",
-        "src/components/ui/select/index.ts",
-        "src/components/ui/spinner/index.ts",
-        "src/core/composables/useAppToast.ts",
-        "src/core/composables/useOverlayInteractionLifecycle.ts",
-        "src/core/i18n/formatters.ts",
-        "src/core/i18n/index.ts",
-        "src/features/board/session/catalog/boards.ts",
-        "src/features/board/session/catalog/commands.ts",
-        "src/features/board/session/catalog/repository.ts",
-        "src/features/board/session/preview/index.ts",
-        "src/features/board/session/sync/boardSync.ts",
-        "src/features/workspace/index.ts",
-        "src/features/workspace/routePaths.ts",
-        "src/lib/utils.ts",
-        "src/test/render.ts",
-        "src/theme/appOverlayMenu.ts",
-        "src/theme/composables/useTheme.ts",
-        "src/theme/dialogMask.ts"
-      ]
+      "targetFanOutTargets": []
     },
     {
       "path": "src/features/canvas/application/board-session/index.ts",
@@ -42646,9 +40445,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         }
       ],
       "measuredFanIn": 5,
-      "measuredFanOut": 17,
+      "measuredFanOut": 18,
       "targetFanIn": 5,
-      "targetFanOut": 17,
+      "targetFanOut": 18,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42679,6 +40478,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/i18n/index.ts",
         "src/core/media/imageAssetPipeline.ts",
         "src/core/media/mediaRef.ts",
+        "src/core/query/queryClient.ts",
         "src/core/utils/auth.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
@@ -43655,18 +41455,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts",
           "to": "src/features/canvas/core/nodes/imageActions.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/imageActions.shim.ts",
-          "to": "src/features/canvas/core/nodes/imageActions.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 1,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 1,
-      "shims": ["src/shared/domain/imageActions.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -43708,18 +41503,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
           "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/serviceRegistry.shim.ts",
-          "to": "src/features/canvas/core/nodes/serviceLabelKey.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 1,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 1,
-      "shims": ["src/shared/domain/serviceRegistry.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -45158,18 +42948,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/application/editing/useFlowImageUploadActions.ts",
           "to": "src/features/canvas/session/media/preloadImage.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/media/preloadImage.shim.ts",
-          "to": "src/features/canvas/session/media/preloadImage.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/media/preloadImage.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -45201,18 +42986,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/canvas/session/serviceLocale.contract.spec.ts",
           "to": "src/features/canvas/session/serviceImageActionText.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/domain/serviceRegistry.shim.ts",
-          "to": "src/features/canvas/session/serviceImageActionText.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 3,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 3,
-      "shims": ["src/shared/domain/serviceRegistry.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -45656,18 +43436,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/legal/routePreservation.contract.spec.ts",
           "to": "src/features/legal/contacts.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/constants/contacts.shim.ts",
-          "to": "src/features/legal/contacts.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 2,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 2,
       "targetFanOut": 0,
-      "shims": ["src/shared/constants/contacts.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -45691,9 +43466,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [],
       "measuredFanIn": 0,
-      "measuredFanOut": 5,
+      "measuredFanOut": 6,
       "targetFanIn": 0,
-      "targetFanOut": 5,
+      "targetFanOut": 6,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -45713,11 +43488,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
         "src/core/composables/useSiteBranding.ts",
         "src/core/i18n/index.ts",
-        "src/features/legal/contacts.ts",
-        "src/features/legal/legalLinks.ts",
-        "src/features/workspace/routePaths.ts"
+        "src/features/workspace/routePaths.ts",
+        "src/test/render.ts"
       ]
     },
     {
@@ -45745,18 +43521,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/legal/routePreservation.contract.spec.ts",
           "to": "src/features/legal/legalLinks.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/constants/legalLinks.shim.ts",
-          "to": "src/features/legal/legalLinks.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 1,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 1,
-      "shims": ["src/shared/constants/legalLinks.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -45806,18 +43577,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/routes/workspaceRoutes.ts",
           "to": "src/features/legal/routePaths.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/constants/routePaths.shim.ts",
-          "to": "src/features/legal/routePaths.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/constants/routePaths.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -45934,11 +43700,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/search/presentation/useSearchScreenRuntime.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/search/session/adapters/libraryBridge.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
@@ -45989,10 +43750,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 23,
-      "measuredFanOut": 37,
-      "targetFanIn": 23,
-      "targetFanOut": 37,
+      "measuredFanIn": 22,
+      "measuredFanOut": 39,
+      "targetFanIn": 22,
+      "targetFanOut": 39,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -46074,17 +43835,18 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
-        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/workspace-library/workspace-library.ts",
         "src/api/mediaAssetDelivery.ts",
+        "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
@@ -46110,7 +43872,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/theme/appOverlayMenu.ts",
         "src/theme/dialogMask.ts",
         "src/theme/formControls.ts",
-        "src/theme/lightboxScrim.ts"
+        "src/theme/lightboxScrim.ts",
+        "vitest/browser"
       ]
     },
     {
@@ -46172,9 +43935,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-virtual/dist/cjs/index.cjs",
+        "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/@testing-library/user-event/dist/cjs/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -46182,13 +43945,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
         "src/api/generated-query/public/workspace-search/workspace-search.ts",
         "src/api/stripUndefined.ts",
         "src/api/upload.ts",
+        "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/popover/index.ts",
         "src/components/ui/spinner/index.ts",
@@ -46227,6 +43990,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "allowedConsumers": [
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
@@ -46321,10 +44089,10 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 19,
-      "measuredFanOut": 48,
-      "targetFanIn": 19,
-      "targetFanOut": 48,
+      "measuredFanIn": 20,
+      "measuredFanOut": 50,
+      "targetFanIn": 20,
+      "targetFanOut": 50,
       "shims": [],
       "shimTtl": "1 phase — delete after P2",
       "retirementPhase": "P2",
@@ -46396,6 +44164,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/components/ui/card/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/core/auth/adminAccess.ts",
+        "src/core/auth/routePolicy.ts",
         "src/core/components/StudioName.vue",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
@@ -46413,6 +44182,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/account/index.ts",
         "src/features/account/ui/chrome/UserAccountMenu.vue",
         "src/features/account/ui/chrome/userAccountMenu.types.ts",
+        "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
         "src/features/board/index.ts",
         "src/features/canvas/presentation/pages/CanvasLandingPage.vue",
@@ -46421,8 +44191,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/legal/pages/PrivacyPolicyPage.vue",
         "src/features/legal/pages/RefundPolicyPage.vue",
         "src/features/legal/pages/TermsPage.vue",
+        "src/features/legal/routePaths.ts",
         "src/features/search/index.ts",
-        "src/features/workspace/routePaths.ts",
         "src/test/factories/index.ts",
         "src/test/msw.ts",
         "src/test/render.ts"
@@ -46583,7 +44353,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
+          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -46711,18 +44481,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.unit.spec.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/constants/routePaths.shim.ts",
-          "to": "src/features/workspace/routePaths.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 34,
+      "measuredFanIn": 33,
       "measuredFanOut": 1,
-      "targetFanIn": 34,
+      "targetFanIn": 33,
       "targetFanOut": 1,
-      "shims": ["src/shared/constants/routePaths.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1b-core",
@@ -47003,12 +44768,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
+          "from": "src/features/admin/models/resource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/shared/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -47623,12 +45388,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/models/infrastructure/adminGatewayResource.ts",
+          "from": "src/features/admin/models/resource.ts",
           "to": "src/shared/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/shared/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         },
@@ -48133,7 +45898,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/shared/api/generated-query/control/control-tasks/control-tasks.ts",
           "kind": "runtime"
         },
@@ -49330,7 +47095,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/shared/api/generated-query/control/model/controlTaskEnvelope.ts",
           "kind": "type-only"
         },
@@ -49399,7 +47164,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/shared/api/generated-query/control/model/index.ts",
           "kind": "type-only"
         },
@@ -52104,12 +49869,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useAdminTaskList.ts",
+          "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
           "to": "src/shared/api/stripUndefined.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.component.spec.ts",
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.component.spec.ts",
           "to": "src/shared/api/stripUndefined.ts",
           "kind": "runtime"
         },
@@ -52988,17 +50753,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue",
+          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
           "to": "src/shared/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/presentation/pages/AdminModelsPage.vue",
+          "from": "src/features/admin/models/ui/pages/AdminModelsPage.vue",
           "to": "src/shared/components/ActionButton.vue",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.vue",
           "to": "src/shared/components/ActionButton.vue",
           "kind": "runtime"
         },
@@ -53206,7 +50971,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/presentation/components/TaskEventsCard.vue",
+          "from": "src/features/admin/monitor/ui/components/TaskEventsCard.vue",
           "to": "src/shared/components/ChartRenderer.vue",
           "kind": "runtime"
         },
@@ -53817,12 +51582,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/application/useAdminModelCatalogWorkspace.ts",
+          "from": "src/features/admin/models/session/useAdminModelCatalogWorkspace.ts",
           "to": "src/shared/composables/useAppClipboard.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useTaskResultDetail.ts",
+          "from": "src/features/admin/monitor/session/useTaskResultDetail.ts",
           "to": "src/shared/composables/useAppClipboard.ts",
           "kind": "runtime"
         },
@@ -54486,7 +52251,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/displayPolicy.ts",
+          "from": "src/features/admin/monitor/core/displayPolicy.ts",
           "to": "src/shared/config/pagination.ts",
           "kind": "runtime"
         },
@@ -54559,7 +52324,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/domain/taskResultImages.ts",
+          "from": "src/features/admin/monitor/core/taskResultImages.ts",
           "to": "src/shared/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -54938,12 +52703,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.component.spec.ts",
+          "from": "src/features/admin/credits/ui/AdminCreditsBillingLayout.component.spec.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue",
+          "from": "src/features/admin/credits/ui/AdminCreditsBillingLayout.vue",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
         },
@@ -55638,7 +53403,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/columns.ts",
+          "from": "src/features/admin/monitor/ui/columns.ts",
           "to": "src/shared/domain/serviceIcons.ts",
           "kind": "runtime"
         },
@@ -55972,7 +53737,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
           "to": "src/shared/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -56189,7 +53954,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultPresentation.ts",
+          "from": "src/features/admin/monitor/core/taskResultPresentation.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
@@ -56986,7 +54751,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/AdminTaskResultDialog.vue",
+          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.vue",
           "to": "src/shared/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -57340,7 +55105,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useMonitorTimeline.ts",
+          "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
           "to": "src/shared/lib/chartPrimitives.ts",
           "kind": "runtime"
         },
@@ -58129,7 +55894,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/infrastructure/resource.ts",
+          "from": "src/features/admin/monitor/resource.ts",
           "to": "src/shared/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -58345,7 +56110,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -59007,12 +56772,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/application/useTaskResultDetail.ts",
+          "from": "src/features/admin/monitor/core/taskResultPresentation.ts",
           "to": "src/shared/utils/dateTime.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultPresentation.ts",
+          "from": "src/features/admin/monitor/session/useTaskResultDetail.ts",
           "to": "src/shared/utils/dateTime.ts",
           "kind": "runtime"
         },
@@ -59074,12 +56839,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/domain/taskResultPresentation.ts",
+          "from": "src/features/admin/monitor/core/taskResultPresentation.ts",
           "to": "src/shared/utils/errorMessages.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/presentation/pages/AdminMonitorPage.vue",
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
           "to": "src/shared/utils/errorMessages.ts",
           "kind": "runtime"
         },
@@ -59782,27 +57547,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/payments/orders/paymentOrderResource.contract.spec.ts",
+          "from": "src/features/admin/credits/session/orders/paymentOrderResource.contract.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/AdminUsersPage.component.spec.ts",
+          "from": "src/features/admin/users/core/view.unit.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/commands.contract.spec.ts",
+          "from": "src/features/admin/users/session/commands.contract.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/commandsInvalidation.contract.spec.ts",
+          "from": "src/features/admin/users/session/commandsInvalidation.contract.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/users/view.unit.spec.ts",
+          "from": "src/features/admin/users/ui/table/AdminUsersPage.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
@@ -59813,6 +57578,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         },
         {
           "from": "src/features/auth/session/browserSessionTransition.contract.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
@@ -59837,9 +57607,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 14,
+      "measuredFanIn": 15,
       "measuredFanOut": 1,
-      "targetFanIn": 14,
+      "targetFanIn": 15,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -59903,21 +57673,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/appOverlayMenu.shim.ts",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/theme/appOverlayMenu.unit.spec.ts",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/theme/appOverlayMenu.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -59975,21 +57740,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/shared/theme/composables/themeKeyboard.shim.ts",
-          "to": "src/theme/composables/themeKeyboard.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/theme/composables/themeKeyboard.contract.spec.ts",
           "to": "src/theme/composables/themeKeyboard.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 1,
       "measuredFanOut": 2,
-      "targetFanIn": 2,
+      "targetFanIn": 1,
       "targetFanOut": 2,
-      "shims": ["src/shared/theme/composables/themeKeyboard.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -60016,11 +57776,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/shared/theme/composables/themeMode.shim.ts",
-          "to": "src/theme/composables/themeMode.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/theme/composables/themeKeyboard.contract.spec.ts",
           "to": "src/theme/composables/themeMode.ts",
           "kind": "type-only"
@@ -60041,11 +57796,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
-      "shims": ["src/shared/theme/composables/themeMode.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -60085,7 +57840,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/lib/chart.ts",
+          "from": "src/features/admin/shared/ui/chart/chart.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
@@ -60105,11 +57860,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/composables/useTheme.shim.ts",
-          "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -60120,11 +57870,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 8,
       "measuredFanOut": 3,
-      "targetFanIn": 9,
+      "targetFanIn": 8,
       "targetFanOut": 3,
-      "shims": ["src/shared/theme/composables/useTheme.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -60208,18 +57958,13 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/shared/theme/dialogMask.shim.ts",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 0,
-      "shims": ["src/shared/theme/dialogMask.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -60291,11 +58036,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/formControls.shim.ts",
-          "to": "src/theme/formControls.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
@@ -60306,11 +58046,11 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 10,
       "measuredFanOut": 0,
-      "targetFanIn": 11,
+      "targetFanIn": 10,
       "targetFanOut": 0,
-      "shims": ["src/shared/theme/formControls.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -60372,21 +58112,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/shared/theme/lightboxScrim.shim.ts",
-          "to": "src/theme/lightboxScrim.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/theme/lightboxScrim.unit.spec.ts",
           "to": "src/theme/lightboxScrim.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
-      "shims": ["src/shared/theme/lightboxScrim.shim.ts"],
+      "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": "p1-lane",
@@ -60428,414 +58163,414 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 
 <!-- SEAM_TABLE_START -->
 
-| Entry                                                                               | Kind      | Status  | Owner         | Exports | Fan-in measured → target | Fan-out measured → target |
-| ----------------------------------------------------------------------------------- | --------- | ------- | ------------- | ------- | ------------------------ | ------------------------- |
-| `src/api/client.ts`                                                                 | canonical | active  | p1-lane       | 6       | 13 → 13                  | 4 → 4                     |
-| `src/api/contractKernel.ts`                                                         | canonical | active  | p1-lane       | 24      | 41 → 41                  | 2 → 2                     |
-| `src/api/generated-query/control/control-billing/control-billing.ts`                | canonical | active  | p1-lane       | 56      | 3 → 3                    | 4 → 4                     |
-| `src/api/generated-query/control/control-credits/control-credits.ts`                | canonical | active  | p1-lane       | 145     | 4 → 4                    | 4 → 4                     |
-| `src/api/generated-query/control/control-payments/control-payments.ts`              | canonical | active  | p1-lane       | 39      | 3 → 3                    | 4 → 4                     |
-| `src/api/generated-query/control/control-platform/control-platform.ts`              | canonical | active  | p1-lane       | 402     | 14 → 14                  | 4 → 4                     |
-| `src/api/generated-query/control/control-tasks/control-tasks.ts`                    | canonical | active  | p1-lane       | 22      | 2 → 2                    | 4 → 4                     |
-| `src/api/generated-query/control/control-users/control-users.ts`                    | canonical | active  | p1-lane       | 80      | 4 → 4                    | 4 → 4                     |
-| `src/api/generated-query/control/index.ts`                                          | cascading | active  | p1-lane       | 784     | 0 → 0                    | 7 → 7                     |
-| `src/api/generated-query/control/model/controlMailConfigRequest.ts`                 | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/api/generated-query/control/model/controlOAuthProviderSummary.ts`              | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts`        | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/api/generated-query/control/model/controlStripeConfigRequest.ts`               | canonical | active  | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/api/generated-query/control/model/controlTaskEnvelope.ts`                      | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/api/generated-query/control/model/index.ts`                                    | canonical | active  | p1-lane       | 159     | 17 → 17                  | 159 → 159                 |
-| `src/api/generated-query/control/model/supportChannelKind.ts`                       | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/api/generated-query/control/model/supportChannelsSetting.ts`                   | canonical | active  | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
-| `src/api/generated-query/public/boards/boards.ts`                                   | canonical | active  | p1-lane       | 144     | 2 → 2                    | 4 → 4                     |
-| `src/api/generated-query/public/index.ts`                                           | cascading | active  | p1-lane       | 619     | 0 → 0                    | 11 → 11                   |
-| `src/api/generated-query/public/model/board.ts`                                     | canonical | active  | p1-lane       | 1       | 4 → 4                    | 2 → 2                     |
-| `src/api/generated-query/public/model/boardDocument.ts`                             | canonical | active  | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/api/generated-query/public/model/index.ts`                                     | canonical | active  | p1-lane       | 236     | 19 → 19                  | 236 → 236                 |
-| `src/api/generated-query/public/user/user.ts`                                       | canonical | active  | p1-lane       | 23      | 5 → 5                    | 4 → 4                     |
-| `src/api/generated-query/public/workspace-billing/workspace-billing.ts`             | canonical | active  | p1-lane       | 97      | 6 → 6                    | 4 → 4                     |
-| `src/api/generated-query/public/workspace-library/workspace-library.ts`             | canonical | active  | p1-lane       | 75      | 3 → 3                    | 4 → 4                     |
-| `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts`             | canonical | active  | p1-lane       | 16      | 2 → 2                    | 4 → 4                     |
-| `src/api/generated-query/public/workspace-search/workspace-search.ts`               | canonical | active  | p1-lane       | 16      | 3 → 3                    | 4 → 4                     |
-| `src/api/generated-query/public/workspaces/workspaces.ts`                           | canonical | active  | p1-lane       | 40      | 2 → 2                    | 4 → 4                     |
-| `src/api/idempotencyKey.ts`                                                         | canonical | active  | p1-lane       | 13      | 13 → 13                  | 0 → 0                     |
-| `src/api/mediaAssetDelivery.ts`                                                     | canonical | active  | p1-lane       | 25      | 27 → 27                  | 4 → 4                     |
-| `src/api/mediaWorkspaceScope.ts`                                                    | canonical | active  | p1-lane       | 3       | 7 → 7                    | 0 → 0                     |
-| `src/api/sessionUserType.ts`                                                        | canonical | active  | p1-lane       | 1       | 15 → 15                  | 0 → 0                     |
-| `src/api/stripUndefined.ts`                                                         | canonical | active  | p1-lane       | 2       | 12 → 12                  | 0 → 0                     |
-| `src/api/upload.ts`                                                                 | canonical | active  | p1-lane       | 22      | 11 → 11                  | 7 → 7                     |
-| `src/api/userSession.ts`                                                            | canonical | active  | p1-lane       | 2       | 3 → 3                    | 3 → 3                     |
-| `src/api/workspaceEventStream.ts`                                                   | canonical | active  | p1-lane       | 20      | 10 → 10                  | 4 → 4                     |
-| `src/api/workspaceTaskContract.ts`                                                  | canonical | active  | p1-lane       | 14      | 6 → 6                    | 2 → 2                     |
-| `src/api/workspaceTaskTransport.ts`                                                 | canonical | active  | p1-lane       | 7       | 8 → 8                    | 5 → 5                     |
-| `src/api/workspaceTaskWaiter.ts`                                                    | canonical | active  | p1-lane       | 2       | 3 → 3                    | 5 → 5                     |
-| `src/api/workspaceTasks.ts`                                                         | canonical | active  | p1-lane       | 23      | 4 → 4                    | 3 → 3                     |
-| `src/app/router/index.ts`                                                           | canonical | active  | integrator    | 1       | 1 → 1                    | 13 → 13                   |
-| `src/components/ui/avatar/index.ts`                                                 | canonical | active  | design-system | 3       | 2 → 2                    | 3 → 3                     |
-| `src/components/ui/badge/index.ts`                                                  | canonical | active  | design-system | 3       | 3 → 3                    | 3 → 3                     |
-| `src/components/ui/button/index.ts`                                                 | canonical | active  | design-system | 10      | 24 → 24                  | 6 → 6                     |
-| `src/components/ui/card/index.ts`                                                   | canonical | active  | design-system | 6       | 2 → 2                    | 4 → 4                     |
-| `src/components/ui/dialog/index.ts`                                                 | canonical | active  | design-system | 12      | 6 → 6                    | 4 → 4                     |
-| `src/components/ui/dropdown-menu/index.ts`                                          | canonical | active  | design-system | 14      | 4 → 4                    | 4 → 4                     |
-| `src/components/ui/form/index.ts`                                                   | canonical | active  | design-system | 15      | 6 → 6                    | 5 → 5                     |
-| `src/components/ui/input/index.ts`                                                  | canonical | active  | design-system | 4       | 9 → 9                    | 5 → 5                     |
-| `src/components/ui/popover/index.ts`                                                | canonical | active  | design-system | 4       | 3 → 3                    | 3 → 3                     |
-| `src/components/ui/select/index.ts`                                                 | canonical | active  | design-system | 14      | 2 → 2                    | 6 → 6                     |
-| `src/components/ui/skeleton/index.ts`                                               | canonical | active  | design-system | 1       | 6 → 6                    | 2 → 2                     |
-| `src/components/ui/spinner/index.ts`                                                | canonical | active  | design-system | 1       | 8 → 8                    | 2 → 2                     |
-| `src/core/auth/adminAccess.ts`                                                      | canonical | active  | p1-lane       | 2       | 2 → 2                    | 0 → 0                     |
-| `src/core/auth/client.ts`                                                           | canonical | active  | p1-lane       | 3       | 3 → 3                    | 4 → 4                     |
-| `src/core/auth/oauthProviders.ts`                                                   | canonical | active  | p1-lane       | 2       | 7 → 7                    | 0 → 0                     |
-| `src/core/auth/passwordPolicy.ts`                                                   | canonical | active  | p1-lane       | 8       | 6 → 6                    | 1 → 1                     |
-| `src/core/auth/routePolicy.ts`                                                      | canonical | active  | p1-lane       | 9       | 3 → 3                    | 0 → 0                     |
-| `src/core/auth/sessionPolicy.ts`                                                    | canonical | active  | p1-lane       | 8       | 6 → 6                    | 1 → 1                     |
-| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane       | 4       | 33 → 33                  | 5 → 5                     |
-| `src/core/components/ChartCard.vue`                                                 | canonical | active  | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/core/components/ChartPanel.vue`                                                | canonical | active  | p1-lane       | 2       | 3 → 3                    | 1 → 1                     |
-| `src/core/components/ChartRenderer.vue`                                             | canonical | active  | p1-lane       | 1       | 4 → 4                    | 3 → 3                     |
-| `src/core/components/DataTableColumn.vue`                                           | canonical | active  | p1-lane       | 3       | 5 → 5                    | 1 → 1                     |
-| `src/core/components/DataTableFrame.vue`                                            | canonical | active  | p1-lane       | 2       | 5 → 5                    | 3 → 3                     |
-| `src/core/components/IbFormField.vue`                                               | canonical | active  | p1-lane       | 2       | 6 → 6                    | 3 → 3                     |
-| `src/core/components/RangedLineChartCard.vue`                                       | canonical | active  | p1-lane       | 2       | 3 → 3                    | 7 → 7                     |
-| `src/core/components/SiteBrandLogo.vue`                                             | canonical | active  | p1-lane       | 1       | 5 → 5                    | 0 → 0                     |
-| `src/core/components/StatusBadge.vue`                                               | canonical | active  | p1-lane       | 3       | 5 → 5                    | 3 → 3                     |
-| `src/core/components/StudioName.vue`                                                | canonical | active  | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
-| `src/core/components/UserConfirmDialog.vue`                                         | canonical | active  | p1-lane       | 1       | 4 → 4                    | 6 → 6                     |
-| `src/core/components/formFieldContract.ts`                                          | canonical | active  | p1-lane       | 2       | 3 → 3                    | 0 → 0                     |
-| `src/core/composables/useAppClipboard.ts`                                           | canonical | active  | p1-lane       | 1       | 6 → 6                    | 0 → 0                     |
-| `src/core/composables/useAppToast.ts`                                               | canonical | active  | p1-lane       | 2       | 18 → 18                  | 1 → 1                     |
-| `src/core/composables/useAsyncAction.ts`                                            | canonical | active  | p1-lane       | 3       | 17 → 17                  | 1 → 1                     |
-| `src/core/composables/useLogoutRedirect.ts`                                         | canonical | active  | p1-lane       | 1       | 7 → 7                    | 1 → 1                     |
-| `src/core/composables/useMenuTriggerFocusRestore.ts`                                | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/core/composables/useOverlayInteractionLifecycle.ts`                            | canonical | active  | p1-lane       | 6       | 11 → 11                  | 1 → 1                     |
-| `src/core/composables/useSiteBranding.ts`                                           | canonical | active  | p1-lane       | 16      | 9 → 9                    | 5 → 5                     |
-| `src/core/composables/useSupportChannels.ts`                                        | canonical | active  | p1-lane       | 4       | 10 → 10                  | 6 → 6                     |
-| `src/core/composables/useUserConfirmDialog.ts`                                      | canonical | active  | p1-lane       | 2       | 4 → 4                    | 1 → 1                     |
-| `src/core/config/pagination.ts`                                                     | canonical | active  | p1-lane       | 2       | 16 → 16                  | 0 → 0                     |
-| `src/core/config/runtimeUrls.ts`                                                    | canonical | active  | p1-lane       | 8       | 19 → 19                  | 0 → 0                     |
-| `src/core/config/timing.ts`                                                         | canonical | active  | p1-lane       | 8       | 7 → 7                    | 0 → 0                     |
-| `src/core/constants/media.ts`                                                       | canonical | active  | p1-lane       | 5       | 6 → 6                    | 0 → 0                     |
-| `src/core/contracts/externalImageProviders.ts`                                      | canonical | active  | p1-lane       | 4       | 13 → 13                  | 0 → 0                     |
-| `src/core/contracts/generationContract.ts`                                          | canonical | active  | p1-lane       | 18      | 24 → 24                  | 0 → 0                     |
-| `src/core/contracts/imageServices.ts`                                               | canonical | active  | p1-lane       | 3       | 30 → 30                  | 0 → 0                     |
-| `src/core/errors/errorCatalog.ts`                                                   | canonical | active  | p1-lane       | 5       | 31 → 31                  | 1 → 1                     |
-| `src/core/i18n/formatters.ts`                                                       | canonical | active  | p1-lane       | 5       | 22 → 22                  | 2 → 2                     |
-| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane       | 7       | 115 → 115                | 5 → 5                     |
-| `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane       | 5       | 6 → 6                    | 0 → 0                     |
-| `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane       | 2       | 5 → 5                    | 5 → 5                     |
-| `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane       | 12      | 4 → 4                    | 0 → 0                     |
-| `src/core/i18n/locales/es/index.ts`                                                 | canonical | active  | p1-lane       | 12      | 3 → 3                    | 0 → 0                     |
-| `src/core/i18n/locales/ko/index.ts`                                                 | canonical | active  | p1-lane       | 12      | 3 → 3                    | 0 → 0                     |
-| `src/core/i18n/locales/zh-CN/index.ts`                                              | canonical | active  | p1-lane       | 12      | 3 → 3                    | 0 → 0                     |
-| `src/core/i18n/userIdeaCurrency.ts`                                                 | canonical | active  | p1-lane       | 1       | 22 → 22                  | 1 → 1                     |
-| `src/core/i18n/userLocale.ts`                                                       | canonical | active  | p1-lane       | 9       | 18 → 18                  | 6 → 6                     |
-| `src/core/interaction/interactiveControlState.ts`                                   | canonical | active  | p1-lane       | 5       | 10 → 10                  | 0 → 0                     |
-| `src/core/interaction/menuKeyboardNavigation.ts`                                    | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/core/lib/brandMark.ts`                                                         | canonical | active  | p1-lane       | 2       | 5 → 5                    | 0 → 0                     |
-| `src/core/lib/chartPrimitives.ts`                                                   | canonical | active  | p1-lane       | 15      | 13 → 13                  | 3 → 3                     |
-| `src/core/lib/chartTimeRange.ts`                                                    | canonical | active  | p1-lane       | 7       | 4 → 4                    | 0 → 0                     |
-| `src/core/lib/pageChrome.ts`                                                        | canonical | active  | p1-lane       | 3       | 4 → 4                    | 0 → 0                     |
-| `src/core/media/imageAssetPipeline.ts`                                              | canonical | active  | p1-lane       | 6       | 5 → 5                    | 6 → 6                     |
-| `src/core/media/imageDimensions.ts`                                                 | canonical | active  | p1-lane       | 4       | 5 → 5                    | 0 → 0                     |
-| `src/core/media/mediaRef.ts`                                                        | canonical | active  | p1-lane       | 5       | 13 → 13                  | 1 → 1                     |
-| `src/core/media/visionIngressPolicy.ts`                                             | canonical | active  | p1-lane       | 8       | 7 → 7                    | 2 → 2                     |
-| `src/core/motion/chartMotion.ts`                                                    | canonical | active  | p1-lane       | 1       | 4 → 4                    | 2 → 2                     |
-| `src/core/motion/dialogMotion.ts`                                                   | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/core/motion/motionPolicy.ts`                                                   | canonical | active  | p1-lane       | 6       | 6 → 6                    | 0 → 0                     |
-| `src/core/motion/popoverMotion.ts`                                                  | canonical | active  | p1-lane       | 3       | 7 → 7                    | 2 → 2                     |
-| `src/core/query/queryClient.ts`                                                     | canonical | active  | p1-lane       | 2       | 10 → 10                  | 1 → 1                     |
-| `src/core/query/queryDefaults.ts`                                                   | canonical | active  | p1-lane       | 5       | 19 → 19                  | 0 → 0                     |
-| `src/core/query/taskResult.ts`                                                      | canonical | active  | p1-lane       | 5       | 9 → 9                    | 1 → 1                     |
-| `src/core/query/userCreditsInvalidation.ts`                                         | canonical | active  | p1-lane       | 4       | 7 → 7                    | 0 → 0                     |
-| `src/core/router/queryParams.ts`                                                    | canonical | active  | p1-lane       | 3       | 15 → 15                  | 1 → 1                     |
-| `src/core/seo/routeSeo.ts`                                                          | canonical | active  | p1-lane       | 12      | 5 → 5                    | 0 → 0                     |
-| `src/core/seo/seoStaticHtml.ts`                                                     | canonical | active  | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane       | 16      | 26 → 26                  | 4 → 4                     |
-| `src/core/utils/currency.ts`                                                        | canonical | active  | p1-lane       | 3       | 3 → 3                    | 2 → 2                     |
-| `src/core/utils/dateTime.ts`                                                        | canonical | active  | p1-lane       | 5       | 7 → 7                    | 2 → 2                     |
-| `src/core/utils/errorMessages.ts`                                                   | canonical | active  | p1-lane       | 4       | 12 → 12                  | 0 → 0                     |
-| `src/core/utils/formValidation.ts`                                                  | canonical | active  | p1-lane       | 3       | 5 → 5                    | 0 → 0                     |
-| `src/core/utils/ids.ts`                                                             | canonical | active  | p1-lane       | 3       | 12 → 12                  | 0 → 0                     |
-| `src/core/utils/imageUploadSupport.ts`                                              | canonical | active  | p1-lane       | 3       | 8 → 8                    | 2 → 2                     |
-| `src/core/utils/number.ts`                                                          | canonical | active  | p1-lane       | 3       | 16 → 16                  | 0 → 0                     |
-| `src/core/utils/opaqueIds.ts`                                                       | canonical | active  | p1-lane       | 5       | 9 → 9                    | 0 → 0                     |
-| `src/core/utils/polling.ts`                                                         | canonical | active  | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
-| `src/core/utils/storage.ts`                                                         | canonical | active  | p1-lane       | 8       | 15 → 15                  | 0 → 0                     |
-| `src/core/utils/workspaceId.ts`                                                     | canonical | active  | p1-lane       | 2       | 9 → 9                    | 1 → 1                     |
-| `src/features/account/core/index.ts`                                                | cascading | active  | p3-lane       | 13      | 0 → 0                    | 79 → 79                   |
-| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane       | 130     | 4 → 4                    | 79 → 79                   |
-| `src/features/account/session/index.ts`                                             | cascading | active  | p3-lane       | 94      | 0 → 0                    | 79 → 79                   |
-| `src/features/account/ui/chrome/SupportChannelQr.vue`                               | canonical | active  | p1-lane       | 1       | 2 → 2                    | 9 → 9                     |
-| `src/features/account/ui/chrome/UserAccountMenu.vue`                                | canonical | active  | p1-lane       | 1       | 7 → 7                    | 14 → 14                   |
-| `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                        | canonical | active  | p1-lane       | 1       | 2 → 2                    | 2 → 2                     |
-| `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane       | 5       | 8 → 8                    | 13 → 13                   |
-| `src/features/account/ui/chrome/userAccountMenu.types.ts`                           | canonical | active  | p1-lane       | 4       | 7 → 7                    | 0 → 0                     |
-| `src/features/account/ui/index.ts`                                                  | cascading | active  | p3-lane       | 23      | 0 → 0                    | 79 → 79                   |
-| `src/features/admin/credits/wallets/index.ts`                                       | canonical | active  | p4-lane       | 1       | 1 → 1                    | 31 → 31                   |
-| `src/features/admin/prompts/core/promptVariables.ts`                                | canonical | active  | p1-lane       | 3       | 4 → 4                    | 1 → 1                     |
-| `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane       | 14      | 17 → 17                  | 1 → 1                     |
-| `src/features/admin/shared/components/AdminAlert.vue`                               | canonical | active  | p4-lane       | 2       | 20 → 20                  | 2 → 2                     |
-| `src/features/admin/shared/components/AdminBadge.vue`                               | canonical | active  | p4-lane       | 2       | 2 → 2                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminButton.vue`                              | canonical | active  | p4-lane       | 3       | 28 → 28                  | 4 → 4                     |
-| `src/features/admin/shared/components/AdminChartCard.vue`                           | canonical | active  | p4-lane       | 1       | 1 → 1                    | 2 → 2                     |
-| `src/features/admin/shared/components/AdminCollectionPageShell.vue`                 | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/features/admin/shared/components/AdminColumn.vue`                              | canonical | active  | p4-lane       | 1       | 15 → 15                  | 0 → 0                     |
-| `src/features/admin/shared/components/AdminConfirmDialog.vue`                       | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminDialogActions.vue`                       | canonical | active  | p4-lane       | 1       | 11 → 11                  | 2 → 2                     |
-| `src/features/admin/shared/components/AdminDialogShell.vue`                         | canonical | active  | p4-lane       | 3       | 18 → 18                  | 5 → 5                     |
-| `src/features/admin/shared/components/AdminDrawer.vue`                              | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminEditorActions.vue`                       | canonical | active  | p4-lane       | 1       | 7 → 7                    | 1 → 1                     |
-| `src/features/admin/shared/components/AdminEmptyState.vue`                          | canonical | active  | p4-lane       | 1       | 15 → 15                  | 2 → 2                     |
-| `src/features/admin/shared/components/AdminFilterPopover.vue`                       | canonical | active  | p4-lane       | 1       | 3 → 3                    | 5 → 5                     |
-| `src/features/admin/shared/components/AdminFormField.vue`                           | canonical | active  | p4-lane       | 2       | 13 → 13                  | 2 → 2                     |
-| `src/features/admin/shared/components/AdminInput.vue`                               | canonical | active  | p4-lane       | 1       | 18 → 18                  | 5 → 5                     |
-| `src/features/admin/shared/components/AdminLogoCropDialog.vue`                      | canonical | active  | p4-lane       | 1       | 1 → 1                    | 8 → 8                     |
-| `src/features/admin/shared/components/AdminLogoPickerPopover.vue`                   | canonical | active  | p4-lane       | 1       | 3 → 3                    | 6 → 6                     |
-| `src/features/admin/shared/components/AdminMono.vue`                                | canonical | active  | p4-lane       | 1       | 9 → 9                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminNumberInput.vue`                         | canonical | active  | p4-lane       | 1       | 5 → 5                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminOptionFilter.vue`                        | canonical | active  | p4-lane       | 2       | 4 → 4                    | 2 → 2                     |
-| `src/features/admin/shared/components/AdminPagerControls.vue`                       | canonical | active  | p4-lane       | 1       | 5 → 5                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminPopover.vue`                             | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/components/AdminPopoverContent.vue`                      | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminPopoverTrigger.vue`                      | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/components/AdminRangedLineChartCard.vue`                 | canonical | active  | p4-lane       | 1       | 1 → 1                    | 1 → 1                     |
-| `src/features/admin/shared/components/AdminRefreshButton.vue`                       | canonical | active  | p4-lane       | 1       | 4 → 4                    | 1 → 1                     |
-| `src/features/admin/shared/components/AdminResourceToolbar.vue`                     | canonical | active  | p4-lane       | 1       | 2 → 2                    | 2 → 2                     |
-| `src/features/admin/shared/components/AdminRowActionsPopover.vue`                   | canonical | active  | p4-lane       | 2       | 3 → 3                    | 2 → 2                     |
-| `src/features/admin/shared/components/AdminSelect.vue`                              | canonical | active  | p4-lane       | 2       | 11 → 11                  | 5 → 5                     |
-| `src/features/admin/shared/components/AdminSettingsDialogFrame.vue`                 | canonical | active  | p4-lane       | 1       | 2 → 2                    | 5 → 5                     |
-| `src/features/admin/shared/components/AdminSpinner.vue`                             | canonical | active  | p4-lane       | 1       | 11 → 11                  | 2 → 2                     |
-| `src/features/admin/shared/components/AdminStatusPill.vue`                          | canonical | active  | p4-lane       | 2       | 24 → 24                  | 1 → 1                     |
-| `src/features/admin/shared/components/AdminSubNavigationLayout.vue`                 | canonical | active  | p4-lane       | 2       | 1 → 1                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminSummaryCard.vue`                         | canonical | active  | p4-lane       | 1       | 1 → 1                    | 0 → 0                     |
-| `src/features/admin/shared/components/AdminSwitch.vue`                              | canonical | active  | p4-lane       | 1       | 13 → 13                  | 3 → 3                     |
-| `src/features/admin/shared/components/AdminTable.vue`                               | canonical | active  | p4-lane       | 5       | 14 → 14                  | 13 → 13                   |
-| `src/features/admin/shared/components/AdminTablePanel.vue`                          | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/features/admin/shared/components/AdminTextarea.vue`                            | canonical | active  | p4-lane       | 1       | 4 → 4                    | 3 → 3                     |
-| `src/features/admin/shared/components/AdminToolbarSearch.vue`                       | canonical | active  | p4-lane       | 1       | 9 → 9                    | 3 → 3                     |
-| `src/features/admin/shared/components/SwitchRow.vue`                                | canonical | active  | p4-lane       | 2       | 4 → 4                    | 2 → 2                     |
-| `src/features/admin/shared/composables/useAdminCollectionQuery.ts`                  | canonical | active  | p4-lane       | 1       | 2 → 2                    | 3 → 3                     |
-| `src/features/admin/shared/composables/useAdminConfirm.ts`                          | canonical | active  | p4-lane       | 9       | 21 → 21                  | 1 → 1                     |
-| `src/features/admin/shared/composables/useAdminCursorCollection.ts`                 | canonical | active  | p4-lane       | 1       | 6 → 6                    | 4 → 4                     |
-| `src/features/admin/shared/composables/useAnomalyRadar.ts`                          | canonical | active  | p4-lane       | 1       | 1 → 1                    | 5 → 5                     |
-| `src/features/admin/shared/composables/useOptimisticToggle.ts`                      | canonical | active  | p4-lane       | 3       | 5 → 5                    | 1 → 1                     |
-| `src/features/admin/shared/composables/usePagePagination.ts`                        | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/features/admin/shared/composables/useQueryPolling.ts`                          | canonical | active  | p4-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/features/admin/shared/composables/useRefetchOnClose.ts`                        | canonical | active  | p4-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/index.ts`                                                | canonical | planned | p4-lane       | 131     | 125 → 125                | 56 → 56                   |
-| `src/features/admin/shared/lib/anomalyRules.ts`                                     | canonical | active  | p4-lane       | 4       | 3 → 3                    | 3 → 3                     |
-| `src/features/admin/shared/lib/cellClasses.ts`                                      | canonical | active  | p4-lane       | 4       | 4 → 4                    | 0 → 0                     |
-| `src/features/admin/shared/lib/cellPlaceholders.ts`                                 | canonical | active  | p4-lane       | 4       | 7 → 7                    | 0 → 0                     |
-| `src/features/admin/shared/lib/chart.ts`                                            | canonical | active  | p4-lane       | 14      | 8 → 8                    | 6 → 6                     |
-| `src/features/admin/shared/lib/confirmSettingsSave.ts`                              | canonical | active  | p4-lane       | 7       | 11 → 11                  | 2 → 2                     |
-| `src/features/admin/shared/lib/controlCopy.ts`                                      | canonical | active  | p4-lane       | 2       | 18 → 18                  | 1 → 1                     |
-| `src/features/admin/shared/lib/controlGuidance.ts`                                  | canonical | active  | p4-lane       | 3       | 6 → 6                    | 0 → 0                     |
-| `src/features/admin/shared/lib/controlMutation.ts`                                  | canonical | active  | p4-lane       | 10      | 23 → 23                  | 1 → 1                     |
-| `src/features/admin/shared/lib/controlResource.ts`                                  | canonical | active  | p4-lane       | 2       | 5 → 5                    | 3 → 3                     |
-| `src/features/admin/shared/lib/reconcileStableRows.ts`                              | canonical | active  | p4-lane       | 1       | 4 → 4                    | 0 → 0                     |
-| `src/features/admin/shared/lib/secretSchema.ts`                                     | canonical | active  | p4-lane       | 1       | 4 → 4                    | 1 → 1                     |
-| `src/features/admin/shared/lib/serviceAdminMeta.ts`                                 | canonical | active  | p4-lane       | 6       | 3 → 3                    | 1 → 1                     |
-| `src/features/admin/shared/lib/tableColumns.ts`                                     | canonical | active  | p4-lane       | 2       | 8 → 8                    | 0 → 0                     |
-| `src/features/admin/shared/lib/taskMetricTokens.ts`                                 | canonical | active  | p4-lane       | 7       | 12 → 12                  | 1 → 1                     |
-| `src/features/admin/shared/lib/timeRange.ts`                                        | canonical | active  | p4-lane       | 5       | 4 → 4                    | 2 → 2                     |
-| `src/features/admin/shared/lib/toast.ts`                                            | canonical | active  | p4-lane       | 4       | 39 → 39                  | 2 → 2                     |
-| `src/features/admin/shared/lib/uiClasses.ts`                                        | canonical | active  | p4-lane       | 38      | 36 → 36                  | 0 → 0                     |
-| `src/features/admin/shared/logos/brandLogos.ts`                                     | canonical | active  | p4-lane       | 14      | 11 → 11                  | 14 → 14                   |
-| `src/features/admin/shared/logos/useBrandLogoOverrides.ts`                          | canonical | active  | p4-lane       | 1       | 1 → 1                    | 5 → 5                     |
-| `src/features/admin/shared/ui/serviceIcons.ts`                                      | canonical | active  | p1-lane       | 1       | 4 → 4                    | 3 → 3                     |
-| `src/features/admin/shared/validation/actionReasonContract.ts`                      | canonical | active  | p4-lane       | 3       | 2 → 2                    | 0 → 0                     |
-| `src/features/auth/components/auth-fields/index.ts`                                 | cascading | active  | p2-lane       | 10      | 3 → 3                    | 11 → 11                   |
-| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane       | 28      | 28 → 28                  | 41 → 41                   |
-| `src/features/board/core/document/index.ts`                                         | cascading | active  | p3-lane       | 87      | 1 → 1                    | 6 → 6                     |
-| `src/features/board/core/index.ts`                                                  | cascading | active  | p3-lane       | 92      | 14 → 14                  | 7 → 7                     |
-| `src/features/board/core/media/index.ts`                                            | cascading | active  | p3-lane       | 1       | 1 → 1                    | 3 → 3                     |
-| `src/features/board/core/schema/index.ts`                                           | cascading | active  | p3-lane       | 4       | 1 → 1                    | 9 → 9                     |
-| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane       | 195     | 48 → 48                  | 47 → 47                   |
-| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane       | 83      | 95 → 95                  | 47 → 47                   |
-| `src/features/board/session/catalog/index.ts`                                       | cascading | active  | p3-lane       | 43      | 2 → 2                    | 11 → 11                   |
-| `src/features/board/session/persistence/index.ts`                                   | cascading | active  | p3-lane       | 13      | 11 → 11                  | 5 → 5                     |
-| `src/features/board/session/preview/index.ts`                                       | cascading | active  | p3-lane       | 5       | 7 → 7                    | 12 → 12                   |
-| `src/features/board/session/share-join/index.ts`                                    | cascading | active  | p3-lane       | 2       | 1 → 1                    | 6 → 6                     |
-| `src/features/board/session/sync/index.ts`                                          | cascading | active  | p3-lane       | 14      | 2 → 2                    | 24 → 24                   |
-| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane       | 7       | 10 → 10                  | 8 → 8                     |
-| `src/features/board/ui/gallery/index.ts`                                            | cascading | active  | p3-lane       | 14      | 1 → 1                    | 27 → 27                   |
-| `src/features/canvas/application/board-session/index.ts`                            | canonical | active  | p5-lane       | 9       | 5 → 5                    | 17 → 17                   |
-| `src/features/canvas/application/editing/index.ts`                                  | canonical | active  | p5-lane       | 10      | 5 → 5                    | 40 → 40                   |
-| `src/features/canvas/application/execution/board-attachment/index.ts`               | canonical | active  | p5-lane       | 2       | 12 → 12                  | 0 → 0                     |
-| `src/features/canvas/application/execution/index.ts`                                | canonical | active  | p5-lane       | 54      | 21 → 21                  | 54 → 54                   |
-| `src/features/canvas/application/execution/pending-execution/index.ts`              | cascading | active  | p5-lane       | 27      | 22 → 22                  | 8 → 8                     |
-| `src/features/canvas/application/execution/result-nodes/index.ts`                   | cascading | active  | p5-lane       | 16      | 4 → 4                    | 23 → 23                   |
-| `src/features/canvas/application/execution/task-lifecycle/index.ts`                 | canonical | active  | p5-lane       | 3       | 1 → 1                    | 1 → 1                     |
-| `src/features/canvas/application/image-workflow/index.ts`                           | canonical | active  | p5-lane       | 3       | 4 → 4                    | 34 → 34                   |
-| `src/features/canvas/application/workspace/index.ts`                                | canonical | active  | p5-lane       | 2       | 4 → 4                    | 30 → 30                   |
-| `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane       | 1       | 7 → 7                    | 1 → 1                     |
-| `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane       | 1       | 5 → 5                    | 1 → 1                     |
-| `src/features/canvas/domain/graph/index.ts`                                         | canonical | active  | p5-lane       | 58      | 59 → 59                  | 3 → 3                     |
-| `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane       | 2       | 2 → 2                    | 79 → 79                   |
-| `src/features/canvas/infrastructure/vue-flow-adapter/index.ts`                      | canonical | active  | p5-lane       | 20      | 20 → 20                  | 27 → 27                   |
-| `src/features/canvas/presentation/chrome/components/index.ts`                       | canonical | active  | p5-lane       | 6       | 1 → 1                    | 12 → 12                   |
-| `src/features/canvas/presentation/chrome/index.ts`                                  | cascading | active  | p5-lane       | 6       | 1 → 1                    | 21 → 21                   |
-| `src/features/canvas/presentation/nodes/groups/index.ts`                            | canonical | active  | p5-lane       | 4       | 3 → 3                    | 10 → 10                   |
-| `src/features/canvas/presentation/nodes/index.ts`                                   | canonical | active  | p5-lane       | 9       | 3 → 3                    | 50 → 50                   |
-| `src/features/canvas/presentation/nodes/primitives/index.ts`                        | canonical | active  | p5-lane       | 21      | 5 → 5                    | 15 → 15                   |
-| `src/features/canvas/presentation/nodes/workflows/index.ts`                         | canonical | active  | p5-lane       | 7       | 1 → 1                    | 33 → 33                   |
-| `src/features/canvas/presentation/overlays/index.ts`                                | canonical | active  | p5-lane       | 2       | 5 → 5                    | 16 → 16                   |
-| `src/features/canvas/presentation/pages/CanvasLandingPage.vue`                      | canonical | active  | p5-lane       | 1       | 2 → 2                    | 10 → 10                   |
-| `src/features/canvas/presentation/pages/CanvasPage.vue`                             | canonical | active  | p5-lane       | 1       | 2 → 2                    | 4 → 4                     |
-| `src/features/canvas/presentation/screens/index.ts`                                 | canonical | active  | p5-lane       | 1       | 1 → 1                    | 51 → 51                   |
-| `src/features/canvas/session/media/preloadImage.ts`                                 | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/features/canvas/session/serviceImageActionText.ts`                             | canonical | active  | p1-lane       | 2       | 3 → 3                    | 3 → 3                     |
-| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane       | 10      | 9 → 9                    | 24 → 24                   |
-| `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane       | 6       | 5 → 5                    | 15 → 15                   |
-| `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane       | 7       | 2 → 2                    | 6 → 6                     |
-| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane       | 34      | 13 → 13                  | 27 → 27                   |
-| `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane       | 7       | 0 → 0                    | 5 → 5                     |
-| `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane       | 1       | 4 → 4                    | 1 → 1                     |
-| `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane       | 4       | 5 → 5                    | 0 → 0                     |
-| `src/features/library/index.ts`                                                     | canonical | active  | p2-lane       | 69      | 23 → 23                  | 37 → 37                   |
-| `src/features/search/index.ts`                                                      | canonical | active  | p3-lane       | 21      | 2 → 2                    | 40 → 40                   |
-| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane       | 41      | 19 → 19                  | 48 → 48                   |
-| `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | retired | workspace-p2  | 20      | 0 → 0                    | 1 → 1                     |
-| `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2  | 20      | 0 → 0                    | 1 → 1                     |
-| `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane       | 9       | 34 → 34                  | 1 → 1                     |
-| `src/features/workspace/selection/workspaceSelectionPort.ts`                        | canonical | active  | workspace-p2  | 7       | 2 → 2                    | 3 → 3                     |
-| `src/shared/api/client.ts`                                                          | canonical | retired | p1-lane       | 6       | 12 → 12                  | 4 → 4                     |
-| `src/shared/api/contractKernel.ts`                                                  | canonical | retired | p1-lane       | 24      | 40 → 40                  | 2 → 2                     |
-| `src/shared/api/generated-query/control/control-billing/control-billing.ts`         | canonical | retired | p1-lane       | 56      | 3 → 3                    | 4 → 4                     |
-| `src/shared/api/generated-query/control/control-credits/control-credits.ts`         | canonical | retired | p1-lane       | 145     | 4 → 4                    | 4 → 4                     |
-| `src/shared/api/generated-query/control/control-payments/control-payments.ts`       | canonical | retired | p1-lane       | 39      | 3 → 3                    | 4 → 4                     |
-| `src/shared/api/generated-query/control/control-platform/control-platform.ts`       | canonical | retired | p1-lane       | 402     | 14 → 14                  | 4 → 4                     |
-| `src/shared/api/generated-query/control/control-tasks/control-tasks.ts`             | canonical | retired | p1-lane       | 22      | 2 → 2                    | 4 → 4                     |
-| `src/shared/api/generated-query/control/control-users/control-users.ts`             | canonical | retired | p1-lane       | 80      | 4 → 4                    | 4 → 4                     |
-| `src/shared/api/generated-query/control/index.ts`                                   | cascading | retired | p1-lane       | 784     | 0 → 0                    | 3 → 3                     |
-| `src/shared/api/generated-query/control/model/controlMailConfigRequest.ts`          | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts`       | canonical | retired | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts`        | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/shared/api/generated-query/control/model/controlTaskEnvelope.ts`               | canonical | retired | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/shared/api/generated-query/control/model/index.ts`                             | canonical | retired | p1-lane       | 159     | 17 → 17                  | 0 → 0                     |
-| `src/shared/api/generated-query/control/model/supportChannelKind.ts`                | canonical | retired | p1-lane       | 1       | 3 → 3                    | 0 → 0                     |
-| `src/shared/api/generated-query/control/model/supportChannelsSetting.ts`            | canonical | retired | p1-lane       | 1       | 3 → 3                    | 1 → 1                     |
-| `src/shared/api/generated-query/public/boards/boards.ts`                            | canonical | retired | p1-lane       | 144     | 2 → 2                    | 4 → 4                     |
-| `src/shared/api/generated-query/public/index.ts`                                    | cascading | retired | p1-lane       | 619     | 0 → 0                    | 3 → 3                     |
-| `src/shared/api/generated-query/public/model/board.ts`                              | canonical | retired | p1-lane       | 1       | 4 → 4                    | 2 → 2                     |
-| `src/shared/api/generated-query/public/model/boardDocument.ts`                      | canonical | retired | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/shared/api/generated-query/public/model/index.ts`                              | canonical | retired | p1-lane       | 236     | 19 → 19                  | 0 → 0                     |
-| `src/shared/api/generated-query/public/user/user.ts`                                | canonical | retired | p1-lane       | 23      | 5 → 5                    | 4 → 4                     |
-| `src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts`      | canonical | retired | p1-lane       | 97      | 6 → 6                    | 4 → 4                     |
-| `src/shared/api/generated-query/public/workspace-library/workspace-library.ts`      | canonical | retired | p1-lane       | 75      | 3 → 3                    | 4 → 4                     |
-| `src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts`      | canonical | retired | p1-lane       | 16      | 2 → 2                    | 4 → 4                     |
-| `src/shared/api/generated-query/public/workspace-search/workspace-search.ts`        | canonical | retired | p1-lane       | 16      | 3 → 3                    | 4 → 4                     |
-| `src/shared/api/generated-query/public/workspaces/workspaces.ts`                    | canonical | retired | p1-lane       | 40      | 2 → 2                    | 4 → 4                     |
-| `src/shared/api/idempotencyKey.ts`                                                  | canonical | retired | p1-lane       | 13      | 12 → 12                  | 0 → 0                     |
-| `src/shared/api/mediaAssetDelivery.ts`                                              | canonical | retired | p1-lane       | 25      | 25 → 25                  | 4 → 4                     |
-| `src/shared/api/mediaWorkspaceScope.ts`                                             | canonical | retired | p1-lane       | 3       | 6 → 6                    | 0 → 0                     |
-| `src/shared/api/sessionUserType.ts`                                                 | canonical | retired | p1-lane       | 1       | 13 → 13                  | 0 → 0                     |
-| `src/shared/api/stripUndefined.ts`                                                  | canonical | retired | p1-lane       | 2       | 11 → 11                  | 0 → 0                     |
-| `src/shared/api/upload.ts`                                                          | canonical | retired | p1-lane       | 22      | 10 → 10                  | 7 → 7                     |
-| `src/shared/api/userSession.ts`                                                     | canonical | retired | p1-lane       | 2       | 2 → 2                    | 3 → 3                     |
-| `src/shared/api/workspaceEventStream.ts`                                            | canonical | retired | p1-lane       | 19      | 5 → 5                    | 3 → 3                     |
-| `src/shared/api/workspaceTaskContract.ts`                                           | canonical | retired | p1-lane       | 14      | 5 → 5                    | 2 → 2                     |
-| `src/shared/api/workspaceTaskTransport.ts`                                          | canonical | retired | p1-lane       | 7       | 7 → 7                    | 5 → 5                     |
-| `src/shared/api/workspaceTaskWaiter.ts`                                             | canonical | retired | p1-lane       | 2       | 2 → 2                    | 5 → 5                     |
-| `src/shared/api/workspaceTasks.ts`                                                  | canonical | retired | p1-lane       | 23      | 3 → 3                    | 3 → 3                     |
-| `src/shared/auth/adminAccess.ts`                                                    | canonical | retired | p1-lane       | 2       | 1 → 1                    | 0 → 0                     |
-| `src/shared/auth/client.ts`                                                         | canonical | retired | p1-lane       | 3       | 2 → 2                    | 4 → 4                     |
-| `src/shared/auth/oauthProviders.ts`                                                 | canonical | retired | p1-lane       | 2       | 6 → 6                    | 0 → 0                     |
-| `src/shared/auth/passwordPolicy.ts`                                                 | canonical | retired | p1-lane       | 8       | 5 → 5                    | 1 → 1                     |
-| `src/shared/auth/sessionPolicy.ts`                                                  | canonical | retired | p1-lane       | 8       | 5 → 5                    | 1 → 1                     |
-| `src/shared/components/ActionButton.vue`                                            | canonical | retired | p1-lane       | 4       | 31 → 31                  | 5 → 5                     |
-| `src/shared/components/ChartCard.vue`                                               | canonical | retired | p1-lane       | 1       | 2 → 2                    | 2 → 2                     |
-| `src/shared/components/ChartPanel.vue`                                              | canonical | retired | p1-lane       | 2       | 2 → 2                    | 1 → 1                     |
-| `src/shared/components/ChartRenderer.vue`                                           | canonical | retired | p1-lane       | 1       | 3 → 3                    | 3 → 3                     |
-| `src/shared/components/DataTableColumn.vue`                                         | canonical | retired | p1-lane       | 3       | 4 → 4                    | 1 → 1                     |
-| `src/shared/components/DataTableFrame.vue`                                          | canonical | retired | p1-lane       | 2       | 4 → 4                    | 3 → 3                     |
-| `src/shared/components/IbFormField.vue`                                             | canonical | retired | p1-lane       | 2       | 5 → 5                    | 3 → 3                     |
-| `src/shared/components/RangedLineChartCard.vue`                                     | canonical | retired | p1-lane       | 2       | 2 → 2                    | 7 → 7                     |
-| `src/shared/components/SiteBrandLogo.vue`                                           | canonical | retired | p1-lane       | 1       | 4 → 4                    | 0 → 0                     |
-| `src/shared/components/StatusBadge.vue`                                             | canonical | retired | p1-lane       | 3       | 4 → 4                    | 3 → 3                     |
-| `src/shared/components/StudioName.vue`                                              | canonical | retired | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/shared/components/UserAccountMenu.vue`                                         | canonical | retired | p3-lane       | 1       | 5 → 5                    | 14 → 14                   |
-| `src/shared/components/UserConfirmDialog.vue`                                       | canonical | retired | p1-lane       | 1       | 2 → 2                    | 6 → 6                     |
-| `src/shared/components/formFieldContract.ts`                                        | canonical | retired | p1-lane       | 2       | 2 → 2                    | 0 → 0                     |
-| `src/shared/components/userAccountMenu.types.ts`                                    | canonical | retired | p3-lane       | 4       | 6 → 6                    | 0 → 0                     |
-| `src/shared/composables/useAppClipboard.ts`                                         | canonical | retired | p1-lane       | 1       | 5 → 5                    | 0 → 0                     |
-| `src/shared/composables/useAppToast.ts`                                             | canonical | retired | p1-lane       | 2       | 17 → 17                  | 1 → 1                     |
-| `src/shared/composables/useAsyncAction.ts`                                          | canonical | retired | p1-lane       | 3       | 16 → 16                  | 1 → 1                     |
-| `src/shared/composables/useLogoutRedirect.ts`                                       | canonical | retired | p1-lane       | 1       | 6 → 6                    | 1 → 1                     |
-| `src/shared/composables/useOverlayInteractionLifecycle.ts`                          | canonical | retired | p1-lane       | 6       | 10 → 10                  | 1 → 1                     |
-| `src/shared/composables/useSiteBranding.ts`                                         | canonical | retired | p1-lane       | 16      | 8 → 8                    | 5 → 5                     |
-| `src/shared/composables/useSupportChannels.ts`                                      | canonical | retired | p1-lane       | 4       | 9 → 9                    | 6 → 6                     |
-| `src/shared/composables/useUserConfirmDialog.ts`                                    | canonical | retired | p1-lane       | 2       | 3 → 3                    | 1 → 1                     |
-| `src/shared/config/pagination.ts`                                                   | canonical | retired | p1-lane       | 2       | 15 → 15                  | 0 → 0                     |
-| `src/shared/config/runtimeUrls.ts`                                                  | canonical | retired | p1-lane       | 8       | 18 → 18                  | 0 → 0                     |
-| `src/shared/config/timing.ts`                                                       | canonical | retired | p1-lane       | 8       | 6 → 6                    | 0 → 0                     |
-| `src/shared/constants/contacts.ts`                                                  | canonical | retired | p1-lane       | 1       | 1 → 1                    | 0 → 0                     |
-| `src/shared/constants/legalLinks.ts`                                                | canonical | retired | p1-lane       | 1       | 2 → 2                    | 1 → 1                     |
-| `src/shared/constants/media.ts`                                                     | canonical | retired | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
-| `src/shared/constants/routePaths.ts`                                                | canonical | retired | p1-lane       | 27      | 44 → 44                  | 0 → 0                     |
-| `src/shared/domain/externalImageProviders.ts`                                       | canonical | retired | p1-lane       | 4       | 12 → 12                  | 0 → 0                     |
-| `src/shared/domain/generationContract.ts`                                           | canonical | retired | p1-lane       | 18      | 23 → 23                  | 0 → 0                     |
-| `src/shared/domain/imageActions.ts`                                                 | canonical | retired | p1-lane       | 1       | 6 → 6                    | 1 → 1                     |
-| `src/shared/domain/imageServices.ts`                                                | canonical | retired | p1-lane       | 3       | 24 → 24                  | 0 → 0                     |
-| `src/shared/domain/serviceIcons.ts`                                                 | canonical | retired | p1-lane       | 1       | 3 → 3                    | 3 → 3                     |
-| `src/shared/domain/serviceRegistry.ts`                                              | canonical | retired | p1-lane       | 6       | 4 → 4                    | 2 → 2                     |
-| `src/shared/errors/errorCatalog.ts`                                                 | canonical | retired | p1-lane       | 5       | 30 → 30                  | 1 → 1                     |
-| `src/shared/i18n/formatters.ts`                                                     | canonical | retired | p1-lane       | 5       | 20 → 20                  | 2 → 2                     |
-| `src/shared/i18n/index.ts`                                                          | canonical | retired | p1-lane       | 7       | 112 → 112                | 5 → 5                     |
-| `src/shared/i18n/localeCore.ts`                                                     | canonical | retired | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
-| `src/shared/i18n/locales/en/index.ts`                                               | cascading | retired | p1-lane       | 11      | 1 → 1                    | 0 → 0                     |
-| `src/shared/i18n/locales/es/index.ts`                                               | cascading | retired | p1-lane       | 11      | 2 → 2                    | 0 → 0                     |
-| `src/shared/i18n/locales/ko/index.ts`                                               | cascading | retired | p1-lane       | 11      | 2 → 2                    | 0 → 0                     |
-| `src/shared/i18n/locales/zh-CN/index.ts`                                            | cascading | retired | p1-lane       | 11      | 2 → 2                    | 0 → 0                     |
-| `src/shared/i18n/userIdeaCurrency.ts`                                               | canonical | retired | p1-lane       | 1       | 21 → 21                  | 1 → 1                     |
-| `src/shared/i18n/userLocale.ts`                                                     | canonical | retired | p1-lane       | 9       | 15 → 15                  | 6 → 6                     |
-| `src/shared/interaction/interactiveControlState.ts`                                 | canonical | retired | p1-lane       | 5       | 8 → 8                    | 0 → 0                     |
-| `src/shared/interaction/menuKeyboardNavigation.ts`                                  | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/shared/lib/brandMark.ts`                                                       | canonical | retired | p1-lane       | 2       | 4 → 4                    | 0 → 0                     |
-| `src/shared/lib/chartPrimitives.ts`                                                 | canonical | retired | p1-lane       | 15      | 12 → 12                  | 3 → 3                     |
-| `src/shared/lib/chartTimeRange.ts`                                                  | canonical | retired | p1-lane       | 7       | 3 → 3                    | 0 → 0                     |
-| `src/shared/lib/pageChrome.ts`                                                      | canonical | retired | p1-lane       | 3       | 3 → 3                    | 0 → 0                     |
-| `src/shared/media/imageAssetPipeline.ts`                                            | canonical | retired | p1-lane       | 6       | 4 → 4                    | 6 → 6                     |
-| `src/shared/media/imageDimensions.ts`                                               | canonical | retired | p1-lane       | 4       | 4 → 4                    | 0 → 0                     |
-| `src/shared/media/mediaRef.ts`                                                      | canonical | retired | p1-lane       | 5       | 12 → 12                  | 1 → 1                     |
-| `src/shared/media/preloadImage.ts`                                                  | canonical | retired | p1-lane       | 1       | 2 → 2                    | 0 → 0                     |
-| `src/shared/media/visionIngressPolicy.ts`                                           | canonical | retired | p1-lane       | 8       | 6 → 6                    | 2 → 2                     |
-| `src/shared/motion/chartMotion.ts`                                                  | canonical | retired | p1-lane       | 1       | 3 → 3                    | 2 → 2                     |
-| `src/shared/motion/motionPolicy.ts`                                                 | canonical | retired | p1-lane       | 6       | 5 → 5                    | 0 → 0                     |
-| `src/shared/motion/popoverMotion.ts`                                                | canonical | retired | p1-lane       | 3       | 6 → 6                    | 2 → 2                     |
-| `src/shared/query/queryClient.ts`                                                   | canonical | retired | p1-lane       | 2       | 5 → 5                    | 1 → 1                     |
-| `src/shared/query/queryDefaults.ts`                                                 | canonical | retired | p1-lane       | 5       | 16 → 16                  | 0 → 0                     |
-| `src/shared/query/taskResult.ts`                                                    | canonical | retired | p1-lane       | 5       | 8 → 8                    | 1 → 1                     |
-| `src/shared/query/userCreditsInvalidation.ts`                                       | canonical | retired | p1-lane       | 4       | 6 → 6                    | 0 → 0                     |
-| `src/shared/router/queryParams.ts`                                                  | canonical | retired | p1-lane       | 3       | 14 → 14                  | 1 → 1                     |
-| `src/shared/seo/routeSeo.ts`                                                        | canonical | retired | p1-lane       | 12      | 4 → 4                    | 0 → 0                     |
-| `src/shared/theme/appOverlayMenu.ts`                                                | canonical | retired | p1-lane       | 5       | 7 → 7                    | 0 → 0                     |
-| `src/shared/theme/composables/useTheme.ts`                                          | canonical | retired | p1-lane       | 4       | 7 → 7                    | 3 → 3                     |
-| `src/shared/theme/dialogMask.ts`                                                    | canonical | retired | p1-lane       | 1       | 6 → 6                    | 0 → 0                     |
-| `src/shared/theme/formControls.ts`                                                  | canonical | retired | p1-lane       | 4       | 10 → 10                  | 0 → 0                     |
-| `src/shared/theme/lightboxScrim.ts`                                                 | canonical | retired | p1-lane       | 3       | 3 → 3                    | 0 → 0                     |
-| `src/shared/utils/auth.ts`                                                          | canonical | retired | p1-lane       | 15      | 16 → 16                  | 4 → 4                     |
-| `src/shared/utils/currency.ts`                                                      | canonical | retired | p1-lane       | 3       | 2 → 2                    | 2 → 2                     |
-| `src/shared/utils/dateTime.ts`                                                      | canonical | retired | p1-lane       | 5       | 6 → 6                    | 2 → 2                     |
-| `src/shared/utils/errorMessages.ts`                                                 | canonical | retired | p1-lane       | 4       | 11 → 11                  | 0 → 0                     |
-| `src/shared/utils/formValidation.ts`                                                | canonical | retired | p1-lane       | 3       | 4 → 4                    | 0 → 0                     |
-| `src/shared/utils/ids.ts`                                                           | canonical | retired | p1-lane       | 3       | 11 → 11                  | 0 → 0                     |
-| `src/shared/utils/imageUploadSupport.ts`                                            | canonical | retired | p1-lane       | 3       | 7 → 7                    | 2 → 2                     |
-| `src/shared/utils/number.ts`                                                        | canonical | retired | p1-lane       | 3       | 15 → 15                  | 0 → 0                     |
-| `src/shared/utils/opaqueIds.ts`                                                     | canonical | retired | p1-lane       | 5       | 8 → 8                    | 0 → 0                     |
-| `src/shared/utils/polling.ts`                                                       | canonical | retired | p1-lane       | 5       | 4 → 4                    | 0 → 0                     |
-| `src/shared/utils/storage.ts`                                                       | canonical | retired | p1-lane       | 8       | 14 → 14                  | 0 → 0                     |
-| `src/shared/utils/workspaceId.ts`                                                   | canonical | retired | p1-lane       | 2       | 8 → 8                    | 1 → 1                     |
-| `src/test/factories/index.ts`                                                       | canonical | active  | integrator    | 12      | 14 → 14                  | 1 → 1                     |
-| `src/theme/appOverlayMenu.ts`                                                       | canonical | active  | p1-lane       | 5       | 7 → 7                    | 0 → 0                     |
-| `src/theme/composables/themeKeyboard.ts`                                            | canonical | active  | p1-lane       | 2       | 2 → 2                    | 2 → 2                     |
-| `src/theme/composables/themeMode.ts`                                                | canonical | active  | p1-lane       | 5       | 5 → 5                    | 0 → 0                     |
-| `src/theme/composables/useTheme.ts`                                                 | canonical | active  | p1-lane       | 4       | 9 → 9                    | 3 → 3                     |
-| `src/theme/dialogMask.ts`                                                           | canonical | active  | p1-lane       | 1       | 7 → 7                    | 0 → 0                     |
-| `src/theme/formControls.ts`                                                         | canonical | active  | p1-lane       | 4       | 11 → 11                  | 0 → 0                     |
-| `src/theme/lightboxScrim.ts`                                                        | canonical | active  | p1-lane       | 3       | 4 → 4                    | 0 → 0                     |
+| Entry                                                                               | Kind      | Status  | Owner           | Exports | Fan-in measured → target | Fan-out measured → target |
+| ----------------------------------------------------------------------------------- | --------- | ------- | --------------- | ------- | ------------------------ | ------------------------- |
+| `src/api/client.ts`                                                                 | canonical | active  | p1-lane         | 6       | 12 → 12                  | 4 → 4                     |
+| `src/api/contractKernel.ts`                                                         | canonical | active  | p1-lane         | 24      | 40 → 40                  | 2 → 2                     |
+| `src/api/generated-query/control/control-billing/control-billing.ts`                | canonical | active  | p1-lane         | 56      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/control/control-credits/control-credits.ts`                | canonical | active  | p1-lane         | 145     | 4 → 4                    | 4 → 4                     |
+| `src/api/generated-query/control/control-payments/control-payments.ts`              | canonical | active  | p1-lane         | 39      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/control/control-platform/control-platform.ts`              | canonical | active  | p1-lane         | 402     | 14 → 14                  | 4 → 4                     |
+| `src/api/generated-query/control/control-tasks/control-tasks.ts`                    | canonical | active  | p1-lane         | 22      | 2 → 2                    | 4 → 4                     |
+| `src/api/generated-query/control/control-users/control-users.ts`                    | canonical | active  | p1-lane         | 80      | 4 → 4                    | 4 → 4                     |
+| `src/api/generated-query/control/index.ts`                                          | cascading | active  | p1-lane         | 784     | 0 → 0                    | 7 → 7                     |
+| `src/api/generated-query/control/model/controlMailConfigRequest.ts`                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlOAuthProviderSummary.ts`              | canonical | active  | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts`        | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlStripeConfigRequest.ts`               | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/api/generated-query/control/model/controlTaskEnvelope.ts`                      | canonical | active  | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/api/generated-query/control/model/index.ts`                                    | canonical | active  | p1-lane         | 159     | 17 → 17                  | 159 → 159                 |
+| `src/api/generated-query/control/model/supportChannelKind.ts`                       | canonical | active  | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
+| `src/api/generated-query/control/model/supportChannelsSetting.ts`                   | canonical | active  | p1-lane         | 1       | 3 → 3                    | 1 → 1                     |
+| `src/api/generated-query/public/boards/boards.ts`                                   | canonical | active  | p1-lane         | 144     | 2 → 2                    | 4 → 4                     |
+| `src/api/generated-query/public/index.ts`                                           | cascading | active  | p1-lane         | 619     | 0 → 0                    | 11 → 11                   |
+| `src/api/generated-query/public/model/board.ts`                                     | canonical | active  | p1-lane         | 1       | 4 → 4                    | 2 → 2                     |
+| `src/api/generated-query/public/model/boardDocument.ts`                             | canonical | active  | p1-lane         | 1       | 3 → 3                    | 2 → 2                     |
+| `src/api/generated-query/public/model/index.ts`                                     | canonical | active  | p1-lane         | 236     | 19 → 19                  | 236 → 236                 |
+| `src/api/generated-query/public/user/user.ts`                                       | canonical | active  | p1-lane         | 23      | 5 → 5                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-billing/workspace-billing.ts`             | canonical | active  | p1-lane         | 97      | 6 → 6                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-library/workspace-library.ts`             | canonical | active  | p1-lane         | 75      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts`             | canonical | active  | p1-lane         | 16      | 2 → 2                    | 4 → 4                     |
+| `src/api/generated-query/public/workspace-search/workspace-search.ts`               | canonical | active  | p1-lane         | 16      | 3 → 3                    | 4 → 4                     |
+| `src/api/generated-query/public/workspaces/workspaces.ts`                           | canonical | active  | p1-lane         | 40      | 2 → 2                    | 4 → 4                     |
+| `src/api/idempotencyKey.ts`                                                         | canonical | active  | p1-lane         | 13      | 12 → 12                  | 0 → 0                     |
+| `src/api/mediaAssetDelivery.ts`                                                     | canonical | active  | p1-lane         | 25      | 26 → 26                  | 4 → 4                     |
+| `src/api/mediaWorkspaceScope.ts`                                                    | canonical | active  | p1-lane         | 3       | 6 → 6                    | 0 → 0                     |
+| `src/api/sessionUserType.ts`                                                        | canonical | active  | p1-lane         | 1       | 14 → 14                  | 0 → 0                     |
+| `src/api/stripUndefined.ts`                                                         | canonical | active  | p1-lane         | 2       | 11 → 11                  | 0 → 0                     |
+| `src/api/upload.ts`                                                                 | canonical | active  | p1-lane         | 22      | 10 → 10                  | 7 → 7                     |
+| `src/api/userSession.ts`                                                            | canonical | active  | p1-lane         | 2       | 2 → 2                    | 3 → 3                     |
+| `src/api/workspaceEventStream.ts`                                                   | canonical | active  | p1-lane         | 20      | 10 → 10                  | 4 → 4                     |
+| `src/api/workspaceTaskContract.ts`                                                  | canonical | active  | p1-lane         | 14      | 5 → 5                    | 2 → 2                     |
+| `src/api/workspaceTaskTransport.ts`                                                 | canonical | active  | p1-lane         | 7       | 7 → 7                    | 5 → 5                     |
+| `src/api/workspaceTaskWaiter.ts`                                                    | canonical | active  | p1-lane         | 2       | 2 → 2                    | 5 → 5                     |
+| `src/api/workspaceTasks.ts`                                                         | canonical | active  | p1-lane         | 23      | 3 → 3                    | 3 → 3                     |
+| `src/app/router/index.ts`                                                           | canonical | active  | integrator      | 1       | 1 → 1                    | 14 → 14                   |
+| `src/components/ui/avatar/index.ts`                                                 | canonical | active  | design-system   | 3       | 2 → 2                    | 3 → 3                     |
+| `src/components/ui/badge/index.ts`                                                  | canonical | active  | design-system   | 3       | 3 → 3                    | 3 → 3                     |
+| `src/components/ui/button/index.ts`                                                 | canonical | active  | design-system   | 10      | 25 → 25                  | 6 → 6                     |
+| `src/components/ui/card/index.ts`                                                   | canonical | active  | design-system   | 6       | 2 → 2                    | 4 → 4                     |
+| `src/components/ui/dialog/index.ts`                                                 | canonical | active  | design-system   | 12      | 6 → 6                    | 4 → 4                     |
+| `src/components/ui/dropdown-menu/index.ts`                                          | canonical | active  | design-system   | 14      | 4 → 4                    | 4 → 4                     |
+| `src/components/ui/form/index.ts`                                                   | canonical | active  | design-system   | 15      | 6 → 6                    | 5 → 5                     |
+| `src/components/ui/input/index.ts`                                                  | canonical | active  | design-system   | 4       | 10 → 10                  | 5 → 5                     |
+| `src/components/ui/popover/index.ts`                                                | canonical | active  | design-system   | 4       | 3 → 3                    | 3 → 3                     |
+| `src/components/ui/select/index.ts`                                                 | canonical | active  | design-system   | 14      | 2 → 2                    | 6 → 6                     |
+| `src/components/ui/skeleton/index.ts`                                               | canonical | active  | design-system   | 1       | 6 → 6                    | 2 → 2                     |
+| `src/components/ui/spinner/index.ts`                                                | canonical | active  | design-system   | 1       | 8 → 8                    | 2 → 2                     |
+| `src/core/auth/adminAccess.ts`                                                      | canonical | active  | p1-lane         | 2       | 1 → 1                    | 0 → 0                     |
+| `src/core/auth/client.ts`                                                           | canonical | active  | p1-lane         | 3       | 2 → 2                    | 4 → 4                     |
+| `src/core/auth/oauthProviders.ts`                                                   | canonical | active  | p1-lane         | 2       | 6 → 6                    | 0 → 0                     |
+| `src/core/auth/passwordPolicy.ts`                                                   | canonical | active  | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
+| `src/core/auth/routePolicy.ts`                                                      | canonical | active  | p1-lane         | 9       | 3 → 3                    | 0 → 0                     |
+| `src/core/auth/sessionPolicy.ts`                                                    | canonical | active  | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
+| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane         | 4       | 32 → 32                  | 5 → 5                     |
+| `src/core/components/ChartCard.vue`                                                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 2 → 2                     |
+| `src/core/components/ChartPanel.vue`                                                | canonical | active  | p1-lane         | 2       | 2 → 2                    | 1 → 1                     |
+| `src/core/components/ChartRenderer.vue`                                             | canonical | active  | p1-lane         | 1       | 3 → 3                    | 3 → 3                     |
+| `src/core/components/DataTableColumn.vue`                                           | canonical | active  | p1-lane         | 3       | 4 → 4                    | 1 → 1                     |
+| `src/core/components/DataTableFrame.vue`                                            | canonical | active  | p1-lane         | 2       | 4 → 4                    | 3 → 3                     |
+| `src/core/components/IbFormField.vue`                                               | canonical | active  | p1-lane         | 2       | 5 → 5                    | 3 → 3                     |
+| `src/core/components/RangedLineChartCard.vue`                                       | canonical | active  | p1-lane         | 2       | 2 → 2                    | 7 → 7                     |
+| `src/core/components/SiteBrandLogo.vue`                                             | canonical | active  | p1-lane         | 1       | 4 → 4                    | 0 → 0                     |
+| `src/core/components/StatusBadge.vue`                                               | canonical | active  | p1-lane         | 3       | 4 → 4                    | 3 → 3                     |
+| `src/core/components/StudioName.vue`                                                | canonical | active  | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/core/components/UserConfirmDialog.vue`                                         | canonical | active  | p1-lane         | 1       | 3 → 3                    | 6 → 6                     |
+| `src/core/components/formFieldContract.ts`                                          | canonical | active  | p1-lane         | 2       | 2 → 2                    | 0 → 0                     |
+| `src/core/composables/useAppClipboard.ts`                                           | canonical | active  | p1-lane         | 1       | 5 → 5                    | 0 → 0                     |
+| `src/core/composables/useAppToast.ts`                                               | canonical | active  | p1-lane         | 2       | 17 → 17                  | 1 → 1                     |
+| `src/core/composables/useAsyncAction.ts`                                            | canonical | active  | p1-lane         | 3       | 16 → 16                  | 1 → 1                     |
+| `src/core/composables/useLogoutRedirect.ts`                                         | canonical | active  | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
+| `src/core/composables/useMenuTriggerFocusRestore.ts`                                | canonical | active  | p1-lane         | 1       | 1 → 1                    | 1 → 1                     |
+| `src/core/composables/useOverlayInteractionLifecycle.ts`                            | canonical | active  | p1-lane         | 6       | 10 → 10                  | 1 → 1                     |
+| `src/core/composables/useSiteBranding.ts`                                           | canonical | active  | p1-lane         | 16      | 8 → 8                    | 5 → 5                     |
+| `src/core/composables/useSupportChannels.ts`                                        | canonical | active  | p1-lane         | 4       | 9 → 9                    | 6 → 6                     |
+| `src/core/composables/useUserConfirmDialog.ts`                                      | canonical | active  | p1-lane         | 2       | 3 → 3                    | 1 → 1                     |
+| `src/core/config/pagination.ts`                                                     | canonical | active  | p1-lane         | 2       | 15 → 15                  | 0 → 0                     |
+| `src/core/config/runtimeUrls.ts`                                                    | canonical | active  | p1-lane         | 8       | 18 → 18                  | 0 → 0                     |
+| `src/core/config/timing.ts`                                                         | canonical | active  | p1-lane         | 8       | 6 → 6                    | 0 → 0                     |
+| `src/core/constants/media.ts`                                                       | canonical | active  | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
+| `src/core/contracts/externalImageProviders.ts`                                      | canonical | active  | p1-lane         | 4       | 12 → 12                  | 0 → 0                     |
+| `src/core/contracts/generationContract.ts`                                          | canonical | active  | p1-lane         | 18      | 23 → 23                  | 0 → 0                     |
+| `src/core/contracts/imageServices.ts`                                               | canonical | active  | p1-lane         | 3       | 29 → 29                  | 0 → 0                     |
+| `src/core/errors/errorCatalog.ts`                                                   | canonical | active  | p1-lane         | 5       | 30 → 30                  | 1 → 1                     |
+| `src/core/i18n/formatters.ts`                                                       | canonical | active  | p1-lane         | 5       | 21 → 21                  | 2 → 2                     |
+| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 117 → 117                | 5 → 5                     |
+| `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
+| `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane         | 2       | 5 → 5                    | 5 → 5                     |
+| `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane         | 12      | 3 → 3                    | 0 → 0                     |
+| `src/core/i18n/locales/es/index.ts`                                                 | canonical | active  | p1-lane         | 12      | 2 → 2                    | 0 → 0                     |
+| `src/core/i18n/locales/ko/index.ts`                                                 | canonical | active  | p1-lane         | 12      | 2 → 2                    | 0 → 0                     |
+| `src/core/i18n/locales/zh-CN/index.ts`                                              | canonical | active  | p1-lane         | 12      | 2 → 2                    | 0 → 0                     |
+| `src/core/i18n/userIdeaCurrency.ts`                                                 | canonical | active  | p1-lane         | 1       | 21 → 21                  | 1 → 1                     |
+| `src/core/i18n/userLocale.ts`                                                       | canonical | active  | p1-lane         | 9       | 17 → 17                  | 6 → 6                     |
+| `src/core/interaction/interactiveControlState.ts`                                   | canonical | active  | p1-lane         | 5       | 9 → 9                    | 0 → 0                     |
+| `src/core/interaction/menuKeyboardNavigation.ts`                                    | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/core/lib/brandMark.ts`                                                         | canonical | active  | p1-lane         | 2       | 4 → 4                    | 0 → 0                     |
+| `src/core/lib/chartPrimitives.ts`                                                   | canonical | active  | p1-lane         | 15      | 12 → 12                  | 3 → 3                     |
+| `src/core/lib/chartTimeRange.ts`                                                    | canonical | active  | p1-lane         | 7       | 3 → 3                    | 0 → 0                     |
+| `src/core/lib/pageChrome.ts`                                                        | canonical | active  | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
+| `src/core/media/imageAssetPipeline.ts`                                              | canonical | active  | p1-lane         | 6       | 4 → 4                    | 6 → 6                     |
+| `src/core/media/imageDimensions.ts`                                                 | canonical | active  | p1-lane         | 4       | 4 → 4                    | 0 → 0                     |
+| `src/core/media/mediaRef.ts`                                                        | canonical | active  | p1-lane         | 5       | 12 → 12                  | 1 → 1                     |
+| `src/core/media/visionIngressPolicy.ts`                                             | canonical | active  | p1-lane         | 8       | 6 → 6                    | 2 → 2                     |
+| `src/core/motion/chartMotion.ts`                                                    | canonical | active  | p1-lane         | 1       | 3 → 3                    | 2 → 2                     |
+| `src/core/motion/dialogMotion.ts`                                                   | canonical | active  | p1-lane         | 1       | 1 → 1                    | 1 → 1                     |
+| `src/core/motion/motionPolicy.ts`                                                   | canonical | active  | p1-lane         | 6       | 5 → 5                    | 0 → 0                     |
+| `src/core/motion/popoverMotion.ts`                                                  | canonical | active  | p1-lane         | 3       | 6 → 6                    | 2 → 2                     |
+| `src/core/query/queryClient.ts`                                                     | canonical | active  | p1-lane         | 2       | 15 → 15                  | 1 → 1                     |
+| `src/core/query/queryDefaults.ts`                                                   | canonical | active  | p1-lane         | 5       | 18 → 18                  | 0 → 0                     |
+| `src/core/query/taskResult.ts`                                                      | canonical | active  | p1-lane         | 5       | 8 → 8                    | 1 → 1                     |
+| `src/core/query/userCreditsInvalidation.ts`                                         | canonical | active  | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
+| `src/core/router/queryParams.ts`                                                    | canonical | active  | p1-lane         | 3       | 14 → 14                  | 1 → 1                     |
+| `src/core/seo/routeSeo.ts`                                                          | canonical | active  | p1-lane         | 12      | 4 → 4                    | 0 → 0                     |
+| `src/core/seo/seoStaticHtml.ts`                                                     | canonical | active  | p1-lane         | 1       | 1 → 1                    | 1 → 1                     |
+| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane         | 16      | 26 → 26                  | 4 → 4                     |
+| `src/core/utils/currency.ts`                                                        | canonical | active  | p1-lane         | 3       | 2 → 2                    | 2 → 2                     |
+| `src/core/utils/dateTime.ts`                                                        | canonical | active  | p1-lane         | 5       | 6 → 6                    | 2 → 2                     |
+| `src/core/utils/errorMessages.ts`                                                   | canonical | active  | p1-lane         | 4       | 11 → 11                  | 0 → 0                     |
+| `src/core/utils/formValidation.ts`                                                  | canonical | active  | p1-lane         | 3       | 4 → 4                    | 0 → 0                     |
+| `src/core/utils/ids.ts`                                                             | canonical | active  | p1-lane         | 3       | 11 → 11                  | 0 → 0                     |
+| `src/core/utils/imageUploadSupport.ts`                                              | canonical | active  | p1-lane         | 3       | 7 → 7                    | 2 → 2                     |
+| `src/core/utils/number.ts`                                                          | canonical | active  | p1-lane         | 3       | 15 → 15                  | 0 → 0                     |
+| `src/core/utils/opaqueIds.ts`                                                       | canonical | active  | p1-lane         | 5       | 8 → 8                    | 0 → 0                     |
+| `src/core/utils/polling.ts`                                                         | canonical | active  | p1-lane         | 5       | 4 → 4                    | 0 → 0                     |
+| `src/core/utils/storage.ts`                                                         | canonical | active  | p1-lane         | 8       | 14 → 14                  | 0 → 0                     |
+| `src/core/utils/workspaceId.ts`                                                     | canonical | active  | p1-lane         | 2       | 8 → 8                    | 1 → 1                     |
+| `src/features/account/core/index.ts`                                                | cascading | active  | p3-lane         | 13      | 0 → 0                    | 79 → 79                   |
+| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane         | 130     | 4 → 4                    | 79 → 79                   |
+| `src/features/account/session/index.ts`                                             | cascading | active  | p3-lane         | 94      | 0 → 0                    | 79 → 79                   |
+| `src/features/account/ui/chrome/SupportChannelQr.vue`                               | canonical | active  | p1-lane         | 1       | 1 → 1                    | 9 → 9                     |
+| `src/features/account/ui/chrome/UserAccountMenu.vue`                                | canonical | active  | p1-lane         | 1       | 6 → 6                    | 14 → 14                   |
+| `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                        | canonical | active  | p1-lane         | 1       | 1 → 1                    | 2 → 2                     |
+| `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane         | 5       | 8 → 8                    | 13 → 13                   |
+| `src/features/account/ui/chrome/userAccountMenu.types.ts`                           | canonical | active  | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
+| `src/features/account/ui/index.ts`                                                  | cascading | active  | p3-lane         | 23      | 0 → 0                    | 79 → 79                   |
+| `src/features/admin/credits/wallets/index.ts`                                       | canonical | retired | p4-lane         | 1       | 1 → 1                    | 31 → 31                   |
+| `src/features/admin/prompts/core/promptVariables.ts`                                | canonical | active  | p1-lane         | 3       | 3 → 3                    | 1 → 1                     |
+| `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane         | 14      | 16 → 16                  | 1 → 1                     |
+| `src/features/admin/shared/core/actionReasonContract.ts`                            | canonical | active  | p4-lane         | 3       | 2 → 2                    | 0 → 0                     |
+| `src/features/admin/shared/core/cellClasses.ts`                                     | canonical | active  | p4-lane         | 4       | 3 → 3                    | 0 → 0                     |
+| `src/features/admin/shared/core/cellPlaceholders.ts`                                | canonical | active  | p4-lane         | 4       | 2 → 2                    | 0 → 0                     |
+| `src/features/admin/shared/core/controlCopy.ts`                                     | canonical | active  | p4-lane         | 2       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/core/controlGuidance.ts`                                 | canonical | active  | p4-lane         | 3       | 5 → 5                    | 0 → 0                     |
+| `src/features/admin/shared/core/controlMutation.ts`                                 | canonical | active  | p4-lane         | 10      | 4 → 4                    | 1 → 1                     |
+| `src/features/admin/shared/core/controlResource.ts`                                 | canonical | active  | p4-lane         | 2       | 1 → 1                    | 3 → 3                     |
+| `src/features/admin/shared/core/reconcileStableRows.ts`                             | canonical | active  | p4-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/features/admin/shared/core/secretSchema.ts`                                    | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/core/serviceAdminMeta.ts`                                | canonical | active  | p4-lane         | 6       | 1 → 1                    | 1 → 1                     |
+| `src/features/admin/shared/core/tableColumns.ts`                                    | canonical | active  | p4-lane         | 2       | 2 → 2                    | 0 → 0                     |
+| `src/features/admin/shared/core/taskMetricTokens.ts`                                | canonical | active  | p4-lane         | 7       | 3 → 3                    | 1 → 1                     |
+| `src/features/admin/shared/core/uiClasses.ts`                                       | canonical | active  | p4-lane         | 38      | 13 → 13                  | 0 → 0                     |
+| `src/features/admin/shared/index.ts`                                                | canonical | active  | p4-admin-shared | 241     | 126 → 126                | 48 → 48                   |
+| `src/features/admin/shared/session/anomalyRules.ts`                                 | canonical | active  | p4-lane         | 4       | 3 → 3                    | 3 → 3                     |
+| `src/features/admin/shared/session/brand/brandLogos.ts`                             | canonical | active  | p4-lane         | 14      | 6 → 6                    | 14 → 14                   |
+| `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts`                  | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
+| `src/features/admin/shared/session/collection/useAdminCollectionQuery.ts`           | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/session/collection/useAdminCursorCollection.ts`          | canonical | active  | p4-lane         | 1       | 1 → 1                    | 4 → 4                     |
+| `src/features/admin/shared/session/collection/useOptimisticToggle.ts`               | canonical | active  | p4-lane         | 3       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/session/collection/usePagePagination.ts`                 | canonical | active  | p4-lane         | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/session/collection/useQueryPolling.ts`                   | canonical | active  | p4-lane         | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/session/collection/useRefetchOnClose.ts`                 | canonical | active  | p4-lane         | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/admin/shared/session/feedback/confirmSettingsSave.ts`                 | canonical | active  | p4-lane         | 7       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/session/feedback/toast.ts`                               | canonical | active  | p4-lane         | 4       | 18 → 18                  | 2 → 2                     |
+| `src/features/admin/shared/session/feedback/useAdminConfirm.ts`                     | canonical | active  | p4-lane         | 9       | 7 → 7                    | 1 → 1                     |
+| `src/features/admin/shared/session/timeRange.ts`                                    | canonical | active  | p4-lane         | 5       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/session/useAnomalyRadar.ts`                              | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
+| `src/features/admin/shared/ui/AdminBadge.vue`                                       | canonical | active  | p4-lane         | 2       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/ui/AdminButton.vue`                                      | canonical | active  | p4-lane         | 3       | 8 → 8                    | 4 → 4                     |
+| `src/features/admin/shared/ui/AdminColumn.vue`                                      | canonical | active  | p4-lane         | 1       | 3 → 3                    | 0 → 0                     |
+| `src/features/admin/shared/ui/AdminMono.vue`                                        | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/ui/AdminSpinner.vue`                                     | canonical | active  | p4-lane         | 1       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/ui/chart/AdminChartCard.vue`                             | canonical | active  | p4-lane         | 1       | 1 → 1                    | 2 → 2                     |
+| `src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue`                   | canonical | active  | p4-lane         | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/admin/shared/ui/chart/chart.ts`                                       | canonical | active  | p4-lane         | 14      | 3 → 3                    | 6 → 6                     |
+| `src/features/admin/shared/ui/feedback/AdminAlert.vue`                              | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue`                      | canonical | active  | p4-lane         | 1       | 3 → 3                    | 3 → 3                     |
+| `src/features/admin/shared/ui/feedback/AdminEmptyState.vue`                         | canonical | active  | p4-lane         | 1       | 1 → 1                    | 2 → 2                     |
+| `src/features/admin/shared/ui/feedback/AdminStatusPill.vue`                         | canonical | active  | p4-lane         | 2       | 3 → 3                    | 1 → 1                     |
+| `src/features/admin/shared/ui/form/AdminFormField.vue`                              | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/ui/form/AdminInput.vue`                                  | canonical | active  | p4-lane         | 1       | 3 → 3                    | 5 → 5                     |
+| `src/features/admin/shared/ui/form/AdminNumberInput.vue`                            | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/ui/form/AdminSelect.vue`                                 | canonical | active  | p4-lane         | 2       | 2 → 2                    | 5 → 5                     |
+| `src/features/admin/shared/ui/form/AdminSwitch.vue`                                 | canonical | active  | p4-lane         | 1       | 3 → 3                    | 3 → 3                     |
+| `src/features/admin/shared/ui/form/AdminTextarea.vue`                               | canonical | active  | p4-lane         | 1       | 1 → 1                    | 3 → 3                     |
+| `src/features/admin/shared/ui/form/SwitchRow.vue`                                   | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue`                   | canonical | active  | p4-lane         | 1       | 2 → 2                    | 6 → 6                     |
+| `src/features/admin/shared/ui/popover/AdminPopover.vue`                             | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/ui/popover/AdminPopoverContent.vue`                      | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue`                      | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/ui/serviceIcons.ts`                                      | canonical | active  | p1-lane         | 1       | 4 → 4                    | 3 → 3                     |
+| `src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue`                   | canonical | active  | p4-lane         | 1       | 1 → 1                    | 2 → 2                     |
+| `src/features/admin/shared/ui/shell/AdminDialogActions.vue`                         | canonical | active  | p4-lane         | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/ui/shell/AdminDialogShell.vue`                           | canonical | active  | p4-lane         | 3       | 4 → 4                    | 5 → 5                     |
+| `src/features/admin/shared/ui/shell/AdminDrawer.vue`                                | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/ui/shell/AdminEditorActions.vue`                         | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue`                        | canonical | active  | p4-lane         | 1       | 1 → 1                    | 8 → 8                     |
+| `src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue`                   | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
+| `src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue`                   | canonical | active  | p4-lane         | 2       | 1 → 1                    | 3 → 3                     |
+| `src/features/admin/shared/ui/shell/AdminSummaryCard.vue`                           | canonical | active  | p4-lane         | 1       | 1 → 1                    | 0 → 0                     |
+| `src/features/admin/shared/ui/table/AdminTable.vue`                                 | canonical | active  | p4-lane         | 5       | 2 → 2                    | 13 → 13                   |
+| `src/features/admin/shared/ui/table/AdminTablePanel.vue`                            | canonical | active  | p4-lane         | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue`                       | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
+| `src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue`                        | canonical | active  | p4-lane         | 2       | 3 → 3                    | 2 → 2                     |
+| `src/features/admin/shared/ui/toolbar/AdminPagerControls.vue`                       | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue`                       | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue`                     | canonical | active  | p4-lane         | 1       | 1 → 1                    | 2 → 2                     |
+| `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`                   | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
+| `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                       | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
+| `src/features/auth/components/auth-fields/index.ts`                                 | cascading | active  | p2-lane         | 10      | 3 → 3                    | 11 → 11                   |
+| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane         | 28      | 29 → 29                  | 47 → 47                   |
+| `src/features/board/core/document/index.ts`                                         | cascading | active  | p3-lane         | 87      | 1 → 1                    | 0 → 0                     |
+| `src/features/board/core/index.ts`                                                  | cascading | active  | p3-lane         | 92      | 14 → 14                  | 0 → 0                     |
+| `src/features/board/core/media/index.ts`                                            | cascading | active  | p3-lane         | 1       | 1 → 1                    | 0 → 0                     |
+| `src/features/board/core/schema/index.ts`                                           | cascading | active  | p3-lane         | 4       | 1 → 1                    | 0 → 0                     |
+| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane         | 195     | 48 → 48                  | 52 → 52                   |
+| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane         | 83      | 95 → 95                  | 52 → 52                   |
+| `src/features/board/session/catalog/index.ts`                                       | cascading | active  | p3-lane         | 43      | 2 → 2                    | 0 → 0                     |
+| `src/features/board/session/persistence/index.ts`                                   | cascading | active  | p3-lane         | 13      | 12 → 12                  | 0 → 0                     |
+| `src/features/board/session/preview/index.ts`                                       | cascading | active  | p3-lane         | 5       | 7 → 7                    | 0 → 0                     |
+| `src/features/board/session/share-join/index.ts`                                    | cascading | active  | p3-lane         | 2       | 1 → 1                    | 0 → 0                     |
+| `src/features/board/session/sync/index.ts`                                          | cascading | active  | p3-lane         | 14      | 2 → 2                    | 0 → 0                     |
+| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane         | 7       | 10 → 10                  | 3 → 3                     |
+| `src/features/board/ui/gallery/index.ts`                                            | cascading | active  | p3-lane         | 14      | 1 → 1                    | 0 → 0                     |
+| `src/features/canvas/application/board-session/index.ts`                            | canonical | active  | p5-lane         | 9       | 5 → 5                    | 18 → 18                   |
+| `src/features/canvas/application/editing/index.ts`                                  | canonical | active  | p5-lane         | 10      | 5 → 5                    | 40 → 40                   |
+| `src/features/canvas/application/execution/board-attachment/index.ts`               | canonical | active  | p5-lane         | 2       | 12 → 12                  | 0 → 0                     |
+| `src/features/canvas/application/execution/index.ts`                                | canonical | active  | p5-lane         | 54      | 21 → 21                  | 54 → 54                   |
+| `src/features/canvas/application/execution/pending-execution/index.ts`              | cascading | active  | p5-lane         | 27      | 22 → 22                  | 8 → 8                     |
+| `src/features/canvas/application/execution/result-nodes/index.ts`                   | cascading | active  | p5-lane         | 16      | 4 → 4                    | 23 → 23                   |
+| `src/features/canvas/application/execution/task-lifecycle/index.ts`                 | canonical | active  | p5-lane         | 3       | 1 → 1                    | 1 → 1                     |
+| `src/features/canvas/application/image-workflow/index.ts`                           | canonical | active  | p5-lane         | 3       | 4 → 4                    | 34 → 34                   |
+| `src/features/canvas/application/workspace/index.ts`                                | canonical | active  | p5-lane         | 2       | 4 → 4                    | 30 → 30                   |
+| `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
+| `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane         | 1       | 4 → 4                    | 1 → 1                     |
+| `src/features/canvas/domain/graph/index.ts`                                         | canonical | active  | p5-lane         | 58      | 59 → 59                  | 3 → 3                     |
+| `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane         | 2       | 2 → 2                    | 79 → 79                   |
+| `src/features/canvas/infrastructure/vue-flow-adapter/index.ts`                      | canonical | active  | p5-lane         | 20      | 20 → 20                  | 27 → 27                   |
+| `src/features/canvas/presentation/chrome/components/index.ts`                       | canonical | active  | p5-lane         | 6       | 1 → 1                    | 12 → 12                   |
+| `src/features/canvas/presentation/chrome/index.ts`                                  | cascading | active  | p5-lane         | 6       | 1 → 1                    | 21 → 21                   |
+| `src/features/canvas/presentation/nodes/groups/index.ts`                            | canonical | active  | p5-lane         | 4       | 3 → 3                    | 10 → 10                   |
+| `src/features/canvas/presentation/nodes/index.ts`                                   | canonical | active  | p5-lane         | 9       | 3 → 3                    | 50 → 50                   |
+| `src/features/canvas/presentation/nodes/primitives/index.ts`                        | canonical | active  | p5-lane         | 21      | 5 → 5                    | 15 → 15                   |
+| `src/features/canvas/presentation/nodes/workflows/index.ts`                         | canonical | active  | p5-lane         | 7       | 1 → 1                    | 33 → 33                   |
+| `src/features/canvas/presentation/overlays/index.ts`                                | canonical | active  | p5-lane         | 2       | 5 → 5                    | 16 → 16                   |
+| `src/features/canvas/presentation/pages/CanvasLandingPage.vue`                      | canonical | active  | p5-lane         | 1       | 2 → 2                    | 10 → 10                   |
+| `src/features/canvas/presentation/pages/CanvasPage.vue`                             | canonical | active  | p5-lane         | 1       | 2 → 2                    | 4 → 4                     |
+| `src/features/canvas/presentation/screens/index.ts`                                 | canonical | active  | p5-lane         | 1       | 1 → 1                    | 51 → 51                   |
+| `src/features/canvas/session/media/preloadImage.ts`                                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/features/canvas/session/serviceImageActionText.ts`                             | canonical | active  | p1-lane         | 2       | 2 → 2                    | 3 → 3                     |
+| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane         | 10      | 9 → 9                    | 24 → 24                   |
+| `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane         | 6       | 5 → 5                    | 15 → 15                   |
+| `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane         | 7       | 2 → 2                    | 6 → 6                     |
+| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane         | 34      | 13 → 13                  | 27 → 27                   |
+| `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane         | 7       | 0 → 0                    | 6 → 6                     |
+| `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane         | 1       | 3 → 3                    | 1 → 1                     |
+| `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane         | 4       | 4 → 4                    | 0 → 0                     |
+| `src/features/library/index.ts`                                                     | canonical | active  | p2-lane         | 69      | 22 → 22                  | 39 → 39                   |
+| `src/features/search/index.ts`                                                      | canonical | active  | p3-lane         | 21      | 2 → 2                    | 40 → 40                   |
+| `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane         | 41      | 20 → 20                  | 50 → 50                   |
+| `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | retired | workspace-p2    | 20      | 0 → 0                    | 1 → 1                     |
+| `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2    | 20      | 0 → 0                    | 1 → 1                     |
+| `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane         | 9       | 33 → 33                  | 1 → 1                     |
+| `src/features/workspace/selection/workspaceSelectionPort.ts`                        | canonical | active  | workspace-p2    | 7       | 2 → 2                    | 3 → 3                     |
+| `src/shared/api/client.ts`                                                          | canonical | retired | p1-lane         | 6       | 12 → 12                  | 4 → 4                     |
+| `src/shared/api/contractKernel.ts`                                                  | canonical | retired | p1-lane         | 24      | 40 → 40                  | 2 → 2                     |
+| `src/shared/api/generated-query/control/control-billing/control-billing.ts`         | canonical | retired | p1-lane         | 56      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-credits/control-credits.ts`         | canonical | retired | p1-lane         | 145     | 4 → 4                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-payments/control-payments.ts`       | canonical | retired | p1-lane         | 39      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-platform/control-platform.ts`       | canonical | retired | p1-lane         | 402     | 14 → 14                  | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-tasks/control-tasks.ts`             | canonical | retired | p1-lane         | 22      | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/control-users/control-users.ts`             | canonical | retired | p1-lane         | 80      | 4 → 4                    | 4 → 4                     |
+| `src/shared/api/generated-query/control/index.ts`                                   | cascading | retired | p1-lane         | 784     | 0 → 0                    | 3 → 3                     |
+| `src/shared/api/generated-query/control/model/controlMailConfigRequest.ts`          | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlOAuthProviderSummary.ts`       | canonical | retired | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts`        | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/controlTaskEnvelope.ts`               | canonical | retired | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/shared/api/generated-query/control/model/index.ts`                             | canonical | retired | p1-lane         | 159     | 17 → 17                  | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/supportChannelKind.ts`                | canonical | retired | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/supportChannelsSetting.ts`            | canonical | retired | p1-lane         | 1       | 3 → 3                    | 1 → 1                     |
+| `src/shared/api/generated-query/public/boards/boards.ts`                            | canonical | retired | p1-lane         | 144     | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/index.ts`                                    | cascading | retired | p1-lane         | 619     | 0 → 0                    | 3 → 3                     |
+| `src/shared/api/generated-query/public/model/board.ts`                              | canonical | retired | p1-lane         | 1       | 4 → 4                    | 2 → 2                     |
+| `src/shared/api/generated-query/public/model/boardDocument.ts`                      | canonical | retired | p1-lane         | 1       | 3 → 3                    | 2 → 2                     |
+| `src/shared/api/generated-query/public/model/index.ts`                              | canonical | retired | p1-lane         | 236     | 19 → 19                  | 0 → 0                     |
+| `src/shared/api/generated-query/public/user/user.ts`                                | canonical | retired | p1-lane         | 23      | 5 → 5                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-billing/workspace-billing.ts`      | canonical | retired | p1-lane         | 97      | 6 → 6                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-library/workspace-library.ts`      | canonical | retired | p1-lane         | 75      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-rewards/workspace-rewards.ts`      | canonical | retired | p1-lane         | 16      | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspace-search/workspace-search.ts`        | canonical | retired | p1-lane         | 16      | 3 → 3                    | 4 → 4                     |
+| `src/shared/api/generated-query/public/workspaces/workspaces.ts`                    | canonical | retired | p1-lane         | 40      | 2 → 2                    | 4 → 4                     |
+| `src/shared/api/idempotencyKey.ts`                                                  | canonical | retired | p1-lane         | 13      | 12 → 12                  | 0 → 0                     |
+| `src/shared/api/mediaAssetDelivery.ts`                                              | canonical | retired | p1-lane         | 25      | 25 → 25                  | 4 → 4                     |
+| `src/shared/api/mediaWorkspaceScope.ts`                                             | canonical | retired | p1-lane         | 3       | 6 → 6                    | 0 → 0                     |
+| `src/shared/api/sessionUserType.ts`                                                 | canonical | retired | p1-lane         | 1       | 13 → 13                  | 0 → 0                     |
+| `src/shared/api/stripUndefined.ts`                                                  | canonical | retired | p1-lane         | 2       | 11 → 11                  | 0 → 0                     |
+| `src/shared/api/upload.ts`                                                          | canonical | retired | p1-lane         | 22      | 10 → 10                  | 7 → 7                     |
+| `src/shared/api/userSession.ts`                                                     | canonical | retired | p1-lane         | 2       | 2 → 2                    | 3 → 3                     |
+| `src/shared/api/workspaceEventStream.ts`                                            | canonical | retired | p1-lane         | 19      | 5 → 5                    | 3 → 3                     |
+| `src/shared/api/workspaceTaskContract.ts`                                           | canonical | retired | p1-lane         | 14      | 5 → 5                    | 2 → 2                     |
+| `src/shared/api/workspaceTaskTransport.ts`                                          | canonical | retired | p1-lane         | 7       | 7 → 7                    | 5 → 5                     |
+| `src/shared/api/workspaceTaskWaiter.ts`                                             | canonical | retired | p1-lane         | 2       | 2 → 2                    | 5 → 5                     |
+| `src/shared/api/workspaceTasks.ts`                                                  | canonical | retired | p1-lane         | 23      | 3 → 3                    | 3 → 3                     |
+| `src/shared/auth/adminAccess.ts`                                                    | canonical | retired | p1-lane         | 2       | 1 → 1                    | 0 → 0                     |
+| `src/shared/auth/client.ts`                                                         | canonical | retired | p1-lane         | 3       | 2 → 2                    | 4 → 4                     |
+| `src/shared/auth/oauthProviders.ts`                                                 | canonical | retired | p1-lane         | 2       | 6 → 6                    | 0 → 0                     |
+| `src/shared/auth/passwordPolicy.ts`                                                 | canonical | retired | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
+| `src/shared/auth/sessionPolicy.ts`                                                  | canonical | retired | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
+| `src/shared/components/ActionButton.vue`                                            | canonical | retired | p1-lane         | 4       | 31 → 31                  | 5 → 5                     |
+| `src/shared/components/ChartCard.vue`                                               | canonical | retired | p1-lane         | 1       | 2 → 2                    | 2 → 2                     |
+| `src/shared/components/ChartPanel.vue`                                              | canonical | retired | p1-lane         | 2       | 2 → 2                    | 1 → 1                     |
+| `src/shared/components/ChartRenderer.vue`                                           | canonical | retired | p1-lane         | 1       | 3 → 3                    | 3 → 3                     |
+| `src/shared/components/DataTableColumn.vue`                                         | canonical | retired | p1-lane         | 3       | 4 → 4                    | 1 → 1                     |
+| `src/shared/components/DataTableFrame.vue`                                          | canonical | retired | p1-lane         | 2       | 4 → 4                    | 3 → 3                     |
+| `src/shared/components/IbFormField.vue`                                             | canonical | retired | p1-lane         | 2       | 5 → 5                    | 3 → 3                     |
+| `src/shared/components/RangedLineChartCard.vue`                                     | canonical | retired | p1-lane         | 2       | 2 → 2                    | 7 → 7                     |
+| `src/shared/components/SiteBrandLogo.vue`                                           | canonical | retired | p1-lane         | 1       | 4 → 4                    | 0 → 0                     |
+| `src/shared/components/StatusBadge.vue`                                             | canonical | retired | p1-lane         | 3       | 4 → 4                    | 3 → 3                     |
+| `src/shared/components/StudioName.vue`                                              | canonical | retired | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/shared/components/UserAccountMenu.vue`                                         | canonical | retired | p3-lane         | 1       | 5 → 5                    | 14 → 14                   |
+| `src/shared/components/UserConfirmDialog.vue`                                       | canonical | retired | p1-lane         | 1       | 2 → 2                    | 6 → 6                     |
+| `src/shared/components/formFieldContract.ts`                                        | canonical | retired | p1-lane         | 2       | 2 → 2                    | 0 → 0                     |
+| `src/shared/components/userAccountMenu.types.ts`                                    | canonical | retired | p3-lane         | 4       | 6 → 6                    | 0 → 0                     |
+| `src/shared/composables/useAppClipboard.ts`                                         | canonical | retired | p1-lane         | 1       | 5 → 5                    | 0 → 0                     |
+| `src/shared/composables/useAppToast.ts`                                             | canonical | retired | p1-lane         | 2       | 17 → 17                  | 1 → 1                     |
+| `src/shared/composables/useAsyncAction.ts`                                          | canonical | retired | p1-lane         | 3       | 16 → 16                  | 1 → 1                     |
+| `src/shared/composables/useLogoutRedirect.ts`                                       | canonical | retired | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
+| `src/shared/composables/useOverlayInteractionLifecycle.ts`                          | canonical | retired | p1-lane         | 6       | 10 → 10                  | 1 → 1                     |
+| `src/shared/composables/useSiteBranding.ts`                                         | canonical | retired | p1-lane         | 16      | 8 → 8                    | 5 → 5                     |
+| `src/shared/composables/useSupportChannels.ts`                                      | canonical | retired | p1-lane         | 4       | 9 → 9                    | 6 → 6                     |
+| `src/shared/composables/useUserConfirmDialog.ts`                                    | canonical | retired | p1-lane         | 2       | 3 → 3                    | 1 → 1                     |
+| `src/shared/config/pagination.ts`                                                   | canonical | retired | p1-lane         | 2       | 15 → 15                  | 0 → 0                     |
+| `src/shared/config/runtimeUrls.ts`                                                  | canonical | retired | p1-lane         | 8       | 18 → 18                  | 0 → 0                     |
+| `src/shared/config/timing.ts`                                                       | canonical | retired | p1-lane         | 8       | 6 → 6                    | 0 → 0                     |
+| `src/shared/constants/contacts.ts`                                                  | canonical | retired | p1-lane         | 1       | 1 → 1                    | 0 → 0                     |
+| `src/shared/constants/legalLinks.ts`                                                | canonical | retired | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/shared/constants/media.ts`                                                     | canonical | retired | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
+| `src/shared/constants/routePaths.ts`                                                | canonical | retired | p1-lane         | 27      | 44 → 44                  | 0 → 0                     |
+| `src/shared/domain/externalImageProviders.ts`                                       | canonical | retired | p1-lane         | 4       | 12 → 12                  | 0 → 0                     |
+| `src/shared/domain/generationContract.ts`                                           | canonical | retired | p1-lane         | 18      | 23 → 23                  | 0 → 0                     |
+| `src/shared/domain/imageActions.ts`                                                 | canonical | retired | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
+| `src/shared/domain/imageServices.ts`                                                | canonical | retired | p1-lane         | 3       | 24 → 24                  | 0 → 0                     |
+| `src/shared/domain/serviceIcons.ts`                                                 | canonical | retired | p1-lane         | 1       | 3 → 3                    | 3 → 3                     |
+| `src/shared/domain/serviceRegistry.ts`                                              | canonical | retired | p1-lane         | 6       | 4 → 4                    | 2 → 2                     |
+| `src/shared/errors/errorCatalog.ts`                                                 | canonical | retired | p1-lane         | 5       | 30 → 30                  | 1 → 1                     |
+| `src/shared/i18n/formatters.ts`                                                     | canonical | retired | p1-lane         | 5       | 20 → 20                  | 2 → 2                     |
+| `src/shared/i18n/index.ts`                                                          | canonical | retired | p1-lane         | 7       | 112 → 112                | 5 → 5                     |
+| `src/shared/i18n/localeCore.ts`                                                     | canonical | retired | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
+| `src/shared/i18n/locales/en/index.ts`                                               | cascading | retired | p1-lane         | 11      | 1 → 1                    | 0 → 0                     |
+| `src/shared/i18n/locales/es/index.ts`                                               | cascading | retired | p1-lane         | 11      | 2 → 2                    | 0 → 0                     |
+| `src/shared/i18n/locales/ko/index.ts`                                               | cascading | retired | p1-lane         | 11      | 2 → 2                    | 0 → 0                     |
+| `src/shared/i18n/locales/zh-CN/index.ts`                                            | cascading | retired | p1-lane         | 11      | 2 → 2                    | 0 → 0                     |
+| `src/shared/i18n/userIdeaCurrency.ts`                                               | canonical | retired | p1-lane         | 1       | 21 → 21                  | 1 → 1                     |
+| `src/shared/i18n/userLocale.ts`                                                     | canonical | retired | p1-lane         | 9       | 15 → 15                  | 6 → 6                     |
+| `src/shared/interaction/interactiveControlState.ts`                                 | canonical | retired | p1-lane         | 5       | 8 → 8                    | 0 → 0                     |
+| `src/shared/interaction/menuKeyboardNavigation.ts`                                  | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/lib/brandMark.ts`                                                       | canonical | retired | p1-lane         | 2       | 4 → 4                    | 0 → 0                     |
+| `src/shared/lib/chartPrimitives.ts`                                                 | canonical | retired | p1-lane         | 15      | 12 → 12                  | 3 → 3                     |
+| `src/shared/lib/chartTimeRange.ts`                                                  | canonical | retired | p1-lane         | 7       | 3 → 3                    | 0 → 0                     |
+| `src/shared/lib/pageChrome.ts`                                                      | canonical | retired | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
+| `src/shared/media/imageAssetPipeline.ts`                                            | canonical | retired | p1-lane         | 6       | 4 → 4                    | 6 → 6                     |
+| `src/shared/media/imageDimensions.ts`                                               | canonical | retired | p1-lane         | 4       | 4 → 4                    | 0 → 0                     |
+| `src/shared/media/mediaRef.ts`                                                      | canonical | retired | p1-lane         | 5       | 12 → 12                  | 1 → 1                     |
+| `src/shared/media/preloadImage.ts`                                                  | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
+| `src/shared/media/visionIngressPolicy.ts`                                           | canonical | retired | p1-lane         | 8       | 6 → 6                    | 2 → 2                     |
+| `src/shared/motion/chartMotion.ts`                                                  | canonical | retired | p1-lane         | 1       | 3 → 3                    | 2 → 2                     |
+| `src/shared/motion/motionPolicy.ts`                                                 | canonical | retired | p1-lane         | 6       | 5 → 5                    | 0 → 0                     |
+| `src/shared/motion/popoverMotion.ts`                                                | canonical | retired | p1-lane         | 3       | 6 → 6                    | 2 → 2                     |
+| `src/shared/query/queryClient.ts`                                                   | canonical | retired | p1-lane         | 2       | 5 → 5                    | 1 → 1                     |
+| `src/shared/query/queryDefaults.ts`                                                 | canonical | retired | p1-lane         | 5       | 16 → 16                  | 0 → 0                     |
+| `src/shared/query/taskResult.ts`                                                    | canonical | retired | p1-lane         | 5       | 8 → 8                    | 1 → 1                     |
+| `src/shared/query/userCreditsInvalidation.ts`                                       | canonical | retired | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
+| `src/shared/router/queryParams.ts`                                                  | canonical | retired | p1-lane         | 3       | 14 → 14                  | 1 → 1                     |
+| `src/shared/seo/routeSeo.ts`                                                        | canonical | retired | p1-lane         | 12      | 4 → 4                    | 0 → 0                     |
+| `src/shared/theme/appOverlayMenu.ts`                                                | canonical | retired | p1-lane         | 5       | 7 → 7                    | 0 → 0                     |
+| `src/shared/theme/composables/useTheme.ts`                                          | canonical | retired | p1-lane         | 4       | 7 → 7                    | 3 → 3                     |
+| `src/shared/theme/dialogMask.ts`                                                    | canonical | retired | p1-lane         | 1       | 6 → 6                    | 0 → 0                     |
+| `src/shared/theme/formControls.ts`                                                  | canonical | retired | p1-lane         | 4       | 10 → 10                  | 0 → 0                     |
+| `src/shared/theme/lightboxScrim.ts`                                                 | canonical | retired | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
+| `src/shared/utils/auth.ts`                                                          | canonical | retired | p1-lane         | 15      | 16 → 16                  | 4 → 4                     |
+| `src/shared/utils/currency.ts`                                                      | canonical | retired | p1-lane         | 3       | 2 → 2                    | 2 → 2                     |
+| `src/shared/utils/dateTime.ts`                                                      | canonical | retired | p1-lane         | 5       | 6 → 6                    | 2 → 2                     |
+| `src/shared/utils/errorMessages.ts`                                                 | canonical | retired | p1-lane         | 4       | 11 → 11                  | 0 → 0                     |
+| `src/shared/utils/formValidation.ts`                                                | canonical | retired | p1-lane         | 3       | 4 → 4                    | 0 → 0                     |
+| `src/shared/utils/ids.ts`                                                           | canonical | retired | p1-lane         | 3       | 11 → 11                  | 0 → 0                     |
+| `src/shared/utils/imageUploadSupport.ts`                                            | canonical | retired | p1-lane         | 3       | 7 → 7                    | 2 → 2                     |
+| `src/shared/utils/number.ts`                                                        | canonical | retired | p1-lane         | 3       | 15 → 15                  | 0 → 0                     |
+| `src/shared/utils/opaqueIds.ts`                                                     | canonical | retired | p1-lane         | 5       | 8 → 8                    | 0 → 0                     |
+| `src/shared/utils/polling.ts`                                                       | canonical | retired | p1-lane         | 5       | 4 → 4                    | 0 → 0                     |
+| `src/shared/utils/storage.ts`                                                       | canonical | retired | p1-lane         | 8       | 14 → 14                  | 0 → 0                     |
+| `src/shared/utils/workspaceId.ts`                                                   | canonical | retired | p1-lane         | 2       | 8 → 8                    | 1 → 1                     |
+| `src/test/factories/index.ts`                                                       | canonical | active  | integrator      | 12      | 15 → 15                  | 1 → 1                     |
+| `src/theme/appOverlayMenu.ts`                                                       | canonical | active  | p1-lane         | 5       | 6 → 6                    | 0 → 0                     |
+| `src/theme/composables/themeKeyboard.ts`                                            | canonical | active  | p1-lane         | 2       | 1 → 1                    | 2 → 2                     |
+| `src/theme/composables/themeMode.ts`                                                | canonical | active  | p1-lane         | 5       | 4 → 4                    | 0 → 0                     |
+| `src/theme/composables/useTheme.ts`                                                 | canonical | active  | p1-lane         | 4       | 8 → 8                    | 3 → 3                     |
+| `src/theme/dialogMask.ts`                                                           | canonical | active  | p1-lane         | 1       | 6 → 6                    | 0 → 0                     |
+| `src/theme/formControls.ts`                                                         | canonical | active  | p1-lane         | 4       | 10 → 10                  | 0 → 0                     |
+| `src/theme/lightboxScrim.ts`                                                        | canonical | active  | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
 
 <!-- SEAM_TABLE_END -->
 

@@ -8,7 +8,7 @@ vi.mock('../../../core/composables/useSupportChannels', () => ({
   useSupportChannels: () => ({ channels: [] }),
 }))
 
-vi.mock('../shared/composables/useAnomalyRadar', () => ({
+vi.mock('../shared/session/useAnomalyRadar', () => ({
   useAnomalyRadar: () => ({ anomalies: [], anomalyCount: 0, hasAnomalies: false }),
 }))
 
@@ -20,7 +20,7 @@ vi.mock('../../../core/composables/useSiteBranding', () => ({
   }),
 }))
 
-vi.mock('../shared/logos/useBrandLogoOverrides', () => ({
+vi.mock('../shared/session/brand/useBrandLogoOverrides', () => ({
   useBrandLogoOverrides: () => undefined,
 }))
 

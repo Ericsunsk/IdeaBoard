@@ -5,7 +5,7 @@ import { useAppToast } from '../core/composables/useAppToast'
 // `vi.mock(.../useAppToast)` shim (success/error/warning/info/loading/dismiss).
 // Specs register it with a bare `vi.mock('<relpath>/useAppToast')` automock and
 // a `mockAppToast()` call in `beforeEach`, keeping one stable identity per test.
-export function createAppToastMocks() {
+function createAppToastMocks() {
   return {
     success: vi.fn(),
     error: vi.fn(),

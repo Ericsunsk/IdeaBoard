@@ -68,7 +68,7 @@ module.exports = {
         // which assumes the second path segment is a layer name. `[^/]+` cannot
         // cross a `/`, so only `features/<x>/<layer>/…` matched — 13 of the 31
         // route pages. Every real admin vertical (`admin/users/`,
-        // `admin/settings/pages/`, `admin/credits/health/`, …) and the workspace
+        // `admin/settings/ui/pages/`, `admin/credits/ui/orders/`, …) and the workspace
         // layout have a *vertical* name in that second segment, so all of them
         // fell through the rule unnoticed.
         //

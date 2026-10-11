@@ -148,9 +148,9 @@ export function mapWorkspaceUploadSessionStatus(value: unknown): WorkspaceUpload
 }
 
 export function assertWorkspaceId(value: string): string {
-  // Intentional local twin of `shared/utils/workspaceId.assertWorkspaceId`:
+  // Intentional local twin of `core/utils/workspaceId.assertWorkspaceId`:
   // parity-pinned by `opaqueIds.unit.spec.ts`; the canonical primitive stays
-  // in `shared/utils` + `opaqueIds`.
+  // in `core/utils/workspaceId` + `core/utils/opaqueIds`.
   return assertOpaqueId(value, 'ws', 'workspace id')
 }
 

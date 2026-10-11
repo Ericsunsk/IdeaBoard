@@ -61,6 +61,8 @@ P2.5 evidence re-anchor, 2026-10-11 (integrator): the P3 board lane migrated the
 
 P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not retention): the 20 retained searchChrome matchers retire with red-proven computed-style browser replacements passing first (`src/features/search/searchChromeStyle.browser.spec.ts` 5/5 chromium green, rerun by the integrator). Group coverage: batch-dock test + SearchPage hover-border test cover 9a88ea3e (5); popover-treatment test covers b149bb99 (7); overlay-gutter test covers 918f5c82 (4); overlay-btn-fills test covers e1406aae (4). Bookkeeping decision per quota formulas (`R_p` must equal `len(retirementIds)`; `counts` must equal measured dispositions): restore the P0-frozen denominators rather than keeping `R_p=31` with 20 additionally-retired outliers — counts retire 383->403 and retain-behavior 78->58; P3 `R_p` 31->51 with the 20 IDs restored to `retirementIds`. All 51 frozen P3 IDs (494 total, `R=403`) preserved; only dispositions/statuses changed. No silent shrink at any step (51->31 recorded with rationale; 31->51 restores the frozen denominator with this approval record). Formal P3 acceptance still pending.
 
+P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment authority; desktop plan v4 §5.9 + §6 read-only): the admin target root is 7 domains (`credits`, `models`, `monitor`, `prompts`, `settings`, `statistics`, `users`) plus `shared` (plus `app` shell for routes/login/layout). `storage/` as an independent vertical is removed: provider/profile ownership moves to `settings/session/storage` with cards in `settings/ui/cards/storage`. `payments/` as an independent vertical is removed: order query/refund presentation moves to `credits/core/orders` with resources in `credits/session/orders` and views in `credits/ui/orders`; Stripe configuration moves to `settings/session/payment` with cards in `settings/ui/cards/payment`. The `pages/` directory is gone: the login assembly moves to `app/login/` (`AdminLoginPage.vue`, `messages.ts`, `useAdminLoginFeedback.ts`). Proposal Phase 1 moves (storage→settings/storage, stripe→settings/payment, orders→credits/orders, `payments/` + `pages/` dirs gone, login→app/login) and Phase 2 moves (three-tier `core/`/`session/`/`ui/` for `prompts`, `statistics`, `users`, `credits`, and `settings`) are complete with no business logic, moves, or renames beyond the listed relocations. `support-channels/` is renamed to `support/` (`settings/session/support/` + `settings/ui/cards/support/`). The `credits/wallets/index.ts` barrel is deleted audit-clean (zero importers; `AdminUsersPage` imports `credits/ui/wallets/AdminUserWalletDialog.vue` directly; seam flipped to retired). Shared regroup `shared/{lib,composables,components,logos,validation}/` → `shared/{core,session,ui}/` is complete. `core/` stays flat by owner ruling (no subdirs); `session/` keeps per-scope subdirs (`brand`, `collection`, `feedback`, plus vertical scopes) and `ui/` keeps group dirs (`form`, `feedback`, `shell`, `chart`, `toolbar`, `popover`, `tabs`). Governance matchers, `CONTEXT.md` refs, and the Knip/boolean baselines are re-keyed to the final tree; P4 bridge shims are retired early with zero importers verified.
+
 ```json migration-ledger
 {
   "version": 1,
@@ -311,7 +313,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "verified-local",
       "approver": "plan-owner",
       "verifiedAt": "2026-10-11",
-      "evidence": "2026-10-11 P2 audit repair: strict ledger P1 and P2 pass with 0 review warnings and 0 unmet requirements; 38 schema/AST/phase fixtures pass. R 2/2 and B 7/7 have current exact assertion evidence, including moving-card DOM/local-state/focus and first-install persisted hydration. Final verification and independent review: see PLANS.md section P2 审计修复（2026-10-11）. This is local evidence, not approval or CI/checkpoint acceptance."
+      "evidence": "2026-10-11 P2 audit repair: strict ledger P1 and P2 pass with 0 review warnings and 0 unmet requirements; 38 schema/AST/phase fixtures pass. R 2/2 and B 7/7 have current exact assertion evidence, including moving-card DOM/local-state/focus and first-install persisted hydration. Final verification and independent review: see PLANS.md section P2 \u5ba1\u8ba1\u4fee\u590d\uff082026-10-11\uff09. This is local evidence, not approval or CI/checkpoint acceptance."
     },
     {
       "phase": "P2.5",
@@ -428,7 +430,9 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "B_p": 5,
       "zeroRetirementReason": null,
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local",
+      "verifiedAt": "2026-10-11",
+      "evidence": "2026-10-11 integrator: 4 retirements (3 feedback-boundary via checkAdminFeedbackBoundary.ts self-test 8/8 + production 453 Admin sources; 1 theme via invalidBorder.browser.spec.ts 1/1 chromium) + 5 behaviors (4 pre-verified + credits-403 via boundary.contract.spec.ts 4/4); 3 Type renames zero-residue (StorageField, CreditLedgerCommand, CreditReconciliationFindingKind) with Credits 33/154 green. Formal P4 acceptance pending; no CI/checkpoint claim."
     },
     {
       "phase": "P5",
@@ -2296,12 +2300,14 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "proposedPhase": null,
       "owner": "/root/p4-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "eslint/admin-feedback-adapter-only",
         "requirement": "Reject direct useAppToast and retired AdminFeedback outside shared toast adapter; positive adapter and negative callers.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 current P4 repair: checkAdminFeedbackBoundary.ts self-test 8 cases passed + production 453 Admin sources passed (ADAPTER_REL features/admin/shared/session/feedback/toast.ts); original adminFeedbackBoundary.contract.spec.ts deleted with 3 source-string assertions retired."
       },
       "reviewRequired": false
     },
@@ -2319,12 +2325,14 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "proposedPhase": null,
       "owner": "/root/p4-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "eslint/admin-feedback-adapter-only",
         "requirement": "Reject direct useAppToast and retired AdminFeedback outside shared toast adapter; positive adapter and negative callers.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 current P4 repair: checkAdminFeedbackBoundary.ts self-test 8 cases passed + production 453 Admin sources passed (ADAPTER_REL features/admin/shared/session/feedback/toast.ts); original adminFeedbackBoundary.contract.spec.ts deleted with 3 source-string assertions retired."
       },
       "reviewRequired": false
     },
@@ -2342,12 +2350,14 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "proposedPhase": null,
       "owner": "/root/p4-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "eslint/admin-feedback-adapter-only",
         "requirement": "Reject direct useAppToast and retired AdminFeedback outside shared toast adapter; positive adapter and negative callers.",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 current P4 repair: checkAdminFeedbackBoundary.ts self-test 8 cases passed + production 453 Admin sources passed (ADAPTER_REL features/admin/shared/session/feedback/toast.ts); original adminFeedbackBoundary.contract.spec.ts deleted with 3 source-string assertions retired."
       },
       "reviewRequired": false
     },
@@ -2361,6 +2371,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(surfaces.some((s) => s.id === binding), `${name} binding surface \"${binding}\" is missing from the inventory`).toBe(true)",
       "disposition": "retain-behavior",
       "reason": "Contrast fixture inventory prerequisite, not a product-source constraint.",
+      "currentAssertion": {
+        "assertion": "expect(surfaces.some((s) => s.id === binding), `${name} binding surface \"${binding}\" is missing from the inventory`).toBe(true)",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -2384,6 +2398,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(ratio, `${name} ${token.id} (${token.value}) on ${surface.id} (${surface.value}) is ${ratio.toFixed(2)}:1, below the ${FLOORS[token.id]}:1 floor`).toBeGreaterThanOrEqual(FLOORS[token.id])",
       "disposition": "retain-behavior",
       "reason": "Numerical contrast/luminance output contract.",
+      "currentAssertion": {
+        "assertion": "expect(ratio, `${name} ${token.id} (${token.value}) on ${surface.id} (${surface.value}) is ${ratio.toFixed(2)}:1, below the ${FLOORS[token.id]}:1 floor`).toBeGreaterThanOrEqual(FLOORS[token.id])",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -2407,6 +2425,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(ratio, `${name} ${token.id} on ${binding} is ${ratio.toFixed(2)}:1; less than ${BINDING_MARGIN} of headroom leaves no room for future surface tweaks`).toBeGreaterThanOrEqual(FLOORS[token.id] + BINDING_MARGIN)",
       "disposition": "retain-behavior",
       "reason": "Numerical contrast/luminance output contract.",
+      "currentAssertion": {
+        "assertion": "expect(ratio, `${name} ${token.id} on ${binding} is ${ratio.toFixed(2)}:1; less than ${BINDING_MARGIN} of headroom leaves no room for future surface tweaks`).toBeGreaterThanOrEqual(FLOORS[token.id] + BINDING_MARGIN)",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -2430,6 +2452,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(currentLuminance, `${name} ${current.id} (L=${currentLuminance.toFixed(4)}) must be lighter than ${previous.id} (L=${previousLuminance.toFixed(4)})`).toBeGreaterThan(previousLuminance)",
       "disposition": "retain-behavior",
       "reason": "Numerical contrast/luminance output contract.",
+      "currentAssertion": {
+        "assertion": "expect(currentLuminance, `${name} ${current.id} (L=${currentLuminance.toFixed(4)}) must be lighter than ${previous.id} (L=${previousLuminance.toFixed(4)})`).toBeGreaterThan(previousLuminance)",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -2453,6 +2479,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(step, `${name} ${previous.id} -> ${current.id} is ${step.toFixed(2)}x luminance; below 0.25 the rungs read as the same weight`).toBeGreaterThan(0.25)",
       "disposition": "retain-behavior",
       "reason": "Numerical contrast/luminance output contract.",
+      "currentAssertion": {
+        "assertion": "expect(step, `${name} ${previous.id} -> ${current.id} is ${step.toFixed(2)}x luminance; below 0.25 the rungs read as the same weight`).toBeGreaterThan(0.25)",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -2476,6 +2506,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(step, `${name} ${previous.id} -> ${current.id} is ${step.toFixed(2)}x luminance; above 0.95 the ramp collapsed into one level`).toBeLessThan(0.95)",
       "disposition": "retain-behavior",
       "reason": "Numerical contrast/luminance output contract.",
+      "currentAssertion": {
+        "assertion": "expect(step, `${name} ${previous.id} -> ${current.id} is ${step.toFixed(2)}x luminance; above 0.95 the ramp collapsed into one level`).toBeLessThan(0.95)",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -2499,6 +2533,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "assertion": "expect(contrastRatio(textPrimary, readToken('--color-admin-surface-pressed')), 'text-1 must stay readable on surface-pressed').toBeGreaterThanOrEqual(FLOORS.primary)",
       "disposition": "retain-behavior",
       "reason": "Numerical contrast/luminance output contract.",
+      "currentAssertion": {
+        "assertion": "expect(contrastRatio(textPrimary, readToken('--color-admin-surface-pressed')), 'text-1 must stay readable on surface-pressed').toBeGreaterThanOrEqual(FLOORS.primary)",
+        "reason": "reviewed lib->core relocation evidence: matcher text unchanged from src/features/admin/shared/lib/textRampContrast.contract.spec.ts; identity projected via pathMappings to src/features/admin/shared/core/textRampContrast.contract.spec.ts"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -14151,12 +14189,43 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "proposedPhase": null,
       "owner": "/root/p4-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/26cf371a",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps the Admin invalid border above hover and focus too",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/admin/credits/shared/invalidBorder.browser.spec.ts",
+            "line": 55,
+            "scenario": "keeps the Admin invalid border above hover and focus",
+            "assertion": "expect(styleOf(input).borderColor).toBe(styleOf(destructiveProbe).borderColor)",
+            "fingerprint": "763cb9f238bd8eb8"
+          },
+          {
+            "source": "src/features/admin/credits/shared/invalidBorder.browser.spec.ts",
+            "line": 56,
+            "scenario": "keeps the Admin invalid border above hover and focus",
+            "assertion": "expect(styleOf(input).borderColor).not.toBe(styleOf(restProbe).borderColor)",
+            "fingerprint": "afc5010fa2d865ca"
+          },
+          {
+            "source": "src/features/admin/credits/shared/invalidBorder.browser.spec.ts",
+            "line": 73,
+            "scenario": "keeps the Admin invalid border above hover and focus",
+            "assertion": "expect(input.matches(':hover')).toBe(true)",
+            "fingerprint": "4368cbb89f9ebea2"
+          },
+          {
+            "source": "src/features/admin/credits/shared/invalidBorder.browser.spec.ts",
+            "line": 80,
+            "scenario": "keeps the Admin invalid border above hover and focus",
+            "assertion": "expect(document.activeElement).toBe(input)",
+            "fingerprint": "ef82f71e4ed512b4"
+          }
+        ],
+        "verifiedRun": "2026-10-11 integrator: invalidBorder.browser.spec.ts 1 passed (chromium, computed border paint beats hover/focus via live destructive token); replaces source-f5f7dc876e706d72-1 source-string assertion deleted with formControls.contract.spec.ts."
       },
       "reviewRequired": false
     },
@@ -17408,7 +17477,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         {
           "source": "src/test/p1ThemeContracts.browser.spec.ts",
           "scenario": "renders real AdminConfirmDialog focus and loading in %s (reduced=%s)",
-          "assertion": "expect(screen.getByRole('button', { name: '取消' })).toBeDisabled()",
+          "assertion": "expect(screen.getByRole('button', { name: '\u53d6\u6d88' })).toBeDisabled()",
           "line": 412,
           "fingerprint": "58c4cff1cfca3562"
         },
@@ -19036,7 +19105,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-12 current P4 repair: `npm run test:run -- src/features/admin/users/session/commands.contract.spec.ts src/features/admin/users/session/commandsInvalidation.contract.spec.ts src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts`; 3 specs / 24 tests passed. This current-revision technical run does not claim formal P4 acceptance or a committed checkpoint."
     },
     {
       "id": "board/revision-recovery",
@@ -19054,7 +19123,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-12 current P4 repair: `npm run test:run -- src/features/admin/users/session/commands.contract.spec.ts src/features/admin/users/session/commandsInvalidation.contract.spec.ts src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts`; 3 specs / 24 tests passed. This current-revision technical run does not claim formal P4 acceptance or a committed checkpoint."
     },
     {
       "id": "board/locale-dual-key-ttl",
@@ -19140,7 +19209,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-12 current P4 repair: `npm run test:run -- src/features/admin/users/session/commands.contract.spec.ts src/features/admin/users/session/commandsInvalidation.contract.spec.ts src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts`; 3 specs / 24 tests passed. This current-revision technical run does not claim formal P4 acceptance or a committed checkpoint."
     },
     {
       "id": "account/checkout-expiry",
@@ -19158,7 +19227,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "2026-10-12 current P4 repair: `npm run test:run -- src/features/admin/users/session/commands.contract.spec.ts src/features/admin/users/session/commandsInvalidation.contract.spec.ts src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts`; 3 specs / 24 tests passed. This current-revision technical run does not claim formal P4 acceptance or a committed checkpoint."
     },
     {
       "id": "account/permission-403",
@@ -19232,11 +19301,11 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/admin/users/commands.contract.spec.ts",
+          "source": "src/features/admin/users/session/commands.contract.spec.ts",
           "line": 58,
           "scenario": "blocks admin delete before confirmation and mutation side effects",
           "assertion": "expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()",
-          "fingerprint": "02c3d10a344c12c1"
+          "fingerprint": "052abb7de2d2093b"
         }
       ],
       "plannedAssertion": null,
@@ -19250,11 +19319,11 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/admin/users/commandsInvalidation.contract.spec.ts",
-          "line": 89,
+          "source": "src/features/admin/users/session/commandsInvalidation.contract.spec.ts",
+          "line": 93,
           "scenario": "invalidates the users list query after ban, unban, role, and delete mutations succeed",
           "assertion": "expect(userQueryClientMock.invalidateQueries).toHaveBeenCalledTimes(4)",
-          "fingerprint": "a2f8e3a2713eb1b0"
+          "fingerprint": "3e519a7d59a3aca8"
         }
       ],
       "plannedAssertion": null,
@@ -19268,11 +19337,11 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
+          "source": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
           "line": 323,
           "scenario": "validates the price and blocks duplicate publishes while pending",
-          "assertion": "expect(screen.getByText('请输入价格')).toBeVisible()",
-          "fingerprint": "0141bb77cf0fa1f1"
+          "assertion": "expect(screen.getByText('\u8bf7\u8f93\u5165\u4ef7\u683c')).toBeVisible()",
+          "fingerprint": "dbd54ea7fa03fe79"
         }
       ],
       "plannedAssertion": null,
@@ -19286,11 +19355,11 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/admin/credits/pricing/AdminBillingPricingPage.component.spec.ts",
+          "source": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
           "line": 265,
           "scenario": "keeps publish failures in the dialog and allows a single retry",
           "assertion": "expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)",
-          "fingerprint": "2a6ae5ebddc32f32"
+          "fingerprint": "a8098b6dd9bff79a"
         }
       ],
       "plannedAssertion": null,
@@ -19301,10 +19370,39 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "phase": "P4",
       "owner": "/root/p4-lane",
       "requirement": "Credits/server boundary validates idempotency, expired inputs and 403 before mutations; visible feedback and identities remain unchanged through vertical Seams.",
-      "status": "pending",
-      "evidence": [],
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/admin/credits/session/rewards/boundary.contract.spec.ts",
+          "line": 59,
+          "scenario": "rejects blank idempotency keys before any network call",
+          "assertion": "expect(resource.create({\n    displayName: '\u590f\u65e5\u7075\u611f\u5956\u52b1',\n    code: 'IDEA2026',\n    creditAmount: 80,\n    maxRedemptions: 100,\n    expiresAt: '2026-12-31T00:00:00Z',\n    idempotencyKey: '   ',\n}, { operatorReason: '\u8fd0\u8425\u6d3b\u52a8\u8865\u7801' })).rejects.toMatchObject({ code: 'control_idempotency_required' })",
+          "fingerprint": "807657409b5d430b"
+        },
+        {
+          "source": "src/features/admin/credits/session/rewards/boundary.contract.spec.ts",
+          "line": 81,
+          "scenario": "rejects expired inputs before any network call",
+          "assertion": "expect(resource.create({\n    displayName: '\u590f\u65e5\u7075\u611f\u5956\u52b1',\n    code: 'IDEA2026',\n    creditAmount: 80,\n    maxRedemptions: 100,\n    expiresAt: '2000-01-01T00:00:00Z',\n    idempotencyKey: 'reward-create:expired-1',\n}, { operatorReason: '\u8fd0\u8425\u6d3b\u52a8\u8865\u7801' })).rejects.toMatchObject({ code: 'control_expired_input' })",
+          "fingerprint": "06ad9456cb69aa03"
+        },
+        {
+          "source": "src/features/admin/credits/session/rewards/boundary.contract.spec.ts",
+          "line": 120,
+          "scenario": "maps 403 to operator copy without leaking plaintext",
+          "assertion": "expect(failure).toMatchObject({ code: 'forbidden' })",
+          "fingerprint": "80f8c2f233124893"
+        },
+        {
+          "source": "src/features/admin/credits/session/rewards/boundary.contract.spec.ts",
+          "line": 145,
+          "scenario": "keeps header-only identities unchanged for valid intents",
+          "assertion": "expect(created.plaintext).toBe('IDEA2026')",
+          "fingerprint": "f3dfe42ca6a2cfb0"
+        }
+      ],
       "plannedAssertion": "Credits/server boundary validates idempotency, expired inputs and 403 before mutations; visible feedback and identities remain unchanged through vertical Seams.",
-      "verifiedRun": null
+      "verifiedRun": "2026-10-11 integrator: boundary.contract.spec.ts 4 passed (idempotency/expiry/403/identities); Credits 33 files / 154 tests passed."
     },
     {
       "id": "canvas/screen-public-interactions",
@@ -19822,123 +19920,235 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
   ],
   "pathMappings": [
     {
-      "source": "src/shared/assets/",
-      "target": "src/core/assets/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/account/application/ + infrastructure/",
+      "target": "src/features/account/session/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "merge paired use cases/resources by scope, no billing behavior changes. Accepted variance (integrator 2026-10-11): session keeps per-scope subdirs (billing/credits/payments/rewards/usage/profile/security + overlay/accountWorkspace/invalidateUserMoney/workspaceBilling behind the session/index.ts seam); core stays flat (chart/formatters/money/return/tabs). Seam evidence: src/features/account/session/index.ts (active cascading seam, sole parent consumer); size-guard evidence: governance/function-length max 100 + audit:complexity (session functions within guard, no new violations).",
       "status": "done"
     },
     {
-      "source": "src/shared/components/",
-      "target": "src/core/components/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/account/domain/",
+      "target": "src/features/account/core/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "money/return/chart/tabs pure ownership",
       "status": "done"
     },
     {
-      "source": "src/shared/composables/",
-      "target": "src/core/composables/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/account/presentation/",
+      "target": "src/features/account/ui/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "recharge/billing/usage/rewards/security/profile/dialog/shared/chrome",
       "status": "done"
     },
     {
-      "source": "src/shared/config/",
-      "target": "src/core/config/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/admin/<vertical>/{domain,application,infrastructure,presentation}/",
+      "target": "src/features/admin/<vertical>/{core,session,resource.ts,ui}/",
+      "phase": "P4",
+      "owner": "/root/p4-lane",
+      "requirement": "zones only when needed; no cross-vertical consumer means no new index. Verified 2026-10-11: prompts/statistics/users/credits/settings three-tier complete; wallets barrel deleted audit-clean (consumer imports ui/wallets directly).",
       "status": "done"
     },
     {
-      "source": "src/shared/constants/",
-      "target": "src/core/constants/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/admin/settings/",
+      "target": "src/features/admin/settings/{cards,session.ts,ui}/",
+      "phase": "P4",
+      "owner": "/root/p4-lane",
+      "requirement": "card ownership (cards under ui/cards/, incl. storage/payment/support); session keeps per-scope subdirs incl. storage/support/payment; support-channels renamed to support. Verified 2026-10-11.",
       "status": "done"
     },
     {
-      "source": "src/shared/lib/",
-      "target": "src/core/lib/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/admin/shared/lib/textRampContrast.contract.spec.ts",
+      "target": "src/features/admin/shared/core/textRampContrast.contract.spec.ts",
+      "phase": "P4",
+      "owner": "/root/p4-lane",
+      "requirement": "Exact relocated contrast assertions retain P0 source/scenario/fingerprint identity; P4 shared lib->core move; bridge shims retired after zero-importer verification.",
       "status": "done"
     },
     {
-      "source": "src/shared/motion/",
-      "target": "src/core/motion/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/admin/shared/{lib,composables,components,logos,validation}/",
+      "target": "src/features/admin/shared/{core,session,ui}/",
+      "phase": "P4",
+      "owner": "/root/p4-lane",
+      "requirement": "single Admin horizontal Seam",
       "status": "done"
     },
     {
-      "source": "src/shared/router/",
-      "target": "src/core/router/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/board/application/",
+      "target": "src/features/board/session/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "catalog/sync/share-join/adapters; test companions colocate",
       "status": "done"
     },
     {
-      "source": "src/shared/seo/",
-      "target": "src/core/seo/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/board/domain/",
+      "target": "src/features/board/core/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "document/schema/media ownership",
       "status": "done"
     },
     {
-      "source": "src/shared/utils/",
-      "target": "src/core/utils/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/board/infrastructure/",
+      "target": "src/features/board/session/adapters/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "resource/browser/persistence remain explicit adapters",
       "status": "done"
     },
     {
-      "source": "src/shared/errors/",
-      "target": "src/core/errors/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/board/presentation/catalog/",
+      "target": "src/features/board/ui/gallery/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "boardCardMotion orphan spec colocates with skin",
       "status": "done"
     },
     {
-      "source": "src/shared/query/",
-      "target": "src/core/query/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/canvas/application/ + infrastructure/",
+      "target": "src/features/canvas/session/",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "boardSession/graphEditing/execution/imageWorkflow/workspace/flowAdapter/media/browser",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/application/image-workflow/components/ImageOutpaintOverlay.vue",
+      "target": "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "colocate component/browser specs with implementation; create index only for actual external consumers",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/application/image-workflow/outpaintIntent.ts",
+      "target": "src/features/canvas/tools/outpaint/core/outpaintIntent.ts",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "pure intent contract; current source runtime dependencies must be rechecked before relocation",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/application/image-workflow/useImageOutpaintOverlay.ts",
+      "target": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "session lifecycle and colocated unit spec",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/domain/",
+      "target": "src/features/canvas/core/",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "graph/execution/nodes; no Vue/router/Query/auth/i18n runtime",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/domain/graph/outpaintGeometry.ts",
+      "target": "src/features/canvas/tools/outpaint/core/outpaintGeometry.ts",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "pure geometry owner",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/presentation/",
+      "target": "src/features/canvas/ui/",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "chrome/screens/nodes/overlays/pages/styles",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/tools/image-tools/",
+      "target": "src/features/canvas/tools/image-tools/{core,session,ui,index.ts}",
+      "phase": "P6",
+      "owner": "/root/p6-lane",
+      "requirement": "zero pathNot exemptions; close ChromeFrame/RetouchImageRect/bindings leaks",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/tools/retouch/core/imageDataUtils.ts",
+      "target": "src/features/canvas/tools/retouch/core/imageData.ts",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "cloneImageData remains pure; rename/incorporate only with caller updates",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/canvas/tools/{retouch,inpaint}/",
+      "target": "src/features/canvas/tools/{retouch,inpaint}/{core,session,ui}/",
+      "phase": "P5",
+      "owner": "/root/p5-lane",
+      "requirement": "preserve tool public identities through <=3 PR alias lifecycle",
+      "status": "planned"
+    },
+    {
+      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
+      "target": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+      "phase": "P2",
+      "owner": "/root/p2-lane",
+      "requirement": "Exact relocated observable gallery assertions retain their P0 source/scenario/fingerprint identity; changed DOM column-count implementation maps separately to reviewed real-browser geometry.",
       "status": "done"
     },
     {
-      "source": "src/shared/auth/",
-      "target": "src/core/auth/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/library/workspace.contract.spec.ts",
+      "target": "src/features/library/session/workspace.contract.spec.ts",
+      "phase": "P2",
+      "owner": "/root/p2-lane",
+      "requirement": "orphan spec follows resource owner",
       "status": "done"
     },
     {
-      "source": "src/shared/interaction/",
-      "target": "src/core/interaction/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/library/{domain,application,infrastructure,components}/",
+      "target": "src/features/library/{core,session,session,ui}/",
+      "phase": "P2",
+      "owner": "/root/p2-lane",
+      "requirement": "minimum actual zones, no Library route constants",
       "status": "done"
     },
     {
-      "source": "src/shared/media/",
-      "target": "src/core/media/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "source": "src/features/search/application/ + infrastructure/",
+      "target": "src/features/search/session/ + session/adapters/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "disambiguate screenRuntime and duplicate filenames",
+      "status": "done"
+    },
+    {
+      "source": "src/features/search/domain/",
+      "target": "src/features/search/core/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "pure ownership",
+      "status": "done"
+    },
+    {
+      "source": "src/features/search/presentation/",
+      "target": "src/features/search/ui/",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "browser/components/pages",
+      "status": "done"
+    },
+    {
+      "source": "src/features/search/searchChrome.contract.spec.ts",
+      "target": "src/features/search/session/adapters/searchChrome.contract.spec.ts",
+      "phase": "P3",
+      "owner": "/root/p3-lane",
+      "requirement": "orphan spec follows owner",
+      "status": "done"
+    },
+    {
+      "source": "src/features/workspace/infrastructure/",
+      "target": "src/features/workspace/selection/",
+      "phase": "P2",
+      "owner": "/root/p2-lane",
+      "requirement": "flat structure, shared installed selection port, singleton behavior before migration",
       "status": "done"
     },
     {
@@ -19950,83 +20160,11 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "done"
     },
     {
-      "source": "src/shared/theme/",
-      "target": "src/theme/",
+      "source": "src/shared/assets/",
+      "target": "src/core/assets/",
       "phase": "P1b",
       "owner": "/root/p1b-lane",
-      "requirement": "tokens/formControls/dialogMask/atoms move with CSS order governance",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/i18n/",
-      "target": "src/core/i18n/",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "pure localeCore and runtime imports remain separately governed",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/generationContract.ts",
-      "target": "src/core/contracts/generationContract.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "pure direct subpath",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/externalImageProviders.ts",
-      "target": "src/core/contracts/externalImageProviders.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "pure direct subpath",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/imageServices.ts",
-      "target": "src/core/contracts/imageServices.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "pure direct subpath",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/imageActions.ts",
-      "target": "src/features/canvas/core/nodes/imageActions.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Canvas-private; depends on pure slug contract",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/serviceRegistry.ts",
-      "target": "src/features/admin/prompts/core/promptVariables.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Admin prompt variables only",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/serviceRegistry.ts",
-      "target": "src/features/canvas/core/nodes/serviceLabelKey.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "pure slug-to-locale-key mapping only",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/serviceRegistry.ts",
-      "target": "src/features/canvas/session/serviceImageActionText.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "call-time i18n resolver runtime; separate test-only helper retained/deleted only after effective replacement",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/domain/serviceIcons.ts",
-      "target": "src/features/admin/shared/ui/serviceIcons.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Vue/Iconoir runtime belongs to Admin UI",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     },
     {
@@ -20094,43 +20232,19 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "done"
     },
     {
-      "source": "src/shared/constants/contacts.ts",
-      "target": "src/features/legal/contacts.ts",
+      "source": "src/shared/auth/",
+      "target": "src/core/auth/",
       "phase": "P1b",
       "owner": "/root/p1b-lane",
-      "requirement": "Only Legal support-email consumer; keep Legal flat",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     },
     {
-      "source": "src/shared/media/preloadImage.ts",
-      "target": "src/features/canvas/session/media/preloadImage.ts",
+      "source": "src/shared/components/",
+      "target": "src/core/components/",
       "phase": "P1b",
       "owner": "/root/p1b-lane",
-      "requirement": "Canvas-specific decode-before-display browser adapter; only Canvas production consumers",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/constants/routePaths.ts",
-      "target": "src/features/workspace/routePaths.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Workspace routes; Admin/legal portions split into respective owners, no URL changes",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/constants/routePaths.ts",
-      "target": "src/features/admin/routePaths.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Admin-owned route constants only; inventory and caller rewrites converge on this phase target without an extra app-layer hop",
-      "status": "done"
-    },
-    {
-      "source": "src/shared/constants/routePaths.ts",
-      "target": "src/features/legal/routePaths.ts",
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "requirement": "Legal owns existing routePaths; merge only equivalent constants",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     },
     {
@@ -20158,227 +20272,219 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "done"
     },
     {
-      "source": "src/features/board/domain/",
-      "target": "src/features/board/core/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "document/schema/media ownership",
+      "source": "src/shared/composables/",
+      "target": "src/core/composables/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     },
     {
-      "source": "src/features/board/application/",
-      "target": "src/features/board/session/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "catalog/sync/share-join/adapters; test companions colocate",
+      "source": "src/shared/config/",
+      "target": "src/core/config/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     },
     {
-      "source": "src/features/board/infrastructure/",
-      "target": "src/features/board/session/adapters/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "resource/browser/persistence remain explicit adapters",
+      "source": "src/shared/constants/",
+      "target": "src/core/constants/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     },
     {
-      "source": "src/features/board/presentation/catalog/",
-      "target": "src/features/board/ui/gallery/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "boardCardMotion orphan spec colocates with skin",
+      "source": "src/shared/constants/contacts.ts",
+      "target": "src/features/legal/contacts.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Only Legal support-email consumer; keep Legal flat",
       "status": "done"
     },
     {
-      "source": "src/features/account/domain/",
-      "target": "src/features/account/core/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "money/return/chart/tabs pure ownership",
+      "source": "src/shared/constants/routePaths.ts",
+      "target": "src/features/workspace/routePaths.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Workspace routes; Admin/legal portions split into respective owners, no URL changes",
       "status": "done"
     },
     {
-      "source": "src/features/account/application/ + infrastructure/",
-      "target": "src/features/account/session/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "merge paired use cases/resources by scope, no billing behavior changes. Accepted variance (integrator 2026-10-11): session keeps per-scope subdirs (billing/credits/payments/rewards/usage/profile/security + overlay/accountWorkspace/invalidateUserMoney/workspaceBilling behind the session/index.ts seam); core stays flat (chart/formatters/money/return/tabs). Seam evidence: src/features/account/session/index.ts (active cascading seam, sole parent consumer); size-guard evidence: governance/function-length max 100 + audit:complexity (session functions within guard, no new violations).",
+      "source": "src/shared/constants/routePaths.ts",
+      "target": "src/features/admin/routePaths.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Admin-owned route constants only; inventory and caller rewrites converge on this phase target without an extra app-layer hop",
       "status": "done"
     },
     {
-      "source": "src/features/account/presentation/",
-      "target": "src/features/account/ui/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "recharge/billing/usage/rewards/security/profile/dialog/shared/chrome",
+      "source": "src/shared/constants/routePaths.ts",
+      "target": "src/features/legal/routePaths.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Legal owns existing routePaths; merge only equivalent constants",
       "status": "done"
     },
     {
-      "source": "src/features/search/domain/",
-      "target": "src/features/search/core/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "pure ownership",
+      "source": "src/shared/domain/externalImageProviders.ts",
+      "target": "src/core/contracts/externalImageProviders.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "pure direct subpath",
       "status": "done"
     },
     {
-      "source": "src/features/search/application/ + infrastructure/",
-      "target": "src/features/search/session/ + session/adapters/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "disambiguate screenRuntime and duplicate filenames",
+      "source": "src/shared/domain/generationContract.ts",
+      "target": "src/core/contracts/generationContract.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "pure direct subpath",
       "status": "done"
     },
     {
-      "source": "src/features/search/presentation/",
-      "target": "src/features/search/ui/",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "browser/components/pages",
+      "source": "src/shared/domain/imageActions.ts",
+      "target": "src/features/canvas/core/nodes/imageActions.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Canvas-private; depends on pure slug contract",
       "status": "done"
     },
     {
-      "source": "src/features/search/searchChrome.contract.spec.ts",
-      "target": "src/features/search/session/adapters/searchChrome.contract.spec.ts",
-      "phase": "P3",
-      "owner": "/root/p3-lane",
-      "requirement": "orphan spec follows owner",
+      "source": "src/shared/domain/imageServices.ts",
+      "target": "src/core/contracts/imageServices.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "pure direct subpath",
       "status": "done"
     },
     {
-      "source": "src/features/library/{domain,application,infrastructure,components}/",
-      "target": "src/features/library/{core,session,session,ui}/",
-      "phase": "P2",
-      "owner": "/root/p2-lane",
-      "requirement": "minimum actual zones, no Library route constants",
+      "source": "src/shared/domain/serviceIcons.ts",
+      "target": "src/features/admin/shared/ui/serviceIcons.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Vue/Iconoir runtime belongs to Admin UI",
       "status": "done"
     },
     {
-      "source": "src/features/library/workspace.contract.spec.ts",
-      "target": "src/features/library/session/workspace.contract.spec.ts",
-      "phase": "P2",
-      "owner": "/root/p2-lane",
-      "requirement": "orphan spec follows resource owner",
+      "source": "src/shared/domain/serviceRegistry.ts",
+      "target": "src/features/admin/prompts/core/promptVariables.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Admin prompt variables only",
       "status": "done"
     },
     {
-      "source": "src/features/workspace/infrastructure/",
-      "target": "src/features/workspace/selection/",
-      "phase": "P2",
-      "owner": "/root/p2-lane",
-      "requirement": "flat structure, shared installed selection port, singleton behavior before migration",
+      "source": "src/shared/domain/serviceRegistry.ts",
+      "target": "src/features/canvas/core/nodes/serviceLabelKey.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "pure slug-to-locale-key mapping only",
       "status": "done"
     },
     {
-      "source": "src/features/admin/shared/{lib,composables,components}/",
-      "target": "src/features/admin/shared/{core,session,ui}/",
-      "phase": "P4",
-      "owner": "/root/p4-lane",
-      "requirement": "single Admin horizontal Seam",
-      "status": "planned"
+      "source": "src/shared/domain/serviceRegistry.ts",
+      "target": "src/features/canvas/session/serviceImageActionText.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "call-time i18n resolver runtime; separate test-only helper retained/deleted only after effective replacement",
+      "status": "done"
     },
     {
-      "source": "src/features/admin/<vertical>/{domain,application,infrastructure,presentation}/",
-      "target": "src/features/admin/<vertical>/{core,session,resource.ts,ui}/",
-      "phase": "P4",
-      "owner": "/root/p4-lane",
-      "requirement": "zones only when needed; no cross-vertical consumer means no new index",
-      "status": "phase-start-review-required"
+      "source": "src/shared/errors/",
+      "target": "src/core/errors/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/admin/settings/",
-      "target": "src/features/admin/settings/{cards,session.ts,ui}/",
-      "phase": "P4",
-      "owner": "/root/p4-lane",
-      "requirement": "card ownership; credits remain pricing/rewards/wallets/health verticals",
-      "status": "planned"
+      "source": "src/shared/i18n/",
+      "target": "src/core/i18n/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "pure localeCore and runtime imports remain separately governed",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/domain/",
-      "target": "src/features/canvas/core/",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "graph/execution/nodes; no Vue/router/Query/auth/i18n runtime",
-      "status": "planned"
+      "source": "src/shared/interaction/",
+      "target": "src/core/interaction/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/application/ + infrastructure/",
-      "target": "src/features/canvas/session/",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "boardSession/graphEditing/execution/imageWorkflow/workspace/flowAdapter/media/browser",
-      "status": "planned"
+      "source": "src/shared/lib/",
+      "target": "src/core/lib/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/presentation/",
-      "target": "src/features/canvas/ui/",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "chrome/screens/nodes/overlays/pages/styles",
-      "status": "planned"
+      "source": "src/shared/media/",
+      "target": "src/core/media/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/tools/{retouch,inpaint}/",
-      "target": "src/features/canvas/tools/{retouch,inpaint}/{core,session,ui}/",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "preserve tool public identities through <=3 PR alias lifecycle",
-      "status": "planned"
+      "source": "src/shared/media/preloadImage.ts",
+      "target": "src/features/canvas/session/media/preloadImage.ts",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Canvas-specific decode-before-display browser adapter; only Canvas production consumers",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/domain/graph/outpaintGeometry.ts",
-      "target": "src/features/canvas/tools/outpaint/core/outpaintGeometry.ts",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "pure geometry owner",
-      "status": "planned"
+      "source": "src/shared/motion/",
+      "target": "src/core/motion/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/application/image-workflow/outpaintIntent.ts",
-      "target": "src/features/canvas/tools/outpaint/core/outpaintIntent.ts",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "pure intent contract; current source runtime dependencies must be rechecked before relocation",
-      "status": "planned"
+      "source": "src/shared/query/",
+      "target": "src/core/query/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/application/image-workflow/useImageOutpaintOverlay.ts",
-      "target": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "session lifecycle and colocated unit spec",
-      "status": "planned"
+      "source": "src/shared/router/",
+      "target": "src/core/router/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/application/image-workflow/components/ImageOutpaintOverlay.vue",
-      "target": "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "colocate component/browser specs with implementation; create index only for actual external consumers",
-      "status": "planned"
+      "source": "src/shared/seo/",
+      "target": "src/core/seo/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/tools/image-tools/",
-      "target": "src/features/canvas/tools/image-tools/{core,session,ui,index.ts}",
-      "phase": "P6",
-      "owner": "/root/p6-lane",
-      "requirement": "zero pathNot exemptions; close ChromeFrame/RetouchImageRect/bindings leaks",
-      "status": "planned"
+      "source": "src/shared/theme/",
+      "target": "src/theme/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "tokens/formControls/dialogMask/atoms move with CSS order governance",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/tools/retouch/core/imageDataUtils.ts",
-      "target": "src/features/canvas/tools/retouch/core/imageData.ts",
-      "phase": "P5",
-      "owner": "/root/p5-lane",
-      "requirement": "cloneImageData remains pure; rename/incorporate only with caller updates",
-      "status": "planned"
-    },
-    {
-      "source": "src/features/library/components/LibraryAssetGallery.unit.spec.ts",
-      "target": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
-      "phase": "P2",
-      "owner": "/root/p2-lane",
-      "requirement": "Exact relocated observable gallery assertions retain their P0 source/scenario/fingerprint identity; changed DOM column-count implementation maps separately to reviewed real-browser geometry.",
+      "source": "src/shared/utils/",
+      "target": "src/core/utils/",
+      "phase": "P1b",
+      "owner": "/root/p1b-lane",
+      "requirement": "Horizontal ownership; feature core may use only inventory-verified pure subpaths. Exact file overrides below take precedence; no mixed root barrel.",
       "status": "done"
     }
   ],
@@ -20401,7 +20507,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20416,7 +20522,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20440,7 +20546,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/client.ts"]
@@ -20455,7 +20561,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20470,7 +20576,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20493,7 +20599,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/contractKernel.ts"]
@@ -20559,7 +20665,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/idempotencyKey.ts"]
@@ -20573,7 +20679,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["board", "canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/mediaAssetDelivery.ts"]
@@ -20588,7 +20694,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20612,7 +20718,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["board", "canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -20644,7 +20750,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["board", "canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 4
@@ -20659,7 +20765,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20673,7 +20779,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["board", "canvas", "library", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/mediaWorkspaceScope.ts"]
@@ -20706,7 +20812,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -20775,7 +20881,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 11
@@ -20799,7 +20905,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/sessionUserType.ts"]
@@ -20813,7 +20919,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "board", "search"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/stripUndefined.ts"]
@@ -20828,7 +20934,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20843,7 +20949,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20863,7 +20969,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "search"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/upload.ts"]
@@ -20883,7 +20989,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["board", "canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -20912,7 +21018,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20927,7 +21033,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20941,7 +21047,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "board", "canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/workspaceEventStream.ts"]
@@ -20998,7 +21104,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21012,7 +21118,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/api/workspaceTasks.ts"]
@@ -21027,7 +21133,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21047,7 +21153,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -21080,7 +21186,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21090,7 +21196,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["admin", "auth"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -21104,7 +21210,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         }
       ],
@@ -21128,7 +21234,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21138,7 +21244,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["admin", "auth"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -21154,7 +21260,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         }
       ],
@@ -21176,7 +21282,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         }
       ],
@@ -21198,7 +21304,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21224,7 +21330,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21250,7 +21356,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21276,7 +21382,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21302,7 +21408,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "consumers": [
         {
-          "from": "src/features/admin/shared/logos/brandLogos.ts",
+          "from": "src/features/admin/shared/session/brandLogos.ts",
           "kind": "runtime"
         },
         {
@@ -21341,7 +21447,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21369,7 +21475,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "auth"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/auth/oauthProviders.ts"]
@@ -21383,7 +21489,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "auth"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/auth/passwordPolicy.ts"]
@@ -21398,7 +21504,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21422,7 +21528,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/auth/sessionPolicy.ts"]
@@ -21437,7 +21543,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21465,7 +21571,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/ChartCard.vue"]
@@ -21479,7 +21585,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/ChartPanel.vue"]
@@ -21493,7 +21599,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/ChartRenderer.vue"]
@@ -21522,7 +21628,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21551,7 +21657,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21565,7 +21671,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "auth", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/IbFormField.vue"]
@@ -21579,7 +21685,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/RangedLineChartCard.vue"]
@@ -21593,7 +21699,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/SiteBrandLogo.vue"]
@@ -21608,7 +21714,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21622,7 +21728,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/StatusBadge.vue"]
@@ -21636,7 +21742,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/StudioName.vue"]
@@ -21687,7 +21793,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "workspace"],
       "disposition": "feature-private",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/UserAccountMenu.vue"]
@@ -21702,7 +21808,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21736,7 +21842,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["admin", "canvas", "workspace"],
       "disposition": "feature-private",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -21750,7 +21856,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "auth", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/formFieldContract.ts"]
@@ -21781,7 +21887,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "workspace"],
       "disposition": "feature-private",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/components/userAccountMenu.types.ts"]
@@ -21810,7 +21916,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21834,7 +21940,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/composables/useAppToast.ts"]
@@ -21848,7 +21954,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "auth", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/composables/useAsyncAction.ts"]
@@ -21863,7 +21969,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21877,7 +21983,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/composables/useLogoutRedirect.ts"]
@@ -21892,7 +21998,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21912,7 +22018,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["admin", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -21933,7 +22039,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "library"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/composables/useOverlayInteractionLifecycle.ts"]
@@ -21950,7 +22056,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21964,7 +22070,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "canvas", "legal"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/composables/useSiteBranding.ts"]
@@ -21979,7 +22085,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21993,7 +22099,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/composables/useSupportChannels.ts"]
@@ -22008,7 +22114,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22037,7 +22143,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22058,7 +22164,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/config/pagination.ts"]
@@ -22073,7 +22179,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22097,7 +22203,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/config/runtimeUrls.ts"]
@@ -22112,7 +22218,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22132,7 +22238,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "library"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/config/timing.ts"]
@@ -22147,7 +22253,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22189,7 +22295,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "search"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/constants/media.ts"]
@@ -22217,7 +22323,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "feature-private",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/constants/routePaths.ts"]
@@ -22246,7 +22352,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "library", "search"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/domain/externalImageProviders.ts"]
@@ -22261,7 +22367,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22275,7 +22381,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "board", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/domain/generationContract.ts"]
@@ -22290,7 +22396,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22318,7 +22424,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/domain/imageServices.ts"]
@@ -22333,7 +22439,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22365,7 +22471,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas"],
       "disposition": "feature-private",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/domain/serviceRegistry.ts"]
@@ -22384,7 +22490,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22407,7 +22513,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/errors/errorCatalog.ts"]
@@ -22422,7 +22528,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22443,7 +22549,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/formatters.ts"]
@@ -22458,7 +22564,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22496,7 +22602,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -22520,7 +22626,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/index.ts"]
@@ -22544,7 +22650,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/localeCore.ts"]
@@ -22574,7 +22680,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -22616,7 +22722,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 4
@@ -22636,7 +22742,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -22651,7 +22757,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22689,7 +22795,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -22723,7 +22829,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22757,7 +22863,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22791,7 +22897,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22825,7 +22931,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22859,7 +22965,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22893,7 +22999,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22907,7 +23013,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/locales/en/index.ts"]
@@ -22941,7 +23047,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22975,7 +23081,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -23009,7 +23115,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -23039,7 +23145,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23069,7 +23175,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23099,7 +23205,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23129,7 +23235,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23159,7 +23265,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23189,7 +23295,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23219,7 +23325,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23243,7 +23349,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/locales/es/index.ts"]
@@ -23273,7 +23379,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23303,7 +23409,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23333,7 +23439,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23363,7 +23469,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23393,7 +23499,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23423,7 +23529,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23453,7 +23559,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23483,7 +23589,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23513,7 +23619,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23543,7 +23649,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23567,7 +23673,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/locales/ko/index.ts"]
@@ -23597,7 +23703,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23627,7 +23733,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23657,7 +23763,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23687,7 +23793,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23717,7 +23823,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23747,7 +23853,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23777,7 +23883,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23807,7 +23913,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23837,7 +23943,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23867,7 +23973,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23891,7 +23997,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/locales/zh-CN/index.ts"]
@@ -23921,7 +24027,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23951,7 +24057,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23981,7 +24087,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24001,7 +24107,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/userIdeaCurrency.ts"]
@@ -24016,7 +24122,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24040,7 +24146,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/i18n/userLocale.ts"]
@@ -24055,7 +24161,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24084,7 +24190,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "auth", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/interaction/interactiveControlState.ts"]
@@ -24099,7 +24205,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24113,7 +24219,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/interaction/menuKeyboardNavigation.ts"]
@@ -24127,7 +24233,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/lib/brandMark.ts"]
@@ -24141,7 +24247,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "board"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/lib/chartPrimitives.ts"]
@@ -24156,7 +24262,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24170,7 +24276,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/lib/chartTimeRange.ts"]
@@ -24185,7 +24291,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24199,7 +24305,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/lib/pageChrome.ts"]
@@ -24213,7 +24319,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/media/imageAssetPipeline.ts"]
@@ -24228,7 +24334,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24257,7 +24363,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24271,7 +24377,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["board", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/media/mediaRef.ts"]
@@ -24286,7 +24392,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24314,7 +24420,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "search"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/media/visionIngressPolicy.ts"]
@@ -24329,7 +24435,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24343,7 +24449,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/motion/chartMotion.ts"]
@@ -24358,7 +24464,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24378,7 +24484,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24393,7 +24499,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24423,7 +24529,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24437,7 +24543,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/motion/motionPolicy.ts"]
@@ -24452,7 +24558,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24467,7 +24573,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24516,7 +24622,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24540,7 +24646,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/query/queryClient.ts"]
@@ -24554,7 +24660,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/query/queryDefaults.ts"]
@@ -24569,7 +24675,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24584,7 +24690,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24599,7 +24705,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24627,7 +24733,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/query/userCreditsInvalidation.ts"]
@@ -24649,7 +24755,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/router/queryParams.ts"]
@@ -24664,7 +24770,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24678,7 +24784,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/seo/routeSeo.ts"]
@@ -24693,7 +24799,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24713,7 +24819,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24733,7 +24839,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/theme/appOverlayMenu.ts"]
@@ -24748,7 +24854,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24763,7 +24869,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24778,7 +24884,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24793,7 +24899,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24808,7 +24914,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24823,7 +24929,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "retired-effective-replacement",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24838,7 +24944,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24868,7 +24974,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24883,7 +24989,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24898,7 +25004,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24926,7 +25032,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "productionFeatureConsumers": ["admin", "board", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -24941,7 +25047,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24955,7 +25061,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "board", "canvas", "workspace"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/theme/composables/useTheme.ts"]
@@ -24970,7 +25076,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24984,7 +25090,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "auth", "board", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/theme/dialogMask.ts"]
@@ -24999,7 +25105,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25013,7 +25119,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "auth", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/theme/formControls.ts"]
@@ -25027,7 +25133,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["library", "search"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/theme/lightboxScrim.ts"]
@@ -25042,7 +25148,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25057,7 +25163,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25072,7 +25178,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25102,7 +25208,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25117,7 +25223,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25132,7 +25238,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25147,7 +25253,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25162,7 +25268,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25177,7 +25283,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25201,7 +25307,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/auth.ts"]
@@ -25216,7 +25322,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25230,7 +25336,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/currency.ts"]
@@ -25244,7 +25350,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "admin"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/dateTime.ts"]
@@ -25259,7 +25365,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25282,7 +25388,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/errorMessages.ts"]
@@ -25297,7 +25403,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25311,7 +25417,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["account", "auth", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/formValidation.ts"]
@@ -25332,7 +25438,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "search"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/ids.ts"]
@@ -25346,7 +25452,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["admin", "canvas", "search"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/imageUploadSupport.ts"]
@@ -25360,7 +25466,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["board", "canvas"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/number.ts"]
@@ -25375,7 +25481,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25398,7 +25504,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/opaqueIds.ts"]
@@ -25413,7 +25519,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25427,7 +25533,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "status": "planned",
       "productionFeatureConsumers": ["board", "canvas", "library"],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/polling.ts"]
@@ -25442,7 +25548,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25466,7 +25572,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/storage.ts"]
@@ -25486,7 +25592,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "search"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
         "entries": ["src/shared/utils/workspaceId.ts"]
@@ -25501,7 +25607,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -29145,10 +29251,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
           "command-specific inputs; exact full execution fingerprint was not recorded"
         ],
         "cwd": ".",
-        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.\nbash -n scripts/render-nginx-template.sh\nbash -n scripts/render-nginx-template-test.sh\nbash -n scripts/render-cloudflare-real-ip-conf.sh\nbash -n scripts/uninstall-vps.sh\nbash -n scripts/bootstrap-vps.sh\nbash -n scripts/deploy-stack.sh\nbash -n scripts/deploy-stack-test.sh\nbash -n scripts/production-deploy-entrypoint.sh\nbash -n scripts/production-deploy-entrypoint-test.sh\nbash -n scripts/run-production-deploy.sh\nbash -n scripts/ci-change-classifier.sh\nbash -n scripts/ci-change-classifier-test.sh\nbash -n scripts/ci-gate.sh\nbash -n scripts/ci-gate-test.sh\nbash -n scripts/ci-parity.sh\nbash -n scripts/ci-parity-test.sh\nbash -n scripts/ci-migration-integration.sh\nbash -n scripts/ci-migration-integration-test.sh\nbash -n scripts/atlas-migration-check.sh\nbash -n scripts/atlas-migration-check-test.sh\nbash -n scripts/openapi-breaking-check.sh\nbash -n scripts/openapi-breaking-check-test.sh\nbash -n scripts/csp-policy.sh\nbash -n scripts/csp-policy-test.sh\nbash -n scripts/qa-production-cleanup.sh\nbash -n scripts/qa-production-cleanup-test.sh\nbash -n scripts/secrets-init.sh\nbash -n scripts/secrets-init-test.sh\nbash -n scripts/secrets-render.sh\nbash -n scripts/secrets-render-test.sh\nbash -n scripts/secrets-validate.sh\nbash -n scripts/secrets-validate-test.sh\nbash -n scripts/ci-media-package-boundary.sh\nbash -n scripts/ci-media-package-boundary-test.sh\nbash -n scripts/ci-legacy-media-zero-scan.sh\nbash -n scripts/ci-legacy-media-zero-scan-test.sh\nbash -n scripts/ci-workflow-contract-test.sh\nbash -n scripts/handbook-version-contract.sh\nbash -n scripts/handbook-version-contract-test.sh\nbash -n scripts/sql-workspace-scope-check.sh\nbash -n scripts/sql-workspace-scope-check-test.sh\nbash -n scripts/openapi-pattern-check.sh\nbash -n scripts/openapi-pattern-check-test.sh\nbash -n scripts/adr-template-check.sh\nbash -n scripts/adr-template-check-test.sh\nbash -n scripts/check-backend-copy.sh\nbash -n scripts/check-backend-copy-test.sh\nbash -n scripts/run-all-self-tests.sh\nbash -n scripts/lib/common.sh\n",
+        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash \u2014 checked by `go vet`/build in CI Gate.\nbash -n scripts/render-nginx-template.sh\nbash -n scripts/render-nginx-template-test.sh\nbash -n scripts/render-cloudflare-real-ip-conf.sh\nbash -n scripts/uninstall-vps.sh\nbash -n scripts/bootstrap-vps.sh\nbash -n scripts/deploy-stack.sh\nbash -n scripts/deploy-stack-test.sh\nbash -n scripts/production-deploy-entrypoint.sh\nbash -n scripts/production-deploy-entrypoint-test.sh\nbash -n scripts/run-production-deploy.sh\nbash -n scripts/ci-change-classifier.sh\nbash -n scripts/ci-change-classifier-test.sh\nbash -n scripts/ci-gate.sh\nbash -n scripts/ci-gate-test.sh\nbash -n scripts/ci-parity.sh\nbash -n scripts/ci-parity-test.sh\nbash -n scripts/ci-migration-integration.sh\nbash -n scripts/ci-migration-integration-test.sh\nbash -n scripts/atlas-migration-check.sh\nbash -n scripts/atlas-migration-check-test.sh\nbash -n scripts/openapi-breaking-check.sh\nbash -n scripts/openapi-breaking-check-test.sh\nbash -n scripts/csp-policy.sh\nbash -n scripts/csp-policy-test.sh\nbash -n scripts/qa-production-cleanup.sh\nbash -n scripts/qa-production-cleanup-test.sh\nbash -n scripts/secrets-init.sh\nbash -n scripts/secrets-init-test.sh\nbash -n scripts/secrets-render.sh\nbash -n scripts/secrets-render-test.sh\nbash -n scripts/secrets-validate.sh\nbash -n scripts/secrets-validate-test.sh\nbash -n scripts/ci-media-package-boundary.sh\nbash -n scripts/ci-media-package-boundary-test.sh\nbash -n scripts/ci-legacy-media-zero-scan.sh\nbash -n scripts/ci-legacy-media-zero-scan-test.sh\nbash -n scripts/ci-workflow-contract-test.sh\nbash -n scripts/handbook-version-contract.sh\nbash -n scripts/handbook-version-contract-test.sh\nbash -n scripts/sql-workspace-scope-check.sh\nbash -n scripts/sql-workspace-scope-check-test.sh\nbash -n scripts/openapi-pattern-check.sh\nbash -n scripts/openapi-pattern-check-test.sh\nbash -n scripts/adr-template-check.sh\nbash -n scripts/adr-template-check-test.sh\nbash -n scripts/check-backend-copy.sh\nbash -n scripts/check-backend-copy-test.sh\nbash -n scripts/run-all-self-tests.sh\nbash -n scripts/lib/common.sh\n",
         "exitCode": 0,
         "durationSeconds": 0.107,
-        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.",
+        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash \u2014 checked by `go vet`/build in CI Gate.",
         "carriedForwardBy": "p25-formal-final-independent-review"
       },
       {
@@ -29183,10 +29289,10 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
           "command-specific inputs; exact full execution fingerprint was not recorded"
         ],
         "cwd": ".",
-        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.\nshellcheck \\\n  scripts/render-nginx-template.sh \\\n  scripts/render-nginx-template-test.sh \\\n  scripts/render-cloudflare-real-ip-conf.sh \\\n  scripts/uninstall-vps.sh \\\n  scripts/bootstrap-vps.sh \\\n  scripts/deploy-stack.sh \\\n  scripts/deploy-stack-test.sh \\\n  scripts/production-deploy-entrypoint.sh \\\n  scripts/production-deploy-entrypoint-test.sh \\\n  scripts/run-production-deploy.sh \\\n  scripts/ci-change-classifier.sh \\\n  scripts/ci-change-classifier-test.sh \\\n  scripts/ci-gate.sh \\\n  scripts/ci-gate-test.sh \\\n  scripts/ci-parity.sh \\\n  scripts/ci-parity-test.sh \\\n  scripts/ci-migration-integration.sh \\\n  scripts/ci-migration-integration-test.sh \\\n  scripts/atlas-migration-check.sh \\\n  scripts/atlas-migration-check-test.sh \\\n  scripts/openapi-breaking-check.sh \\\n  scripts/openapi-breaking-check-test.sh \\\n  scripts/csp-policy.sh \\\n  scripts/csp-policy-test.sh \\\n  scripts/qa-production-cleanup.sh \\\n  scripts/qa-production-cleanup-test.sh \\\n  scripts/secrets-init.sh \\\n  scripts/secrets-init-test.sh \\\n  scripts/secrets-render.sh \\\n  scripts/secrets-render-test.sh \\\n  scripts/secrets-validate.sh \\\n  scripts/secrets-validate-test.sh \\\n  scripts/ci-media-package-boundary.sh \\\n  scripts/ci-media-package-boundary-test.sh \\\n  scripts/ci-legacy-media-zero-scan.sh \\\n  scripts/ci-legacy-media-zero-scan-test.sh \\\n  scripts/ci-workflow-contract-test.sh \\\n  scripts/handbook-version-contract.sh \\\n  scripts/handbook-version-contract-test.sh \\\n  scripts/sql-workspace-scope-check.sh \\\n  scripts/sql-workspace-scope-check-test.sh \\\n  scripts/openapi-pattern-check.sh \\\n  scripts/openapi-pattern-check-test.sh \\\n  scripts/adr-template-check.sh \\\n  scripts/adr-template-check-test.sh \\\n  scripts/check-backend-copy.sh \\\n  scripts/check-backend-copy-test.sh \\\n  scripts/run-all-self-tests.sh \\\n  scripts/lib/common.sh\n",
+        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash \u2014 excluded from shellcheck.\nshellcheck \\\n  scripts/render-nginx-template.sh \\\n  scripts/render-nginx-template-test.sh \\\n  scripts/render-cloudflare-real-ip-conf.sh \\\n  scripts/uninstall-vps.sh \\\n  scripts/bootstrap-vps.sh \\\n  scripts/deploy-stack.sh \\\n  scripts/deploy-stack-test.sh \\\n  scripts/production-deploy-entrypoint.sh \\\n  scripts/production-deploy-entrypoint-test.sh \\\n  scripts/run-production-deploy.sh \\\n  scripts/ci-change-classifier.sh \\\n  scripts/ci-change-classifier-test.sh \\\n  scripts/ci-gate.sh \\\n  scripts/ci-gate-test.sh \\\n  scripts/ci-parity.sh \\\n  scripts/ci-parity-test.sh \\\n  scripts/ci-migration-integration.sh \\\n  scripts/ci-migration-integration-test.sh \\\n  scripts/atlas-migration-check.sh \\\n  scripts/atlas-migration-check-test.sh \\\n  scripts/openapi-breaking-check.sh \\\n  scripts/openapi-breaking-check-test.sh \\\n  scripts/csp-policy.sh \\\n  scripts/csp-policy-test.sh \\\n  scripts/qa-production-cleanup.sh \\\n  scripts/qa-production-cleanup-test.sh \\\n  scripts/secrets-init.sh \\\n  scripts/secrets-init-test.sh \\\n  scripts/secrets-render.sh \\\n  scripts/secrets-render-test.sh \\\n  scripts/secrets-validate.sh \\\n  scripts/secrets-validate-test.sh \\\n  scripts/ci-media-package-boundary.sh \\\n  scripts/ci-media-package-boundary-test.sh \\\n  scripts/ci-legacy-media-zero-scan.sh \\\n  scripts/ci-legacy-media-zero-scan-test.sh \\\n  scripts/ci-workflow-contract-test.sh \\\n  scripts/handbook-version-contract.sh \\\n  scripts/handbook-version-contract-test.sh \\\n  scripts/sql-workspace-scope-check.sh \\\n  scripts/sql-workspace-scope-check-test.sh \\\n  scripts/openapi-pattern-check.sh \\\n  scripts/openapi-pattern-check-test.sh \\\n  scripts/adr-template-check.sh \\\n  scripts/adr-template-check-test.sh \\\n  scripts/check-backend-copy.sh \\\n  scripts/check-backend-copy-test.sh \\\n  scripts/run-all-self-tests.sh \\\n  scripts/lib/common.sh\n",
         "exitCode": 0,
         "durationSeconds": 1.954,
-        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.",
+        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash \u2014 excluded from shellcheck.",
         "carriedForwardBy": "p25-formal-final-independent-review"
       },
       {
@@ -29645,8 +29751,8 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
         "artifactRefs": ["syncDesign.artifacts"],
         "reviewer": "/root",
         "decision": "accepted",
-        "scope": "Canonical plan §5.1/§6.11 scoped closeout revision for already completed P1/P2/P2.5 only.",
-        "summary": "Historical before-start green checkpoint was not recorded. Accepted current closeout deviation under user instruction 收尾p2.5; not retrospective compliance, not user personal signature. Current green baseline replaces the missing rollback record for closeout only. Future phases require their own before-start checkpoint."
+        "scope": "Canonical plan \u00a75.1/\u00a76.11 scoped closeout revision for already completed P1/P2/P2.5 only.",
+        "summary": "Historical before-start green checkpoint was not recorded. Accepted current closeout deviation under user instruction \u6536\u5c3ep2.5; not retrospective compliance, not user personal signature. Current green baseline replaces the missing rollback record for closeout only. Future phases require their own before-start checkpoint."
       },
       {
         "id": "p25-closeout-green-checkpoint",
@@ -29709,7 +29815,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
           "p25-closeout-checker-quality",
           "p25-closeout-node-typecheck"
         ],
-        "scope": "Current named delegated integrator acceptance authorized by user instruction 收尾p2.5; separate from independent technical review and user personal signoff.",
+        "scope": "Current named delegated integrator acceptance authorized by user instruction \u6536\u5c3ep2.5; separate from independent technical review and user personal signoff.",
         "summary": "Six Sync decisions and Common/Knip/Quotas accepted individually through their owning gate references; runtime/contracts/frozen IDs/quotas unchanged. P3 remains blocked."
       },
       {
@@ -30262,9 +30368,13 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       "policyRevision": {
         "id": "acceptance-without-push-2026-10-11",
         "requestedBy": "user",
-        "instruction": "验收标准中去掉push",
+        "instruction": "\u9a8c\u6536\u6807\u51c6\u4e2d\u53bb\u6389push",
         "reason": "Remove remote publication as an acceptance prerequisite; preserve verification strength and recorded history.",
-        "requirementRefs": ["plan §5.1", "plan §6.7", "plan §6.11"],
+        "requirementRefs": [
+          "plan \u00a75.1",
+          "plan \u00a76.7",
+          "plan \u00a76.11"
+        ],
         "impact": "Local workflow-equivalent green CI and local integration commits are eligible acceptance evidence. No phase acceptance, before-start checkpoint or remote execution is manufactured."
       },
       "remoteMainSha": "7a70883ec1c9abf06954f02dfd1fd956f4b400cc",
@@ -30320,9 +30430,9 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
       ],
       "closeoutPolicyRevision": {
         "id": "p25-closeout-2026-10-11",
-        "instruction": "/subagents 收尾p2.5",
+        "instruction": "/subagents \u6536\u5c3ep2.5",
         "delegatedReviewer": "/root",
-        "requirementRefs": ["plan §5.1", "plan §6.11"],
+        "requirementRefs": ["plan \u00a75.1", "plan \u00a76.11"],
         "scope": "Completed P1/P2/P2.5 acceptance only; no P3/P4 execution authorization.",
         "historicalCheckpointException": "For completed P1/P2/P2.5 only, accept the missing historical before-start checkpoint as an explicit deviation and establish a verified committed green rollback baseline now. Preserve the original gap; do not backdate compliance. Record current predecessor and gate acceptance separately. Future phase starts require green immutable checkpoints before implementation. No P3/P4 authorization or technical/quota/production red-green waiver."
       }
@@ -30875,7 +30985,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
     },
     "auditRepairAttemptHistory": {
       "requestedBy": "user",
-      "instruction": "/subagents 依次修复",
+      "instruction": "/subagents \u4f9d\u6b21\u4fee\u590d",
       "status": "running-at-recording",
       "baselineSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
       "startedAt": "2026-10-11T10:27:43.196418+00:00",
@@ -30918,7 +31028,7 @@ P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not re
     "trioHistoricalRedDeviation": {
       "status": "accepted-scoped-deviation",
       "authorizedBy": "user / plan owner",
-      "instruction": "同意",
+      "instruction": "\u540c\u610f",
       "recordedAt": "2026-10-11",
       "scope": [
         "board/query-migration-trio-race",

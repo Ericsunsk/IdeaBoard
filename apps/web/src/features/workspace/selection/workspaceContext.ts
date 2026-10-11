@@ -228,7 +228,7 @@ export function installWorkspaceSelectionStore(deps?: {
   provision?: WorkspaceProvisionFn | undefined
 }): WorkspaceSelectionStore {
   if (!sharedStore) sharedStore = createWorkspaceSelectionStore(deps)
-  // IoC registration for `shared/api/mediaAssetDelivery` (which must not
+  // IoC registration for `api/mediaAssetDelivery` (which must not
   // import this feature module): resolve implicit workspace ids from the
   // shared singleton. Idempotent; runs on every access.
   setMediaWorkspaceIdResolver(() => sharedStore?.getSelectedId() ?? null)

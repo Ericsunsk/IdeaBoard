@@ -74,10 +74,10 @@ const grandfatheredMakeFactories = new Set([
   'src/features/board/testing/factories.ts:makePendingImageNodeSnapshot',
   'src/features/board/testing/factories.ts:makeBoardSnapshot',
   'src/features/board/testing/factories.ts:makeBoardState',
-  'src/features/admin/credits/health/testing.ts:makeCreditHealth',
-  'src/features/admin/credits/health/testing.ts:makeReconciliationRun',
-  'src/features/admin/credits/health/testing.ts:makeCreditFinding',
-  'src/features/admin/credits/pricing/testing.ts:makeCatalogItems',
+  'src/features/admin/credits/session/health/testing.ts:makeCreditHealth',
+  'src/features/admin/credits/session/health/testing.ts:makeReconciliationRun',
+  'src/features/admin/credits/session/health/testing.ts:makeCreditFinding',
+  'src/features/admin/credits/session/pricing/testing.ts:makeCatalogItems',
   'src/features/canvas/application/testing/boardFixtures.ts:makeBoardSnapshot',
   'src/features/canvas/application/testing/boardFixtures.ts:makeBoardState',
   'src/features/canvas/tools/retouch/core/ids.ts:makeRetouchLayerId',
@@ -184,7 +184,7 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
         'Unmounts one Testing Library render result between multiple render() calls; the component harness still goes through src/test/render.',
     },
   ],
-  'src/features/admin/settings/shared/components/AdminSettingsOnThisPage.component.spec.ts': [
+  'src/features/admin/settings/ui/pages/AdminSettingsOnThisPage.component.spec.ts': [
     {
       rule: 'document-div-host',
       reason:
@@ -208,70 +208,70 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies neutral creator and info admin role colors on the shared StatusBadge carrier.',
     },
   ],
-  'src/features/admin/credits/pricing/BillingStatusCell.component.spec.ts': [
+  'src/features/admin/credits/ui/pricing/BillingStatusCell.component.spec.ts': [
     {
       reason:
         'Verifies centered status pills in the fixed-width billing status slot without pulse DOM.',
     },
   ],
-  'src/features/admin/credits/pricing/ModelPoolEditorPanel.component.spec.ts': [
+  'src/features/admin/credits/ui/pricing/ModelPoolEditorPanel.component.spec.ts': [
     {
       reason:
         'Verifies the reserved validation row height that prevents model pool form layout shifts.',
     },
   ],
-  'src/features/admin/credits/rewards/AdminRewardCodesPage.component.spec.ts': [
+  'src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts': [
     {
       reason: 'Verifies centered reward status pills in the fixed-width SwitchRow slot.',
     },
   ],
-  'src/features/admin/models/presentation/controls/ObservedStatsPanel.component.spec.ts': [
+  'src/features/admin/models/ui/controls/ObservedStatsPanel.component.spec.ts': [
     {
       reason: 'Verifies success and neutral on-sale status colors without processing pulse DOM.',
     },
   ],
-  'src/features/admin/settings/image-library/AdminImageProvidersTable.component.spec.ts': [
+  'src/features/admin/settings/ui/cards/image-library/AdminImageProvidersTable.component.spec.ts': [
     {
       reason:
         'Verifies provider status color transitions and absence of row opacity changes while toggles settle.',
     },
   ],
-  'src/features/admin/settings/mail/AdminMailConfigCard.component.spec.ts': [
+  'src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.component.spec.ts': [
     {
       reason:
         'Verifies mail readiness semantic colors and centered status pills in the fixed-width header slot.',
     },
   ],
-  'src/features/admin/settings/outbound/AdminOutboundPolicyCard.component.spec.ts': [
+  'src/features/admin/settings/ui/cards/outbound/AdminOutboundPolicyCard.component.spec.ts': [
     {
       reason:
         'Verifies configured outbound allowances use a neutral status instead of a warning tone.',
     },
   ],
-  'src/features/admin/settings/payment/AdminPaymentSettingsCard.component.spec.ts': [
+  'src/features/admin/settings/ui/cards/payment/AdminPaymentSettingsCard.component.spec.ts': [
     {
       reason:
         'Verifies payment configuration remains neutral while product and webhook health use readiness tones.',
     },
   ],
-  'src/features/admin/shared/components/AdminStatusPill.component.spec.ts': [
+  'src/features/admin/shared/ui/feedback/AdminStatusPill.component.spec.ts': [
     {
       reason: 'Verifies the Badge carrier, semantic tone and dot colors, and fixed size tokens.',
     },
   ],
-  'src/features/admin/shared/components/AdminSwitch.component.spec.ts': [
+  'src/features/admin/shared/ui/form/AdminSwitch.component.spec.ts': [
     {
       reason:
         'Verifies the switch track opacity transition, shared timing token, and thumb translation classes.',
     },
   ],
-  'src/features/admin/shared/components/SwitchRow.component.spec.ts': [
+  'src/features/admin/shared/ui/form/SwitchRow.component.spec.ts': [
     {
       reason:
         'Verifies centered fixed-width status geometry, absolute pulse layering, nonshrinking switches, and row gap tokens.',
     },
   ],
-  'src/features/admin/storage/pages/AdminStoragePage.component.spec.ts': [
+  'src/features/admin/settings/ui/cards/storage/AdminStoragePage.component.spec.ts': [
     {
       reason:
         'Verifies storage status color transitions and stable row opacity during toggle updates.',
@@ -295,19 +295,19 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the auth field prefix-icon absolute positioning contract shared by Email and Password inputs.',
     },
   ],
-  'src/features/admin/settings/branding/AdminBrandingCard.component.spec.ts': [
+  'src/features/admin/settings/ui/cards/branding/AdminBrandingCard.component.spec.ts': [
     {
       reason:
         'Verifies the brand logo preview keeps object-cover parity with the Sidebar/Login/account rendering paths instead of silently switching to object-contain.',
     },
   ],
-  'src/features/admin/shared/components/AdminDrawer.component.spec.ts': [
+  'src/features/admin/shared/ui/shell/AdminDrawer.component.spec.ts': [
     {
       reason:
         'Verifies the drawer positioning contract (right-anchored full-height panel) that distinguishes AdminDrawer from the centered AdminDialogShell.',
     },
   ],
-  'src/features/admin/shared/components/AdminTable.component.spec.ts': [
+  'src/features/admin/shared/ui/table/AdminTable.component.spec.ts': [
     {
       reason:
         'Verifies the table visual contracts added with sticky headers, disabled-row hover suppression, checkbox density, and stale-row opacity; class strings are the contract surface AdminTable exposes.',
@@ -319,7 +319,7 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the one-provider OAuth layout contract that makes a single login button span the full row.',
     },
   ],
-  'src/features/admin/monitor/presentation/AdminTaskResultDialog.component.spec.ts': [
+  'src/features/admin/monitor/ui/AdminTaskResultDialog.component.spec.ts': [
     {
       reason:
         'Verifies the keyboard focus visibility class contract for the image result action; the DOM harness cannot compute Tailwind focus pseudo-state styles.',
@@ -361,19 +361,19 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the admin sidebar responsive collapse/expand width classes and mobile drawer transform contract.',
     },
   ],
-  'src/features/admin/shared/components/AdminSurfaceFrame.component.spec.ts': [
+  'src/features/admin/shared/ui/shell/AdminSurfaceFrame.component.spec.ts': [
     {
       reason:
         'Verifies the shared Admin surface height and overflow contract across Management and Table adapters.',
     },
   ],
-  'src/features/admin/shared/components/AdminToolbarSearch.component.spec.ts': [
+  'src/features/admin/shared/ui/toolbar/AdminToolbarSearch.component.spec.ts': [
     {
       reason:
         'Verifies the shared Admin search fluid width contract used by the management toolbars.',
     },
   ],
-  'src/features/admin/shared/components/AdminDialogShell.component.spec.ts': [
+  'src/features/admin/shared/ui/shell/AdminDialogShell.component.spec.ts': [
     {
       reason: 'Verifies the shared Admin dialog footer layout contract.',
     },

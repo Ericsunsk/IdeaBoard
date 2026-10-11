@@ -2,7 +2,7 @@
 //
 // `shared/` must not import concrete feature modules, so the workspace
 // selection store is injected by `features/workspace` instead of being
-// imported by `shared/api/mediaAssetDelivery`. This leaf carries no
+// imported by `api/mediaAssetDelivery`. This leaf carries no
 // dependencies at all (not even transitively), so importing it never
 // widens any importer's dependency closure — in particular it keeps
 // `features/workspace/selection/workspaceContext` light for tests

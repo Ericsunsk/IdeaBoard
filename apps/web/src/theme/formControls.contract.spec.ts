@@ -51,13 +51,10 @@ describe('User form input contract', () => {
     expect(ibFormInputErrorClass).toContain('focus:bg-destructive/5')
   })
 
-  it('keeps the Admin invalid border above hover and focus too', () => {
-    for (const file of [
-      ['features/admin/shared/components', 'AdminInput.vue'],
-      ['features/admin/shared/components', 'AdminNumberInput.vue'],
-      ['features/admin/payments/stripe-settings', 'StripeSettingsDialog.vue'],
-    ]) {
-      expect(src(...file)).toContain('!border-destructive')
-    }
-  })
+  // P4 retirement (source-f5f7dc876e706d72-1): the "keeps the Admin invalid
+  // border above hover and focus too" source-string assertion is replaced by
+  // the computed-style browser contract
+  // (`features/admin/credits/ui/shared/invalidBorder.browser.spec.ts`), which
+  // asserts the rendered invalid border paint beats hover and focus through
+  // the live destructive token.
 })

@@ -9,10 +9,6 @@ import {
   type RetirementSources,
   type PurityModule,
 } from '../../scripts/checkRetirementReplacements'
-import {
-  validateBoardsSortSelect,
-  validateRedeemErrorWiring,
-} from '../../scripts/checkThemeContractRetirements'
 
 const valid = loadRetirementSources()
 const app = 'src/app/style.css'
@@ -115,7 +111,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'bridge-fallback',
     invalidate: (s) => {
-      const file = 'src/features/admin/shared/lib/adminThemeTokens.ts'
+      const file = 'src/features/admin/shared/core/adminThemeTokens.ts'
       s[file] = s[file]!.replace(
         "'--color-admin-text-1', '#313131'",
         "'--color-admin-text-1', '#ffffff'",

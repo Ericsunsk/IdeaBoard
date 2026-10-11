@@ -3,7 +3,7 @@
 // Covers the explicit CanvasTaskRequestData -> v1 semantic mapping: submit input
 // mapping + fail-closed rules, quote -> readiness mapping, output-ref image
 // extraction, terminal settlement, and cancel workspace resolution. The
-// central `shared/api/workspaceTasks` resource is mocked (its own contract
+// central `api/workspaceTasks` resource is mocked (its own contract
 // spec covers `/api/v1` over MSW); the workspace selection store is stubbed.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {

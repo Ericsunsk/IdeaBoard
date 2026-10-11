@@ -58,7 +58,7 @@ const styleCountRules = [
 type StyleCountRuleId = (typeof styleCountRules)[number]['id']
 
 const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
-  'src/features/admin/pages/login/AdminLoginPage.vue': {
+  'src/features/admin/app/login/AdminLoginPage.vue': {
     counts: {
       'raw-color': 0,
       'raw-shadow': 0,
@@ -66,7 +66,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     reason:
       'Cleared: the login card now uses --shadow-login-card and --radius-board-dialog. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/admin/monitor/domain/status.ts': {
+  'src/features/admin/monitor/core/status.ts': {
     counts: {
       'raw-color': 0,
       'raw-shadow': 0,
@@ -74,14 +74,14 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     reason:
       'Cleared: status glow/wash resolve through admin status tokens and dot halos through shadow-admin-status-dot-* (see legacy-token allowance). Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/admin/shared/lib/adminThemeTokens.ts': {
+  'src/features/admin/shared/core/adminThemeTokens.ts': {
     counts: {
       'raw-color': 58,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
   },
-  'src/features/admin/shared/lib/taskMetricTokens.ts': {
+  'src/features/admin/shared/core/taskMetricTokens.ts': {
     counts: {
       'raw-color': 0,
     },
@@ -95,7 +95,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     reason:
       'Sidebar shell motion (width/max-height choreography) uses Motion Policy var() tokens; color/transform feedback inside the shell uses plain Tailwind transition utilities.',
   },
-  'src/features/admin/settings/shared/components/AdminSettingsOnThisPage.vue': {
+  'src/features/admin/settings/ui/pages/AdminSettingsOnThisPage.vue': {
     counts: {
       'raw-motion': 3,
     },
@@ -147,7 +147,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 
 // ── Token budgets (repo-wide) ─────────────────────────────────────────────
 // Hex colors and font stacks live in the token source of truth
-// (`src/app/style.css`, `src/theme/**`, `src/features/admin/shared/lib/taskMetricTokens.ts`);
+// (`src/app/style.css`, `src/theme/**`, `src/features/admin/shared/core/taskMetricTokens.ts`);
 // call sites reference tokens. Type sizes use the type scale (`text-admin-*`);
 // display/optical one-offs outside the scale carry explicit
 // waivers with reasons instead of forced mappings. Breakpoints use the named
@@ -160,8 +160,8 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 function isTokenOwnerFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
-    file.sourcePath === 'src/features/admin/shared/lib/taskMetricTokens.ts' ||
-    file.sourcePath === 'src/features/admin/shared/lib/adminThemeTokens.ts' ||
+    file.sourcePath === 'src/features/admin/shared/core/taskMetricTokens.ts' ||
+    file.sourcePath === 'src/features/admin/shared/core/adminThemeTokens.ts' ||
     file.sourcePath.startsWith('src/theme/')
   )
 }
@@ -357,7 +357,7 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
 }
 
 const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/admin/shared/lib/uiClasses.ts': {
+  'src/features/admin/shared/core/uiClasses.ts': {
     counts: {
       'arbitrary-breakpoint': 1,
     },
@@ -372,14 +372,14 @@ const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRul
 // Token declarations themselves are checked by the separate forbidden-alias
 // rule below. There is no product-prefixed color alias tier.
 const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/admin/monitor/domain/status.ts': {
+  'src/features/admin/monitor/core/status.ts': {
     counts: {
       'legacy-token': 10,
     },
     reason:
       'Task status banner gradients resolve glow/wash through admin status tokens (5 banners × glow/wash refs); dot halos use shadow-admin-status-dot-* utilities. Table and detail views share this one domain visual contract.',
   },
-  'src/features/admin/monitor/presentation/AdminTaskResultDialog.vue': {
+  'src/features/admin/monitor/ui/AdminTaskResultDialog.vue': {
     counts: {
       'legacy-token': 0,
     },

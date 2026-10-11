@@ -1,0 +1,153 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useAdminUserCommands } from './commands'
+import { makeAdminUserCommandTarget } from '../../../../test/factories'
+
+const userQueryClientMock = vi.hoisted(() => ({
+  invalidateQueries: vi.fn().mockResolvedValue(undefined),
+}))
+
+const userApiMocks = vi.hoisted(() => ({
+  banAdminUser: vi.fn().mockResolvedValue(undefined),
+  deleteAdminUser: vi.fn().mockResolvedValue(undefined),
+  revokeAdminUserSessions: vi.fn().mockResolvedValue(undefined),
+  unbanAdminUser: vi.fn().mockResolvedValue(undefined),
+  updateAdminUserRole: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@tanstack/vue-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/vue-query')>()
+  return {
+    ...actual,
+    useQueryClient: () => userQueryClientMock,
+    useMutation: (options: {
+      mutationFn: (input: unknown) => Promise<unknown>
+      onSuccess?: (data: unknown, input: unknown) => Promise<unknown> | unknown
+    }) => ({
+      mutateAsync: async (input: unknown) => {
+        const data = await options.mutationFn(input)
+        await options.onSuccess?.(data, input)
+        return data
+      },
+    }),
+  }
+})
+
+vi.mock('./api', () => ({
+  banAdminUser: userApiMocks.banAdminUser,
+  deleteAdminUser: userApiMocks.deleteAdminUser,
+  revokeAdminUserSessions: userApiMocks.revokeAdminUserSessions,
+  unbanAdminUser: userApiMocks.unbanAdminUser,
+  updateAdminUserRole: userApiMocks.updateAdminUserRole,
+}))
+
+vi.mock('./resource', () => ({
+  getAdminUsersListQueryKey: () => ['admin', 'users'],
+}))
+
+vi.mock('./sessionCommands', () => ({
+  createAdminUserSessionCommands: () => ({
+    startImpersonation: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+describe('admin user command query invalidation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    userQueryClientMock.invalidateQueries.mockResolvedValue(undefined)
+    userApiMocks.banAdminUser.mockResolvedValue(undefined)
+    userApiMocks.deleteAdminUser.mockResolvedValue(undefined)
+    userApiMocks.revokeAdminUserSessions.mockResolvedValue(undefined)
+    userApiMocks.unbanAdminUser.mockResolvedValue(undefined)
+    userApiMocks.updateAdminUserRole.mockResolvedValue(undefined)
+  })
+
+  it('invalidates the users list query after ban, unban, role, and delete mutations succeed', async () => {
+    const harness = createHarness()
+    const commands = harness.commands
+
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-1', status: 1, displayName: 'alice' }),
+    )
+    commands.handleActionSelect('status')
+    commands.banForm.value = { expiresInDays: 0, reason: 'audit reason' }
+    await commands.confirmBanUser()
+
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-2', status: 0, displayName: 'bob' }),
+    )
+    commands.handleActionSelect('status')
+    await harness.settleConfirms()
+
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-3', role: 'user', displayName: 'cara' }),
+    )
+    commands.handleActionSelect('role')
+    await harness.settleConfirms()
+
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-4', role: 'user', displayName: 'dana' }),
+    )
+    commands.handleActionSelect('delete')
+    await harness.settleConfirms()
+
+    expect(userQueryClientMock.invalidateQueries).toHaveBeenCalledTimes(4)
+    expect(userQueryClientMock.invalidateQueries).toHaveBeenNthCalledWith(1, {
+      queryKey: ['admin', 'users'],
+    })
+    expect(userQueryClientMock.invalidateQueries).toHaveBeenNthCalledWith(2, {
+      queryKey: ['admin', 'users'],
+    })
+    expect(userQueryClientMock.invalidateQueries).toHaveBeenNthCalledWith(3, {
+      queryKey: ['admin', 'users'],
+    })
+    expect(userQueryClientMock.invalidateQueries).toHaveBeenNthCalledWith(4, {
+      queryKey: ['admin', 'users'],
+    })
+  })
+})
+
+function createHarness() {
+  const confirm = {
+    confirm: vi.fn().mockResolvedValue(true),
+    readReason: vi.fn().mockReturnValue('audit reason'),
+  }
+  const feedback = createAdminUsersFeedback()
+  const commands = useAdminUserCommands(
+    { feedback, confirm },
+    {
+      sessionCommands: {
+        startImpersonation: vi.fn().mockResolvedValue(undefined),
+      },
+    },
+  )
+
+  return {
+    commands,
+    confirm,
+    settleConfirms: async () => {
+      await vi.waitFor(() => expect(confirm.confirm).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    },
+  }
+}
+
+function createAdminUsersFeedback() {
+  return {
+    loadFailed: vi.fn(),
+    adminStatusChangeForbidden: vi.fn(),
+    unbanSucceeded: vi.fn(),
+    unbanFailed: vi.fn(),
+    banSucceeded: vi.fn(),
+    banFailed: vi.fn(),
+    missingAuthUserForSessionRevoke: vi.fn(),
+    revokeSessionsSucceeded: vi.fn(),
+    revokeSessionsFailed: vi.fn(),
+    missingAuthUserForImpersonation: vi.fn(),
+    impersonationStarted: vi.fn(),
+    impersonationFailed: vi.fn(),
+    userDeleted: vi.fn(),
+    userDeleteFailed: vi.fn(),
+    roleUpdated: vi.fn(),
+    roleUpdateFailed: vi.fn(),
+  }
+}
