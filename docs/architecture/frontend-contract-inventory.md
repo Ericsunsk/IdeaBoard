@@ -16997,7 +16997,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
       "missingEvidence": []
     },
     {
@@ -17177,7 +17177,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
       "missingEvidence": []
     },
     {
@@ -17266,7 +17266,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
       "missingEvidence": []
     },
     {
@@ -17551,7 +17551,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
       "missingEvidence": []
     },
     {
@@ -17822,7 +17822,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
       "missingEvidence": []
     },
     {
@@ -17911,7 +17911,7 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "syncDesign.evidence: p25-cleanup-specs; technical review: p25-cleanup-independent-review.",
+      "verifiedRun": "p25-formal-final-sync-specs and p25-formal-final-independent-review; named plan-owner acceptance remains pending.",
       "missingEvidence": []
     },
     {
@@ -26641,9 +26641,19 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "P2.5/PHASE-KNIP",
         "P2.5/PHASE-QUOTAS",
         "P2.5/PHASE-COMMON"
+      ],
+      "unresolvedItems": [
+        "Historical before-start green rollback checkpoint absent; plan-owner deviation/replanning required.",
+        "P1/P2 prerequisite formal CI/checkpoint acceptance unrecorded.",
+        "Named plan-owner acceptance of six decisions unrecorded.",
+        "GitHub CI needs publication of 230 local commits; push not authorized in this turn."
       ]
     },
     "artifacts": [
+      {
+        "path": ".github/workflows/web.yml",
+        "sha256": "2d4d1790d5dc75c788aa38411bf013e15d0c25411c27611c383a7dfaa86df04f"
+      },
       {
         "path": "DESIGN.md",
         "sha256": "e738da9d8b819f123a1e4b38563216fc4b6bef87b37cbc584ba0d4f7862df6ff"
@@ -26665,6 +26675,10 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "sha256": "aaad2075feaf905ce9021cd50d9c1e7891f38f9d9733ac73000f17cd7195b4f2"
       },
       {
+        "path": "apps/web/knip.jsonc",
+        "sha256": "f2556227711f34fb660fe834be41d5ea21ffac4ca73150d8ab1c0a5fa7dcd09f"
+      },
+      {
         "path": "apps/web/knip.production.config.ts",
         "sha256": "dcd269490751aa371ad6f8cf2d4687829010b06a9a5828905d0c2ce3bb08a219"
       },
@@ -26677,12 +26691,28 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "sha256": "202ac5d26dfbeda461365b5aead61353afa87ffbfbf1cd9b47c0a7f410ec9bf0"
       },
       {
+        "path": "apps/web/scripts/accessibilitySmoke.ts",
+        "sha256": "50fcfc4717f4363fad327b194b166ee9b979a1e07a1168ca3a3ab74f9154a8db"
+      },
+      {
         "path": "apps/web/scripts/checkFrontendMigrationLedger.ts",
         "sha256": "ff8de648e13f16b4f1143156a760241d8f3253a64a4454e2621945ad61640d42"
       },
       {
         "path": "apps/web/scripts/knipGovernanceManifest.json",
         "sha256": "80167cb4762a8fccf1999a1d393dfe8d58d76e57bf055d06053e3afdb858a753"
+      },
+      {
+        "path": "apps/web/scripts/smokeSupport.contract.spec.ts",
+        "sha256": "c3f4e10a22d4f9e4f023108cdb8ff8a983fde588803c7b79b565f7c403767d0a"
+      },
+      {
+        "path": "apps/web/scripts/smokeSupport.ts",
+        "sha256": "e74fd062940d49394baafa145ca5d9fe66a5bfc6e2150ecc5640384102942007"
+      },
+      {
+        "path": "apps/web/scripts/userRouteSmoke.ts",
+        "sha256": "51ec36f33e6212842f35bb45b51e3cadcc6249e75aba75099d61c38d9fc97d35"
       },
       {
         "path": "apps/web/src/api/workspaceEventStream.ts",
@@ -26757,6 +26787,14 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "sha256": "dd556c62870434fa57599d9f1163df2e56447c040059755487c3d1fbcacca49e"
       },
       {
+        "path": "apps/web/src/features/canvas/application/execution/workspace/canvasTaskContractMapping.ts",
+        "sha256": "c6b3dc620cbeb37a4aaa9ce70392ce23f0df3ff76799257f4f06a4f7eb635f9d"
+      },
+      {
+        "path": "apps/web/src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+        "sha256": "757496fa6dfb2fe712dfc56801a8d62b6888fdf0712ef186a8a2907c56896db8"
+      },
+      {
         "path": "apps/web/tsconfig.test-node.json",
         "sha256": "dd7ce06fe0f8995088f12e6a974403a85bb0bae08a727f035d560757d451a47e"
       },
@@ -26770,11 +26808,23 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       },
       {
         "path": "docs/adr/0014-board-sync-query-ownership.md",
-        "sha256": "7c7a8ca0dccdf55a38e96bf84378f694f906be34c6f2df50ebd5c68341f049fb"
+        "sha256": "812ebea0b67a98d9af8451535df08067a3c494bb258903cca829c886a8fbbdb4"
       },
       {
         "path": "docs/frontend-seam-inventory.md",
         "sha256": "33385367d7079318f48559e5cbbcbb3ad1abaf632e9df910cc5dc7a35b9ef12e"
+      },
+      {
+        "path": "scripts/ci-legacy-media-zero-scan-test.sh",
+        "sha256": "d4640938c0382c2dcc4da59dde8aea196833d9bf4511a7c3e452778b24cc9bf9"
+      },
+      {
+        "path": "scripts/ci-legacy-media-zero-scan.sh",
+        "sha256": "02650dcf5b5315d70377c5363670913287d1948992f44f71848213707c2e299d"
+      },
+      {
+        "path": "scripts/ci-workflow-contract-check.go",
+        "sha256": "a53d574229a3f804b5339eb34320c3962fda4d4e4545dffd28c3d12043e14625"
       }
     ],
     "gates": [
@@ -26790,7 +26840,8 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "acceptedBy": null,
         "acceptedAt": null,
         "unresolvedItems": [
-          "Immutable committed rollback checkpoint with green CI not recorded."
+          "No green CI rollback checkpoint was recorded before P2.5 started; current local checks cannot retroactively satisfy the temporal gate. Plan-owner deviation/replanning decision required.",
+          "Target commits are unpublished; no GitHub Actions run at the local SHA."
         ]
       },
       {
@@ -26800,11 +26851,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "owner": "/root",
         "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-independent-review",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/SYNC-CACHE-TIMING",
@@ -26813,11 +26871,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "owner": "/root",
         "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-independent-review",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/SYNC-FOCUS",
@@ -26826,11 +26891,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "owner": "/root",
         "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-independent-review",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/SYNC-SSE",
@@ -26839,11 +26911,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "owner": "/root",
         "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-independent-review",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/SYNC-REVISION",
@@ -26852,11 +26931,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "owner": "/root",
         "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-independent-review",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/SYNC-DRAFT-PRECEDENCE",
@@ -26865,25 +26951,32 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "owner": "/root",
         "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": ["p25-cleanup-specs", "p25-cleanup-independent-review"],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "evidenceRefs": [
+          "p25-cleanup-specs",
+          "p25-cleanup-independent-review",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
+        ],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/SYNC-MERGED-DESIGN",
         "gateId": "SYNC-MERGED-DESIGN",
         "phaseId": "P2.5",
         "owner": "/root",
-        "verificationStatus": "not-run",
+        "verificationStatus": "passed",
         "acceptanceStatus": "pending",
-        "evidenceRefs": [],
-        "verifiedAt": null,
+        "evidenceRefs": ["p25-formal-main-integration"],
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
         "unresolvedItems": [
-          "Plan-owner decision acceptance and design/spec merge not recorded."
+          "Named plan-owner acceptance of all six decisions pending; local main integration is recorded, remote merge/CI absent."
         ]
       },
       {
@@ -26896,12 +26989,18 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "evidenceRefs": [
           "p25-cleanup-strict-p1",
           "p25-cleanup-independent-review",
-          "p25-cleanup-knip-ledger"
+          "p25-cleanup-knip-ledger",
+          "p25-formal-final-lint",
+          "p25-formal-workflow-normal",
+          "p25-formal-workflow-production",
+          "p25-formal-final-independent-review"
         ],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/PHASE-QUOTAS",
@@ -26914,12 +27013,16 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
           "p25-cleanup-specs",
           "p25-cleanup-ledger-p2",
           "p25-cleanup-independent-review",
-          "p25-cleanup-ledger-p25"
+          "p25-cleanup-ledger-p25",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-independent-review"
         ],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       },
       {
         "instanceId": "P2.5/PHASE-COMMON",
@@ -26933,17 +27036,23 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
           "p25-cleanup-eslint",
           "p25-cleanup-format",
           "p25-cleanup-strict-p1",
-          "p25-full-tests",
-          "p25-build",
-          "p25-lint",
-          "p25-style",
-          "p25-generated",
-          "p25-cleanup-independent-review"
+          "p25-cleanup-independent-review",
+          "p25-formal-final-lint",
+          "p25-formal-final-sync-specs",
+          "p25-formal-final-node-typecheck",
+          "p25-formal-workflow-normal",
+          "p25-formal-workflow-production",
+          "p25-formal-workflow-smoke-contract",
+          "p25-formal-workflow-workflow",
+          "p25-formal-workflow-actionlint",
+          "p25-formal-final-independent-review"
         ],
-        "verifiedAt": "2026-10-10T20:45:09.451503+00:00",
+        "verifiedAt": "2026-10-11T05:10:57.941226+00:00",
         "acceptedBy": null,
         "acceptedAt": null,
-        "unresolvedItems": ["Plan-owner acceptance pending."]
+        "unresolvedItems": [
+          "Delegated independent formal review completed; named plan-owner acceptance is not recorded."
+        ]
       }
     ],
     "evidence": [
@@ -27404,6 +27513,758 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
         "exitCode": 0,
         "durationSeconds": 9.46,
         "summary": "51 fixtures, 0 review warnings / 0 P2.5 local unmet requirements; formal acceptance remains pending."
+      },
+      {
+        "id": "p25-formal-quality-generated",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:37.702019+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run api:check-generated",
+        "exitCode": 0,
+        "durationSeconds": 6.273,
+        "summary": "Canonical Orval output matches current generated bytes.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-quality-style",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:04:03.482991+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run lint:style",
+        "exitCode": 0,
+        "durationSeconds": 1.031,
+        "summary": "Stylelint passed.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-quality-typecheck",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:04:48.418691+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run test:typecheck",
+        "exitCode": 0,
+        "durationSeconds": 44.961,
+        "summary": "Test + test-node TypeScript passed.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-quality-build",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:05:16.707035+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run build",
+        "exitCode": 0,
+        "durationSeconds": 28.292,
+        "summary": "vue-tsc, Vite build and bundle budgets passed.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-quality-affected",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:05:18.490475+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run test:run -- src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 1.783,
+        "summary": "Canvas task adapter: 40 active tests passed including retired-param rejection.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-quality-strict-p1",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:07:50.078074+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run lint:p1",
+        "exitCode": 0,
+        "durationSeconds": 150.392,
+        "summary": "PASS; duration is orchestration elapsed including a deliberate pause after child completion.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-quality-strict-p2",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:07:59.880004+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2",
+        "exitCode": 0,
+        "durationSeconds": 9.801,
+        "summary": "51 fixtures / 0 review warnings / 0 unmet P2 requirements.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-final-lint",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:10:10.414733+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint",
+        "exitCode": 0,
+        "durationSeconds": 140.29,
+        "summary": "Full lint passed: 0 ESLint errors / 171 warnings; dual Knip and all configured quality gates passed."
+      },
+      {
+        "id": "p25-formal-final-sync-specs",
+        "kind": "command",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:10:13.773898+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run test:run -- src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 3.359,
+        "summary": "6 files / 38 active Sync design tests passed; 0 skipped."
+      },
+      {
+        "id": "p25-formal-final-node-typecheck",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:10:14.666069+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx vue-tsc -p tsconfig.test-node.json --noEmit",
+        "exitCode": 0,
+        "durationSeconds": 0.892,
+        "summary": "Final test-node TypeScript passed after smoke lifecycle fix."
+      },
+      {
+        "id": "p25-formal-browser-linux-smoke",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:05:53.521535+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "./scripts/ci-parity.sh web-smoke",
+        "exitCode": 0,
+        "durationSeconds": 98.535,
+        "summary": "Linux Playwright 1.62.1-noble: 4 public pages / 2 redirects passed; process exited naturally with exit 0; live API probes intentionally skipped.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-browser-accessibility",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:05:58.662341+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/web",
+        "command": "npm run test:accessibility",
+        "exitCode": 0,
+        "durationSeconds": 5.14,
+        "summary": "4 anonymous public pages / 2 auth guards passed using explicit local API fixtures; not an authenticated/WCAG/backend integration audit.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-workflow-normal",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:06:28.434943+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:knip:normal",
+        "exitCode": 0,
+        "durationSeconds": 4.676,
+        "summary": "Full normal Knip exited 0 with precise real workflow node:test entry."
+      },
+      {
+        "id": "p25-formal-workflow-production",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:06:33.111451+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:knip:production",
+        "exitCode": 0,
+        "durationSeconds": 5.01,
+        "summary": "Full production strict Knip exited 0."
+      },
+      {
+        "id": "p25-formal-workflow-smoke-contract",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:06:38.121706+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npx tsx --test scripts/smokeSupport.contract.spec.ts",
+        "exitCode": 0,
+        "durationSeconds": 1.246,
+        "summary": "2 node:test checks passed: exact anonymous API boundaries and natural process/port cleanup."
+      },
+      {
+        "id": "p25-formal-workflow-workflow",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:06:39.367506+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": ".",
+        "command": "bash scripts/ci-workflow-contract-test.sh",
+        "exitCode": 0,
+        "durationSeconds": 1.288,
+        "summary": "Workflow contract passed including canonical drift command and executable smoke contract step."
+      },
+      {
+        "id": "p25-formal-workflow-actionlint",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:06:40.656129+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": ".",
+        "command": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml",
+        "exitCode": 0,
+        "durationSeconds": 2.239,
+        "summary": "actionlint v1.7.7 passed after final workflow changes."
+      },
+      {
+        "id": "p25-formal-media-workflow",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:58:17.498905+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/ci-workflow-contract-test.sh",
+        "exitCode": 0,
+        "durationSeconds": 0.485,
+        "summary": "Workflow contract passed.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-media-fixture",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:58:17.983699+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/ci-legacy-media-zero-scan-test.sh",
+        "exitCode": 0,
+        "durationSeconds": 0.581,
+        "summary": "Legacy zero-scan clean/invalid fixtures passed including real runtime/interfaces/worker forbidden import.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-media-scan",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:58:18.564338+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/ci-legacy-media-zero-scan.sh",
+        "exitCode": 0,
+        "durationSeconds": 0.13,
+        "summary": "Actual legacy zero-result scan passed with no new allowlist.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-0",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:59:29.694125+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml",
+        "exitCode": 0,
+        "durationSeconds": 5.004,
+        "summary": "Exact Ops workflow step passed locally: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-1",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-intermediate-not-current",
+        "recordedAt": "2026-10-11T04:59:34.699009+00:00",
+        "result": "failed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": ".",
+        "command": "bash scripts/run-all-self-tests.sh",
+        "exitCode": 1,
+        "durationSeconds": 17.777,
+        "summary": "Historical failure: 21 selftests passed / 1 failed; ADR0014 missing Context/Decision/Consequences/Status. Fixed and superseded by p25-formal-ops-selftests."
+      },
+      {
+        "id": "p25-formal-ops-2",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:59:52.476260+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.\nbash -n scripts/render-nginx-template.sh\nbash -n scripts/render-nginx-template-test.sh\nbash -n scripts/render-cloudflare-real-ip-conf.sh\nbash -n scripts/uninstall-vps.sh\nbash -n scripts/bootstrap-vps.sh\nbash -n scripts/deploy-stack.sh\nbash -n scripts/deploy-stack-test.sh\nbash -n scripts/production-deploy-entrypoint.sh\nbash -n scripts/production-deploy-entrypoint-test.sh\nbash -n scripts/run-production-deploy.sh\nbash -n scripts/ci-change-classifier.sh\nbash -n scripts/ci-change-classifier-test.sh\nbash -n scripts/ci-gate.sh\nbash -n scripts/ci-gate-test.sh\nbash -n scripts/ci-parity.sh\nbash -n scripts/ci-parity-test.sh\nbash -n scripts/ci-migration-integration.sh\nbash -n scripts/ci-migration-integration-test.sh\nbash -n scripts/atlas-migration-check.sh\nbash -n scripts/atlas-migration-check-test.sh\nbash -n scripts/openapi-breaking-check.sh\nbash -n scripts/openapi-breaking-check-test.sh\nbash -n scripts/csp-policy.sh\nbash -n scripts/csp-policy-test.sh\nbash -n scripts/qa-production-cleanup.sh\nbash -n scripts/qa-production-cleanup-test.sh\nbash -n scripts/secrets-init.sh\nbash -n scripts/secrets-init-test.sh\nbash -n scripts/secrets-render.sh\nbash -n scripts/secrets-render-test.sh\nbash -n scripts/secrets-validate.sh\nbash -n scripts/secrets-validate-test.sh\nbash -n scripts/ci-media-package-boundary.sh\nbash -n scripts/ci-media-package-boundary-test.sh\nbash -n scripts/ci-legacy-media-zero-scan.sh\nbash -n scripts/ci-legacy-media-zero-scan-test.sh\nbash -n scripts/ci-workflow-contract-test.sh\nbash -n scripts/handbook-version-contract.sh\nbash -n scripts/handbook-version-contract-test.sh\nbash -n scripts/sql-workspace-scope-check.sh\nbash -n scripts/sql-workspace-scope-check-test.sh\nbash -n scripts/openapi-pattern-check.sh\nbash -n scripts/openapi-pattern-check-test.sh\nbash -n scripts/adr-template-check.sh\nbash -n scripts/adr-template-check-test.sh\nbash -n scripts/check-backend-copy.sh\nbash -n scripts/check-backend-copy-test.sh\nbash -n scripts/run-all-self-tests.sh\nbash -n scripts/lib/common.sh\n",
+        "exitCode": 0,
+        "durationSeconds": 0.107,
+        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-3",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:59:52.583864+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "shellcheck --version",
+        "exitCode": 0,
+        "durationSeconds": 0.048,
+        "summary": "Exact Ops workflow step passed locally: shellcheck --version",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-4",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:59:52.631782+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.\nshellcheck \\\n  scripts/render-nginx-template.sh \\\n  scripts/render-nginx-template-test.sh \\\n  scripts/render-cloudflare-real-ip-conf.sh \\\n  scripts/uninstall-vps.sh \\\n  scripts/bootstrap-vps.sh \\\n  scripts/deploy-stack.sh \\\n  scripts/deploy-stack-test.sh \\\n  scripts/production-deploy-entrypoint.sh \\\n  scripts/production-deploy-entrypoint-test.sh \\\n  scripts/run-production-deploy.sh \\\n  scripts/ci-change-classifier.sh \\\n  scripts/ci-change-classifier-test.sh \\\n  scripts/ci-gate.sh \\\n  scripts/ci-gate-test.sh \\\n  scripts/ci-parity.sh \\\n  scripts/ci-parity-test.sh \\\n  scripts/ci-migration-integration.sh \\\n  scripts/ci-migration-integration-test.sh \\\n  scripts/atlas-migration-check.sh \\\n  scripts/atlas-migration-check-test.sh \\\n  scripts/openapi-breaking-check.sh \\\n  scripts/openapi-breaking-check-test.sh \\\n  scripts/csp-policy.sh \\\n  scripts/csp-policy-test.sh \\\n  scripts/qa-production-cleanup.sh \\\n  scripts/qa-production-cleanup-test.sh \\\n  scripts/secrets-init.sh \\\n  scripts/secrets-init-test.sh \\\n  scripts/secrets-render.sh \\\n  scripts/secrets-render-test.sh \\\n  scripts/secrets-validate.sh \\\n  scripts/secrets-validate-test.sh \\\n  scripts/ci-media-package-boundary.sh \\\n  scripts/ci-media-package-boundary-test.sh \\\n  scripts/ci-legacy-media-zero-scan.sh \\\n  scripts/ci-legacy-media-zero-scan-test.sh \\\n  scripts/ci-workflow-contract-test.sh \\\n  scripts/handbook-version-contract.sh \\\n  scripts/handbook-version-contract-test.sh \\\n  scripts/sql-workspace-scope-check.sh \\\n  scripts/sql-workspace-scope-check-test.sh \\\n  scripts/openapi-pattern-check.sh \\\n  scripts/openapi-pattern-check-test.sh \\\n  scripts/adr-template-check.sh \\\n  scripts/adr-template-check-test.sh \\\n  scripts/check-backend-copy.sh \\\n  scripts/check-backend-copy-test.sh \\\n  scripts/run-all-self-tests.sh \\\n  scripts/lib/common.sh\n",
+        "exitCode": 0,
+        "durationSeconds": 1.954,
+        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-5",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T04:59:54.586332+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "docker run --rm \\\n  -v \"${PWD}:/work:ro\" \\\n  -w /work \\\n  --entrypoint hadolint \\\n  hadolint/hadolint@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \\\n  apps/api/Dockerfile apps/auth/Dockerfile\n",
+        "exitCode": 0,
+        "durationSeconds": 19.904,
+        "summary": "Exact Ops workflow step passed locally: docker run --rm \\",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-6",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:14.491035+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "yamllint --version",
+        "exitCode": 0,
+        "durationSeconds": 0.19,
+        "summary": "Exact Ops workflow step passed locally: yamllint --version",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-7",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:14.682265+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "yamllint \\\n  docker/compose.yml \\\n  docker/compose.npm.yml \\\n  docker/compose.local.yml \\\n  .grype.yaml\n",
+        "exitCode": 0,
+        "durationSeconds": 0.136,
+        "summary": "Exact Ops workflow step passed locally: yamllint \\",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-8",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:14.818246+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/deploy-stack-test.sh",
+        "exitCode": 0,
+        "durationSeconds": 0.537,
+        "summary": "Exact Ops workflow step passed locally: bash scripts/deploy-stack-test.sh",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-9",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:15.355544+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/production-deploy-entrypoint-test.sh",
+        "exitCode": 0,
+        "durationSeconds": 4.368,
+        "summary": "Exact Ops workflow step passed locally: bash scripts/production-deploy-entrypoint-test.sh",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-10",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:19.723580+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "tmp_dir=\"$(mktemp -d)\"\ndefault_conf=\"$tmp_dir/default.conf\"\ndocker_conf=\"$tmp_dir/docker.conf\"\nreal_ip_conf=\"$tmp_dir/real-ip.conf\"\n\nbash scripts/render-nginx-template.sh \"$default_conf\"\nenv \\\n  NGINX_API_UPSTREAM=http://api:6000 \\\n  NGINX_AUTH_UPSTREAM=http://auth:6001 \\\n  NGINX_AUTH_HEALTH_UPSTREAM=http://auth:6001/api/health \\\n  NGINX_WEB_ROOT=/usr/share/nginx/html \\\n  NGINX_ROOT_DIRECTIVE=\"return 404\" \\\n  bash scripts/render-nginx-template.sh \"$docker_conf\"\nenv \\\n  NGINX_REAL_IP_INCLUDE=/etc/nginx/cloudflare-real-ip.conf \\\n  bash scripts/render-nginx-template.sh \"$real_ip_conf\"\n\nfor rendered_conf in \"$default_conf\" \"$docker_conf\" \"$real_ip_conf\"; do\n  grep -F 'location ~ ^/api/v1/workspaces/[^/]+/tasks(/|$)' \"$rendered_conf\"\n  grep -F 'location ~ ^/api/v1/workspaces/[^/]+/events(/|$)' \"$rendered_conf\"\n  grep -F 'proxy_set_header Connection \"\";' \"$rendered_conf\"\n  if grep -F \"\\${\" \"$rendered_conf\"; then\n    echo \"Unrendered template variable in $rendered_conf\" >&2\n    exit 1\n  fi\n  if grep -F 'X-XSS-Protection' \"$rendered_conf\"; then\n    echo \"Unexpected legacy X-XSS-Protection header in $rendered_conf\" >&2\n    exit 1\n  fi\ndone\n\ngrep -F \"try_files \\$uri \\$uri/ /index.html;\" \"$default_conf\"\ngrep -F 'return 404;' \"$docker_conf\"\ngrep -F 'include /etc/nginx/cloudflare-real-ip.conf;' \"$real_ip_conf\"\n",
+        "exitCode": 0,
+        "durationSeconds": 0.197,
+        "summary": "Exact Ops workflow step passed locally: tmp_dir=\"$(mktemp -d)\"",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-11",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:19.920507+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "tmp_dir=\"$(mktemp -d)\"\ndefault_conf=\"$tmp_dir/default.conf\"\ndocker_conf=\"$tmp_dir/docker.conf\"\nreal_ip_include=\"$tmp_dir/cloudflare-real-ip.conf\"\nreal_ip_conf=\"$tmp_dir/real-ip.conf\"\n\nbash scripts/render-nginx-template.sh \"$default_conf\"\nenv \\\n  NGINX_API_UPSTREAM=http://api:6000 \\\n  NGINX_AUTH_UPSTREAM=http://auth:6001 \\\n  NGINX_AUTH_HEALTH_UPSTREAM=http://auth:6001/api/health \\\n  NGINX_WEB_ROOT=/usr/share/nginx/html \\\n  NGINX_ROOT_DIRECTIVE=\"return 404\" \\\n  bash scripts/render-nginx-template.sh \"$docker_conf\"\nprintf '%s\\n' \\\n  'set_real_ip_from 127.0.0.1;' \\\n  'real_ip_header CF-Connecting-IP;' \\\n  'real_ip_recursive on;' \\\n  > \"$real_ip_include\"\nenv \\\n  NGINX_REAL_IP_INCLUDE=/etc/nginx/cloudflare-real-ip.conf \\\n  bash scripts/render-nginx-template.sh \"$real_ip_conf\"\n\ndocker run --rm \\\n  -v \"$default_conf:/etc/nginx/conf.d/default.conf:ro\" \\\n  nginx:1.27-alpine nginx -t\ndocker run --rm \\\n  --add-host api:127.0.0.1 \\\n  --add-host auth:127.0.0.1 \\\n  -v \"$docker_conf:/etc/nginx/conf.d/default.conf:ro\" \\\n  nginx:1.27-alpine nginx -t\ndocker run --rm \\\n  -v \"$real_ip_conf:/etc/nginx/conf.d/default.conf:ro\" \\\n  -v \"$real_ip_include:/etc/nginx/cloudflare-real-ip.conf:ro\" \\\n  nginx:1.27-alpine nginx -t\n",
+        "exitCode": 0,
+        "durationSeconds": 13.902,
+        "summary": "Exact Ops workflow step passed locally: tmp_dir=\"$(mktemp -d)\"",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-12",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:33.822638+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "docker compose -f docker/compose.yml --env-file docker/.env.example config\ndocker compose -f docker/compose.yml -f docker/compose.npm.yml --env-file docker/.env.example config\n",
+        "exitCode": 0,
+        "durationSeconds": 0.372,
+        "summary": "Exact Ops workflow step passed locally: docker compose -f docker/compose.yml --env-file docker/.env.example config",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-13",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:34.195415+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/check-backend-copy.sh",
+        "exitCode": 0,
+        "durationSeconds": 0.29,
+        "summary": "Exact Ops workflow step passed locally: bash scripts/check-backend-copy.sh",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-14",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:00:34.486120+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": "apps/api",
+        "command": "go build ./...",
+        "exitCode": 0,
+        "durationSeconds": 10.57,
+        "summary": "Exact Ops workflow step passed locally: go build ./...",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-ops-selftests",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-scoped-execution",
+        "recordedAt": "2026-10-11T05:02:02.911463+00:00",
+        "result": "passed",
+        "artifactRefs": [
+          "command-specific inputs; exact full execution fingerprint was not recorded"
+        ],
+        "cwd": ".",
+        "command": "bash scripts/run-all-self-tests.sh",
+        "exitCode": 0,
+        "durationSeconds": 32.804,
+        "summary": "All 22 orchestration selftests passed / 0 failed after ADR heading repair.",
+        "carriedForwardBy": "p25-formal-final-independent-review"
+      },
+      {
+        "id": "p25-formal-intermediate-quality-lint",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-intermediate-not-current",
+        "recordedAt": "2026-10-11T05:04:02.451484+00:00",
+        "result": "failed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint",
+        "exitCode": 1,
+        "durationSeconds": 204.751,
+        "summary": "Historical failure: standalone smoke helper spec had no declared executable Knip entry. Final workflow entry and full lint now pass."
+      },
+      {
+        "id": "p25-formal-intermediate-quality-strict-p25",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-intermediate-not-current",
+        "recordedAt": "2026-10-11T05:08:10.811514+00:00",
+        "result": "failed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": "apps/web",
+        "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
+        "exitCode": 1,
+        "durationSeconds": 10.931,
+        "summary": "Historical failure: 10 stale/missing evidence requirements after artifact scope refresh; final current independent review and command records resolve them."
+      },
+      {
+        "id": "p25-formal-intermediate-browser-linux-smoke",
+        "kind": "command",
+        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "historical-intermediate-not-current",
+        "recordedAt": "2026-10-11T05:03:44.129477+00:00",
+        "result": "failed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "cwd": ".",
+        "command": "./scripts/ci-parity.sh web-smoke",
+        "exitCode": 143,
+        "durationSeconds": 183.046,
+        "summary": "Historical interrupted run (exit143): page checks printed PASS but npm-wrapped Vite orphan prevented natural exit; final direct-Vite Linux run exits0."
+      },
+      {
+        "id": "p25-formal-main-integration",
+        "kind": "merge",
+        "requirementIds": ["P2.5/SYNC-MERGED-DESIGN"],
+        "scope": "Local main integration at immutable 70b6df4f (committed artifact fingerprint); later uncommitted ADR/CI corrections are excluded. No remote merge or formal acceptance. Permanent private test helper has no production importer.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "mergeSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "recordedAt": "2026-10-11T05:10:57.941226+00:00",
+        "result": "passed",
+        "artifactRefs": ["70b6df4f committed design artifacts"],
+        "summary": "Git HEAD commit is present on local main; six specs/ADR/CONTEXT included. Remote main is 230 local commits behind; target SHA unavailable remotely."
+      },
+      {
+        "id": "p25-formal-final-independent-review",
+        "kind": "review",
+        "requirementIds": [
+          "P2.5/SYNC-SOT",
+          "P2.5/SYNC-CACHE-TIMING",
+          "P2.5/SYNC-FOCUS",
+          "P2.5/SYNC-SSE",
+          "P2.5/SYNC-REVISION",
+          "P2.5/SYNC-DRAFT-PRECEDENCE",
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
+        "scope": "User-delegated formal design review and final CI/source verification; 44 exact artifacts. Named plan-owner acceptance is separate.",
+        "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "recordedAt": "2026-10-11T05:11:50.760749+00:00",
+        "result": "passed",
+        "artifactRefs": ["syncDesign.artifacts"],
+        "reviewer": "/root/p25_formal_review",
+        "decision": "passed",
+        "reviewedArtifactRefs": ["syncDesign.artifacts"],
+        "summary": "All six decisions and Common/Knip/Quotas PASS; exact hashes/fingerprint, unchanged permanent specs/trio, no production Query importer, canonical drift and worker scan, fail-closed retired param, scoped anonymous fixture and real Linux process exit, exact executable Knip entry. No formal phase/CI/checkpoint authorization."
       }
     ],
     "p3Trio": [
@@ -27697,7 +28558,68 @@ P1 is **COMPLETE locally**: full normal/production strict Knip, strict P1 gates,
       }
     ],
     "p3StartStatus": "blocked",
-    "scope": "Design and private test-only executable thin slice on main; production Query migration is out of scope. Local proof and independent technical review do not authorize P3."
+    "scope": "Design and private permanent test-only executable helper integrated locally on main; formal delegated review and local CI equivalence do not grant P3/P4. Production Query migration is out of scope.",
+    "localCi": {
+      "status": "passed",
+      "kind": "local-workflow-equivalent",
+      "testedCommit": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
+      "uncommittedArtifactFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+      "environment": "macOS Node 22.23.2; Linux browser parity Playwright 1.62.1-noble; workflow-defined tool versions",
+      "unitBaseline": "540 files / 3624 tests passed on initial revision; affected adapter 40 tests + Sync 38 + helper 2 reverified after relevant patches.",
+      "requiredLaneScope": "P2.5 local diff requires Web, Ops, Media Contract and Handbook Contract; source path classifiers confirmed. Remote publication includes 230 earlier local commits and requires all contexts.",
+      "backendIntegration": "Not claimed; anonymous smoke fixtures and explicitly skipped live probes are scoped evidence.",
+      "githubActionsStatus": "not-run-target-unpublished",
+      "remoteMainSha": "7a70883ec1c9abf06954f02dfd1fd956f4b400cc",
+      "unpublishedCommitCount": 230,
+      "evidenceRefs": [
+        "p25-formal-quality-generated",
+        "p25-formal-quality-style",
+        "p25-formal-quality-typecheck",
+        "p25-formal-quality-build",
+        "p25-formal-quality-affected",
+        "p25-formal-quality-strict-p1",
+        "p25-formal-quality-strict-p2",
+        "p25-formal-final-lint",
+        "p25-formal-final-sync-specs",
+        "p25-formal-final-node-typecheck",
+        "p25-formal-browser-linux-smoke",
+        "p25-formal-browser-accessibility",
+        "p25-formal-workflow-normal",
+        "p25-formal-workflow-production",
+        "p25-formal-workflow-smoke-contract",
+        "p25-formal-workflow-workflow",
+        "p25-formal-workflow-actionlint",
+        "p25-formal-media-workflow",
+        "p25-formal-media-fixture",
+        "p25-formal-media-scan",
+        "p25-formal-ops-0",
+        "p25-formal-ops-2",
+        "p25-formal-ops-3",
+        "p25-formal-ops-4",
+        "p25-formal-ops-5",
+        "p25-formal-ops-6",
+        "p25-formal-ops-7",
+        "p25-formal-ops-8",
+        "p25-formal-ops-9",
+        "p25-formal-ops-10",
+        "p25-formal-ops-11",
+        "p25-formal-ops-12",
+        "p25-formal-ops-13",
+        "p25-formal-ops-14",
+        "p25-formal-ops-selftests",
+        "p25-formal-main-integration",
+        "p25-formal-final-independent-review"
+      ],
+      "initialFailureHistory": [
+        "Initial legacy scan hit a production reject-list token original_image_url, not a submitted payload; removed specialized obsolete key handling and verified generic rejection.",
+        "Initial anonymous accessibility failed with 24 console 502 errors when API/Auth services were absent; exact local GET fixtures established.",
+        "Intermediate overly broad **/api/** route intercepted /src/api module requests; exact pathname /api/ predicate and regression corrected it.",
+        "Intermediate Linux smoke hung after printed PASS because npm wrapper left Vite alive; interrupted exit143 preserved, direct Vite subprocess shutdown and Linux exit0 regression verified.",
+        "Intermediate Knip rejected standalone helper as unused; real workflow execution and exact Knip executable entry added, no ignore.",
+        "Initial Ops selftests failed ADR headings; required template repaired and 22/22 reverified.",
+        "P2.5 check after artifact revision update rejected stale/missing evidence; actual new command/review records refreshed, 51 fixtures /0 warnings /0 unmet verified."
+      ]
+    }
   }
 }
 ```

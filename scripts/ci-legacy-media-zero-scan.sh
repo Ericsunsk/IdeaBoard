@@ -45,7 +45,7 @@ scan_source 'retired /uploads/ frontend URL contract' '"/uploads/' \
 # Workflow and worker production code may only cross into Media through
 # typed ports. Tests are excluded by scan_source's *_test.go rule.
 scan_source 'forbidden concrete media/storage dependency' 'ideaboard/api/internal/media/storage' \
-  "$repo_root/apps/api/internal/runtime/worker" "$repo_root/apps/api/internal/workflow"
+  "$repo_root/apps/api/internal/runtime/interfaces/worker" "$repo_root/apps/api/internal/workflow"
 
 if ((fail != 0)); then
   cat >&2 <<'EOF'

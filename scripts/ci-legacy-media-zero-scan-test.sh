@@ -31,4 +31,11 @@ if REPO_ROOT="$tmp_dir/frontend" bash "$scan" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo 'OK: legacy production contracts fail'
+mkdir -p "$tmp_dir/worker/apps/api/internal/runtime/interfaces/worker" "$tmp_dir/worker/apps/web/src"
+printf '%s\n' 'package worker' 'import "ideaboard/api/internal/media/storage"' >"$tmp_dir/worker/apps/api/internal/runtime/interfaces/worker/bad.go"
+if REPO_ROOT="$tmp_dir/worker" bash "$scan" >/dev/null 2>&1; then
+  echo 'FAIL: concrete media/storage dependency in current worker location should fail' >&2
+  exit 1
+fi
+
+echo 'OK: legacy production contracts and concrete worker dependencies fail'

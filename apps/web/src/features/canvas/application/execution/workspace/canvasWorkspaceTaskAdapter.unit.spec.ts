@@ -302,6 +302,20 @@ describe('toWorkspaceCreateInput', () => {
 })
 
 describe('canonical output resolution ingress (#850)', () => {
+  it('rejects retired original image params through the unknown-param gate', () => {
+    for (const value of ['', 'https://cdn.example/original.png']) {
+      expectUnmappable(
+        () =>
+          toWorkspaceCreateInput({
+            prompt: '',
+            service: 'render',
+            params: { original_image_url: value },
+          }),
+        'params',
+      )
+    }
+  })
+
   it('submits service with identical prompt/ratio/dims/count/media semantics', () => {
     const input = toWorkspaceCreateInput({
       prompt: 'a red house',

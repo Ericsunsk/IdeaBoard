@@ -123,6 +123,12 @@ func checkReusableWorkflows(root string) {
 	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")
 
 	web := loadWorkflow(root, "web.yml")
+	webGenerated := requireStep(object(object(web, "jobs"), "quality"), "Generated API drift")
+	requireEqual(webGenerated["working-directory"], "apps/web", "Web generated drift must run from the canonical Web root")
+	requireEqual(webGenerated["run"], "npm run api:check-generated", "Web generated drift must use the isolated canonical API client checker")
+	webSmokeContract := requireStep(object(object(web, "jobs"), "smoke"), "Anonymous smoke API contract")
+	requireEqual(webSmokeContract["working-directory"], "apps/web", "Anonymous smoke API contract must run from the Web root")
+	requireEqual(webSmokeContract["run"], "npx tsx --test scripts/smokeSupport.contract.spec.ts", "Web smoke must execute the standalone anonymous API contract")
 	webAudit := requireStep(object(object(web, "jobs"), "quality"), "Production dependency audit")
 	requireEqual(webAudit["run"], "npm audit --omit=dev --audit-level=high", "Web audit must reject high production vulnerabilities")
 

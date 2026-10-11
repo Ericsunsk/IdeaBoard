@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
+  "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict P1 current batch; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",

@@ -153,7 +153,6 @@ const LEGACY_MEDIA_PARAM_KEYS: ReadonlySet<string> = new Set([
   'reference_image_urls',
   'mask_image_url',
   'mask_image_urls',
-  'original_image_url',
 ])
 
 const NUMERIC_ASSET_PARAM_KEYS: ReadonlySet<string> = new Set([

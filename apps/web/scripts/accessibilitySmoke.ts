@@ -4,9 +4,9 @@
  * Anonymous-surface only: starts its own Vite dev server (or reuses
  * USER_ROUTE_SMOKE_BASE_URL), drives the public SPA routes with Playwright
  * Chromium, and asserts a baseline accessibility shape on each page plus the
- * auth-guard redirect targets. The web-smoke CI lane runs no backend and no
- * credentials exist in this repo, so this script performs GET-only reads and
- * never mutates state.
+ * auth-guard redirect targets. The web-smoke CI lane runs no backend: a
+ * self-started server uses deterministic anonymous API fixtures; an external
+ * base URL keeps genuine API integration. Only GET reads are allowed locally.
  *
  * No-axe approach: `@axe-core/playwright` is not a dependency (removed as
  * unused), no new packages are installed, and the installed Playwright
@@ -32,6 +32,7 @@
  */
 import { chromium, type Page } from 'playwright'
 import {
+  installAnonymousSmokeApi,
   logSmokeVerbose,
   readSmokeConfig,
   resolveSmokePort,
@@ -199,6 +200,7 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage()
+    await installAnonymousSmokeApi(page, config, baseUrl, failures)
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text())
     })

@@ -27,7 +27,7 @@ jobs:
           working-directory: apps/web
       - name: Generated API drift
         working-directory: apps/web
-        run: npm run api:generate && git diff --exit-code -- src/shared/api/generated-query
+        run: npm run api:check-generated
       - name: ESLint
         working-directory: apps/web
         run: npm run lint
@@ -81,6 +81,9 @@ jobs:
       - uses: ./.github/actions/npm-ci
         with:
           working-directory: apps/web
+      - name: Anonymous smoke API contract
+        working-directory: apps/web
+        run: npx tsx --test scripts/smokeSupport.contract.spec.ts
       - name: Browser smoke
         run: ./scripts/ci-parity.sh web-smoke
       - name: Accessibility smoke

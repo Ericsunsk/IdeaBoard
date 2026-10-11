@@ -7,7 +7,7 @@ supersedes: none
 
 # Board Sync 的 Query ownership（P2.5 六项设计）
 
-## 背景与验收边界
+## Context
 
 计划 §3.4 / §5.7 要求六项 Sync 决策分别由 plan owner 接受，设计和永久 regression specs 合并后才能启动 P3。本 ADR 是待接受的设计；本地验证、plan-owner acceptance、merge 与 CI 是独立状态。执行状态及证据只记录在 [canonical migration ledger](../architecture/frontend-contract-inventory.md) 的 `behaviors` 与 `syncDesign`，本文不替代 acceptance 或授予 P3 启动权限。
 
@@ -17,7 +17,9 @@ supersedes: none
 
 下表的 spec 路径以 `apps/web/src/features/` 为前缀。每项 verification 引用 canonical ledger 中对应 `behaviors[id].evidence` / `verifiedRun` 和 `syncDesign.evidence`；对应 gate 的 acceptance 仍待 plan owner 独立记录。
 
-## 1. Source of truth
+## Decision
+
+### 1. Source of truth
 
 P3 目标：TanStack Query 拥有 catalog list 和每个 board 的 server document snapshot；feature-owned store 拥有 draft overlay。selection port 提供 scope，缺少 workspace 时在任何 network call 前 fail closed。Query key 只允许 `['boards', workspaceId, 'list']` 与 `['boards', workspaceId, 'board', boardId, 'document']`，scope root 为 `['boards', workspaceId]`。Canvas 使用 draft-overlay view；gallery 使用 server catalog view，不为 thumbnails 获取完整 document。
 
@@ -30,7 +32,7 @@ P3 目标：TanStack Query 拥有 catalog list 和每个 board 的 server docume
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts`                                                                                                                                                                                                                                                                                                        |
 | Acceptance                  | Pending plan-owner acceptance；production Query ownership 待 P3                                                                                                                                                                                                                                                                                                                                                     |
 
-## 2. Stale/gc timing
+### 2. Stale/gc timing
 
 catalog list 使用 `accountScoped` preset（stale 15s）；document 继承 global default（stale 5s）。`gcTime` 10m、`retry 1` 继续继承 singleton `queryClient` defaults；production feature 不创建第二个 QueryClient。
 
@@ -43,7 +45,7 @@ catalog list 使用 `accountScoped` preset（stale 15s）；document 继承 glob
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardCacheTiming.contract.spec.ts`                                                                                                                                                                                                                                     |
 | Acceptance                  | Pending plan-owner acceptance；production options 待 P3                                                                                                                                                                                                                                                                                        |
 
-## 3. Focus/refetch controls
+### 3. Focus/refetch controls
 
 global `refetchOnWindowFocus` 保持 `false`。gallery 的 visible touch 经 5s throttle 后走显式 invalidate，hidden tab 不读取；document 隐藏时 autosave flush pending save。SSE 与 mutation invalidation 按各自规则执行。
 
@@ -56,7 +58,7 @@ global `refetchOnWindowFocus` 保持 `false`。gallery 的 visible touch 经 5s 
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardFocusControls.contract.spec.ts`                                                                                                                                                                                                                                                                                 |
 | Acceptance                  | Pending plan-owner acceptance；现有 production 行为的 regression evidence 与 P3 Query binding 分开记录                                                                                                                                                                                                                                                                                       |
 
-## 4. SSE-to-Query mapping
+### 4. SSE-to-Query mapping
 
 SSE 仅提供 invalidation signal。`board.document_replaced` 经 500ms coalesce 后 invalidate document；revision 小于或等于 observed revision 的 frames 丢弃；draft-dirty board 只 mark stale，不 refetch、不覆盖 draft。`board.member_changed` invalidate list；`board.share_revoked` invalidate list 并 remove document query。gap 仅 invalidate `['boards', workspaceId]` scope root，其他 workspace 与 tasks cache 保持不变。event 即使含意外 document 字段也不作为 snapshot 使用；SSE 禁止对 document content 调用 `setQueryData`。未来 optimistic `setQueryData` 仅限 create/rename local write-back。
 
@@ -69,7 +71,7 @@ SSE 仅提供 invalidation signal。`board.document_replaced` 经 500ms coalesce
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts`                                                                                                                                                                                                                                                                                                                                                 |
 | Acceptance                  | Pending plan-owner acceptance；production invalidator 待 P3                                                                                                                                                                                                                                                                                                                                                                                               |
 
-## 5. Revision coexistence 与 404
+### 5. Revision coexistence 与 404
 
 document save 将 observed revision 作为 `If-Match`。HTTP 409 保留 draft 与 base revision，并维持 conflict classification，直至显式 reload 收敛。archived write 使用 banner path，不进入 revision-conflict path；rename 仅 PATCH name，不写 document，并采用 server-advanced revision。
 
@@ -84,7 +86,7 @@ document PUT 404 不触发 create 或 upsert，保留 local draft 和已有 base
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts`                                                                                                                                                                                                                                                                                                                                              |
 | Acceptance                  | Pending plan-owner acceptance；当前 transport regression 不能替代 P3 production Query integration verification                                                                                                                                                                                                                                                                                                                                               |
 
-## 6. Local-draft overlay precedence
+### 6. Local-draft overlay precedence
 
 local-newer draft 优先于旧 remote snapshot；显式 rollback 或 `preserveLocalNewer: false` 才收敛到 remote snapshot。never-synced offline creation 保留，完整 list 确认 deleted-elsewhere 的 synced board 才移除。overlay 固定到请求捕获的 scope，workspace switch 后丢弃 late response。Canvas 显示 draft overlay，gallery 显示 server catalog；P3 实现 Query ownership 后保持相同优先级。
 
@@ -97,7 +99,7 @@ local-newer draft 优先于旧 remote snapshot；显式 rollback 或 `preserveLo
 | Command                     | `cd apps/web && npm run test:run -- src/features/board/application/sync/boardDraftOverlay.contract.spec.ts`                                                                                                                                                                                                                                                                                                             |
 | Acceptance                  | Pending plan-owner acceptance；现有 store regression 与 P3 Query binding 分开记录                                                                                                                                                                                                                                                                                                                                       |
 
-## P3 red/green trio 冻结
+### P3 red/green trio 冻结
 
 以下 test locator、scenario 和 observable assertions 是 P3 必须保留的 trio。当前 design harness green 只属于 P2.5 本地 design verification。P3 开始后，先将这些 scenarios 绑定实际 production Query boundary，运行并记录 implementation 前的真实 red，再实现迁移并以相同 command 记录 green；不得通过 skip、固定字符串比较或继续调用 private design harness 声称 production green。conflict 的当前 transport assertions 已为 green，P3 的 red 必须覆盖新增 production Query integration，而不能伪造现有 transport failure。
 
@@ -116,6 +118,10 @@ npm run test:run -- src/features/board/application/sync/boardSseMapping.contract
 npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'
 ```
 
-## 后续约束
+## Consequences
 
 `search`、`canvas` 与 `library` 保持 Query ban。六项 decision 的 local verification、独立 review 和 plan-owner acceptance 必须在 canonical ledger 分开记录；所有 P2.5 exit gates 接受并合并后才能启动 P3。新的 board key root、freshness/gc policy、focus path、SSE snapshot payload、revision wire encoding 或 draft precedence 变化都触发设计 review；后续 accepted ADR 应明确 supersede 本记录。
+
+## Status
+
+Proposed。六项设计的受委托独立 review 已通过；named plan-owner acceptance、历史 before-start green CI checkpoint 与前置 phase 验收仍需在 canonical ledger 完成。设计及永久 specs 已进入本地 `main`；private executable test helper 保存 spike 结论，production Query 迁移仍未合入。
