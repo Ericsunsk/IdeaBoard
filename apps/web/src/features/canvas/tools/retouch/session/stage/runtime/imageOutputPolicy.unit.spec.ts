@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WEBP_PREVIEW_QUALITY } from '../../../../../infrastructure/media/displayImagePreviewEncoding.ts'
+import { WEBP_PREVIEW_QUALITY } from '../../../../../session/media/displayImagePreviewEncoding.ts'
 import {
   createImageProcessingOutputFileName,
   resolveImageProcessingOutputEncoding,

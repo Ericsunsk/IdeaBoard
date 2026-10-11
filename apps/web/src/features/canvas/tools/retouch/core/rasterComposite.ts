@@ -1,6 +1,6 @@
 import type { RetouchEditableLayer, RetouchLayer, RetouchRasterContent } from './model.ts'
 import { applyImageRetouchInPlace } from './engine'
-import { cloneImageData } from './imageDataUtils'
+import { clonePixelBuffer } from './clonePixelBuffer'
 
 type RetouchRasterLayerImageProvider = (content: RetouchRasterContent) => ImageData | null
 
@@ -21,7 +21,7 @@ export function compositeRetouchLayerStack(
 ): ImageData {
   const context: CompositeContext = {
     sourceImageData,
-    output: cloneImageData(sourceImageData),
+    output: clonePixelBuffer(sourceImageData),
     getRasterImageData: options.getRasterImageData ?? (() => null),
     overrides: options.overrides ?? new Map<string, ImageData>(),
   }

@@ -11,27 +11,27 @@ type LocalMotionAllowance = {
 }
 
 const localMotionAllowances: Record<string, LocalMotionAllowance> = {
-  'src/features/canvas/presentation/styles/canvas-surface-skin.css': {
+  'src/features/canvas/ui/styles/canvas-surface-skin.css': {
     properties: ['--flow-edge-running-duration'],
     reason:
       'Canvas execution edges use a continuous activity cycle; finite Motion Policy intents do not describe cycle speed.',
   },
-  'src/features/canvas/presentation/styles/canvas-tool-tooltip.css': {
+  'src/features/canvas/ui/styles/canvas-tool-tooltip.css': {
     properties: ['--canvas-tool-tooltip-delay'],
     reason: 'Canvas tooltips need a dwell delay, which is not a transition duration.',
   },
-  'src/features/canvas/presentation/nodes/styles/node-shared.css': {
+  'src/features/canvas/ui/styles/node-shared.css': {
     properties: ['--node-running-border-cycle'],
     animationEasingCount: 1,
     reason:
       'The running border is continuous execution feedback with a reduced-motion static fallback.',
   },
-  'src/features/canvas/presentation/nodes/workflows/FusionStage.vue': {
+  'src/features/canvas/ui/nodes/workflows/FusionStage.vue': {
     animationEasingCount: 1,
     reason:
       'Fusion execution flow reuses the Canvas activity cycle and stops under reduced motion.',
   },
-  'src/features/canvas/presentation/styles/canvas-vue-flow-adapter-skin.css': {
+  'src/features/canvas/ui/styles/canvas-vue-flow-adapter-skin.css': {
     animationEasingCount: 1,
     reason:
       'The Vue Flow adapter paints the execution edge activity cycle and disables it under reduced motion.',

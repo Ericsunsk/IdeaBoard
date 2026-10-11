@@ -83,7 +83,7 @@
 import { useI18n } from 'vue-i18n'
 import '../shared/styles/retouch-histogram-plot.css'
 import { computed, ref } from 'vue'
-import { usePointerDragSession } from '../../../../infrastructure/browser/interaction/usePointerDragSession.ts'
+import { usePointerDragSession } from '../../../../session/browser/interaction/usePointerDragSession.ts'
 import { clampWithFallback } from '../../../../../../core/utils/number'
 import { resolveKeyboardDelta } from '../shared/keyboardDelta.ts'
 import { useInstrumentRefs } from '../shared/useInstrumentRefs.ts'

@@ -1,4 +1,4 @@
-import { canvasToBlob } from '../../../../../infrastructure/media/canvasMediaIo.ts'
+import { canvasToBlob } from '../../../../../session/media/canvasMediaIo.ts'
 import type { ImageRetouchRecipe } from '../../../../../../board/ports/canvas'
 import type { RetouchEffectLayer, RetouchLayer, RetouchRasterContent } from '../../../core/model.ts'
 import { createImageProcessingOutputFileName } from './imageOutputPolicy'

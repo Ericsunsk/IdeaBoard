@@ -1,6 +1,6 @@
 import { effectScope, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { useCanvasCustomLayerOverlay } from '../features/canvas/presentation/overlays'
+import { useCanvasCustomLayerOverlay } from '../features/canvas/ui/overlays'
 import {
   useOverlayInteractionLifecycle,
   type OverlayDismissal,

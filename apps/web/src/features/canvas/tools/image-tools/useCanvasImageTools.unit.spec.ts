@@ -3,7 +3,7 @@ import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../board'
 import { renderRetouchLayerStackFile } from '../retouch/session/stage/runtime/finalRender'
-import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../application/execution'
+import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../session/execution'
 import type { UseCanvasImageToolsOptions } from './session'
 import { useCanvasImageTools, type CanvasImageTools } from './'
 import { i18n } from '../../../../core/i18n'

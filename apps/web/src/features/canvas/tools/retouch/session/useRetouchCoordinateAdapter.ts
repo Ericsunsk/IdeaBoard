@@ -2,11 +2,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import type { Node } from '@vue-flow/core'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
 import { IMAGE_TOOL_CHROME_LAYOUT } from '../../image-tools/imageToolChrome.ts'
-import { useRafScheduler } from '../../../infrastructure/browser/interaction/useRafScheduler.ts'
-import { waitForNextAnimationFrame } from '../../../infrastructure/browser/animationFrame.ts'
-import { containImageRect } from '../../../domain/graph/outpaintGeometry.ts'
+import { useRafScheduler } from '../../../session/browser/interaction/useRafScheduler.ts'
+import { waitForNextAnimationFrame } from '../../../session/browser/animationFrame.ts'
+import { containImageRect } from '../../../tools/outpaint/core/geometry.ts'
 import type { RetouchModeState } from './useRetouchMode'
-import type { CanvasFlowViewportControls } from '../../../infrastructure/vue-flow-adapter'
+import type { CanvasFlowViewportControls } from '../../../session/flow-adapter'
 
 type FlowViewport = { x: number; y: number; zoom: number }
 

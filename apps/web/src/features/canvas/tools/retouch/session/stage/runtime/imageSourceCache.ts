@@ -1,4 +1,4 @@
-import { resolveFetchUrl } from '../../../../../infrastructure/media/canvasMediaIo.ts'
+import { resolveFetchUrl } from '../../../../../session/media/canvasMediaIo.ts'
 import { isAnimatedImageBlob } from '../../../core/media.ts'
 
 /**

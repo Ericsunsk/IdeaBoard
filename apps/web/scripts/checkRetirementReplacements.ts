@@ -143,16 +143,16 @@ const chromeConsumers = [
   'features/search/ui/components/SearchBatchActionDock.vue',
   'features/board/ui/gallery/skin.ts',
   'features/library/ui/LibraryFloatingIsland.vue',
-  'features/canvas/presentation/chrome/components/CanvasChrome.vue',
-  'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
-  'features/canvas/presentation/chrome/CanvasMiniMap.vue',
+  'features/canvas/ui/chrome/components/CanvasChrome.vue',
+  'features/canvas/ui/chrome/components/CanvasChromeBoardHeader.vue',
+  'features/canvas/ui/chrome/CanvasMiniMap.vue',
   'features/account/ui/chrome/UserAccountMenu.vue',
   'features/account/ui/chrome/UserCreditBalanceButton.vue',
 ].map((file) => `src/${file}`)
 const featureSkins = [
   'src/features/search/ui/search.css',
-  'src/features/canvas/presentation/styles/canvas-chrome.css',
-  'src/features/canvas/presentation/styles/canvas-vue-flow-adapter-skin.css',
+  'src/features/canvas/ui/styles/canvas-chrome.css',
+  'src/features/canvas/ui/styles/canvas-vue-flow-adapter-skin.css',
 ]
 const lightboxes = [
   'src/features/search/ui/components/SearchLightboxModal.vue',
@@ -822,7 +822,7 @@ export function validateCanvasPurity(modules: PurityModule[]): RetirementViolati
     /^(?:vue(?:-router|-i18n)?|pinia|axios|ofetch|better-auth)(?:$|\/)|^@(?:tanstack|vue-flow)\//.test(
       target,
     ) ||
-    /^src\/(?:api\/generated-query|features\/(?:library|search)|features\/canvas\/(?:application|infrastructure|presentation)|features\/canvas\/tools\/image-tools)(?:\/|$)/.test(
+    /^src\/(?:api\/generated-query|features\/(?:library|search)|features\/canvas\/(?:session|ui)|features\/canvas\/tools\/image-tools)(?:\/|$)/.test(
       target,
     ) ||
     (/^src\/features\/canvas\/tools\//.test(target) && !target.includes('/core/')) ||
@@ -848,7 +848,7 @@ export function validateCanvasPurity(modules: PurityModule[]): RetirementViolati
     visit(root.source, [root.source])
   }
   for (const module of modules)
-    if (module.source.startsWith('src/features/canvas/domain/graph/application/'))
+    if (module.source.startsWith('src/features/canvas/core/graph/application/'))
       issues.push({
         rule: 'canvas-runtime-location',
         file: module.source,

@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { ref, useId, watch } from 'vue'
-import { usePointerDragSession } from '../../../../infrastructure/browser/interaction/usePointerDragSession.ts'
+import { usePointerDragSession } from '../../../../session/browser/interaction/usePointerDragSession.ts'
 import { clamp } from '../../../../../../core/utils/number.ts'
 import type { RetouchCurveChannel } from '../../core/model.ts'
 import type { NormalizedCurveChannelPoint } from '../../core/kinds/curves.ts'

@@ -20,7 +20,7 @@ import { useI18n } from 'vue-i18n'
 import type { Component } from 'vue'
 import type { ImageRetouchKind } from '../../core/model.ts'
 import { RETOUCH_EFFECT_RAIL } from '../../session/retouchViewModel.ts'
-import { NodeToolIconButton } from '../../../../presentation/nodes/primitives'
+import { NodeToolIconButton } from '../../../../ui/nodes/primitives'
 import '../shared/styles/retouch-panel.css'
 
 defineProps<{

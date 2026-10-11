@@ -1,5 +1,16 @@
 # ExecPlans
 
+## P5 Canvas Structure Migration (2026-10-12)
+
+- Goal: complete the P5/PR2 Canvas directory migration and align governance artifacts with the current `core/session/ui/tools` tree.
+- Scope: move-only Canvas layout changes and their canonical inventory, API baseline, dependency report, Knip ledger, ADR, CONTEXT, and migration evidence. No runtime behavior or generated API wrapper edits.
+- Success criteria: active Seam targets and consumers resolve to existing paths; Seam schema self-test, strict P5 migration ledger, public API surface update/check, and current P1 dependency report run against the new tree. Remaining dependency findings must be concrete source violations rather than stale inventory paths.
+- Risks: preserve public exports and consumer edges across renames; do not delete historical evidence, shrink frozen quotas, or convert advisory deep edges into blanket exemptions.
+- Rollback: revert only this migration's path and governance updates; retain the prior committed P4 checkpoint and do not reset unrelated worktree changes.
+- Results: active Canvas seams now map to `core/graph`, `session/*`, and `ui/*`; moved tool paths are reflected in the Seam inventory, fan report, Knip manifest/ledger, public API baseline, and ADR. `Canvas Context` now documents the post-P5 ownership boundaries.
+- Verification: Seam schema self-test and render passed; migration-ledger consistency/fixtures passed; `npm run api:surface:update` and `npm run api:surface:check` passed with 255 entrypoints / 3603 symbols. Strict P1 dependency checking passed with no stale Canvas inventory errors; it still reports 219 historical advisory undeclared deep edges.
+- Status: COMPLETE locally; P5 formal acceptance, commit, and remote CI remain separate gates.
+
 ## P4 Audit Repair (2026-10-12)
 
 - Goal: Resolve the P4 diff review findings without changing runtime behavior or claiming formal phase acceptance.

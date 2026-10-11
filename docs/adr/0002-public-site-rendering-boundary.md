@@ -26,7 +26,7 @@ complete legacy API hard cut`.
 
 Current contract: `DESIGN.md` "Frontend Context Map & Architecture Contract",
 which states that the anonymous public landing page is not a separate context —
-`/` renders `apps/web/src/features/canvas/presentation/pages/CanvasLandingPage.vue`
+`/` renders `apps/web/src/features/canvas/ui/pages/CanvasLandingPage.vue`
 directly and public access plus SEO are expressed through router meta, and that
 new public pages belong to the Canvas presentation layer rather than a parallel
 `public-site` vertical.

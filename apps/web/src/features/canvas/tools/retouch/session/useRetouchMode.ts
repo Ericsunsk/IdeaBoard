@@ -2,7 +2,7 @@ import { useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { RetouchMode } from '../core/model.ts'
-import { isEditableEventTarget } from '../../../infrastructure/browser/domEventTargets.ts'
+import { isEditableEventTarget } from '../../../session/browser/domEventTargets.ts'
 
 const windowTarget = () => (typeof window === 'undefined' ? null : window)
 

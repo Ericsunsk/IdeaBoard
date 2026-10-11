@@ -142,9 +142,9 @@ import {
   INPAINT_MIN_LAYER_OPACITY,
 } from '../core/constants'
 import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
-import { NodeToolIconButton, PromptTextComposer } from '../../../presentation/nodes/primitives'
+import { NodeToolIconButton, PromptTextComposer } from '../../../ui/nodes/primitives'
 import { SERVICE } from '../../../../../core/contracts/imageServices'
-import { useCanvasBillingQuote } from '../../../application/execution'
+import { useCanvasBillingQuote } from '../../../session/execution'
 
 defineProps<{
   drawMode: ImageMaskDrawMode

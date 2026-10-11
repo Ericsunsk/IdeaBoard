@@ -8,7 +8,7 @@ import type {
 } from '../retouch'
 import type { RetouchEffectParamKey, RetouchEffectParamMap } from '../retouch/core/model.ts'
 import type { ImageMaskDrawMode } from '../inpaint'
-import type { ImageStrengthAction } from '../../application/execution'
+import type { ImageStrengthAction } from '../../session/execution'
 import type { ImageToolSession } from './session'
 import type { ZeroCopyStageHandle } from '../retouch'
 

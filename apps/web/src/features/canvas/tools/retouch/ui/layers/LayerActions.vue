@@ -53,7 +53,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { Copy, EmptyPage, SendDiagonalSolid, Trash, VerticalMerge } from '@iconoir/vue'
-import { NodeToolIconButton } from '../../../../presentation/nodes/primitives'
+import { NodeToolIconButton } from '../../../../ui/nodes/primitives'
 import '../shared/styles/retouch-panel.css'
 
 defineProps<{

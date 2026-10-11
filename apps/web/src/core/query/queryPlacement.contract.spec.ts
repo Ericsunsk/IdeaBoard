@@ -32,8 +32,8 @@ const allowedFixtures: PlacementFixture[] = [
     ['Canvas contract harness', 'src/features/canvas/query.contract.spec.ts'],
     ['Canvas component harness', 'src/features/canvas/query.component.spec.ts'],
     ['Canvas browser harness', 'src/features/canvas/query.browser.spec.ts'],
-    ['Canvas testing helper', 'src/features/canvas/application/testing/query.ts'],
-    ['Canvas testing entry', 'src/features/canvas/testing.ts'],
+    ['Canvas testing helper', 'src/features/canvas/session/testing/query.ts'],
+    ['Canvas testing entry', 'src/features/canvas/session/testing.ts'],
     ['shared test harness', 'src/test/query.ts'],
   ].map(([name, importer]) => buildImportFixture(name!, importer!, '@tanstack/vue-query')),
   buildImportFixture(
@@ -157,7 +157,7 @@ const canvasFixtures: PlacementFixture[] = [
   },
   {
     name: 'Canvas Vue script',
-    importer: 'src/features/canvas/presentation/pages/QueryFixture.vue',
+    importer: 'src/features/canvas/ui/pages/QueryFixture.vue',
     code: '<script setup lang="ts">import { QueryClient } from "@tanstack/vue-query"; console.log(QueryClient)</script><template><div /></template>',
   },
 ]
@@ -192,7 +192,7 @@ describe('Query placement through the actual ESLint config', () => {
     async (layer) => {
       const messages = await lintFixture({
         name: 'Overlay and Query coexist',
-        importer: `src/features/canvas/presentation/${layer}/query.ts`,
+        importer: `src/features/canvas/ui/${layer}/query.ts`,
         code: "import { useOverlayInteractionLifecycle } from '@/core/composables/useOverlayInteractionLifecycle'; import { QueryClient } from '@tanstack/vue-query'; console.log(useOverlayInteractionLifecycle, QueryClient)",
       })
       expect(

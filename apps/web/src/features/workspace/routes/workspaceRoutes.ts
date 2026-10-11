@@ -52,13 +52,13 @@ export const workspaceRoutes: RouteRecordRaw[] = [
       {
         path: 'login',
         name: 'UserLogin',
-        component: () => import('../../canvas/presentation/pages/CanvasLandingPage.vue'),
+        component: () => import('../../canvas/ui/pages/CanvasLandingPage.vue'),
         meta: { guest: true },
       },
       {
         path: 'register',
         name: 'UserRegister',
-        component: () => import('../../canvas/presentation/pages/CanvasLandingPage.vue'),
+        component: () => import('../../canvas/ui/pages/CanvasLandingPage.vue'),
         meta: { guest: true },
       },
       {
@@ -102,7 +102,7 @@ export const workspaceRoutes: RouteRecordRaw[] = [
       {
         path: 'canvas',
         name: 'UserCanvas',
-        component: () => import('../../canvas/presentation/pages/CanvasPage.vue'),
+        component: () => import('../../canvas/ui/pages/CanvasPage.vue'),
         meta: { requiresAuth: true },
       },
     ],

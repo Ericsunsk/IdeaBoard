@@ -15,7 +15,7 @@
 //
 // Legacy `/api/user` task behavior (submit/readiness/matrix/cancel/wait) is
 // retired (W2 stream 1): canvas owns its workspace task port in
-// `features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter`.
+// `features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter`.
 
 export {
   assertWorkspaceTaskAssetId,

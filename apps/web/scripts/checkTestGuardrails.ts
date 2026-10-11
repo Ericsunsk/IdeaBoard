@@ -78,8 +78,8 @@ const grandfatheredMakeFactories = new Set([
   'src/features/admin/credits/session/health/testing.ts:makeReconciliationRun',
   'src/features/admin/credits/session/health/testing.ts:makeCreditFinding',
   'src/features/admin/credits/session/pricing/testing.ts:makeCatalogItems',
-  'src/features/canvas/application/testing/boardFixtures.ts:makeBoardSnapshot',
-  'src/features/canvas/application/testing/boardFixtures.ts:makeBoardState',
+  'src/features/canvas/session/board-session/boardFixtures.ts:makeBoardSnapshot',
+  'src/features/canvas/session/board-session/boardFixtures.ts:makeBoardState',
   'src/features/canvas/tools/retouch/core/ids.ts:makeRetouchLayerId',
   'src/features/canvas/tools/retouch/core/ids.ts:makeCurvePointId',
   'src/features/canvas/tools/retouch/core/ids.ts:makeCurvePointFallbackId',
@@ -177,7 +177,7 @@ function checkMakeFactoryFixtures(): void {
 }
 
 const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
-  'src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts': [
+  'src/features/canvas/ui/nodes/home/ImageActionMenu.component.spec.ts': [
     {
       rule: 'raw-unmount-call',
       reason:
@@ -378,13 +378,13 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
       reason: 'Verifies the shared Admin dialog footer layout contract.',
     },
   ],
-  'src/features/canvas/presentation/nodes/home/ImageActionMenu.component.spec.ts': [
+  'src/features/canvas/ui/nodes/home/ImageActionMenu.component.spec.ts': [
     {
       reason:
         'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
     },
   ],
-  'src/features/canvas/presentation/nodes/primitives/PromptComposerControls.options.component.spec.ts':
+  'src/features/canvas/ui/nodes/primitives/PromptComposerControls.options.component.spec.ts':
     [
       {
         reason:

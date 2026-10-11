@@ -8,18 +8,20 @@
     // Standalone node:test contract executed by web.yml's Anonymous smoke API contract step.
     "scripts/smokeSupport.contract.spec.ts",
     "src/features/account/ui/index.ts",
-    "src/features/canvas/presentation/nodes/primitives/index.ts",
-    "src/features/canvas/presentation/nodes/workflows/index.ts",
-    "src/features/canvas/application/execution/index.ts",
-    "src/features/canvas/infrastructure/vue-flow-adapter/index.ts",
+    "src/features/canvas/ui/nodes/primitives/index.ts",
+    "src/features/canvas/ui/nodes/workflows/index.ts",
+    "src/features/canvas/session/execution/index.ts",
+    "src/features/canvas/session/flow-adapter/index.ts",
     // Intra-feature seams with wide fan-in (13+ consumers each). Canvas is a
     // single feature that consumers cross internally through these barrels, so
     // they are audited as entry surface for the same reason as the cross-feature
     // seams above. Low-fan-in barrels (1-2 consumers) are deliberately excluded
     // to keep this list meaningful.
-    "src/features/canvas/domain/graph/index.ts",
-    "src/features/canvas/application/workspace/index.ts",
-    "src/features/canvas/presentation/nodes/index.ts",
+    "src/features/canvas/core/graph/index.ts",
+    "src/features/canvas/session/workspace/index.ts",
+    "src/features/canvas/ui/nodes/index.ts",
+    "src/features/canvas/index.ts",
+    "src/features/canvas/tools/outpaint/index.ts",
     "src/features/board/index.ts",
     "src/features/library/index.ts",
     "src/features/auth/index.ts",

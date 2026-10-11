@@ -1,6 +1,6 @@
 import { processingCancelledError } from './processingCancelled'
-import { canvasToBlob } from '../../../../../infrastructure/media/canvasMediaIo.ts'
-import { detectCanvasTransparency } from '../../../../../infrastructure/media/displayImagePreviewEncoding.ts'
+import { canvasToBlob } from '../../../../../session/media/canvasMediaIo.ts'
+import { detectCanvasTransparency } from '../../../../../session/media/displayImagePreviewEncoding.ts'
 import { resolveImageExportEncoding } from './imageOutputPolicy'
 import {
   createImageSourceCache,

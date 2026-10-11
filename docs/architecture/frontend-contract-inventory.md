@@ -9,12 +9,12 @@ This inventory defines protected frontend contracts and their current sources of
 | Persisted Board schema and migrations       | `board` + backend Boards                     | Backend: `apps/api/internal/boards/v1_workspace.go`, `postgres_workspace.go`, `apps/api/internal/db/schema/fragments/boards.sql`, `apps/api/internal/db/migrations/`; Frontend: `apps/web/src/features/board/domain/schema/stateSchema.ts`, `boardStateEnvelopeContract.ts`, `domain/media/references.ts`, `infrastructure/persistence/boardStateSerialization.ts`                                       | Preserve shape and migration behavior; schema changes require a separate migration spec and ADR                                                                                                                                                                                | Board schema/serialization contract tests (`stateSchema.unit.spec.ts`, `boardStateEnvelopeContract.unit.spec.ts`); backend board tests |
 | API endpoints and request/response payloads | Backend API boundary                         | Specs: `apps/api/openapi.public.yaml`, `openapi.control.yaml`; generated client: `apps/web/src/api/generated-query/public/`, `control/`; feature adapters: `features/account/infrastructure/**/resource.ts`, `features/admin/**/resource.ts`, `features/board/infrastructure/api/boardsResource.ts`                                                                                                      | Internal adapter paths may move. Board document PUT uses `If-Match` and returns document `revision`; ADR 0006 records the earlier `base_revision`/`new_revision` API. Current wire semantics come from the workspace API specs and Board adapter, and must not change silently | `api:check-generated`, frontend contract tests, API tests                                                                              |
 | Backend error codes                         | Backend API boundary                         | Backend: `apps/api/internal/platform/contract/errorcodes.go` (shared and task codes), `apps/api/internal/media/errors/codes.go`; Frontend mapping: feature `feedback/` and `resource.ts` error mapping                                                                                                                                                                                                   | Preserve codes and meanings                                                                                                                                                                                                                                                    | API/error mapping tests                                                                                                                |
-| Workflow services and execution contracts   | Shared service vocabulary + Canvas execution | Frontend: `apps/web/src/core/contracts/imageServices.ts`, `generationContract.ts`, `features/canvas/core/nodes/serviceLabelKey.ts`, `features/canvas/session/serviceImageActionText.ts`, `features/admin/prompts/core/promptVariables.ts`, `apps/web/src/features/canvas/domain/execution-contracts/`; Backend: `apps/api/internal/workflow/`                                                            | Service identifiers, supported resolutions, and execution fields must change explicitly; the Service Model Pool contract is recorded in ADR 0012                                                                                                                               | Service registry, generation, and execution contract tests                                                                             |
-| `localStorage` keys                         | Owning feature                               | `apps/web/src/core/i18n/localeCore.ts` (`ideaboard.user-locale`), `core/utils/auth.ts` (`USER_KEY`, `LAST_AUTH_STORAGE_SCOPE_KEY`), `features/board/infrastructure/persistence/state.ts` (`ideaboard.canvas.boardStates.v2`), `features/board/application/catalog/boards.ts` (`ideaboard.canvas.boards.v2`), `features/canvas/infrastructure/browser/canvasViewportStorage.ts` (`ideaboard:canvas:view`) | Preserve keys and serialized meaning                                                                                                                                                                                                                                           | Storage contract tests and key scan                                                                                                    |
+| Workflow services and execution contracts   | Shared service vocabulary + Canvas execution | Frontend: `apps/web/src/core/contracts/imageServices.ts`, `generationContract.ts`, `features/canvas/core/nodes/serviceLabelKey.ts`, `features/canvas/session/media/serviceImageActionText.ts`, `features/admin/prompts/core/promptVariables.ts`, `apps/web/src/features/canvas/core/execution/`; Backend: `apps/api/internal/workflow/`                                                                        | Service identifiers, supported resolutions, and execution fields must change explicitly; the Service Model Pool contract is recorded in ADR 0012                                                                                                                               | Service registry, generation, and execution contract tests                                                                             |
+| `localStorage` keys                         | Owning feature                               | `apps/web/src/core/i18n/localeCore.ts` (`ideaboard.user-locale`), `core/utils/auth.ts` (`USER_KEY`, `LAST_AUTH_STORAGE_SCOPE_KEY`), `features/board/infrastructure/persistence/state.ts` (`ideaboard.canvas.boardStates.v2`), `features/board/application/catalog/boards.ts` (`ideaboard.canvas.boards.v2`), `features/canvas/session/browser/canvasViewportStorage.ts` (`ideaboard:canvas:view`) | Preserve keys and serialized meaning                                                                                                                                                                                                                                           | Storage contract tests and key scan                                                                                                    |
 | `sessionStorage` keys                       | Owning feature                               | `features/auth/overlay.ts` (`ideaboard:auth:post-auth-path`), `features/search/infrastructure/browserPersistence.ts`, `authContinuation.ts` (`ideaboard:search:pending-auth-action`, `anonymous-query-gate`), `feedPersistence.ts`, `visionReferencePersistence.ts`, `libraryIslandPersistence.ts`                                                                                                       | Preserve keys and serialized meaning                                                                                                                                                                                                                                           | Storage contract tests and key scan                                                                                                    |
 | Query keys and invalidation                 | Owning feature/resource                      | Generated helpers: `get*QueryKey()` from `api/generated-query/`; feature-local keys: `features/account/infrastructure/**/resource.ts`, `features/admin/credits/**/resource.ts`; invalidation in `resource.ts`/`commands.ts` (e.g. `features/admin/users/commands.ts`)                                                                                                                                    | Helpers may move; cache scope and invalidation semantics must remain stable                                                                                                                                                                                                    | Query/resource tests and invalidation tests (`commandsInvalidation.contract.spec.ts`)                                                  |
 | Public route URLs                           | Router/public product                        | `apps/web/src/app/router/index.ts`, `apps/web/src/app/router/types.d.ts`, `apps/web/src/features/workspace/routes/workspaceRoutes.ts`, `apps/web/src/features/workspace/pages/WorkspaceShareJoinPage.vue`                                                                                                                                                                                                | Preserve URLs, including `/user/*`; internal component names may change                                                                                                                                                                                                        | Router contract tests (`workspaceRoutes.contract.spec.ts`) and route scan                                                              |
-| Media references                            | `board`                                      | `apps/web/src/features/board/domain/media/references.ts` (+ `references.unit.spec.ts`), `apps/web/src/features/canvas/application/board-session/boardSyncMediaReconciliation.ts`                                                                                                                                                                                                                         | Preserve reference identity and resolution semantics                                                                                                                                                                                                                           | Board/media serialization tests                                                                                                        |
+| Media references                            | `board`                                      | `apps/web/src/features/board/domain/media/references.ts` (+ `references.unit.spec.ts`), `apps/web/src/features/canvas/session/board-session/boardSyncMediaReconciliation.ts`                                                                                                                                                                                                                             | Preserve reference identity and resolution semantics                                                                                                                                                                                                                           | Board/media serialization tests                                                                                                        |
 | Serialized Board state                      | `board`                                      | `apps/web/src/features/board/domain/schema/boardStateEnvelopeContract.ts`, `infrastructure/persistence/boardStateSerialization.ts`, `infrastructure/preview/boardPreviewSerializer.ts`, `infrastructure/preview/boardPreviewVersion.ts`                                                                                                                                                                  | Preserve envelope semantics; no silent version bump                                                                                                                                                                                                                            | Snapshot/round-trip tests (`boardSync.contract.spec.ts`, `useBoardSession.contract.spec.ts`)                                           |
 
 ## Non-contract internals that may be renamed
@@ -73,7 +73,11 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
   "seamInventory": "docs/frontend-seam-inventory.md#Inventory",
   "method": {
     "unit": "One TS AST expect matcher call site; loops/table cases are not expanded; each/template test titles preserved; duplicate normalized assertions receive occurrence IDs.",
-    "directSourceMarkers": ["readFileSync", "readFile(", "?raw"],
+    "directSourceMarkers": [
+      "readFileSync",
+      "readFile(",
+      "?raw"
+    ],
     "scope": "All src/**/*.spec.ts containing direct source markers. Tooling tests are retained as fixtures and do not count as product behavior. All matchers in selected files reviewed, including imported values and rendered behavior. This is a syntactic candidate scan, not full helper-derived dataflow/taint analysis.",
     "sourceFiles": [
       "src/app/style.contract.spec.ts",
@@ -116,7 +120,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P1a",
       "retirementIds": [],
       "R_p": 0,
-      "behaviorIds": ["api/generated-query-carve-out"],
+      "behaviorIds": [
+        "api/generated-query-carve-out"
+      ],
       "B_p": 1,
       "zeroRetirementReason": "Generated-query declaration only; no product constraint retirement is authorized.",
       "zeroBehaviorReason": null,
@@ -313,7 +319,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified-local",
       "approver": "plan-owner",
       "verifiedAt": "2026-10-11",
-      "evidence": "2026-10-11 P2 audit repair: strict ledger P1 and P2 pass with 0 review warnings and 0 unmet requirements; 38 schema/AST/phase fixtures pass. R 2/2 and B 7/7 have current exact assertion evidence, including moving-card DOM/local-state/focus and first-install persisted hydration. Final verification and independent review: see PLANS.md section P2 \u5ba1\u8ba1\u4fee\u590d\uff082026-10-11\uff09. This is local evidence, not approval or CI/checkpoint acceptance."
+      "evidence": "2026-10-11 P2 audit repair: strict ledger P1 and P2 pass with 0 review warnings and 0 unmet requirements; 38 schema/AST/phase fixtures pass. R 2/2 and B 7/7 have current exact assertion evidence, including moving-card DOM/local-state/focus and first-install persisted hydration. Final verification and independent review: see PLANS.md section P2 审计修复（2026-10-11）. This is local evidence, not approval or CI/checkpoint acceptance."
     },
     {
       "phase": "P2.5",
@@ -723,7 +729,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["scrollbar-role", "token-namespace"],
+        "ruleRefs": [
+          "scrollbar-role",
+          "token-namespace"
+        ],
         "fixtureCases": [
           {
             "rule": "scrollbar-role",
@@ -778,7 +787,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["scrollbar-role", "token-namespace"],
+        "ruleRefs": [
+          "scrollbar-role",
+          "token-namespace"
+        ],
         "fixtureCases": [
           {
             "rule": "scrollbar-role",
@@ -833,7 +845,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-namespace"],
+        "ruleRefs": [
+          "token-namespace"
+        ],
         "fixtureCases": [
           {
             "rule": "token-namespace",
@@ -882,7 +896,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -931,7 +947,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -980,7 +998,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1029,7 +1049,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1078,7 +1100,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1127,7 +1151,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1176,7 +1202,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1225,7 +1253,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1274,7 +1304,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1346,7 +1378,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1395,7 +1429,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1444,7 +1480,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1493,7 +1531,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -1542,7 +1582,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -2587,7 +2629,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["bridge-fallback"],
+        "ruleRefs": [
+          "bridge-fallback"
+        ],
         "fixtureCases": [
           {
             "rule": "bridge-fallback",
@@ -2636,7 +2680,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["bridge-fallback"],
+        "ruleRefs": [
+          "bridge-fallback"
+        ],
         "fixtureCases": [
           {
             "rule": "bridge-fallback",
@@ -2685,7 +2731,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["bridge-fallback"],
+        "ruleRefs": [
+          "bridge-fallback"
+        ],
         "fixtureCases": [
           {
             "rule": "bridge-fallback",
@@ -2734,7 +2782,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["bridge-fallback"],
+        "ruleRefs": [
+          "bridge-fallback"
+        ],
         "fixtureCases": [
           {
             "rule": "bridge-fallback",
@@ -2783,7 +2833,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -2832,7 +2884,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -2881,7 +2935,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -2930,7 +2986,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -2979,7 +3037,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3028,7 +3088,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3077,7 +3139,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3126,7 +3190,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3175,7 +3241,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3224,7 +3292,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3273,7 +3343,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3322,7 +3394,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3371,7 +3445,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3420,7 +3496,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3469,7 +3547,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3518,7 +3598,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3567,7 +3649,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3616,7 +3700,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3665,7 +3751,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-alias"],
+        "ruleRefs": [
+          "token-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "token-alias",
@@ -3714,7 +3802,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["type-scale"],
+        "ruleRefs": [
+          "type-scale"
+        ],
         "fixtureCases": [
           {
             "rule": "type-scale",
@@ -3763,7 +3853,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["literal-deduplication"],
+        "ruleRefs": [
+          "literal-deduplication"
+        ],
         "fixtureCases": [
           {
             "rule": "literal-deduplication",
@@ -4305,6 +4397,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(existsSync(legacyRuntimePath)).toBe(false)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(existsSync(legacyRuntimePath)).toBe(false)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4328,6 +4426,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(core).toMatch(/export function createPendingImageExecutionCore\\(/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(core).toMatch(/export function createPendingImageExecutionCore\\(/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4351,6 +4455,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(core).toMatch(/captureActiveLeases/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(core).toMatch(/captureActiveLeases/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4374,6 +4484,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(core).toMatch(/cancellableTaskIds/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(core).toMatch(/cancellableTaskIds/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4397,6 +4513,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).toMatch(/projectPendingImageExecutionEdges\\(edges, executionSnapshot\\.value\\)\\.edges/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).toMatch(/projectPendingImageExecutionEdges\\(edges, executionSnapshot\\.value\\)\\.edges/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4420,6 +4542,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).toMatch(/const renderEdges = computed\\(/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).toMatch(/const renderEdges = computed\\(/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4443,6 +4571,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).toMatch(/graphAdapter\\.applyIncrementalProjection\\(/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).toMatch(/graphAdapter\\.applyIncrementalProjection\\(/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4466,6 +4600,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).not.toMatch(/watch\\(\\s*\\[options\\.edges, executionSnapshot\\]/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).not.toMatch(/watch\\(\\s*\\[options\\.edges, executionSnapshot\\]/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4489,6 +4629,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).toMatch(/options\\.executionCore\\.release\\(leases\\)/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).toMatch(/options\\.executionCore\\.release\\(leases\\)/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4512,6 +4658,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).toMatch(/options\\.cancelTasks\\(release\\.cancellableTaskIds\\)/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).toMatch(/options\\.cancelTasks\\(release\\.cancellableTaskIds\\)/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4535,6 +4687,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(flowRuntime).not.toMatch(/runningNodeIds\\s*=\\s*ref/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(flowRuntime).not.toMatch(/runningNodeIds\\s*=\\s*ref/)",
+        "reason": "Reviewed P5 ownership-path relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+        "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4558,6 +4716,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(isForbiddenI18nTarget(resolveWebRelative(sourceFile, specifier)!)).toBe(true)",
       "disposition": "retain-fixture",
       "reason": "Governance fixture, not a real product-source constraint.",
+      "currentAssertion": {
+        "assertion": "expect(isForbiddenI18nTarget(resolveWebRelative(sourceFile, specifier)!)).toBe(true)",
+        "reason": "Reviewed domain-to-core relocation; frozen P0 assertion identity remains unchanged.",
+        "source": "src/features/canvas/core/canvasDomainPurity.unit.spec.ts",
+        "scenario": "rejects relative and aliased i18n runtime/barrel imports while allowing localeCore"
+      },
       "phase": "P1b",
       "proposedPhase": null,
       "owner": "/root/p1b-lane",
@@ -4595,7 +4759,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "reviewRequired": false,
       "currentAssertion": {
         "assertion": "expect(isForbiddenI18nTarget(resolveWebRelative(sourceFile, '@/core/i18n/localeCore')!)).toBe(false)",
-        "reason": "Reviewed P1 ownership-path update only; frozen P0 assertion identity and retirement obligation remain unchanged."
+        "reason": "Reviewed domain-to-core relocation and localeCore alias update; frozen P0 assertion identity remains unchanged.",
+        "source": "src/features/canvas/core/canvasDomainPurity.unit.spec.ts",
+        "scenario": "rejects relative and aliased i18n runtime/barrel imports while allowing localeCore"
       }
     },
     {
@@ -4630,12 +4796,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
             "source": "src/test/retirementLint.contract.spec.ts",
             "line": 323,
             "scenario": "rejects a relocated graph application runtime inside domain",
-            "assertion": "expect(validateCanvasPurity([\n    { source: core },\n    { source: 'src/features/canvas/domain/graph/application/runtime.ts' },\n]).map((issue) => issue.rule)).toContain('canvas-runtime-location')",
+            "assertion": "expect(validateCanvasPurity([\n    { source: core },\n    { source: 'src/features/canvas/core/graph/application/runtime.ts' },\n]).map((issue) => issue.rule)).toContain('canvas-runtime-location')",
             "fingerprint": "9de15613927f0f86"
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["canvas-runtime-location"],
+        "ruleRefs": [
+          "canvas-runtime-location"
+        ],
         "fixtureCases": [
           {
             "rule": "canvas-runtime-location",
@@ -4691,7 +4859,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["canvas-purity"],
+        "ruleRefs": [
+          "canvas-purity"
+        ],
         "fixtureCases": [
           {
             "rule": "canvas-purity",
@@ -4747,7 +4917,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["canvas-purity"],
+        "ruleRefs": [
+          "canvas-purity"
+        ],
         "fixtureCases": [
           {
             "rule": "canvas-purity",
@@ -4769,6 +4941,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(adapterSkinCss).toContain('--canvas-selection-stroke-width: 1px')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(adapterSkinCss).toContain('--canvas-selection-stroke-width: 1px')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4792,6 +4970,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(adapterSkinCss).toContain('--canvas-group-frame-selected-ring-width: var(--canvas-selection-stroke-width)')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(adapterSkinCss).toContain('--canvas-group-frame-selected-ring-width: var(--canvas-selection-stroke-width)')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4815,6 +4999,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(adapterSkinCss).toContain('--canvas-group-frame-selected-ring-color: var(--canvas-selection-group-border)')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(adapterSkinCss).toContain('--canvas-group-frame-selected-ring-color: var(--canvas-selection-group-border)')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4838,6 +5028,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(adapterSkinCss).toContain('border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-active-border)')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(adapterSkinCss).toContain('border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-active-border)')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4861,6 +5057,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(adapterSkinCss).toContain('border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-group-border)')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(adapterSkinCss).toContain('border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-group-border)')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4884,6 +5086,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(overlayVue).toContain('box-shadow: 0 0 0 var(--canvas-group-frame-selected-ring-width)')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(overlayVue).toContain('box-shadow: 0 0 0 var(--canvas-group-frame-selected-ring-width)')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4907,6 +5115,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(overlayVue).toContain('var(--canvas-group-frame-selected-ring-color)')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(overlayVue).toContain('var(--canvas-group-frame-selected-ring-color)')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "uses the cursor selection stroke width for the selected group frame ring"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4930,6 +5144,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(frames).toHaveLength(2)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(frames).toHaveLength(2)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "projects persistent group frame bodies in the Vue Flow zoom plane"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4953,6 +5173,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(selectedFrame.style.left).toBe('500px')",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(selectedFrame.style.left).toBe('500px')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "projects persistent group frame bodies in the Vue Flow zoom plane"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4976,6 +5202,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(selectedFrame.style.top).toBe('120px')",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(selectedFrame.style.top).toBe('120px')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "projects persistent group frame bodies in the Vue Flow zoom plane"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -4999,6 +5231,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(selectedFrame.style.width).toBe('320px')",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(selectedFrame.style.width).toBe('320px')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "projects persistent group frame bodies in the Vue Flow zoom plane"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5022,6 +5260,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(selectedFrame.style.height).toBe('180px')",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(selectedFrame.style.height).toBe('180px')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "projects persistent group frame bodies in the Vue Flow zoom plane"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5045,6 +5289,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(selectedFrame.getAttribute('class')).toContain('is-selected')",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(selectedFrame.getAttribute('class')).toContain('is-selected')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "projects persistent group frame bodies in the Vue Flow zoom plane"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5068,6 +5318,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(1)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(1)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "renders selected group controls with resize zones only"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5091,6 +5347,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(resizeZones).toHaveLength(8)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(resizeZones).toHaveLength(8)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "renders selected group controls with resize zones only"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5114,6 +5376,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle.is-edge-handle')).toHaveLength(4)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle.is-edge-handle')).toHaveLength(4)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "renders selected group controls with resize zones only"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5137,6 +5405,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle.is-corner-handle')).toHaveLength(4)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle.is-corner-handle')).toHaveLength(4)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "renders selected group controls with resize zones only"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5160,6 +5434,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(Array.from(resizeZones).map((zone) => zone\n    .getAttribute('class')\n    ?.split(/\\s+/)\n    .find((className) => className.startsWith('handle-')))).toEqual([\n    'handle-nw',\n    'handle-n',\n    'handle-ne',\n    'handle-e',\n    'handle-se',\n    'handle-s',\n    'handle-sw',\n    'handle-w',\n])",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(Array.from(resizeZones).map((zone) => zone\n    .getAttribute('class')\n    ?.split(/\\s+/)\n    .find((className) => className.startsWith('handle-')))).toEqual([\n    'handle-nw',\n    'handle-n',\n    'handle-ne',\n    'handle-e',\n    'handle-se',\n    'handle-s',\n    'handle-sw',\n    'handle-w',\n])",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "renders selected group controls with resize zones only"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5183,6 +5463,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(Array.from(container.querySelectorAll('button'))).toEqual(Array.from(resizeZones))",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(Array.from(container.querySelectorAll('button'))).toEqual(Array.from(resizeZones))",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "renders selected group controls with resize zones only"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5206,6 +5492,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-body')).toHaveLength(1)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-body')).toHaveLength(1)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "does not render controls for unselected group frames"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5229,6 +5521,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(0)",
       "disposition": "retain-behavior",
       "reason": "Rendered component behavior.",
+      "currentAssertion": {
+        "assertion": "expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(0)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+        "scenario": "does not render controls for unselected group frames"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5252,6 +5550,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(screenIndex.trim()).toBe(\"export { default as CanvasScreen } from './CanvasScreen.vue'\")",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(screenIndex.trim()).toBe(\"export { default as CanvasScreen } from './CanvasScreen.vue'\")",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps CanvasScreen as the sole public workspace-ui seam"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5275,6 +5579,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(screenIndex).not.toContain('./internal/')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(screenIndex).not.toContain('./internal/')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps CanvasScreen as the sole public workspace-ui seam"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5298,6 +5608,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('./internal/useCanvasScreenImageToolUi')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('./internal/useCanvasScreenImageToolUi')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5321,6 +5637,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('./internal/useCanvasScreenSurfaceInteractions')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('./internal/useCanvasScreenSurfaceInteractions')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5344,6 +5666,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('./internal/createCanvasScreenNodePresentation')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('./internal/createCanvasScreenNodePresentation')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5367,6 +5695,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('./internal/useCanvasScreenLifecycle')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('./internal/useCanvasScreenLifecycle')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5390,6 +5724,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).not.toContain('__ideaboardCanvasBenchmarkActions')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).not.toContain('__ideaboardCanvasBenchmarkActions')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5413,6 +5753,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(screenLifecycle).toContain('__ideaboardCanvasBenchmarkActions')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(screenLifecycle).toContain('__ideaboardCanvasBenchmarkActions')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5436,6 +5782,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).not.toMatch(/let\\s+\\w+\\s*:[^=]+?=\\s*\\(.*?\\)\\s*=>\\s*\\{\\}/)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).not.toMatch(/let\\s+\\w+\\s*:[^=]+?=\\s*\\(.*?\\)\\s*=>\\s*\\{\\}/)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5459,6 +5811,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(runtimeParts).not.toContain(removedBackchannel)",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(runtimeParts).not.toContain(removedBackchannel)",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "assembles cohesive private ownership modules without temporal callback backchannels"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5482,6 +5840,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(uiAdapter).not.toContain('isCanvasInteractionLocked')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(uiAdapter).not.toContain('isCanvasInteractionLocked')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "gets Image Workflow locks and selection from runtime seams instead of Screen callbacks"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5505,6 +5869,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(uiAdapter).not.toContain('selection:')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(uiAdapter).not.toContain('selection:')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "gets Image Workflow locks and selection from runtime seams instead of Screen callbacks"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5528,6 +5898,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(imageWorkflow).toContain('isCanvasInteractionLocked: graph.isCanvasInteractionLocked')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(imageWorkflow).toContain('isCanvasInteractionLocked: graph.isCanvasInteractionLocked')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "gets Image Workflow locks and selection from runtime seams instead of Screen callbacks"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5551,6 +5927,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(imageWorkflow).toContain('selectNode: options.flowPaneAdapter.selectOnlyNode')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(imageWorkflow).toContain('selectNode: options.flowPaneAdapter.selectOnlyNode')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "gets Image Workflow locks and selection from runtime seams instead of Screen callbacks"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5574,6 +5956,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain(':edges=\"renderEdges\"')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain(':edges=\"renderEdges\"')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps connection endpoints immutable in the Vue Flow surface"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5597,6 +5985,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('onlyRenderVisibleElements: false')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('onlyRenderVisibleElements: false')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps connection endpoints immutable in the Vue Flow surface"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5620,6 +6014,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('edgesUpdatable: false')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('edgesUpdatable: false')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps connection endpoints immutable in the Vue Flow surface"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5643,6 +6043,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('connectOnClick: false')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('connectOnClick: false')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps connection endpoints immutable in the Vue Flow surface"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -5666,6 +6072,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "assertion": "expect(canvasScreen).toContain('defaultEdgeOptions: { animated: false, updatable: false }')",
       "disposition": "retire",
       "reason": "Implementation-source constraint; effective lint/type/browser replacement must pass before retirement.",
+      "currentAssertion": {
+        "assertion": "expect(canvasScreen).toContain('defaultEdgeOptions: { animated: false, updatable: false }')",
+        "reason": "Reviewed P5 Canvas UI relocation; frozen P0/P5 assertion identity remains unchanged.",
+        "source": "src/features/canvas/ui/screens/canvasScreenArchitecture.contract.spec.ts",
+        "scenario": "keeps connection endpoints immutable in the Vue Flow surface"
+      },
       "phase": "P5",
       "proposedPhase": null,
       "owner": "/root/p5-lane",
@@ -9995,7 +10407,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
-        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "ruleRefs": [
+          "chrome-consumer",
+          "feature-surface-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-consumer",
@@ -10050,7 +10465,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
-        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "ruleRefs": [
+          "chrome-consumer",
+          "feature-surface-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-consumer",
@@ -10105,7 +10523,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
-        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "ruleRefs": [
+          "chrome-consumer",
+          "feature-surface-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-consumer",
@@ -10200,7 +10621,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11 integrator: retirementLint.contract.spec.ts 84 passed; `lint:retirement-replacements` production PostCSS/SFC/TS-AST pass; positive controls rerun on real sources (SearchPage surface removal -> chrome-consumer; search.css shadow redeclare -> feature-surface-owner).",
-        "ruleRefs": ["chrome-consumer", "feature-surface-owner"],
+        "ruleRefs": [
+          "chrome-consumer",
+          "feature-surface-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-consumer",
@@ -12104,7 +12528,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-closure"],
+        "ruleRefs": [
+          "token-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "token-closure",
@@ -12337,7 +12763,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-consumer"],
+        "ruleRefs": [
+          "chrome-consumer"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-consumer",
@@ -12386,7 +12814,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["readonly-controller"],
+        "ruleRefs": [
+          "readonly-controller"
+        ],
         "fixtureCases": [
           {
             "rule": "readonly-controller",
@@ -12535,7 +12965,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["native-chrome-control"],
+        "ruleRefs": [
+          "native-chrome-control"
+        ],
         "fixtureCases": [
           {
             "rule": "native-chrome-control",
@@ -12584,7 +13016,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["native-chrome-control"],
+        "ruleRefs": [
+          "native-chrome-control"
+        ],
         "fixtureCases": [
           {
             "rule": "native-chrome-control",
@@ -12633,7 +13067,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["feature-surface-owner"],
+        "ruleRefs": [
+          "feature-surface-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "feature-surface-owner",
@@ -12682,7 +13118,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["feature-surface-owner"],
+        "ruleRefs": [
+          "feature-surface-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "feature-surface-owner",
@@ -12731,7 +13169,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-surface", "chrome-geometry"],
+        "ruleRefs": [
+          "chrome-surface",
+          "chrome-geometry"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-surface",
@@ -12786,7 +13227,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-surface", "chrome-geometry"],
+        "ruleRefs": [
+          "chrome-surface",
+          "chrome-geometry"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-surface",
@@ -12841,7 +13285,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-surface", "chrome-geometry"],
+        "ruleRefs": [
+          "chrome-surface",
+          "chrome-geometry"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-surface",
@@ -12896,7 +13343,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-surface", "chrome-geometry"],
+        "ruleRefs": [
+          "chrome-surface",
+          "chrome-geometry"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-surface",
@@ -12951,7 +13401,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-surface", "chrome-geometry"],
+        "ruleRefs": [
+          "chrome-surface",
+          "chrome-geometry"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-surface",
@@ -13006,7 +13459,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["chrome-surface", "chrome-geometry"],
+        "ruleRefs": [
+          "chrome-surface",
+          "chrome-geometry"
+        ],
         "fixtureCases": [
           {
             "rule": "chrome-surface",
@@ -13061,7 +13517,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13110,7 +13568,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13159,7 +13619,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13208,7 +13670,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13257,7 +13721,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13306,7 +13772,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13355,7 +13823,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-semantic"],
+        "ruleRefs": [
+          "round-semantic"
+        ],
         "fixtureCases": [
           {
             "rule": "round-semantic",
@@ -13404,7 +13874,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-chrome-state", "chrome-state-owner"],
+        "ruleRefs": [
+          "round-chrome-state",
+          "chrome-state-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "round-chrome-state",
@@ -13459,7 +13932,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-chrome-state", "chrome-state-owner"],
+        "ruleRefs": [
+          "round-chrome-state",
+          "chrome-state-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "round-chrome-state",
@@ -13514,7 +13990,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-chrome-state", "chrome-state-owner"],
+        "ruleRefs": [
+          "round-chrome-state",
+          "chrome-state-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "round-chrome-state",
@@ -13569,7 +14048,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["round-chrome-state", "chrome-state-owner"],
+        "ruleRefs": [
+          "round-chrome-state",
+          "chrome-state-owner"
+        ],
         "fixtureCases": [
           {
             "rule": "round-chrome-state",
@@ -13819,7 +14301,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["persistent-form-error"],
+        "ruleRefs": [
+          "persistent-form-error"
+        ],
         "fixtureCases": [
           {
             "rule": "persistent-form-error",
@@ -13868,7 +14352,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["persistent-form-error"],
+        "ruleRefs": [
+          "persistent-form-error"
+        ],
         "fixtureCases": [
           {
             "rule": "persistent-form-error",
@@ -13921,7 +14407,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["announced-form-error"],
+        "ruleRefs": [
+          "announced-form-error"
+        ],
         "fixtureCases": [
           {
             "rule": "announced-form-error",
@@ -13970,7 +14458,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["announced-form-error"],
+        "ruleRefs": [
+          "announced-form-error"
+        ],
         "fixtureCases": [
           {
             "rule": "announced-form-error",
@@ -14019,7 +14509,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["announced-form-error"],
+        "ruleRefs": [
+          "announced-form-error"
+        ],
         "fixtureCases": [
           {
             "rule": "announced-form-error",
@@ -14473,7 +14965,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["lightbox-shared-skin"],
+        "ruleRefs": [
+          "lightbox-shared-skin"
+        ],
         "fixtureCases": [
           {
             "rule": "lightbox-shared-skin",
@@ -14522,7 +15016,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["lightbox-shared-skin"],
+        "ruleRefs": [
+          "lightbox-shared-skin"
+        ],
         "fixtureCases": [
           {
             "rule": "lightbox-shared-skin",
@@ -14571,7 +15067,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["lightbox-shared-skin"],
+        "ruleRefs": [
+          "lightbox-shared-skin"
+        ],
         "fixtureCases": [
           {
             "rule": "lightbox-shared-skin",
@@ -14620,7 +15118,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["lightbox-shared-skin"],
+        "ruleRefs": [
+          "lightbox-shared-skin"
+        ],
         "fixtureCases": [
           {
             "rule": "lightbox-shared-skin",
@@ -14807,7 +15307,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-chart-alias"],
+        "ruleRefs": [
+          "dark-chart-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-chart-alias",
@@ -14856,7 +15358,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-chart-alias"],
+        "ruleRefs": [
+          "dark-chart-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-chart-alias",
@@ -14905,7 +15409,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-chart-alias"],
+        "ruleRefs": [
+          "dark-chart-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-chart-alias",
@@ -14954,7 +15460,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-chart-alias"],
+        "ruleRefs": [
+          "dark-chart-alias"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-chart-alias",
@@ -15003,7 +15511,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-base-closure"],
+        "ruleRefs": [
+          "dark-base-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-base-closure",
@@ -15052,7 +15562,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-base-closure"],
+        "ruleRefs": [
+          "dark-base-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-base-closure",
@@ -15101,7 +15613,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-uniqueness"],
+        "ruleRefs": [
+          "token-uniqueness"
+        ],
         "fixtureCases": [
           {
             "rule": "token-uniqueness",
@@ -15150,7 +15664,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-namespace"],
+        "ruleRefs": [
+          "token-namespace"
+        ],
         "fixtureCases": [
           {
             "rule": "token-namespace",
@@ -15199,7 +15715,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-required"],
+        "ruleRefs": [
+          "dark-required"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-required",
@@ -15248,7 +15766,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-required"],
+        "ruleRefs": [
+          "dark-required"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-required",
@@ -15297,7 +15817,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["dark-required"],
+        "ruleRefs": [
+          "dark-required"
+        ],
         "fixtureCases": [
           {
             "rule": "dark-required",
@@ -15346,7 +15868,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["synchronous-theme-boot"],
+        "ruleRefs": [
+          "synchronous-theme-boot"
+        ],
         "fixtureCases": [
           {
             "rule": "synchronous-theme-boot",
@@ -15395,7 +15919,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["synchronous-theme-boot"],
+        "ruleRefs": [
+          "synchronous-theme-boot"
+        ],
         "fixtureCases": [
           {
             "rule": "synchronous-theme-boot",
@@ -15444,7 +15970,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["synchronous-theme-boot"],
+        "ruleRefs": [
+          "synchronous-theme-boot"
+        ],
         "fixtureCases": [
           {
             "rule": "synchronous-theme-boot",
@@ -15493,7 +16021,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["synchronous-theme-boot"],
+        "ruleRefs": [
+          "synchronous-theme-boot"
+        ],
         "fixtureCases": [
           {
             "rule": "synchronous-theme-boot",
@@ -15542,7 +16072,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-import-order"],
+        "ruleRefs": [
+          "token-import-order"
+        ],
         "fixtureCases": [
           {
             "rule": "token-import-order",
@@ -15591,7 +16123,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-import-order"],
+        "ruleRefs": [
+          "token-import-order"
+        ],
         "fixtureCases": [
           {
             "rule": "token-import-order",
@@ -15640,7 +16174,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-import-order"],
+        "ruleRefs": [
+          "token-import-order"
+        ],
         "fixtureCases": [
           {
             "rule": "token-import-order",
@@ -15689,7 +16225,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-import-order"],
+        "ruleRefs": [
+          "token-import-order"
+        ],
         "fixtureCases": [
           {
             "rule": "token-import-order",
@@ -15738,7 +16276,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-import-order"],
+        "ruleRefs": [
+          "token-import-order"
+        ],
         "fixtureCases": [
           {
             "rule": "token-import-order",
@@ -15787,7 +16327,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-import-order"],
+        "ruleRefs": [
+          "token-import-order"
+        ],
         "fixtureCases": [
           {
             "rule": "token-import-order",
@@ -15836,7 +16378,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -15885,7 +16429,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -15934,7 +16480,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -15983,7 +16531,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16032,7 +16582,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16081,7 +16633,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16130,7 +16684,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16179,7 +16735,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16228,7 +16786,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16277,7 +16837,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["token-parity"],
+        "ruleRefs": [
+          "token-parity"
+        ],
         "fixtureCases": [
           {
             "rule": "token-parity",
@@ -16326,7 +16888,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           }
         ],
         "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
-        "ruleRefs": ["primitive-closure"],
+        "ruleRefs": [
+          "primitive-closure"
+        ],
         "fixtureCases": [
           {
             "rule": "primitive-closure",
@@ -16936,56 +17500,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 58,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(SERVICE_SLUGS).toHaveLength(8)",
           "fingerprint": "18c1b156302c1a39"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 61,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(setUserLocale(locale)).resolves.toBe(true)",
           "fingerprint": "f9e62fa6d4fe3770"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 63,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(serviceLabelKey(slug)).toBe(`canvas.features.${slug}`)",
           "fingerprint": "9d2fa3d05d7c73ca"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 65,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(text).toEqual({ label: labels[locale][slug], title: labels[locale][slug] })",
           "fingerprint": "0e33e338e8f5068c"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 68,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(i18n.global.locale.value).toBe(locale)",
           "fingerprint": "11e46134ae5b7142"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 70,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(snapshots['en']).not.toEqual(snapshots['zh-CN'])",
           "fingerprint": "47397f79170ecbac"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 71,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(snapshots['en']).not.toEqual(snapshots['es'])",
           "fingerprint": "6eccb4211bfd9df7"
         },
         {
-          "source": "src/features/canvas/session/serviceLocale.contract.spec.ts",
+          "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 72,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(snapshots['en']).not.toEqual(snapshots['ko'])",
@@ -17477,7 +18041,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         {
           "source": "src/test/p1ThemeContracts.browser.spec.ts",
           "scenario": "renders real AdminConfirmDialog focus and loading in %s (reduced=%s)",
-          "assertion": "expect(screen.getByRole('button', { name: '\u53d6\u6d88' })).toBeDisabled()",
+          "assertion": "expect(screen.getByRole('button', { name: '取消' })).toBeDisabled()",
           "line": 412,
           "fingerprint": "58c4cff1cfca3562"
         },
@@ -19340,7 +19904,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "source": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
           "line": 323,
           "scenario": "validates the price and blocks duplicate publishes while pending",
-          "assertion": "expect(screen.getByText('\u8bf7\u8f93\u5165\u4ef7\u683c')).toBeVisible()",
+          "assertion": "expect(screen.getByText('请输入价格')).toBeVisible()",
           "fingerprint": "dbd54ea7fa03fe79"
         }
       ],
@@ -19376,14 +19940,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "source": "src/features/admin/credits/session/rewards/boundary.contract.spec.ts",
           "line": 59,
           "scenario": "rejects blank idempotency keys before any network call",
-          "assertion": "expect(resource.create({\n    displayName: '\u590f\u65e5\u7075\u611f\u5956\u52b1',\n    code: 'IDEA2026',\n    creditAmount: 80,\n    maxRedemptions: 100,\n    expiresAt: '2026-12-31T00:00:00Z',\n    idempotencyKey: '   ',\n}, { operatorReason: '\u8fd0\u8425\u6d3b\u52a8\u8865\u7801' })).rejects.toMatchObject({ code: 'control_idempotency_required' })",
+          "assertion": "expect(resource.create({\n    displayName: '夏日灵感奖励',\n    code: 'IDEA2026',\n    creditAmount: 80,\n    maxRedemptions: 100,\n    expiresAt: '2026-12-31T00:00:00Z',\n    idempotencyKey: '   ',\n}, { operatorReason: '运营活动补码' })).rejects.toMatchObject({ code: 'control_idempotency_required' })",
           "fingerprint": "807657409b5d430b"
         },
         {
           "source": "src/features/admin/credits/session/rewards/boundary.contract.spec.ts",
           "line": 81,
           "scenario": "rejects expired inputs before any network call",
-          "assertion": "expect(resource.create({\n    displayName: '\u590f\u65e5\u7075\u611f\u5956\u52b1',\n    code: 'IDEA2026',\n    creditAmount: 80,\n    maxRedemptions: 100,\n    expiresAt: '2000-01-01T00:00:00Z',\n    idempotencyKey: 'reward-create:expired-1',\n}, { operatorReason: '\u8fd0\u8425\u6d3b\u52a8\u8865\u7801' })).rejects.toMatchObject({ code: 'control_expired_input' })",
+          "assertion": "expect(resource.create({\n    displayName: '夏日灵感奖励',\n    code: 'IDEA2026',\n    creditAmount: 80,\n    maxRedemptions: 100,\n    expiresAt: '2000-01-01T00:00:00Z',\n    idempotencyKey: 'reward-create:expired-1',\n}, { operatorReason: '运营活动补码' })).rejects.toMatchObject({ code: 'control_expired_input' })",
           "fingerprint": "06ad9456cb69aa03"
         },
         {
@@ -19412,7 +19976,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/presentation/screens/CanvasScreen.component.spec.ts",
+          "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
           "line": 470,
           "scenario": "renders and forwards Canvas interactions through the public Screen seam",
           "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
@@ -19430,7 +19994,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/presentation/screens/CanvasScreen.component.spec.ts",
+          "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
           "line": 552,
           "scenario": "recovers the next Board session when the route switches",
           "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
@@ -19448,14 +20012,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/application/execution/pending-execution/core.unit.spec.ts",
+          "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
           "line": 310,
           "scenario": "returns a shared Task only after its final active slot is cancelled or released",
           "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
           "fingerprint": "6e88bfd5ae00d2e8"
         },
         {
-          "source": "src/features/canvas/application/execution/pending-execution/core.unit.spec.ts",
+          "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
           "line": 314,
           "scenario": "returns a shared Task only after its final active slot is cancelled or released",
           "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
@@ -19493,14 +20057,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/presentation/nodes/primitives/NodeToolIconButton.component.spec.ts",
+          "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
           "line": 18,
           "scenario": "supports pointer and keyboard activation through its accessible name",
           "assertion": "expect(control).toHaveFocus()",
           "fingerprint": "ccff7d7f218fd503"
         },
         {
-          "source": "src/features/canvas/presentation/nodes/primitives/NodeToolIconButton.component.spec.ts",
+          "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
           "line": 19,
           "scenario": "supports pointer and keyboard activation through its accessible name",
           "assertion": "expect(onClick).toHaveBeenCalledTimes(2)",
@@ -20012,19 +20576,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "target": "src/features/canvas/session/",
       "phase": "P5",
       "owner": "/root/p5-lane",
-      "requirement": "boardSession/graphEditing/execution/imageWorkflow/workspace/flowAdapter/media/browser",
-      "status": "planned"
+      "requirement": "boardSession/graph-editing/execution/image-workflow/workspace/flow-adapter/media/browser",
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/application/image-workflow/components/ImageOutpaintOverlay.vue",
+      "source": "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
       "target": "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "colocate component/browser specs with implementation; create index only for actual external consumers",
-      "status": "planned"
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/application/image-workflow/outpaintIntent.ts",
+      "source": "src/features/canvas/tools/outpaint/session/outpaintIntent.ts",
       "target": "src/features/canvas/tools/outpaint/core/outpaintIntent.ts",
       "phase": "P5",
       "owner": "/root/p5-lane",
@@ -20032,12 +20596,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "planned"
     },
     {
-      "source": "src/features/canvas/application/image-workflow/useImageOutpaintOverlay.ts",
+      "source": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
       "target": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "session lifecycle and colocated unit spec",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/canvas/domain/",
@@ -20045,15 +20609,15 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "graph/execution/nodes; no Vue/router/Query/auth/i18n runtime",
-      "status": "planned"
+      "status": "done"
     },
     {
-      "source": "src/features/canvas/domain/graph/outpaintGeometry.ts",
-      "target": "src/features/canvas/tools/outpaint/core/outpaintGeometry.ts",
+      "source": "src/features/canvas/tools/outpaint/core/outpaintGeometry.ts",
+      "target": "src/features/canvas/tools/outpaint/core/geometry.ts",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "pure geometry owner",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/canvas/presentation/",
@@ -20061,7 +20625,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "chrome/screens/nodes/overlays/pages/styles",
-      "status": "planned"
+      "status": "done"
     },
     {
       "source": "src/features/canvas/tools/image-tools/",
@@ -20072,7 +20636,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "planned"
     },
     {
-      "source": "src/features/canvas/tools/retouch/core/imageDataUtils.ts",
+      "source": "src/features/canvas/tools/retouch/core/clonePixelBuffer.ts",
       "target": "src/features/canvas/tools/retouch/core/imageData.ts",
       "phase": "P5",
       "owner": "/root/p5-lane",
@@ -20385,7 +20949,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/domain/serviceRegistry.ts",
-      "target": "src/features/canvas/session/serviceImageActionText.ts",
+      "target": "src/features/canvas/session/media/serviceImageActionText.ts",
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "requirement": "call-time i18n resolver runtime; separate test-only helper retained/deleted only after effective replacement",
@@ -20488,6 +21052,130 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "done"
     }
   ],
+  "p5CanvasPr1Freeze": {
+    "pr": "PR1 (add aliases)",
+    "frozenAtHead": "bfe0a3b2926022b5c2dae39615ca155996d33457",
+    "owner": "p5-lane",
+    "fileCounts": {
+      "total": 580,
+      "nonTools": 427,
+      "tools": 153,
+      "method": "find apps/web/src/features/canvas -type f; tools subset is -path */tools/*"
+    },
+    "surface": {
+      "entries": 255,
+      "symbols": 3603,
+      "method": "keys and total export names in apps/web/publicApiSurface.baseline.json at frozen head"
+    },
+    "toolIndexExports": {
+      "src/features/canvas/tools/retouch/index.ts": [
+        "ImageRetouchKind",
+        "RetouchEffectLayer",
+        "RetouchHslParamKey",
+        "RetouchLayer",
+        "RetouchMode",
+        "RetouchNonHslWholeParams",
+        "RetouchParamValue",
+        "useRetouchSession",
+        "useRetouchMode",
+        "RetouchModeState",
+        "useRetouchCoordinateAdapter",
+        "RetouchChromeAnchorRect",
+        "RetouchImageRect",
+        "ZeroCopyStageHandle",
+        "ZeroCopyStageStatus",
+        "cancelImageRetouchFinalRender",
+        "hasRenderableRetouchLayerStack",
+        "renderImageRetouchFile",
+        "renderImageRetouchRecipeFile",
+        "renderRetouchLayerStackFile",
+        "ImageRetouchRenderSource",
+        "createRetouchApplyCommands",
+        "RetouchApplyBoardCapabilities",
+        "RetouchApplyFeedbackCapabilities",
+        "RetouchApplyScope",
+        "RetouchApplyScopeHost",
+        "RetouchApplySession",
+        "RetouchApplySource",
+        "createRetouchChromeSource",
+        "RetouchChromeSource",
+        "RetouchChromeSourceOptions",
+        "RetouchEditorLayers",
+        "isWebGLRetouchSupported",
+        "RetouchChrome"
+      ],
+      "src/features/canvas/tools/inpaint/index.ts": [
+        "ImageInpaintChrome",
+        "ImageInpaintOverlay",
+        "ImageMaskDrawMode",
+        "useImageInpaintOverlay",
+        "useInpaintChromeActions",
+        "useInpaintChromeState"
+      ],
+      "src/features/canvas/tools/image-tools/index.ts": [
+        "useCanvasImageTools",
+        "ImageToolPresentation",
+        "UseCanvasImageToolsOptions",
+        "ImageActionBinding",
+        "ImageActionStrengthControl",
+        "ImageToolChromeCommands",
+        "ImageToolChromeModel",
+        "ImageToolPresentationBinding",
+        "ImageToolStageBinding",
+        "CanvasImageTools"
+      ]
+    },
+    "rootSeam": {
+      "path": "src/features/canvas/index.ts",
+      "reExports": [
+        "src/features/canvas/tools/retouch/index.ts",
+        "src/features/canvas/tools/inpaint/index.ts",
+        "src/features/canvas/tools/image-tools/index.ts",
+        "src/features/canvas/core/nodes/imageActions.ts",
+        "src/features/canvas/core/nodes/serviceLabelKey.ts"
+      ]
+    },
+    "aliases": [
+      {
+        "path": "src/features/canvas/session/board-session/index.ts",
+        "source": "src/features/canvas/session/board-session/index.ts"
+      },
+      {
+        "path": "src/features/canvas/session/graph-editing/index.ts",
+        "source": "src/features/canvas/session/graph-editing/index.ts"
+      },
+      {
+        "path": "src/features/canvas/session/execution/index.ts",
+        "source": "src/features/canvas/session/execution/index.ts"
+      },
+      {
+        "path": "src/features/canvas/session/image-workflow/index.ts",
+        "source": "src/features/canvas/session/image-workflow/index.ts"
+      },
+      {
+        "path": "src/features/canvas/session/workspace/index.ts",
+        "source": "src/features/canvas/session/workspace/index.ts"
+      },
+      {
+        "path": "src/features/canvas/core/graph/index.ts",
+        "source": "src/features/canvas/core/graph/index.ts"
+      }
+    ],
+    "pr2Rules": [
+      "R1: application/execution split executes in PR2: planning/commands/media/pending-execution go to core/execution IF pure else session/execution; runtime/task-lifecycle/task-runner/workspace/billing/board-attachment/result-nodes go to session/execution.",
+      "R2: application/group-runtime goes to session/graph-editing.",
+      "R3: application/testing/boardFixtures.ts goes to session/board-session.",
+      "R4: application/canvasGraphStoreWriter.ts goes to core/graph.",
+      "R5: domain/canvasDomainPurity.unit.spec.ts goes to core/ keeping filename.",
+      "R6: presentation nodes/styles CSS goes to ui/styles.",
+      "R7: session/serviceImageActionText.ts plus session/serviceLocale.contract.spec.ts go to session/media.",
+      "R8: assets/home SVG goes to ui/pages/assets.",
+      "R9: outpaint is an overlay-session slice at tools/outpaint/ (core: outpaintGeometry; session: outpaintIntent plus useImageOutpaintOverlay; ui: ImageOutpaintOverlay plus specs; index.ts); execution planning/command files STAY.",
+      "R10: tools/retouch/core/imageDataUtils.ts goes to tools/retouch/core/imageData.ts.",
+      "R11: type quota PreviewMimeType becomes PreviewMimeKind (PR2).",
+      "R12: source-72d10c1416508e26-1 re-keys to src/theme/formControls.spec:44 (PR2)."
+    ]
+  },
   "generatedMapping": {
     "sourcePattern": "src/shared/api/generated-query/**",
     "targetPattern": "src/api/generated-query/**",
@@ -20500,14 +21188,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
   "sharedFileMappings": [
     {
       "source": "src/shared/CONTEXT.md",
-      "targets": ["src/core/CONTEXT.md", "src/api/CONTEXT.md"],
+      "targets": [
+        "src/core/CONTEXT.md",
+        "src/api/CONTEXT.md"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20515,14 +21206,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/client.contract.spec.ts",
-      "targets": ["src/api/client.contract.spec.ts"],
+      "targets": [
+        "src/api/client.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20530,7 +21223,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/client.ts",
-      "targets": ["src/api/client.ts"],
+      "targets": [
+        "src/api/client.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20546,22 +21241,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/client.ts"]
+        "entries": [
+          "src/shared/api/client.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/client.unit.spec.ts",
-      "targets": ["src/api/client.unit.spec.ts"],
+      "targets": [
+        "src/api/client.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20569,14 +21268,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/contractKernel.contract.spec.ts",
-      "targets": ["src/api/contractKernel.contract.spec.ts"],
+      "targets": [
+        "src/api/contractKernel.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20584,7 +21285,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/contractKernel.ts",
-      "targets": ["src/api/contractKernel.ts"],
+      "targets": [
+        "src/api/contractKernel.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20599,15 +21302,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/contractKernel.ts"]
+        "entries": [
+          "src/shared/api/contractKernel.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/controlMutator.ts",
-      "targets": ["src/api/controlMutator.ts"],
+      "targets": [
+        "src/api/controlMutator.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20641,7 +21348,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -20651,7 +21360,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/idempotencyKey.ts",
-      "targets": ["src/api/idempotencyKey.ts"],
+      "targets": [
+        "src/api/idempotencyKey.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20665,36 +21376,48 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/idempotencyKey.ts"]
+        "entries": [
+          "src/shared/api/idempotencyKey.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/mediaAssetDelivery.ts",
-      "targets": ["src/api/mediaAssetDelivery.ts"],
+      "targets": [
+        "src/api/mediaAssetDelivery.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["board", "canvas", "library"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/mediaAssetDelivery.ts"]
+        "entries": [
+          "src/shared/api/mediaAssetDelivery.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/mediaAssetDelivery.unit.spec.ts",
-      "targets": ["src/api/mediaAssetDelivery.unit.spec.ts"],
+      "targets": [
+        "src/api/mediaAssetDelivery.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20702,7 +21425,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/mediaAssetMetadata.ts",
-      "targets": ["src/api/mediaAssetMetadata.ts"],
+      "targets": [
+        "src/api/mediaAssetMetadata.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20716,9 +21441,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["board", "canvas", "library"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -20726,7 +21455,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/mediaAssetUrls.ts",
-      "targets": ["src/api/mediaAssetUrls.ts"],
+      "targets": [
+        "src/api/mediaAssetUrls.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20748,9 +21479,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["board", "canvas", "library"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 4
@@ -20758,14 +21493,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/mediaAssetUrls.unit.spec.ts",
-      "targets": ["src/api/mediaAssetUrls.unit.spec.ts"],
+      "targets": [
+        "src/api/mediaAssetUrls.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20773,21 +21510,32 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/mediaWorkspaceScope.ts",
-      "targets": ["src/api/mediaWorkspaceScope.ts"],
+      "targets": [
+        "src/api/mediaWorkspaceScope.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["board", "canvas", "library", "workspace"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas",
+        "library",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/mediaWorkspaceScope.ts"]
+        "entries": [
+          "src/shared/api/mediaWorkspaceScope.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/orvalMutator.ts",
-      "targets": ["src/api/orvalMutator.ts"],
+      "targets": [
+        "src/api/orvalMutator.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20812,7 +21560,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -20820,7 +21568,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/publicMutator.ts",
-      "targets": ["src/api/publicMutator.ts"],
+      "targets": [
+        "src/api/publicMutator.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20881,7 +21631,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 11
@@ -20889,7 +21639,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/sessionUserType.ts",
-      "targets": ["src/api/sessionUserType.ts"],
+      "targets": [
+        "src/api/sessionUserType.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20905,36 +21657,48 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/sessionUserType.ts"]
+        "entries": [
+          "src/shared/api/sessionUserType.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/stripUndefined.ts",
-      "targets": ["src/api/stripUndefined.ts"],
+      "targets": [
+        "src/api/stripUndefined.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "board", "search"],
+      "productionFeatureConsumers": [
+        "admin",
+        "board",
+        "search"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/stripUndefined.ts"]
+        "entries": [
+          "src/shared/api/stripUndefined.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/stripUndefined.unit.spec.ts",
-      "targets": ["src/api/stripUndefined.unit.spec.ts"],
+      "targets": [
+        "src/api/stripUndefined.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20942,14 +21706,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/upload.contract.spec.ts",
-      "targets": ["src/api/upload.contract.spec.ts"],
+      "targets": [
+        "src/api/upload.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -20957,7 +21723,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/upload.ts",
-      "targets": ["src/api/upload.ts"],
+      "targets": [
+        "src/api/upload.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20969,15 +21737,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "search"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/upload.ts"]
+        "entries": [
+          "src/shared/api/upload.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/useMediaAssetDelivery.ts",
-      "targets": ["src/api/useMediaAssetDelivery.ts"],
+      "targets": [
+        "src/api/useMediaAssetDelivery.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -20987,9 +21759,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["board", "canvas", "library"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -20997,28 +21773,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/userSession.ts",
-      "targets": ["src/api/userSession.ts"],
+      "targets": [
+        "src/api/userSession.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["auth"],
+      "productionFeatureConsumers": [
+        "auth"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/userSession.ts"]
+        "entries": [
+          "src/shared/api/userSession.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/userSession.unit.spec.ts",
-      "targets": ["src/api/userSession.unit.spec.ts"],
+      "targets": [
+        "src/api/userSession.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21026,14 +21810,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/workspaceEventStream.contract.spec.ts",
-      "targets": ["src/api/workspaceEventStream.contract.spec.ts"],
+      "targets": [
+        "src/api/workspaceEventStream.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21041,70 +21827,99 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/workspaceEventStream.ts",
-      "targets": ["src/api/workspaceEventStream.ts"],
+      "targets": [
+        "src/api/workspaceEventStream.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "board", "canvas", "library"],
+      "productionFeatureConsumers": [
+        "account",
+        "board",
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/workspaceEventStream.ts"]
+        "entries": [
+          "src/shared/api/workspaceEventStream.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/workspaceTaskContract.ts",
-      "targets": ["src/api/workspaceTaskContract.ts"],
+      "targets": [
+        "src/api/workspaceTaskContract.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/workspaceTaskContract.ts"]
+        "entries": [
+          "src/shared/api/workspaceTaskContract.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/workspaceTaskTransport.ts",
-      "targets": ["src/api/workspaceTaskTransport.ts"],
+      "targets": [
+        "src/api/workspaceTaskTransport.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/workspaceTaskTransport.ts"]
+        "entries": [
+          "src/shared/api/workspaceTaskTransport.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/workspaceTaskWaiter.ts",
-      "targets": ["src/api/workspaceTaskWaiter.ts"],
+      "targets": [
+        "src/api/workspaceTaskWaiter.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/workspaceTaskWaiter.ts"]
+        "entries": [
+          "src/shared/api/workspaceTaskWaiter.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/workspaceTasks.contract.spec.ts",
-      "targets": ["src/api/workspaceTasks.contract.spec.ts"],
+      "targets": [
+        "src/api/workspaceTasks.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21112,28 +21927,34 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/api/workspaceTasks.ts",
-      "targets": ["src/api/workspaceTasks.ts"],
+      "targets": [
+        "src/api/workspaceTasks.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/api/workspaceTasks.ts"]
+        "entries": [
+          "src/shared/api/workspaceTasks.ts"
+        ]
       }
     },
     {
       "source": "src/shared/api/workspaceUpload.contract.spec.ts",
-      "targets": ["src/api/workspaceUpload.contract.spec.ts"],
+      "targets": [
+        "src/api/workspaceUpload.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21141,7 +21962,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/assets/eric-studio-logo.svg",
-      "targets": ["src/core/assets/eric-studio-logo.svg"],
+      "targets": [
+        "src/core/assets/eric-studio-logo.svg"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21151,9 +21974,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -21161,7 +21987,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/assets/eric-studio-logo.svg.d.ts",
-      "targets": ["src/asset-modules.d.ts"],
+      "targets": [
+        "src/asset-modules.d.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -21176,7 +22004,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/assets/oauth/discord.svg",
-      "targets": ["src/core/assets/oauth/discord.svg"],
+      "targets": [
+        "src/core/assets/oauth/discord.svg"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21194,9 +22024,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin", "auth"],
+      "productionFeatureConsumers": [
+        "admin",
+        "auth"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -21204,7 +22037,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/assets/oauth/github.svg",
-      "targets": ["src/features/admin/shared/ui/assets/oauth/github.svg"],
+      "targets": [
+        "src/features/admin/shared/ui/assets/oauth/github.svg"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21214,7 +22049,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21224,7 +22061,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/assets/oauth/google.svg",
-      "targets": ["src/core/assets/oauth/google.svg"],
+      "targets": [
+        "src/core/assets/oauth/google.svg"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21242,9 +22081,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin", "auth"],
+      "productionFeatureConsumers": [
+        "admin",
+        "auth"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -21264,7 +22106,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21286,7 +22130,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21312,7 +22158,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21338,7 +22186,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21364,7 +22214,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21390,7 +22242,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21416,7 +22270,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
@@ -21426,28 +22282,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/auth/adminAccess.ts",
-      "targets": ["src/core/auth/adminAccess.ts"],
+      "targets": [
+        "src/core/auth/adminAccess.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["workspace"],
+      "productionFeatureConsumers": [
+        "workspace"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Role-to-permission capability, no Workspace state/UI; generic auth policy remains horizontal.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/auth/adminAccess.ts"]
+        "entries": [
+          "src/shared/auth/adminAccess.ts"
+        ]
       }
     },
     {
       "source": "src/shared/auth/client.contract.spec.ts",
-      "targets": ["src/core/auth/client.contract.spec.ts"],
+      "targets": [
+        "src/core/auth/client.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21455,56 +22319,78 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/auth/client.ts",
-      "targets": ["src/core/auth/client.ts"],
+      "targets": [
+        "src/core/auth/client.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["auth"],
+      "productionFeatureConsumers": [
+        "auth"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Better Auth singleton infrastructure is explicitly horizontal by plan/Shared CONTEXT.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/auth/client.ts"]
+        "entries": [
+          "src/shared/auth/client.ts"
+        ]
       }
     },
     {
       "source": "src/shared/auth/oauthProviders.ts",
-      "targets": ["src/core/auth/oauthProviders.ts"],
+      "targets": [
+        "src/core/auth/oauthProviders.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "auth"],
+      "productionFeatureConsumers": [
+        "admin",
+        "auth"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/auth/oauthProviders.ts"]
+        "entries": [
+          "src/shared/auth/oauthProviders.ts"
+        ]
       }
     },
     {
       "source": "src/shared/auth/passwordPolicy.ts",
-      "targets": ["src/core/auth/passwordPolicy.ts"],
+      "targets": [
+        "src/core/auth/passwordPolicy.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "auth"],
+      "productionFeatureConsumers": [
+        "account",
+        "auth"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/auth/passwordPolicy.ts"]
+        "entries": [
+          "src/shared/auth/passwordPolicy.ts"
+        ]
       }
     },
     {
       "source": "src/shared/auth/sessionPolicy.contract.spec.ts",
-      "targets": ["src/core/auth/sessionPolicy.contract.spec.ts"],
+      "targets": [
+        "src/core/auth/sessionPolicy.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21512,7 +22398,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/auth/sessionPolicy.ts",
-      "targets": ["src/core/auth/sessionPolicy.ts"],
+      "targets": [
+        "src/core/auth/sessionPolicy.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21528,22 +22416,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/auth/sessionPolicy.ts"]
+        "entries": [
+          "src/shared/auth/sessionPolicy.ts"
+        ]
       }
     },
     {
       "source": "src/shared/components/ActionButton.component.spec.ts",
-      "targets": ["src/core/components/ActionButton.component.spec.ts"],
+      "targets": [
+        "src/core/components/ActionButton.component.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21551,84 +22443,119 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/ActionButton.vue",
-      "targets": ["src/core/components/ActionButton.vue"],
+      "targets": [
+        "src/core/components/ActionButton.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Design-system action chrome primitive; props/slots/events contain no Admin domain state.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/ActionButton.vue"]
+        "entries": [
+          "src/shared/components/ActionButton.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/ChartCard.vue",
-      "targets": ["src/core/components/ChartCard.vue"],
+      "targets": [
+        "src/core/components/ChartCard.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/ChartCard.vue"]
+        "entries": [
+          "src/shared/components/ChartCard.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/ChartPanel.vue",
-      "targets": ["src/core/components/ChartPanel.vue"],
+      "targets": [
+        "src/core/components/ChartPanel.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/ChartPanel.vue"]
+        "entries": [
+          "src/shared/components/ChartPanel.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/ChartRenderer.vue",
-      "targets": ["src/core/components/ChartRenderer.vue"],
+      "targets": [
+        "src/core/components/ChartRenderer.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/ChartRenderer.vue"]
+        "entries": [
+          "src/shared/components/ChartRenderer.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/DataTableColumn.vue",
-      "targets": ["src/core/components/DataTableColumn.vue"],
+      "targets": [
+        "src/core/components/DataTableColumn.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account"],
+      "productionFeatureConsumers": [
+        "account"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Generic accessible column primitive, no Account facts or resource dependency.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/DataTableColumn.vue"]
+        "entries": [
+          "src/shared/components/DataTableColumn.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/DataTableFrame.component.spec.ts",
-      "targets": ["src/core/components/DataTableFrame.component.spec.ts"],
+      "targets": [
+        "src/core/components/DataTableFrame.component.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21636,28 +22563,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/DataTableFrame.vue",
-      "targets": ["src/core/components/DataTableFrame.vue"],
+      "targets": [
+        "src/core/components/DataTableFrame.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account"],
+      "productionFeatureConsumers": [
+        "account"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Generic semantic table frame, no Account facts or resource dependency.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/DataTableFrame.vue"]
+        "entries": [
+          "src/shared/components/DataTableFrame.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/IbFormField.component.spec.ts",
-      "targets": ["src/core/components/IbFormField.component.spec.ts"],
+      "targets": [
+        "src/core/components/IbFormField.component.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21665,56 +22600,80 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/IbFormField.vue",
-      "targets": ["src/core/components/IbFormField.vue"],
+      "targets": [
+        "src/core/components/IbFormField.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "auth", "library"],
+      "productionFeatureConsumers": [
+        "account",
+        "auth",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/IbFormField.vue"]
+        "entries": [
+          "src/shared/components/IbFormField.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/RangedLineChartCard.vue",
-      "targets": ["src/core/components/RangedLineChartCard.vue"],
+      "targets": [
+        "src/core/components/RangedLineChartCard.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/RangedLineChartCard.vue"]
+        "entries": [
+          "src/shared/components/RangedLineChartCard.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/SiteBrandLogo.vue",
-      "targets": ["src/core/components/SiteBrandLogo.vue"],
+      "targets": [
+        "src/core/components/SiteBrandLogo.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/SiteBrandLogo.vue"]
+        "entries": [
+          "src/shared/components/SiteBrandLogo.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/StatusBadge.component.spec.ts",
-      "targets": ["src/core/components/StatusBadge.component.spec.ts"],
+      "targets": [
+        "src/core/components/StatusBadge.component.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21722,35 +22681,51 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/StatusBadge.vue",
-      "targets": ["src/core/components/StatusBadge.vue"],
+      "targets": [
+        "src/core/components/StatusBadge.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/StatusBadge.vue"]
+        "entries": [
+          "src/shared/components/StatusBadge.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/StudioName.vue",
-      "targets": ["src/core/components/StudioName.vue"],
+      "targets": [
+        "src/core/components/StudioName.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/StudioName.vue"]
+        "entries": [
+          "src/shared/components/StudioName.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/SupportChannelQr.vue",
-      "targets": ["src/features/account/ui/chrome/SupportChannelQr.vue"],
+      "targets": [
+        "src/features/account/ui/chrome/SupportChannelQr.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -21760,7 +22735,11 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
       "evidence": "Companion follows UserAccountMenu into Account chrome; actual component path verified.",
       "consumerEvidence": {
@@ -21787,28 +22766,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/UserAccountMenu.vue",
-      "targets": ["src/features/account/ui/chrome/UserAccountMenu.vue"],
+      "targets": [
+        "src/features/account/ui/chrome/UserAccountMenu.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "feature-private",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/UserAccountMenu.vue"]
+        "entries": [
+          "src/shared/components/UserAccountMenu.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/UserConfirmDialog.component.spec.ts",
-      "targets": ["src/core/components/UserConfirmDialog.component.spec.ts"],
+      "targets": [
+        "src/core/components/UserConfirmDialog.component.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21816,21 +22805,29 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/UserConfirmDialog.vue",
-      "targets": ["src/core/components/UserConfirmDialog.vue"],
+      "targets": [
+        "src/core/components/UserConfirmDialog.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["library"],
+      "productionFeatureConsumers": [
+        "library"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Generic user-surface confirmation with injected title/message/intent/loading and modal lifecycle; no Library state.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/UserConfirmDialog.vue"]
+        "entries": [
+          "src/shared/components/UserConfirmDialog.vue"
+        ]
       }
     },
     {
       "source": "src/shared/components/UserCreditBalanceButton.vue",
-      "targets": ["src/features/account/ui/chrome/UserCreditBalanceButton.vue"],
+      "targets": [
+        "src/features/account/ui/chrome/UserCreditBalanceButton.vue"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21840,9 +22837,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "feature-private",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -21850,16 +22851,25 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/formFieldContract.ts",
-      "targets": ["src/core/components/formFieldContract.ts"],
+      "targets": [
+        "src/core/components/formFieldContract.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "auth", "library"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "auth",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/formFieldContract.ts"]
+        "entries": [
+          "src/shared/components/formFieldContract.ts"
+        ]
       }
     },
     {
@@ -21881,42 +22891,58 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/components/userAccountMenu.types.ts",
-      "targets": ["src/features/account/ui/chrome/userAccountMenu.types.ts"],
+      "targets": [
+        "src/features/account/ui/chrome/userAccountMenu.types.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "feature-private",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/components/userAccountMenu.types.ts"]
+        "entries": [
+          "src/shared/components/userAccountMenu.types.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useAppClipboard.ts",
-      "targets": ["src/core/composables/useAppClipboard.ts"],
+      "targets": [
+        "src/core/composables/useAppClipboard.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Browser clipboard capability returns success to injected feature feedback, no Admin facts/resources.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useAppClipboard.ts"]
+        "entries": [
+          "src/shared/composables/useAppClipboard.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useAppClipboard.unit.spec.ts",
-      "targets": ["src/core/composables/useAppClipboard.unit.spec.ts"],
+      "targets": [
+        "src/core/composables/useAppClipboard.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21924,7 +22950,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useAppToast.ts",
-      "targets": ["src/core/composables/useAppToast.ts"],
+      "targets": [
+        "src/core/composables/useAppToast.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -21940,36 +22968,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useAppToast.ts"]
+        "entries": [
+          "src/shared/composables/useAppToast.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useAsyncAction.ts",
-      "targets": ["src/core/composables/useAsyncAction.ts"],
+      "targets": [
+        "src/core/composables/useAsyncAction.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "auth", "workspace"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "auth",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useAsyncAction.ts"]
+        "entries": [
+          "src/shared/composables/useAsyncAction.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useAsyncAction.unit.spec.ts",
-      "targets": ["src/core/composables/useAsyncAction.unit.spec.ts"],
+      "targets": [
+        "src/core/composables/useAsyncAction.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -21977,28 +23018,39 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useLogoutRedirect.ts",
-      "targets": ["src/core/composables/useLogoutRedirect.ts"],
+      "targets": [
+        "src/core/composables/useLogoutRedirect.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useLogoutRedirect.ts"]
+        "entries": [
+          "src/shared/composables/useLogoutRedirect.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useLogoutRedirect.unit.spec.ts",
-      "targets": ["src/core/composables/useLogoutRedirect.unit.spec.ts"],
+      "targets": [
+        "src/core/composables/useLogoutRedirect.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22006,7 +23058,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useMenuTriggerFocusRestore.ts",
-      "targets": ["src/core/composables/useMenuTriggerFocusRestore.ts"],
+      "targets": [
+        "src/core/composables/useMenuTriggerFocusRestore.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22016,9 +23070,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -22026,7 +23084,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useOverlayInteractionLifecycle.ts",
-      "targets": ["src/core/composables/useOverlayInteractionLifecycle.ts"],
+      "targets": [
+        "src/core/composables/useOverlayInteractionLifecycle.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22039,10 +23099,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "library"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useOverlayInteractionLifecycle.ts"]
+        "entries": [
+          "src/shared/composables/useOverlayInteractionLifecycle.ts"
+        ]
       }
     },
     {
@@ -22056,7 +23118,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22064,28 +23126,39 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useSiteBranding.ts",
-      "targets": ["src/core/composables/useSiteBranding.ts"],
+      "targets": [
+        "src/core/composables/useSiteBranding.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "canvas", "legal"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "canvas",
+        "legal"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useSiteBranding.ts"]
+        "entries": [
+          "src/shared/composables/useSiteBranding.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useSiteBranding.unit.spec.ts",
-      "targets": ["src/core/composables/useSiteBranding.unit.spec.ts"],
+      "targets": [
+        "src/core/composables/useSiteBranding.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22093,28 +23166,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useSupportChannels.ts",
-      "targets": ["src/core/composables/useSupportChannels.ts"],
+      "targets": [
+        "src/core/composables/useSupportChannels.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useSupportChannels.ts"]
+        "entries": [
+          "src/shared/composables/useSupportChannels.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useSupportChannels.unit.spec.ts",
-      "targets": ["src/core/composables/useSupportChannels.unit.spec.ts"],
+      "targets": [
+        "src/core/composables/useSupportChannels.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22122,28 +23205,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/composables/useUserConfirmDialog.ts",
-      "targets": ["src/core/composables/useUserConfirmDialog.ts"],
+      "targets": [
+        "src/core/composables/useUserConfirmDialog.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["library"],
+      "productionFeatureConsumers": [
+        "library"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Generic pending confirmation/promise lifecycle, no Library facts/resources.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/composables/useUserConfirmDialog.ts"]
+        "entries": [
+          "src/shared/composables/useUserConfirmDialog.ts"
+        ]
       }
     },
     {
       "source": "src/shared/composables/useUserConfirmDialog.unit.spec.ts",
-      "targets": ["src/core/composables/useUserConfirmDialog.unit.spec.ts"],
+      "targets": [
+        "src/core/composables/useUserConfirmDialog.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22151,7 +23242,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/config/pagination.ts",
-      "targets": ["src/core/config/pagination.ts"],
+      "targets": [
+        "src/core/config/pagination.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22164,22 +23257,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/config/pagination.ts"]
+        "entries": [
+          "src/shared/config/pagination.ts"
+        ]
       }
     },
     {
       "source": "src/shared/config/pagination.unit.spec.ts",
-      "targets": ["src/core/config/pagination.unit.spec.ts"],
+      "targets": [
+        "src/core/config/pagination.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22187,7 +23284,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/config/runtimeUrls.ts",
-      "targets": ["src/core/config/runtimeUrls.ts"],
+      "targets": [
+        "src/core/config/runtimeUrls.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22203,22 +23302,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/config/runtimeUrls.ts"]
+        "entries": [
+          "src/shared/config/runtimeUrls.ts"
+        ]
       }
     },
     {
       "source": "src/shared/config/runtimeUrls.unit.spec.ts",
-      "targets": ["src/core/config/runtimeUrls.unit.spec.ts"],
+      "targets": [
+        "src/core/config/runtimeUrls.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22226,7 +23329,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/config/timing.ts",
-      "targets": ["src/core/config/timing.ts"],
+      "targets": [
+        "src/core/config/timing.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22238,22 +23343,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "library"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/config/timing.ts"]
+        "entries": [
+          "src/shared/config/timing.ts"
+        ]
       }
     },
     {
       "source": "src/shared/config/timing.unit.spec.ts",
-      "targets": ["src/core/config/timing.unit.spec.ts"],
+      "targets": [
+        "src/core/config/timing.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22261,44 +23370,65 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/constants/contacts.ts",
-      "targets": ["src/features/legal/contacts.ts"],
+      "targets": [
+        "src/features/legal/contacts.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["legal"],
+      "productionFeatureConsumers": [
+        "legal"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/constants/contacts.ts"]
+        "entries": [
+          "src/shared/constants/contacts.ts"
+        ]
       }
     },
     {
       "source": "src/shared/constants/legalLinks.ts",
-      "targets": ["src/features/legal/legalLinks.ts"],
+      "targets": [
+        "src/features/legal/legalLinks.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
-      "productionFeatureConsumers": ["canvas", "legal"],
+      "productionFeatureConsumers": [
+        "canvas",
+        "legal"
+      ],
       "disposition": "horizontal-or-companion",
       "evidence": "Legal owns route links; horizontal dependency cannot import concrete Legal feature.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/constants/legalLinks.ts"]
+        "entries": [
+          "src/shared/constants/legalLinks.ts"
+        ]
       }
     },
     {
       "source": "src/shared/constants/media.ts",
-      "targets": ["src/core/constants/media.ts"],
+      "targets": [
+        "src/core/constants/media.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "search"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "search"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/constants/media.ts"]
+        "entries": [
+          "src/shared/constants/media.ts"
+        ]
       }
     },
     {
@@ -22323,15 +23453,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "feature-private",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/constants/routePaths.ts"]
+        "entries": [
+          "src/shared/constants/routePaths.ts"
+        ]
       }
     },
     {
       "source": "src/shared/constants/routePaths.unit.spec.ts",
-      "targets": ["src/features/admin/routePaths.unit.spec.ts"],
+      "targets": [
+        "src/features/admin/routePaths.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -22346,28 +23480,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/domain/externalImageProviders.ts",
-      "targets": ["src/core/contracts/externalImageProviders.ts"],
+      "targets": [
+        "src/core/contracts/externalImageProviders.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "library", "search"],
+      "productionFeatureConsumers": [
+        "admin",
+        "library",
+        "search"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/domain/externalImageProviders.ts"]
+        "entries": [
+          "src/shared/domain/externalImageProviders.ts"
+        ]
       }
     },
     {
       "source": "src/shared/domain/externalImageProviders.unit.spec.ts",
-      "targets": ["src/core/contracts/externalImageProviders.unit.spec.ts"],
+      "targets": [
+        "src/core/contracts/externalImageProviders.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22375,28 +23519,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/domain/generationContract.ts",
-      "targets": ["src/core/contracts/generationContract.ts"],
+      "targets": [
+        "src/core/contracts/generationContract.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "board", "canvas"],
+      "productionFeatureConsumers": [
+        "admin",
+        "board",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/domain/generationContract.ts"]
+        "entries": [
+          "src/shared/domain/generationContract.ts"
+        ]
       }
     },
     {
       "source": "src/shared/domain/generationContract.unit.spec.ts",
-      "targets": ["src/core/contracts/generationContract.unit.spec.ts"],
+      "targets": [
+        "src/core/contracts/generationContract.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22404,42 +23558,57 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/domain/imageActions.ts",
-      "targets": ["src/features/canvas/core/nodes/imageActions.ts"],
+      "targets": [
+        "src/features/canvas/core/nodes/imageActions.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/domain/imageActions.ts"]
+        "entries": [
+          "src/shared/domain/imageActions.ts"
+        ]
       }
     },
     {
       "source": "src/shared/domain/imageServices.ts",
-      "targets": ["src/core/contracts/imageServices.ts"],
+      "targets": [
+        "src/core/contracts/imageServices.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/domain/imageServices.ts"]
+        "entries": [
+          "src/shared/domain/imageServices.ts"
+        ]
       }
     },
     {
       "source": "src/shared/domain/imageServices.unit.spec.ts",
-      "targets": ["src/core/contracts/imageServices.unit.spec.ts"],
+      "targets": [
+        "src/core/contracts/imageServices.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22447,16 +23616,22 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/domain/serviceIcons.ts",
-      "targets": ["src/features/admin/shared/ui/serviceIcons.ts"],
+      "targets": [
+        "src/features/admin/shared/ui/serviceIcons.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin"],
+      "productionFeatureConsumers": [
+        "admin"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/domain/serviceIcons.ts"]
+        "entries": [
+          "src/shared/domain/serviceIcons.ts"
+        ]
       }
     },
     {
@@ -22464,17 +23639,22 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "targets": [
         "src/features/admin/prompts/core/promptVariables.ts",
         "src/features/canvas/core/nodes/serviceLabelKey.ts",
-        "src/features/canvas/session/serviceImageActionText.ts"
+        "src/features/canvas/session/media/serviceImageActionText.ts"
       ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas"
+      ],
       "disposition": "feature-private",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/domain/serviceRegistry.ts"]
+        "entries": [
+          "src/shared/domain/serviceRegistry.ts"
+        ]
       }
     },
     {
@@ -22482,7 +23662,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "targets": [
         "src/features/admin/prompts/core/promptVariables.unit.spec.ts",
         "src/features/canvas/core/nodes/serviceLabelKey.unit.spec.ts",
-        "src/features/canvas/session/serviceImageActionText.unit.spec.ts"
+        "src/features/canvas/session/media/serviceImageActionText.unit.spec.ts"
       ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
@@ -22490,7 +23670,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22498,7 +23678,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/errors/errorCatalog.ts",
-      "targets": ["src/core/errors/errorCatalog.ts"],
+      "targets": [
+        "src/core/errors/errorCatalog.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22513,22 +23695,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/errors/errorCatalog.ts"]
+        "entries": [
+          "src/shared/errors/errorCatalog.ts"
+        ]
       }
     },
     {
       "source": "src/shared/errors/errorCatalog.unit.spec.ts",
-      "targets": ["src/core/errors/errorCatalog.unit.spec.ts"],
+      "targets": [
+        "src/core/errors/errorCatalog.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22536,7 +23722,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/formatters.ts",
-      "targets": ["src/core/i18n/formatters.ts"],
+      "targets": [
+        "src/core/i18n/formatters.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22549,22 +23737,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/formatters.ts"]
+        "entries": [
+          "src/shared/i18n/formatters.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/formatters.unit.spec.ts",
-      "targets": ["src/core/i18n/formatters.unit.spec.ts"],
+      "targets": [
+        "src/core/i18n/formatters.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22572,7 +23764,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/i18nRuntime.ts",
-      "targets": ["src/core/i18n/i18nRuntime.ts"],
+      "targets": [
+        "src/core/i18n/i18nRuntime.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22602,7 +23796,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -22610,7 +23804,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/index.ts",
-      "targets": ["src/core/i18n/index.ts"],
+      "targets": [
+        "src/core/i18n/index.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22626,15 +23822,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/index.ts"]
+        "entries": [
+          "src/shared/i18n/index.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/localeCore.ts",
-      "targets": ["src/core/i18n/localeCore.ts"],
+      "targets": [
+        "src/core/i18n/localeCore.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22650,15 +23850,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/localeCore.ts"]
+        "entries": [
+          "src/shared/i18n/localeCore.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/localeDetection.ts",
-      "targets": ["src/core/i18n/localeDetection.ts"],
+      "targets": [
+        "src/core/i18n/localeDetection.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22680,7 +23884,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -22688,7 +23892,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/localeManifest.ts",
-      "targets": ["src/core/i18n/localeManifest.ts"],
+      "targets": [
+        "src/core/i18n/localeManifest.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22722,7 +23928,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 4
@@ -22730,7 +23936,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/localeParity.ts",
-      "targets": ["src/core/i18n/localeParity.ts"],
+      "targets": [
+        "src/core/i18n/localeParity.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22742,7 +23950,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       ],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -22750,14 +23958,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/localeParity.unit.spec.ts",
-      "targets": ["src/core/i18n/localeParity.unit.spec.ts"],
+      "targets": [
+        "src/core/i18n/localeParity.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -22765,7 +23975,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/account.ts",
-      "targets": ["src/core/i18n/locales/en/account.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/account.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22795,7 +24007,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -22803,7 +24015,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/admin.ts",
-      "targets": ["src/core/i18n/locales/en/admin.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/admin.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22829,7 +24043,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22837,7 +24051,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/auth.ts",
-      "targets": ["src/core/i18n/locales/en/auth.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/auth.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22863,7 +24079,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22871,7 +24087,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/billing.ts",
-      "targets": ["src/core/i18n/locales/en/billing.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/billing.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22897,7 +24115,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22905,7 +24123,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/canvas.ts",
-      "targets": ["src/core/i18n/locales/en/canvas.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/canvas.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22931,7 +24151,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22939,7 +24159,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/common.ts",
-      "targets": ["src/core/i18n/locales/en/common.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/common.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22965,7 +24187,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -22973,7 +24195,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/errors.ts",
-      "targets": ["src/core/i18n/locales/en/errors.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/errors.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -22999,7 +24223,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -23007,21 +24231,27 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/index.ts",
-      "targets": ["src/core/i18n/locales/en/index.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/index.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/locales/en/index.ts"]
+        "entries": [
+          "src/shared/i18n/locales/en/index.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/locales/en/library.ts",
-      "targets": ["src/core/i18n/locales/en/library.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/library.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23047,7 +24277,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -23055,7 +24285,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/search.ts",
-      "targets": ["src/core/i18n/locales/en/search.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/search.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23081,7 +24313,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -23089,7 +24321,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/en/workspace.ts",
-      "targets": ["src/core/i18n/locales/en/workspace.ts"],
+      "targets": [
+        "src/core/i18n/locales/en/workspace.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23115,7 +24349,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 2
@@ -23123,7 +24357,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/account.ts",
-      "targets": ["src/core/i18n/locales/es/account.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/account.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23145,7 +24381,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23153,7 +24389,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/admin.ts",
-      "targets": ["src/core/i18n/locales/es/admin.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/admin.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23175,7 +24413,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23183,7 +24421,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/auth.ts",
-      "targets": ["src/core/i18n/locales/es/auth.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/auth.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23205,7 +24445,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23213,7 +24453,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/billing.ts",
-      "targets": ["src/core/i18n/locales/es/billing.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/billing.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23235,7 +24477,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23243,7 +24485,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/canvas.ts",
-      "targets": ["src/core/i18n/locales/es/canvas.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/canvas.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23265,7 +24509,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23273,7 +24517,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/common.ts",
-      "targets": ["src/core/i18n/locales/es/common.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/common.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23295,7 +24541,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23303,7 +24549,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/errors.ts",
-      "targets": ["src/core/i18n/locales/es/errors.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/errors.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23325,7 +24573,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23333,7 +24581,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/index.ts",
-      "targets": ["src/core/i18n/locales/es/index.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/index.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23349,15 +24599,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/locales/es/index.ts"]
+        "entries": [
+          "src/shared/i18n/locales/es/index.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/locales/es/library.ts",
-      "targets": ["src/core/i18n/locales/es/library.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/library.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23379,7 +24633,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23387,7 +24641,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/search.ts",
-      "targets": ["src/core/i18n/locales/es/search.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/search.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23409,7 +24665,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23417,7 +24673,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/es/workspace.ts",
-      "targets": ["src/core/i18n/locales/es/workspace.ts"],
+      "targets": [
+        "src/core/i18n/locales/es/workspace.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23439,7 +24697,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23447,7 +24705,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/account.ts",
-      "targets": ["src/core/i18n/locales/ko/account.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/account.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23469,7 +24729,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23477,7 +24737,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/admin.ts",
-      "targets": ["src/core/i18n/locales/ko/admin.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/admin.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23499,7 +24761,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23507,7 +24769,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/auth.ts",
-      "targets": ["src/core/i18n/locales/ko/auth.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/auth.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23529,7 +24793,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23537,7 +24801,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/billing.ts",
-      "targets": ["src/core/i18n/locales/ko/billing.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/billing.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23559,7 +24825,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23567,7 +24833,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/canvas.ts",
-      "targets": ["src/core/i18n/locales/ko/canvas.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/canvas.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23589,7 +24857,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23597,7 +24865,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/common.ts",
-      "targets": ["src/core/i18n/locales/ko/common.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/common.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23619,7 +24889,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23627,7 +24897,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/errors.ts",
-      "targets": ["src/core/i18n/locales/ko/errors.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/errors.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23649,7 +24921,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23657,7 +24929,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/index.ts",
-      "targets": ["src/core/i18n/locales/ko/index.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/index.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23673,15 +24947,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/locales/ko/index.ts"]
+        "entries": [
+          "src/shared/i18n/locales/ko/index.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/locales/ko/library.ts",
-      "targets": ["src/core/i18n/locales/ko/library.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/library.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23703,7 +24981,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23711,7 +24989,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/search.ts",
-      "targets": ["src/core/i18n/locales/ko/search.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/search.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23733,7 +25013,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23741,7 +25021,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/ko/workspace.ts",
-      "targets": ["src/core/i18n/locales/ko/workspace.ts"],
+      "targets": [
+        "src/core/i18n/locales/ko/workspace.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23763,7 +25045,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23771,7 +25053,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/account.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/account.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/account.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23793,7 +25077,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23801,7 +25085,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/admin.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/admin.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/admin.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23823,7 +25109,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23831,7 +25117,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/auth.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/auth.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/auth.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23853,7 +25141,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23861,7 +25149,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/billing.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/billing.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/billing.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23883,7 +25173,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23891,7 +25181,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/canvas.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/canvas.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/canvas.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23913,7 +25205,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23921,7 +25213,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/common.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/common.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/common.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23943,7 +25237,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23951,7 +25245,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/errors.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/errors.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/errors.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23973,7 +25269,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -23981,7 +25277,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/index.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/index.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/index.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -23997,15 +25295,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/locales/zh-CN/index.ts"]
+        "entries": [
+          "src/shared/i18n/locales/zh-CN/index.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/library.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/library.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/library.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24027,7 +25329,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24035,7 +25337,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/search.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/search.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/search.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24057,7 +25361,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24065,7 +25369,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/locales/zh-CN/workspace.ts",
-      "targets": ["src/core/i18n/locales/zh-CN/workspace.ts"],
+      "targets": [
+        "src/core/i18n/locales/zh-CN/workspace.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24087,7 +25393,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24095,7 +25401,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/userIdeaCurrency.ts",
-      "targets": ["src/core/i18n/userIdeaCurrency.ts"],
+      "targets": [
+        "src/core/i18n/userIdeaCurrency.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24107,22 +25415,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/userIdeaCurrency.ts"]
+        "entries": [
+          "src/shared/i18n/userIdeaCurrency.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/userIdeaCurrency.unit.spec.ts",
-      "targets": ["src/core/i18n/userIdeaCurrency.unit.spec.ts"],
+      "targets": [
+        "src/core/i18n/userIdeaCurrency.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24130,7 +25442,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/i18n/userLocale.ts",
-      "targets": ["src/core/i18n/userLocale.ts"],
+      "targets": [
+        "src/core/i18n/userLocale.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24146,22 +25460,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/i18n/userLocale.ts"]
+        "entries": [
+          "src/shared/i18n/userLocale.ts"
+        ]
       }
     },
     {
       "source": "src/shared/i18n/userLocale.unit.spec.ts",
-      "targets": ["src/core/i18n/userLocale.unit.spec.ts"],
+      "targets": [
+        "src/core/i18n/userLocale.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24169,7 +25487,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/interaction/interactiveControlState.contract.spec.ts",
-      "targets": ["src/test/p1ThemeContracts.browser.spec.ts"],
+      "targets": [
+        "src/test/p1ThemeContracts.browser.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -24184,28 +25504,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/interaction/interactiveControlState.ts",
-      "targets": ["src/core/interaction/interactiveControlState.ts"],
+      "targets": [
+        "src/core/interaction/interactiveControlState.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "auth", "canvas"],
+      "productionFeatureConsumers": [
+        "account",
+        "auth",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/interaction/interactiveControlState.ts"]
+        "entries": [
+          "src/shared/interaction/interactiveControlState.ts"
+        ]
       }
     },
     {
       "source": "src/shared/interaction/interactiveControlState.unit.spec.ts",
-      "targets": ["src/core/interaction/interactiveControlState.unit.spec.ts"],
+      "targets": [
+        "src/core/interaction/interactiveControlState.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24213,56 +25543,80 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/interaction/menuKeyboardNavigation.ts",
-      "targets": ["src/core/interaction/menuKeyboardNavigation.ts"],
+      "targets": [
+        "src/core/interaction/menuKeyboardNavigation.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas", "library"],
+      "productionFeatureConsumers": [
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/interaction/menuKeyboardNavigation.ts"]
+        "entries": [
+          "src/shared/interaction/menuKeyboardNavigation.ts"
+        ]
       }
     },
     {
       "source": "src/shared/lib/brandMark.ts",
-      "targets": ["src/core/lib/brandMark.ts"],
+      "targets": [
+        "src/core/lib/brandMark.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/lib/brandMark.ts"]
+        "entries": [
+          "src/shared/lib/brandMark.ts"
+        ]
       }
     },
     {
       "source": "src/shared/lib/chartPrimitives.ts",
-      "targets": ["src/core/lib/chartPrimitives.ts"],
+      "targets": [
+        "src/core/lib/chartPrimitives.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "board"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "board"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/lib/chartPrimitives.ts"]
+        "entries": [
+          "src/shared/lib/chartPrimitives.ts"
+        ]
       }
     },
     {
       "source": "src/shared/lib/chartPrimitives.unit.spec.ts",
-      "targets": ["src/core/lib/chartPrimitives.unit.spec.ts"],
+      "targets": [
+        "src/core/lib/chartPrimitives.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24270,28 +25624,37 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/lib/chartTimeRange.ts",
-      "targets": ["src/core/lib/chartTimeRange.ts"],
+      "targets": [
+        "src/core/lib/chartTimeRange.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/lib/chartTimeRange.ts"]
+        "entries": [
+          "src/shared/lib/chartTimeRange.ts"
+        ]
       }
     },
     {
       "source": "src/shared/lib/chartTimeRange.unit.spec.ts",
-      "targets": ["src/core/lib/chartTimeRange.unit.spec.ts"],
+      "targets": [
+        "src/core/lib/chartTimeRange.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24299,42 +25662,59 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/lib/pageChrome.ts",
-      "targets": ["src/core/lib/pageChrome.ts"],
+      "targets": [
+        "src/core/lib/pageChrome.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/lib/pageChrome.ts"]
+        "entries": [
+          "src/shared/lib/pageChrome.ts"
+        ]
       }
     },
     {
       "source": "src/shared/media/imageAssetPipeline.ts",
-      "targets": ["src/core/media/imageAssetPipeline.ts"],
+      "targets": [
+        "src/core/media/imageAssetPipeline.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/media/imageAssetPipeline.ts"]
+        "entries": [
+          "src/shared/media/imageAssetPipeline.ts"
+        ]
       }
     },
     {
       "source": "src/shared/media/imageAssetPipeline.unit.spec.ts",
-      "targets": ["src/core/media/imageAssetPipeline.unit.spec.ts"],
+      "targets": [
+        "src/core/media/imageAssetPipeline.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24342,28 +25722,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/media/imageDimensions.ts",
-      "targets": ["src/core/media/imageDimensions.ts"],
+      "targets": [
+        "src/core/media/imageDimensions.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Browser natural-image-size probe/cache capability, no Canvas node/session state.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/media/imageDimensions.ts"]
+        "entries": [
+          "src/shared/media/imageDimensions.ts"
+        ]
       }
     },
     {
       "source": "src/shared/media/imageDimensions.unit.spec.ts",
-      "targets": ["src/core/media/imageDimensions.unit.spec.ts"],
+      "targets": [
+        "src/core/media/imageDimensions.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24371,28 +25759,37 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/media/mediaRef.ts",
-      "targets": ["src/core/media/mediaRef.ts"],
+      "targets": [
+        "src/core/media/mediaRef.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["board", "canvas"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/media/mediaRef.ts"]
+        "entries": [
+          "src/shared/media/mediaRef.ts"
+        ]
       }
     },
     {
       "source": "src/shared/media/mediaRef.unit.spec.ts",
-      "targets": ["src/core/media/mediaRef.unit.spec.ts"],
+      "targets": [
+        "src/core/media/mediaRef.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24400,42 +25797,58 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/media/preloadImage.ts",
-      "targets": ["src/features/canvas/session/media/preloadImage.ts"],
+      "targets": [
+        "src/features/canvas/session/media/preloadImage.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "feature-private",
       "evidence": "Horizontal ownership contract verified against production consumer paths and existing Shared CONTEXT; importing capability does not itself make it feature-private.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/media/preloadImage.ts"]
+        "entries": [
+          "src/shared/media/preloadImage.ts"
+        ]
       }
     },
     {
       "source": "src/shared/media/visionIngressPolicy.ts",
-      "targets": ["src/core/media/visionIngressPolicy.ts"],
+      "targets": [
+        "src/core/media/visionIngressPolicy.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "search"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "search"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/media/visionIngressPolicy.ts"]
+        "entries": [
+          "src/shared/media/visionIngressPolicy.ts"
+        ]
       }
     },
     {
       "source": "src/shared/media/visionIngressPolicy.unit.spec.ts",
-      "targets": ["src/core/media/visionIngressPolicy.unit.spec.ts"],
+      "targets": [
+        "src/core/media/visionIngressPolicy.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24443,28 +25856,37 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/chartMotion.ts",
-      "targets": ["src/core/motion/chartMotion.ts"],
+      "targets": [
+        "src/core/motion/chartMotion.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/motion/chartMotion.ts"]
+        "entries": [
+          "src/shared/motion/chartMotion.ts"
+        ]
       }
     },
     {
       "source": "src/shared/motion/chartMotion.unit.spec.ts",
-      "targets": ["src/core/motion/chartMotion.unit.spec.ts"],
+      "targets": [
+        "src/core/motion/chartMotion.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24472,7 +25894,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/dialog-motion.css",
-      "targets": ["src/core/motion/dialog-motion.css"],
+      "targets": [
+        "src/core/motion/dialog-motion.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24484,7 +25908,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       ],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24492,14 +25916,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/dialog-motion.css.d.ts",
-      "targets": ["src/core/motion/dialog-motion.css.d.ts"],
+      "targets": [
+        "src/core/motion/dialog-motion.css.d.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24507,7 +25933,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/dialogMotion.contract.spec.ts",
-      "targets": ["src/test/p1ThemeContracts.browser.spec.ts"],
+      "targets": [
+        "src/test/p1ThemeContracts.browser.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -24522,14 +25950,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/dialogMotion.ts",
-      "targets": ["src/core/motion/dialogMotion.ts"],
+      "targets": [
+        "src/core/motion/dialogMotion.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24537,28 +25967,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/motionPolicy.ts",
-      "targets": ["src/core/motion/motionPolicy.ts"],
+      "targets": [
+        "src/core/motion/motionPolicy.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "canvas"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/motion/motionPolicy.ts"]
+        "entries": [
+          "src/shared/motion/motionPolicy.ts"
+        ]
       }
     },
     {
       "source": "src/shared/motion/motionPolicy.unit.spec.ts",
-      "targets": ["src/core/motion/motionPolicy.unit.spec.ts"],
+      "targets": [
+        "src/core/motion/motionPolicy.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24566,14 +26006,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/motionPolicyGuard.unit.spec.ts",
-      "targets": ["src/core/motion/motionPolicyGuard.unit.spec.ts"],
+      "targets": [
+        "src/core/motion/motionPolicyGuard.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24581,7 +26023,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/popover-motion.css",
-      "targets": ["src/core/motion/popover-motion.css"],
+      "targets": [
+        "src/core/motion/popover-motion.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24591,7 +26035,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Generic popover enter/leave motion token contract, no Canvas business selectors.",
       "consumerEvidence": {
@@ -24601,28 +26047,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/motion/popoverMotion.ts",
-      "targets": ["src/core/motion/popoverMotion.ts"],
+      "targets": [
+        "src/core/motion/popoverMotion.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Generic reduced-motion-aware transition policy, no Canvas session state.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/motion/popoverMotion.ts"]
+        "entries": [
+          "src/shared/motion/popoverMotion.ts"
+        ]
       }
     },
     {
       "source": "src/shared/motion/popoverMotion.unit.spec.ts",
-      "targets": ["src/core/motion/popoverMotion.unit.spec.ts"],
+      "targets": [
+        "src/core/motion/popoverMotion.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24630,7 +26084,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/query/queryClient.ts",
-      "targets": ["src/core/query/queryClient.ts"],
+      "targets": [
+        "src/core/query/queryClient.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24646,36 +26102,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/query/queryClient.ts"]
+        "entries": [
+          "src/shared/query/queryClient.ts"
+        ]
       }
     },
     {
       "source": "src/shared/query/queryDefaults.ts",
-      "targets": ["src/core/query/queryDefaults.ts"],
+      "targets": [
+        "src/core/query/queryDefaults.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/query/queryDefaults.ts"]
+        "entries": [
+          "src/shared/query/queryDefaults.ts"
+        ]
       }
     },
     {
       "source": "src/shared/query/queryDefaults.unit.spec.ts",
-      "targets": ["src/core/query/queryDefaults.unit.spec.ts"],
+      "targets": [
+        "src/core/query/queryDefaults.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24683,14 +26152,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/query/queryPlacement.contract.spec.ts",
-      "targets": ["src/core/query/queryPlacement.contract.spec.ts"],
+      "targets": [
+        "src/core/query/queryPlacement.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24698,14 +26169,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/query/taskResult.contract.spec.ts",
-      "targets": ["src/core/query/taskResult.contract.spec.ts"],
+      "targets": [
+        "src/core/query/taskResult.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24713,35 +26186,51 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/query/taskResult.ts",
-      "targets": ["src/core/query/taskResult.ts"],
+      "targets": [
+        "src/core/query/taskResult.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["canvas"],
+      "productionFeatureConsumers": [
+        "canvas"
+      ],
       "disposition": "horizontal-capability-reviewed",
       "evidence": "Transport image-output normalization follows canonical media/OpenAPI shape; no Query cache dependency or Canvas graph state.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/query/taskResult.ts"]
+        "entries": [
+          "src/shared/query/taskResult.ts"
+        ]
       }
     },
     {
       "source": "src/shared/query/userCreditsInvalidation.ts",
-      "targets": ["src/core/query/userCreditsInvalidation.ts"],
+      "targets": [
+        "src/core/query/userCreditsInvalidation.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin", "canvas"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/query/userCreditsInvalidation.ts"]
+        "entries": [
+          "src/shared/query/userCreditsInvalidation.ts"
+        ]
       }
     },
     {
       "source": "src/shared/router/queryParams.ts",
-      "targets": ["src/core/router/queryParams.ts"],
+      "targets": [
+        "src/core/router/queryParams.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24755,22 +26244,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/router/queryParams.ts"]
+        "entries": [
+          "src/shared/router/queryParams.ts"
+        ]
       }
     },
     {
       "source": "src/shared/router/queryParams.unit.spec.ts",
-      "targets": ["src/core/router/queryParams.unit.spec.ts"],
+      "targets": [
+        "src/core/router/queryParams.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24778,28 +26271,34 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/seo/routeSeo.ts",
-      "targets": ["src/core/seo/routeSeo.ts"],
+      "targets": [
+        "src/core/seo/routeSeo.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/seo/routeSeo.ts"]
+        "entries": [
+          "src/shared/seo/routeSeo.ts"
+        ]
       }
     },
     {
       "source": "src/shared/seo/routeSeo.unit.spec.ts",
-      "targets": ["src/core/seo/routeSeo.unit.spec.ts"],
+      "targets": [
+        "src/core/seo/routeSeo.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24807,7 +26306,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/seo/seoStaticHtml.ts",
-      "targets": ["src/core/seo/seoStaticHtml.ts"],
+      "targets": [
+        "src/core/seo/seoStaticHtml.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24819,7 +26320,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       ],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 1
@@ -24827,7 +26328,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/appOverlayMenu.ts",
-      "targets": ["src/theme/appOverlayMenu.ts"],
+      "targets": [
+        "src/theme/appOverlayMenu.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -24839,22 +26342,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/theme/appOverlayMenu.ts"]
+        "entries": [
+          "src/shared/theme/appOverlayMenu.ts"
+        ]
       }
     },
     {
       "source": "src/shared/theme/appOverlayMenu.unit.spec.ts",
-      "targets": ["src/theme/appOverlayMenu.unit.spec.ts"],
+      "targets": [
+        "src/theme/appOverlayMenu.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24862,14 +26369,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/board-page-background.css",
-      "targets": ["src/theme/atoms/board-page-background.css"],
+      "targets": [
+        "src/theme/atoms/board-page-background.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24877,14 +26386,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/brand-mark.css",
-      "targets": ["src/theme/atoms/brand-mark.css"],
+      "targets": [
+        "src/theme/atoms/brand-mark.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24892,14 +26403,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/interactive-control-state.css",
-      "targets": ["src/theme/atoms/interactive-control-state.css"],
+      "targets": [
+        "src/theme/atoms/interactive-control-state.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24907,14 +26420,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/page-chrome.css",
-      "targets": ["src/theme/atoms/page-chrome.css"],
+      "targets": [
+        "src/theme/atoms/page-chrome.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24922,14 +26437,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/pageChrome.contract.spec.ts",
-      "targets": ["scripts/checkThemeContractRetirements.ts"],
+      "targets": [
+        "scripts/checkThemeContractRetirements.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "retired-effective-replacement",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24937,14 +26454,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/round-control.css",
-      "targets": ["src/theme/atoms/round-control.css"],
+      "targets": [
+        "src/theme/atoms/round-control.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24952,7 +26471,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/roundControl.contract.spec.ts",
-      "targets": ["scripts/checkRetirementReplacements.ts"],
+      "targets": [
+        "scripts/checkRetirementReplacements.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -24967,14 +26488,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/touch-target.css",
-      "targets": ["src/theme/atoms/touch-target.css"],
+      "targets": [
+        "src/theme/atoms/touch-target.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24982,14 +26505,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/atoms/user-avatar-button.css",
-      "targets": ["src/theme/atoms/user-avatar-button.css"],
+      "targets": [
+        "src/theme/atoms/user-avatar-button.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -24997,14 +26522,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/composables/themeKeyboard.ts",
-      "targets": ["src/theme/composables/themeKeyboard.ts"],
+      "targets": [
+        "src/theme/composables/themeKeyboard.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25012,7 +26539,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/composables/themeMode.ts",
-      "targets": ["src/theme/composables/themeMode.ts"],
+      "targets": [
+        "src/theme/composables/themeMode.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25030,9 +26559,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "kind": "runtime"
         }
       ],
-      "productionFeatureConsumers": ["admin", "board", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "board",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 3
@@ -25040,14 +26574,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/composables/themeMode.unit.spec.ts",
-      "targets": ["src/theme/composables/themeMode.unit.spec.ts"],
+      "targets": [
+        "src/theme/composables/themeMode.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25055,28 +26591,39 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/composables/useTheme.ts",
-      "targets": ["src/theme/composables/useTheme.ts"],
+      "targets": [
+        "src/theme/composables/useTheme.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "board", "canvas", "workspace"],
+      "productionFeatureConsumers": [
+        "admin",
+        "board",
+        "canvas",
+        "workspace"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/theme/composables/useTheme.ts"]
+        "entries": [
+          "src/shared/theme/composables/useTheme.ts"
+        ]
       }
     },
     {
       "source": "src/shared/theme/composables/useTheme.unit.spec.ts",
-      "targets": ["src/theme/composables/useTheme.unit.spec.ts"],
+      "targets": [
+        "src/theme/composables/useTheme.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25084,28 +26631,39 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/dialogMask.ts",
-      "targets": ["src/theme/dialogMask.ts"],
+      "targets": [
+        "src/theme/dialogMask.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "auth", "board", "library"],
+      "productionFeatureConsumers": [
+        "account",
+        "auth",
+        "board",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/theme/dialogMask.ts"]
+        "entries": [
+          "src/shared/theme/dialogMask.ts"
+        ]
       }
     },
     {
       "source": "src/shared/theme/formControls.contract.spec.ts",
-      "targets": ["src/theme/formControls.contract.spec.ts"],
+      "targets": [
+        "src/theme/formControls.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25113,42 +26671,59 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/formControls.ts",
-      "targets": ["src/theme/formControls.ts"],
+      "targets": [
+        "src/theme/formControls.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "auth", "library"],
+      "productionFeatureConsumers": [
+        "account",
+        "auth",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/theme/formControls.ts"]
+        "entries": [
+          "src/shared/theme/formControls.ts"
+        ]
       }
     },
     {
       "source": "src/shared/theme/lightboxScrim.ts",
-      "targets": ["src/theme/lightboxScrim.ts"],
+      "targets": [
+        "src/theme/lightboxScrim.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["library", "search"],
+      "productionFeatureConsumers": [
+        "library",
+        "search"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/theme/lightboxScrim.ts"]
+        "entries": [
+          "src/shared/theme/lightboxScrim.ts"
+        ]
       }
     },
     {
       "source": "src/shared/theme/lightboxScrim.unit.spec.ts",
-      "targets": ["src/theme/lightboxScrim.unit.spec.ts"],
+      "targets": [
+        "src/theme/lightboxScrim.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25156,14 +26731,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/canvas.css",
-      "targets": ["src/theme/tokens/canvas.css"],
+      "targets": [
+        "src/theme/tokens/canvas.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25171,14 +26748,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/contracts/darkTokens.contract.spec.ts",
-      "targets": ["src/theme/tokens/contracts/darkTokens.contract.spec.ts"],
+      "targets": [
+        "src/theme/tokens/contracts/darkTokens.contract.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25186,7 +26765,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/contracts/tokenParity.contract.spec.ts",
-      "targets": ["scripts/checkRetirementReplacements.ts"],
+      "targets": [
+        "scripts/checkRetirementReplacements.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "done",
@@ -25201,14 +26782,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/dark.css",
-      "targets": ["src/theme/tokens/dark.css"],
+      "targets": [
+        "src/theme/tokens/dark.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25216,14 +26799,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/index.css",
-      "targets": ["src/theme/tokens/index.css"],
+      "targets": [
+        "src/theme/tokens/index.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25231,14 +26816,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/light.css",
-      "targets": ["src/theme/tokens/light.css"],
+      "targets": [
+        "src/theme/tokens/light.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25246,14 +26833,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/primitives.css",
-      "targets": ["src/theme/tokens/primitives.css"],
+      "targets": [
+        "src/theme/tokens/primitives.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25261,14 +26850,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/semantic-dark.css",
-      "targets": ["src/theme/tokens/semantic-dark.css"],
+      "targets": [
+        "src/theme/tokens/semantic-dark.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25276,14 +26867,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/theme/tokens/semantic-light.css",
-      "targets": ["src/theme/tokens/semantic-light.css"],
+      "targets": [
+        "src/theme/tokens/semantic-light.css"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25291,7 +26884,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/auth.ts",
-      "targets": ["src/core/utils/auth.ts"],
+      "targets": [
+        "src/core/utils/auth.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25307,22 +26902,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/auth.ts"]
+        "entries": [
+          "src/shared/utils/auth.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/auth.unit.spec.ts",
-      "targets": ["src/core/utils/auth.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/auth.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25330,42 +26929,58 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/currency.ts",
-      "targets": ["src/core/utils/currency.ts"],
+      "targets": [
+        "src/core/utils/currency.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/currency.ts"]
+        "entries": [
+          "src/shared/utils/currency.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/dateTime.ts",
-      "targets": ["src/core/utils/dateTime.ts"],
+      "targets": [
+        "src/core/utils/dateTime.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "admin"],
+      "productionFeatureConsumers": [
+        "account",
+        "admin"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/dateTime.ts"]
+        "entries": [
+          "src/shared/utils/dateTime.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/dateTime.unit.spec.ts",
-      "targets": ["src/core/utils/dateTime.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/dateTime.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25373,7 +26988,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/errorMessages.ts",
-      "targets": ["src/core/utils/errorMessages.ts"],
+      "targets": [
+        "src/core/utils/errorMessages.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25388,22 +27005,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/errorMessages.ts"]
+        "entries": [
+          "src/shared/utils/errorMessages.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/errorMessages.unit.spec.ts",
-      "targets": ["src/core/utils/errorMessages.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/errorMessages.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25411,21 +27032,31 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/formValidation.ts",
-      "targets": ["src/core/utils/formValidation.ts"],
+      "targets": [
+        "src/core/utils/formValidation.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["account", "auth", "library"],
+      "productionFeatureConsumers": [
+        "account",
+        "auth",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/formValidation.ts"]
+        "entries": [
+          "src/shared/utils/formValidation.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/ids.ts",
-      "targets": ["src/core/utils/ids.ts"],
+      "targets": [
+        "src/core/utils/ids.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25438,50 +27069,69 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "search"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/ids.ts"]
+        "entries": [
+          "src/shared/utils/ids.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/imageUploadSupport.ts",
-      "targets": ["src/core/utils/imageUploadSupport.ts"],
+      "targets": [
+        "src/core/utils/imageUploadSupport.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["admin", "canvas", "search"],
+      "productionFeatureConsumers": [
+        "admin",
+        "canvas",
+        "search"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/imageUploadSupport.ts"]
+        "entries": [
+          "src/shared/utils/imageUploadSupport.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/number.ts",
-      "targets": ["src/core/utils/number.ts"],
+      "targets": [
+        "src/core/utils/number.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["board", "canvas"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/number.ts"]
+        "entries": [
+          "src/shared/utils/number.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/number.unit.spec.ts",
-      "targets": ["src/core/utils/number.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/number.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25489,7 +27139,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/opaqueIds.ts",
-      "targets": ["src/core/utils/opaqueIds.ts"],
+      "targets": [
+        "src/core/utils/opaqueIds.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25504,22 +27156,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/opaqueIds.ts"]
+        "entries": [
+          "src/shared/utils/opaqueIds.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/opaqueIds.unit.spec.ts",
-      "targets": ["src/core/utils/opaqueIds.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/opaqueIds.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25527,28 +27183,38 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/polling.ts",
-      "targets": ["src/core/utils/polling.ts"],
+      "targets": [
+        "src/core/utils/polling.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
-      "productionFeatureConsumers": ["board", "canvas", "library"],
+      "productionFeatureConsumers": [
+        "board",
+        "canvas",
+        "library"
+      ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/polling.ts"]
+        "entries": [
+          "src/shared/utils/polling.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/polling.unit.spec.ts",
-      "targets": ["src/core/utils/polling.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/polling.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -25556,7 +27222,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     {
       "source": "src/shared/utils/storage.ts",
-      "targets": ["src/core/utils/storage.ts"],
+      "targets": [
+        "src/core/utils/storage.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25572,15 +27240,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "workspace"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/storage.ts"]
+        "entries": [
+          "src/shared/utils/storage.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/workspaceId.ts",
-      "targets": ["src/core/utils/workspaceId.ts"],
+      "targets": [
+        "src/core/utils/workspaceId.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
@@ -25592,22 +27264,26 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "search"
       ],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "seam-inventory",
-        "entries": ["src/shared/utils/workspaceId.ts"]
+        "entries": [
+          "src/shared/utils/workspaceId.ts"
+        ]
       }
     },
     {
       "source": "src/shared/utils/workspaceId.unit.spec.ts",
-      "targets": ["src/core/utils/workspaceId.unit.spec.ts"],
+      "targets": [
+        "src/core/utils/workspaceId.unit.spec.ts"
+      ],
       "phase": "P1b",
       "owner": "/root/p1b-lane",
       "status": "planned",
       "consumers": [],
       "productionFeatureConsumers": [],
       "disposition": "horizontal-or-companion",
-      "evidence": "Explicit \u00a710 ownership or horizontal directory rule; companions follow owning implementation.",
+      "evidence": "Explicit §10 ownership or horizontal directory rule; companions follow owning implementation.",
       "consumerEvidence": {
         "kind": "direct-cruise-edges",
         "count": 0
@@ -27821,7 +29497,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "sources": {
           "src/app/style.contract.spec.ts": 29,
           "src/features/admin/shared/lib/textRampContrast.contract.spec.ts": 25,
-          "src/features/canvas/domain/canvasDomainPurity.unit.spec.ts": 3,
+          "src/features/canvas/core/canvasDomainPurity.unit.spec.ts": 3,
           "src/shared/components/iconButtonAccessibleName.contract.spec.ts": 2
         },
         "rationale": "Every original frozen ID is retired only after its specific semantic lint or real Chromium behavior replacement passed positive/negative verification. Frozen source IDs and denominators stay unchanged.",
@@ -27887,7 +29563,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "P1/P2 predecessor formal checkpoint/CI acceptance was not recorded at original completion.",
         "Named delegated acceptance was not recorded until this closeout."
       ],
-      "deviationEvidenceRefs": ["p25-closeout-historical-checkpoint-deviation"]
+      "deviationEvidenceRefs": [
+        "p25-closeout-historical-checkpoint-deviation"
+      ]
     },
     "artifacts": [
       {
@@ -27904,7 +29582,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/.dependency-cruiser.cjs",
-        "sha256": "842c1ccc09dd568f953fe6090217a7d1f2b69aa8dd08f8bf5a397bc369899a4f"
+        "sha256": "10887068aa2f5fc566430b2e98c995579209907315da1876948bf8af9bda6df8"
       },
       {
         "path": "apps/web/eslint.config.js",
@@ -27916,7 +29594,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/knip.jsonc",
-        "sha256": "b7dd59e337f1b80490e5e415abd0400d235fd1e3e3bc61707a4c5e28e26f15cc"
+        "sha256": "3c441bfff63371ec52ded86a0d8d5a89b2bab53bdb77e3b8ba8f49e896c6bef0"
       },
       {
         "path": "apps/web/knip.production.config.ts",
@@ -27928,7 +29606,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/package.json",
-        "sha256": "1278d2286f546442f64d992dd2fbdb1c4ccd14947acc809fffd26e3c53d0cf6b"
+        "sha256": "a333309c6cfcab9da58f328b80e4f354aef073d164a83c5d79df37c038a296a5"
       },
       {
         "path": "apps/web/scripts/accessibilitySmoke.ts",
@@ -27936,11 +29614,11 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/scripts/checkFrontendMigrationLedger.ts",
-        "sha256": "773a07ae82d35caa3d3f3722bf9d68f7bf83d430fc5fb20e864a675ba7a5e767"
+        "sha256": "653b09834f8bef8e5a543a3556fbf47c055afa43417088646edce50fa25c0030"
       },
       {
         "path": "apps/web/scripts/checkRetirementReplacements.ts",
-        "sha256": "dfe313f5b7f2f350dc900f9fee136730c8e189147a555a49193e1da4be42e7a7"
+        "sha256": "efc9db7d0f7ff8bd0c22bd5a4e614f9d9c346ef42343dcff413519068d80a154"
       },
       {
         "path": "apps/web/scripts/checkThemeContractRetirements.ts",
@@ -27948,7 +29626,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/scripts/knipGovernanceManifest.json",
-        "sha256": "78773510aed3e8df10266db74600769ec6f2a96a3ba1e3c2028238d2368bfd5a"
+        "sha256": "bbff5082e25b8126cf8b32c6a901e77b486c992552921b233c9bf034635e0e61"
       },
       {
         "path": "apps/web/scripts/smokeSupport.contract.spec.ts",
@@ -27968,7 +29646,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/src/core/CONTEXT.md",
-        "sha256": "87e65b2e2b3f8cdc16c2dca336efb3a76c99fe4244f65f50da738d6fbf87e15a"
+        "sha256": "9777d7676e450505f581ef8b3ae371b0b27bc9b1d1412a6a2fef8ba2eb946580"
       },
       {
         "path": "apps/web/src/core/query/queryClient.ts",
@@ -28040,7 +29718,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/src/features/board/CONTEXT.md",
-        "sha256": "c05bc1aaaa661f3614541030ded0921269a84d368d0c7a8aeb5e8f14b86753af"
+        "sha256": "12131d418ab2667069064528259f1744ce96456b8effdc5eb92a0fc768890916"
       },
       {
         "path": "apps/web/src/features/board/session/adapters/boardsResource.ts",
@@ -28052,7 +29730,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
-        "sha256": "68d77d0ee6a7c44a8686f4ab697dc99449b972516ea18b95e1f34243a5b09c80"
+        "sha256": "c1d5733375081c59ad61049e8d33c8a46e52f170628e2054c7f46b4b6c7a7a9b"
       },
       {
         "path": "apps/web/src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
@@ -28068,7 +29746,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "apps/web/src/features/board/session/sync/boardFocusControls.contract.spec.ts",
-        "sha256": "1492e5e6b67e812b9c9c05d8fb9e8265ebcb9fa2ce3b69ce4937454b9e7e23df"
+        "sha256": "a203d041ac3df8d582ba3d17201594107974f067e7a379d1c427bdc10121bb0c"
       },
       {
         "path": "apps/web/src/features/board/session/sync/boardQueries.ts",
@@ -28119,36 +29797,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "sha256": "141652bab044f14808fb29d6bf382c461428e0dae1c0f3c6c3b2c26a55cfef2a"
       },
       {
-        "path": "apps/web/src/features/canvas/application/board-session/autosavePolicy.ts",
+        "path": "apps/web/src/features/canvas/session/board-session/autosavePolicy.ts",
         "sha256": "874eb9c6ec61c7474927a3c03842673b1b6674a2a4ecd11d3458c2b9c357c4e7"
       },
       {
-        "path": "apps/web/src/features/canvas/application/board-session/repository.ts",
+        "path": "apps/web/src/features/canvas/session/board-session/repository.ts",
         "sha256": "26e835524ab429f09f3a393a72d4af92c3e267286467bfa303f89dc82b13c72e"
       },
       {
-        "path": "apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts",
-        "sha256": "dd556c62870434fa57599d9f1163df2e56447c040059755487c3d1fbcacca49e"
+        "path": "apps/web/src/features/canvas/session/board-session/useBoardAutosave.ts",
+        "sha256": "2a7b9373ac6255c643e29c6829fd2602a91801969e804d27250dbd64b9bcf764"
       },
       {
-        "path": "apps/web/src/features/canvas/application/board-session/useBoardSession.ts",
+        "path": "apps/web/src/features/canvas/session/board-session/useBoardSession.ts",
         "sha256": "0667fa8dfe56a945e82fe1543552049cea87b5c15439af938d8f92ebb57233cc"
       },
       {
-        "path": "apps/web/src/features/canvas/application/execution/workspace/canvasTaskContractMapping.ts",
-        "sha256": "c6b3dc620cbeb37a4aaa9ce70392ce23f0df3ff76799257f4f06a4f7eb635f9d"
+        "path": "apps/web/src/features/canvas/session/execution/workspace/canvasTaskContractMapping.ts",
+        "sha256": "6472f3e9036814dc411decb69b2a6e10ee12159ca7d2c232b81a71175be41a60"
       },
       {
-        "path": "apps/web/src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
-        "sha256": "757496fa6dfb2fe712dfc56801a8d62b6888fdf0712ef186a8a2907c56896db8"
+        "path": "apps/web/src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+        "sha256": "7214d5a2fdcc2a0018ac92c92d5d2e1a5a1f6065ca1aa7f1a6a72304c56202af"
       },
       {
-        "path": "apps/web/src/features/canvas/application/workspace/internal/useBoardRuntime.ts",
-        "sha256": "0a36a401e0c0783ef90049e09fc81460c4c70927169411119030a18d82ba56c8"
+        "path": "apps/web/src/features/canvas/session/workspace/internal/useBoardRuntime.ts",
+        "sha256": "b8804451bbbb73a4044f9bb5388d02ef19f1643d25f5343a67ed2bdcabfb1c88"
       },
       {
         "path": "apps/web/src/test/retirementLint.contract.spec.ts",
-        "sha256": "07e51c33de99b90c3eec29b42b5c7243a58ed441ed0f0541c7037245b4708422"
+        "sha256": "fad5750c63a06d2b99a9237f4583d66bfc516fb24552243412c81e80e3a93987"
       },
       {
         "path": "apps/web/tsconfig.test-node.json",
@@ -28168,7 +29846,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "path": "docs/frontend-seam-inventory.md",
-        "sha256": "327d49a9fa3f7485224c0e883efe26f17a1c1ab3d6d9e9f95540550692727cad"
+        "sha256": "3ec3b547c64f61f1bebf3097871e41bab4168b41ecc50835c2081d15487c3c9c"
       },
       {
         "path": "scripts/ci-legacy-media-zero-scan-test.sh",
@@ -28394,10 +30072,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:28:42.899364+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
         "exitCode": 0,
@@ -28418,10 +30098,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:13.829586+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:run",
         "exitCode": 0,
@@ -28431,13 +30113,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-build",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:13.829593+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run build",
         "exitCode": 0,
@@ -28447,13 +30133,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-lint",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:13.829585+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint",
         "exitCode": 0,
@@ -28463,13 +30153,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-typecheck",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:13.832062+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:typecheck",
         "exitCode": 0,
@@ -28479,13 +30173,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-dependencies",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "f96f7083673755c03bc90566823d12dddcede8ed0168e7adc5e11621d4ade396",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:23:16.372508+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:dependencies -- --strict --phase=P1",
         "exitCode": 0,
@@ -28495,13 +30193,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-strict-p1",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:30:03.115501+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:p1",
         "exitCode": 0,
@@ -28511,13 +30214,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-ledger-p2",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:28:42.893680+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:migration-ledger -- --strict --phase=P2",
         "exitCode": 0,
@@ -28527,13 +30234,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-knip-ledger-final",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:28:42.887507+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run audit:knip-ledger",
         "exitCode": 0,
@@ -28543,13 +30254,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-knip-ledger",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:39.738607+00:00",
         "result": "failed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run audit:knip-ledger",
         "exitCode": 1,
@@ -28559,13 +30274,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-format-final",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:28:42.890748+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run format:check",
         "exitCode": 0,
@@ -28575,13 +30294,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-format",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:36.215828+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run format:check",
         "exitCode": 0,
@@ -28591,13 +30314,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-style",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:37.367071+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:style",
         "exitCode": 0,
@@ -28607,13 +30334,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-generated",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision. Final replay covers changed checker/Knip registration; runtime source/build inputs were unchanged.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "bc16aeaa56c0d59b02d1dd5f67cc87581984db89ab421d71fcd12c9fdee470f6",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:24:38.672713+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run api:check-generated",
         "exitCode": 0,
@@ -28623,13 +30354,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-checker-eslint",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:30:03.115496+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx eslint scripts/checkFrontendMigrationLedger.ts",
         "exitCode": 0,
@@ -28652,25 +30387,33 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "kind": "review",
         "scope": "All 33 final P2.5 design, behavior, helper and governance artifacts; technical review only.; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:31:36.622629+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "reviewer": "/root/p25_final_verifier",
         "decision": "passed",
-        "reviewedArtifactRefs": ["syncDesign.artifacts"],
+        "reviewedArtifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "summary": "Independent 38 tests, test:typecheck, 51 checker fixtures, hashes, 4 failing negative mutations, exact Seam edges and file-only Knip support review PASS. Does not grant plan-owner acceptance, merge or CI."
       },
       {
         "id": "p25-ledger-p25",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution; historical artifact revision before redundancy cleanup; preserved as history.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "cb1e16881bbe5c0a3a1eed79532afe8cf5a24ea9586f3ac2b6b96bb744c1b2b5",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:31:37.373545+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
         "exitCode": 0,
@@ -28691,10 +30434,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:41:56.088974+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts",
         "exitCode": 0,
@@ -28704,13 +30449,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-cleanup-typecheck",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:41:56.083124+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:typecheck",
         "exitCode": 0,
@@ -28720,13 +30469,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-cleanup-eslint",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:41:56.083402+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx eslint scripts/checkFrontendMigrationLedger.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts",
         "exitCode": 0,
@@ -28736,13 +30489,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-cleanup-strict-p1",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:41:56.090953+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:p1",
         "exitCode": 0,
@@ -28752,13 +30510,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-cleanup-ledger-p2",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:43:09.853138+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:migration-ledger -- --strict --phase=P2",
         "exitCode": 0,
@@ -28768,13 +30530,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-cleanup-format",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:43:11.007701+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx prettier --check scripts/checkFrontendMigrationLedger.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts src/core/CONTEXT.md ../../PLANS.md ../../docs/architecture/frontend-contract-inventory.md",
         "exitCode": 0,
@@ -28797,25 +30563,33 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "kind": "review",
         "scope": "P2.5 redundancy cleanup and all 33 exact final artifacts; technical review only.",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:45:09.451503+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "reviewer": "/root/p25_cleanup_verifier",
         "decision": "passed",
-        "reviewedArtifactRefs": ["syncDesign.artifacts"],
+        "reviewedArtifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "summary": "Independent equivalence review and 51 real checker fixtures PASS; six behavior assertion multisets and exact trio preserved, all current bytes/frozen invariants verified. No formal acceptance or CI claim."
       },
       {
         "id": "p25-cleanup-knip-ledger",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:44:54.356252+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run audit:knip-ledger",
         "exitCode": 0,
@@ -28825,13 +30599,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-cleanup-ledger-p25",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS"
+        ],
         "scope": "P2.5 current main uncommitted design/test diff; local execution",
         "checkpointSha": "07805f4c69d1a672aa6ab80aee1c79fd6862923c",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-10T20:45:10.143322+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
         "exitCode": 0,
@@ -28841,10 +30619,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-generated",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:37.702019+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -28860,10 +30640,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-style",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:04:03.482991+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -28879,10 +30661,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-typecheck",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:04:48.418691+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -28898,10 +30682,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-build",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:05:16.707035+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -28917,17 +30703,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-affected",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:05:18.490475+00:00",
         "result": "passed",
         "artifactRefs": [
           "command-specific inputs; exact full execution fingerprint was not recorded"
         ],
         "cwd": "apps/web",
-        "command": "npm run test:run -- src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+        "command": "npm run test:run -- src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
         "exitCode": 0,
         "durationSeconds": 1.783,
         "summary": "Canvas task adapter: 40 active tests passed including retired-param rejection.",
@@ -28936,10 +30724,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-strict-p1",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:07:50.078074+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -28955,10 +30746,13 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-quality-strict-p2",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:07:59.880004+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -28974,13 +30768,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-final-lint",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:10:10.414733+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint",
         "exitCode": 0,
@@ -29002,10 +30801,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:10:13.773898+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:run -- src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts",
         "exitCode": 0,
@@ -29015,13 +30816,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-final-node-typecheck",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:10:14.666069+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx vue-tsc -p tsconfig.test-node.json --noEmit",
         "exitCode": 0,
@@ -29031,10 +30836,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-browser-linux-smoke",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:05:53.521535+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29050,10 +30857,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-browser-accessibility",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:05:58.662341+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29069,13 +30878,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-workflow-normal",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:06:28.434943+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:knip:normal",
         "exitCode": 0,
@@ -29085,13 +30899,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-workflow-production",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:06:33.111451+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:knip:production",
         "exitCode": 0,
@@ -29101,13 +30920,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-workflow-smoke-contract",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:06:38.121706+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx tsx --test scripts/smokeSupport.contract.spec.ts",
         "exitCode": 0,
@@ -29117,13 +30940,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-workflow-workflow",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:06:39.367506+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": ".",
         "command": "bash scripts/ci-workflow-contract-test.sh",
         "exitCode": 0,
@@ -29133,13 +30960,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-workflow-actionlint",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Local workflow-equivalent verification of final sources; documentary changes are reviewed separately; not GitHub CI.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:06:40.656129+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": ".",
         "command": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml",
         "exitCode": 0,
@@ -29149,10 +30980,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-media-workflow",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:58:17.498905+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29168,10 +31001,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-media-fixture",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:58:17.983699+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29187,10 +31022,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-media-scan",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:58:18.564338+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29206,10 +31043,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-0",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:59:29.694125+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29225,13 +31064,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-1",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-intermediate-not-current",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:59:34.699009+00:00",
         "result": "failed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": ".",
         "command": "bash scripts/run-all-self-tests.sh",
         "exitCode": 1,
@@ -29241,29 +31084,33 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-2",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:59:52.476260+00:00",
         "result": "passed",
         "artifactRefs": [
           "command-specific inputs; exact full execution fingerprint was not recorded"
         ],
         "cwd": ".",
-        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash \u2014 checked by `go vet`/build in CI Gate.\nbash -n scripts/render-nginx-template.sh\nbash -n scripts/render-nginx-template-test.sh\nbash -n scripts/render-cloudflare-real-ip-conf.sh\nbash -n scripts/uninstall-vps.sh\nbash -n scripts/bootstrap-vps.sh\nbash -n scripts/deploy-stack.sh\nbash -n scripts/deploy-stack-test.sh\nbash -n scripts/production-deploy-entrypoint.sh\nbash -n scripts/production-deploy-entrypoint-test.sh\nbash -n scripts/run-production-deploy.sh\nbash -n scripts/ci-change-classifier.sh\nbash -n scripts/ci-change-classifier-test.sh\nbash -n scripts/ci-gate.sh\nbash -n scripts/ci-gate-test.sh\nbash -n scripts/ci-parity.sh\nbash -n scripts/ci-parity-test.sh\nbash -n scripts/ci-migration-integration.sh\nbash -n scripts/ci-migration-integration-test.sh\nbash -n scripts/atlas-migration-check.sh\nbash -n scripts/atlas-migration-check-test.sh\nbash -n scripts/openapi-breaking-check.sh\nbash -n scripts/openapi-breaking-check-test.sh\nbash -n scripts/csp-policy.sh\nbash -n scripts/csp-policy-test.sh\nbash -n scripts/qa-production-cleanup.sh\nbash -n scripts/qa-production-cleanup-test.sh\nbash -n scripts/secrets-init.sh\nbash -n scripts/secrets-init-test.sh\nbash -n scripts/secrets-render.sh\nbash -n scripts/secrets-render-test.sh\nbash -n scripts/secrets-validate.sh\nbash -n scripts/secrets-validate-test.sh\nbash -n scripts/ci-media-package-boundary.sh\nbash -n scripts/ci-media-package-boundary-test.sh\nbash -n scripts/ci-legacy-media-zero-scan.sh\nbash -n scripts/ci-legacy-media-zero-scan-test.sh\nbash -n scripts/ci-workflow-contract-test.sh\nbash -n scripts/handbook-version-contract.sh\nbash -n scripts/handbook-version-contract-test.sh\nbash -n scripts/sql-workspace-scope-check.sh\nbash -n scripts/sql-workspace-scope-check-test.sh\nbash -n scripts/openapi-pattern-check.sh\nbash -n scripts/openapi-pattern-check-test.sh\nbash -n scripts/adr-template-check.sh\nbash -n scripts/adr-template-check-test.sh\nbash -n scripts/check-backend-copy.sh\nbash -n scripts/check-backend-copy-test.sh\nbash -n scripts/run-all-self-tests.sh\nbash -n scripts/lib/common.sh\n",
+        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.\nbash -n scripts/render-nginx-template.sh\nbash -n scripts/render-nginx-template-test.sh\nbash -n scripts/render-cloudflare-real-ip-conf.sh\nbash -n scripts/uninstall-vps.sh\nbash -n scripts/bootstrap-vps.sh\nbash -n scripts/deploy-stack.sh\nbash -n scripts/deploy-stack-test.sh\nbash -n scripts/production-deploy-entrypoint.sh\nbash -n scripts/production-deploy-entrypoint-test.sh\nbash -n scripts/run-production-deploy.sh\nbash -n scripts/ci-change-classifier.sh\nbash -n scripts/ci-change-classifier-test.sh\nbash -n scripts/ci-gate.sh\nbash -n scripts/ci-gate-test.sh\nbash -n scripts/ci-parity.sh\nbash -n scripts/ci-parity-test.sh\nbash -n scripts/ci-migration-integration.sh\nbash -n scripts/ci-migration-integration-test.sh\nbash -n scripts/atlas-migration-check.sh\nbash -n scripts/atlas-migration-check-test.sh\nbash -n scripts/openapi-breaking-check.sh\nbash -n scripts/openapi-breaking-check-test.sh\nbash -n scripts/csp-policy.sh\nbash -n scripts/csp-policy-test.sh\nbash -n scripts/qa-production-cleanup.sh\nbash -n scripts/qa-production-cleanup-test.sh\nbash -n scripts/secrets-init.sh\nbash -n scripts/secrets-init-test.sh\nbash -n scripts/secrets-render.sh\nbash -n scripts/secrets-render-test.sh\nbash -n scripts/secrets-validate.sh\nbash -n scripts/secrets-validate-test.sh\nbash -n scripts/ci-media-package-boundary.sh\nbash -n scripts/ci-media-package-boundary-test.sh\nbash -n scripts/ci-legacy-media-zero-scan.sh\nbash -n scripts/ci-legacy-media-zero-scan-test.sh\nbash -n scripts/ci-workflow-contract-test.sh\nbash -n scripts/handbook-version-contract.sh\nbash -n scripts/handbook-version-contract-test.sh\nbash -n scripts/sql-workspace-scope-check.sh\nbash -n scripts/sql-workspace-scope-check-test.sh\nbash -n scripts/openapi-pattern-check.sh\nbash -n scripts/openapi-pattern-check-test.sh\nbash -n scripts/adr-template-check.sh\nbash -n scripts/adr-template-check-test.sh\nbash -n scripts/check-backend-copy.sh\nbash -n scripts/check-backend-copy-test.sh\nbash -n scripts/run-all-self-tests.sh\nbash -n scripts/lib/common.sh\n",
         "exitCode": 0,
         "durationSeconds": 0.107,
-        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash \u2014 checked by `go vet`/build in CI Gate.",
+        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.",
         "carriedForwardBy": "p25-formal-final-independent-review"
       },
       {
         "id": "p25-formal-ops-3",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:59:52.583864+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29279,29 +31126,33 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-4",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:59:52.631782+00:00",
         "result": "passed",
         "artifactRefs": [
           "command-specific inputs; exact full execution fingerprint was not recorded"
         ],
         "cwd": ".",
-        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash \u2014 excluded from shellcheck.\nshellcheck \\\n  scripts/render-nginx-template.sh \\\n  scripts/render-nginx-template-test.sh \\\n  scripts/render-cloudflare-real-ip-conf.sh \\\n  scripts/uninstall-vps.sh \\\n  scripts/bootstrap-vps.sh \\\n  scripts/deploy-stack.sh \\\n  scripts/deploy-stack-test.sh \\\n  scripts/production-deploy-entrypoint.sh \\\n  scripts/production-deploy-entrypoint-test.sh \\\n  scripts/run-production-deploy.sh \\\n  scripts/ci-change-classifier.sh \\\n  scripts/ci-change-classifier-test.sh \\\n  scripts/ci-gate.sh \\\n  scripts/ci-gate-test.sh \\\n  scripts/ci-parity.sh \\\n  scripts/ci-parity-test.sh \\\n  scripts/ci-migration-integration.sh \\\n  scripts/ci-migration-integration-test.sh \\\n  scripts/atlas-migration-check.sh \\\n  scripts/atlas-migration-check-test.sh \\\n  scripts/openapi-breaking-check.sh \\\n  scripts/openapi-breaking-check-test.sh \\\n  scripts/csp-policy.sh \\\n  scripts/csp-policy-test.sh \\\n  scripts/qa-production-cleanup.sh \\\n  scripts/qa-production-cleanup-test.sh \\\n  scripts/secrets-init.sh \\\n  scripts/secrets-init-test.sh \\\n  scripts/secrets-render.sh \\\n  scripts/secrets-render-test.sh \\\n  scripts/secrets-validate.sh \\\n  scripts/secrets-validate-test.sh \\\n  scripts/ci-media-package-boundary.sh \\\n  scripts/ci-media-package-boundary-test.sh \\\n  scripts/ci-legacy-media-zero-scan.sh \\\n  scripts/ci-legacy-media-zero-scan-test.sh \\\n  scripts/ci-workflow-contract-test.sh \\\n  scripts/handbook-version-contract.sh \\\n  scripts/handbook-version-contract-test.sh \\\n  scripts/sql-workspace-scope-check.sh \\\n  scripts/sql-workspace-scope-check-test.sh \\\n  scripts/openapi-pattern-check.sh \\\n  scripts/openapi-pattern-check-test.sh \\\n  scripts/adr-template-check.sh \\\n  scripts/adr-template-check-test.sh \\\n  scripts/check-backend-copy.sh \\\n  scripts/check-backend-copy-test.sh \\\n  scripts/run-all-self-tests.sh \\\n  scripts/lib/common.sh\n",
+        "command": "# scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.\nshellcheck \\\n  scripts/render-nginx-template.sh \\\n  scripts/render-nginx-template-test.sh \\\n  scripts/render-cloudflare-real-ip-conf.sh \\\n  scripts/uninstall-vps.sh \\\n  scripts/bootstrap-vps.sh \\\n  scripts/deploy-stack.sh \\\n  scripts/deploy-stack-test.sh \\\n  scripts/production-deploy-entrypoint.sh \\\n  scripts/production-deploy-entrypoint-test.sh \\\n  scripts/run-production-deploy.sh \\\n  scripts/ci-change-classifier.sh \\\n  scripts/ci-change-classifier-test.sh \\\n  scripts/ci-gate.sh \\\n  scripts/ci-gate-test.sh \\\n  scripts/ci-parity.sh \\\n  scripts/ci-parity-test.sh \\\n  scripts/ci-migration-integration.sh \\\n  scripts/ci-migration-integration-test.sh \\\n  scripts/atlas-migration-check.sh \\\n  scripts/atlas-migration-check-test.sh \\\n  scripts/openapi-breaking-check.sh \\\n  scripts/openapi-breaking-check-test.sh \\\n  scripts/csp-policy.sh \\\n  scripts/csp-policy-test.sh \\\n  scripts/qa-production-cleanup.sh \\\n  scripts/qa-production-cleanup-test.sh \\\n  scripts/secrets-init.sh \\\n  scripts/secrets-init-test.sh \\\n  scripts/secrets-render.sh \\\n  scripts/secrets-render-test.sh \\\n  scripts/secrets-validate.sh \\\n  scripts/secrets-validate-test.sh \\\n  scripts/ci-media-package-boundary.sh \\\n  scripts/ci-media-package-boundary-test.sh \\\n  scripts/ci-legacy-media-zero-scan.sh \\\n  scripts/ci-legacy-media-zero-scan-test.sh \\\n  scripts/ci-workflow-contract-test.sh \\\n  scripts/handbook-version-contract.sh \\\n  scripts/handbook-version-contract-test.sh \\\n  scripts/sql-workspace-scope-check.sh \\\n  scripts/sql-workspace-scope-check-test.sh \\\n  scripts/openapi-pattern-check.sh \\\n  scripts/openapi-pattern-check-test.sh \\\n  scripts/adr-template-check.sh \\\n  scripts/adr-template-check-test.sh \\\n  scripts/check-backend-copy.sh \\\n  scripts/check-backend-copy-test.sh \\\n  scripts/run-all-self-tests.sh \\\n  scripts/lib/common.sh\n",
         "exitCode": 0,
         "durationSeconds": 1.954,
-        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash \u2014 excluded from shellcheck.",
+        "summary": "Exact Ops workflow step passed locally: # scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.",
         "carriedForwardBy": "p25-formal-final-independent-review"
       },
       {
         "id": "p25-formal-ops-5",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T04:59:54.586332+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29317,10 +31168,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-6",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:14.491035+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29336,10 +31189,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-7",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:14.682265+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29355,10 +31210,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-8",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:14.818246+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29374,10 +31231,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-9",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:15.355544+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29393,10 +31252,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-10",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:19.723580+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29412,10 +31273,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-11",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:19.920507+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29431,10 +31294,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-12",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:33.822638+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29450,10 +31315,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-13",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:34.195415+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29469,10 +31336,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-14",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:00:34.486120+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29488,10 +31357,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-ops-selftests",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical scoped execution before final workflow/Knip/documentary revision. Checked inputs remain unchanged or are separately revalidated; final independent review carries this result forward. This is not execution at the final full artifact fingerprint, GitHub CI or checkpoint acceptance.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-scoped-execution",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:02:02.911463+00:00",
         "result": "passed",
         "artifactRefs": [
@@ -29507,13 +31378,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-intermediate-quality-lint",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-KNIP", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-KNIP",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-intermediate-not-current",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:04:02.451484+00:00",
         "result": "failed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint",
         "exitCode": 1,
@@ -29523,13 +31399,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-intermediate-quality-strict-p25",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-intermediate-not-current",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:08:10.811514+00:00",
         "result": "failed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:migration-ledger -- --strict --phase=P2.5",
         "exitCode": 1,
@@ -29539,13 +31420,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-intermediate-browser-linux-smoke",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "scope": "Historical intermediate local run; preserved failure/progression; cannot satisfy current gates.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "historical-intermediate-not-current",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:03:44.129477+00:00",
         "result": "failed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": ".",
         "command": "./scripts/ci-parity.sh web-smoke",
         "exitCode": 143,
@@ -29555,14 +31440,18 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-formal-main-integration",
         "kind": "merge",
-        "requirementIds": ["P2.5/SYNC-MERGED-DESIGN"],
+        "requirementIds": [
+          "P2.5/SYNC-MERGED-DESIGN"
+        ],
         "scope": "Local main integration at immutable 70b6df4f (committed artifact fingerprint); later uncommitted ADR/CI corrections are excluded. No remote merge or formal acceptance. Permanent private test helper has no production importer.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
         "mergeSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "6e512e6a4a44e83db820c6c2511b6e7c4e83a0d9a2b31db8b16ce5dc5e5f8b5d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:10:57.941226+00:00",
         "result": "passed",
-        "artifactRefs": ["70b6df4f committed design artifacts"],
+        "artifactRefs": [
+          "70b6df4f committed design artifacts"
+        ],
         "summary": "Git HEAD commit is present on local main; six specs/ADR/CONTEXT included. Remote main is 230 local commits behind; target SHA unavailable remotely."
       },
       {
@@ -29581,13 +31470,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         ],
         "scope": "User-delegated formal design review and final CI/source verification; 44 exact artifacts. Named plan-owner acceptance is separate.",
         "checkpointSha": "70b6df4f2edcad4e371eef8bcd6087f3c1fbeaf4",
-        "treeFingerprint": "8184c2b9aa0218498d396f030aa43209749a3db96f483f812bcde399700bdcba",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:11:50.760749+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "reviewer": "/root/p25_formal_review",
         "decision": "passed",
-        "reviewedArtifactRefs": ["syncDesign.artifacts"],
+        "reviewedArtifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "summary": "All six decisions and Common/Knip/Quotas PASS; exact hashes/fingerprint, unchanged permanent specs/trio, no production Query importer, canonical drift and worker scan, fail-closed retired param, scoped anonymous fixture and real Linux process exit, exact executable Knip entry. No formal phase/CI/checkpoint authorization."
       },
       {
@@ -29604,10 +31497,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "P2.5/PHASE-COMMON"
         ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run test:run -- src/features/board/application/sync/boardCacheTiming.contract.spec.ts src/features/board/application/sync/boardDraftOverlay.contract.spec.ts src/features/board/application/sync/boardFocusControls.contract.spec.ts src/features/board/application/sync/boardRevisionConflict.contract.spec.ts src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts src/features/board/application/sync/boardSseMapping.contract.spec.ts",
         "exitCode": 0,
@@ -29618,12 +31513,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-closeout-knip-normal",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON", "P2.5/PHASE-KNIP"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON",
+          "P2.5/PHASE-KNIP"
+        ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:knip:normal",
         "exitCode": 0,
@@ -29634,12 +31534,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-closeout-knip-production",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON", "P2.5/PHASE-KNIP"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON",
+          "P2.5/PHASE-KNIP"
+        ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npm run lint:knip:production",
         "exitCode": 0,
@@ -29650,12 +31555,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-closeout-checker-quality",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx eslint scripts/checkFrontendMigrationLedger.ts",
         "exitCode": 0,
@@ -29666,12 +31575,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-closeout-node-typecheck",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "cwd": "apps/web",
         "command": "npx vue-tsc -p tsconfig.test-node.json --noEmit",
         "exitCode": 0,
@@ -29688,10 +31601,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "P2/PHASE-CHECKPOINT"
         ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "reviewer": "/root",
         "decision": "passed",
         "evidenceRefs": [
@@ -29745,24 +31660,30 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "P2.5/PHASE-CHECKPOINT"
         ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "reviewer": "/root",
         "decision": "accepted",
-        "scope": "Canonical plan \u00a75.1/\u00a76.11 scoped closeout revision for already completed P1/P2/P2.5 only.",
-        "summary": "Historical before-start green checkpoint was not recorded. Accepted current closeout deviation under user instruction \u6536\u5c3ep2.5; not retrospective compliance, not user personal signature. Current green baseline replaces the missing rollback record for closeout only. Future phases require their own before-start checkpoint."
+        "scope": "Canonical plan §5.1/§6.11 scoped closeout revision for already completed P1/P2/P2.5 only.",
+        "summary": "Historical before-start green checkpoint was not recorded. Accepted current closeout deviation under user instruction 收尾p2.5; not retrospective compliance, not user personal signature. Current green baseline replaces the missing rollback record for closeout only. Future phases require their own before-start checkpoint."
       },
       {
         "id": "p25-closeout-green-checkpoint",
         "kind": "checkpoint",
-        "requirementIds": ["P2.5/PHASE-CHECKPOINT"],
+        "requirementIds": [
+          "P2.5/PHASE-CHECKPOINT"
+        ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "ciEvidence": "p25-closeout-baseline-ci-review",
         "baselineRef": "syncDesign.closeoutBaseline",
         "evidenceRefs": [
@@ -29775,12 +31696,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "id": "p25-closeout-current-main-integration",
         "kind": "merge",
-        "requirementIds": ["P2.5/SYNC-MERGED-DESIGN"],
+        "requirementIds": [
+          "P2.5/SYNC-MERGED-DESIGN"
+        ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "mergeSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
         "baselineRef": "syncDesign.closeoutBaseline",
         "scope": "Six design decisions and permanent specs integrated on current local main at 5b7af20b; closeout documentary/checker delta reviewed separately. No push/remote merge required.",
@@ -29801,10 +31726,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "P2.5/PHASE-COMMON"
         ],
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "recordedAt": "2026-10-11T05:33:01.571188+00:00",
         "result": "passed",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "reviewer": "/root",
         "decision": "accepted",
         "evidenceRefs": [
@@ -29815,16 +31742,21 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "p25-closeout-checker-quality",
           "p25-closeout-node-typecheck"
         ],
-        "scope": "Current named delegated integrator acceptance authorized by user instruction \u6536\u5c3ep2.5; separate from independent technical review and user personal signoff.",
+        "scope": "Current named delegated integrator acceptance authorized by user instruction 收尾p2.5; separate from independent technical review and user personal signoff.",
         "summary": "Six Sync decisions and Common/Knip/Quotas accepted individually through their owning gate references; runtime/contracts/frozen IDs/quotas unchanged. P3 remains blocked."
       },
       {
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "id": "p25-closeout-strict-P1",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
         "recordedAt": "2026-10-11T05:34:00.560624+00:00",
         "result": "passed",
         "cwd": "apps/web",
@@ -29835,11 +31767,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "id": "p25-closeout-strict-P2",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
         "recordedAt": "2026-10-11T05:34:00.560624+00:00",
         "result": "passed",
         "cwd": "apps/web",
@@ -29850,11 +31787,17 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "id": "p25-closeout-predecessor-acceptance",
         "kind": "review",
-        "requirementIds": ["P1", "P2", "P2.5/dependencies"],
+        "requirementIds": [
+          "P1",
+          "P2",
+          "P2.5/dependencies"
+        ],
         "recordedAt": "2026-10-11T05:34:00.560624+00:00",
         "result": "passed",
         "reviewer": "/root",
@@ -29869,11 +31812,16 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "id": "p25-closeout-strict-P2.5",
         "kind": "command",
-        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ],
         "recordedAt": "2026-10-11T05:35:31.815713+00:00",
         "result": "passed",
         "cwd": "apps/web",
@@ -29884,8 +31832,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       },
       {
         "checkpointSha": "5b7af20b3ac2d90e61917419fe3e81fb0e0e771c",
-        "treeFingerprint": "9d73659de1d66d2b5ece022d17231290b02a7a7bd45d338ff357fa408b85272d",
-        "artifactRefs": ["syncDesign.artifacts"],
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
+        "artifactRefs": [
+          "syncDesign.artifacts"
+        ],
         "id": "p25-closeout-final-independent-review",
         "kind": "review",
         "requirementIds": [
@@ -29905,7 +31855,9 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "result": "passed",
         "reviewer": "/root/p25_closeout_verifier",
         "decision": "passed",
-        "evidenceRefs": ["p25-closeout-strict-P2.5"],
+        "evidenceRefs": [
+          "p25-closeout-strict-P2.5"
+        ],
         "scope": "Final independent read-only review of exact closeout artifacts, baseline, accepted ledger and canonical plan scoped exception.",
         "summary": "Independent strict 60 fixtures /0 warnings /0 unmet. Current 44 artifact hashes/fingerprint and baseline44 git-show bytes verified. All gate/deviation/localCi/predecessor refs resolve; 11 gates accepted. Current retrospective P1/P2 and /root delegated acceptance distinct from user personal signature. P3 blocked and production trio pending; diff check PASS."
       },
@@ -29913,7 +31865,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "id": "p3-repair-board",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run test:run -- src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
         "cwd": "apps/web",
@@ -29932,91 +31884,106 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "id": "p3-repair-account",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run test:run -- src/features/account src/test/retirementLint.contract.spec.ts",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 18.962,
-        "requirementIds": ["P2.5/PHASE-COMMON"]
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ]
       },
       {
         "id": "p3-repair-typecheck",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run test:typecheck",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 36.077,
-        "requirementIds": ["P2.5/PHASE-COMMON"]
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ]
       },
       {
         "id": "p3-repair-knip-normal",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run lint:knip:normal",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 17.348,
-        "requirementIds": ["P2.5/PHASE-KNIP"]
+        "requirementIds": [
+          "P2.5/PHASE-KNIP"
+        ]
       },
       {
         "id": "p3-repair-knip-production",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run lint:knip:production",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 16.49,
-        "requirementIds": ["P2.5/PHASE-KNIP"]
+        "requirementIds": [
+          "P2.5/PHASE-KNIP"
+        ]
       },
       {
         "id": "p3-repair-theme",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run lint:theme-contract",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 1.561,
-        "requirementIds": ["P2.5/PHASE-COMMON"]
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ]
       },
       {
         "id": "p3-repair-surface",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run api:surface:check -- --strict",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 6.194,
-        "requirementIds": ["P2.5/PHASE-COMMON"]
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ]
       },
       {
         "id": "p3-repair-board-followup",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
-        "command": "npm run test:run -- src/features/board/session src/features/canvas/application/board-session/repository.contract.spec.ts src/features/canvas/application/workspace/internal/useBoardRuntime.unit.spec.ts",
+        "command": "npm run test:run -- src/features/board/session src/features/canvas/session/board-session/repository.contract.spec.ts src/features/canvas/session/workspace/internal/useBoardRuntime.unit.spec.ts",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 8,
-        "requirementIds": ["P2.5/PHASE-QUOTAS", "P2.5/PHASE-COMMON"]
+        "requirementIds": [
+          "P2.5/PHASE-QUOTAS",
+          "P2.5/PHASE-COMMON"
+        ]
       },
       {
         "id": "p3-repair-final-independent-review",
         "kind": "review",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "reviewer": "/root/p3_final_review",
         "decision": "passed",
@@ -30039,24 +32006,29 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "id": "p3-repair-seam-p1",
         "kind": "command",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "command": "npm run lint:dependencies -- --strict --phase=P1",
         "cwd": "apps/web",
         "exitCode": 0,
         "durationSeconds": 32.2,
-        "requirementIds": ["P2.5/PHASE-COMMON"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON"
+        ],
         "recordedAt": "2026-10-11"
       },
       {
         "id": "p3-seam-final-independent-review",
         "kind": "review",
         "checkpointSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
-        "treeFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+        "treeFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
         "result": "passed",
         "reviewer": "/root/p3_seam_final_review",
         "decision": "passed",
-        "requirementIds": ["P2.5/PHASE-COMMON", "P2.5/PHASE-QUOTAS"],
+        "requirementIds": [
+          "P2.5/PHASE-COMMON",
+          "P2.5/PHASE-QUOTAS"
+        ],
         "recordedAt": "2026-10-11",
         "scope": "Independent read-only review of final P3 Seam inventory updates, P1 current-batch strict boundary checks, trio historical-red deviation and final ledger freshness.",
         "summary": "No blocking findings. P1 current-batch dependency boundaries and all positive/negative fixtures passed; 273 seams, 0 dependency-cruiser violations, 0 Board deep imports and zero generated undeclaredDeepImports. Trio productionStatus and missing historical red evidence remain pending without fabricated proof."
@@ -30368,12 +32340,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "policyRevision": {
         "id": "acceptance-without-push-2026-10-11",
         "requestedBy": "user",
-        "instruction": "\u9a8c\u6536\u6807\u51c6\u4e2d\u53bb\u6389push",
+        "instruction": "验收标准中去掉push",
         "reason": "Remove remote publication as an acceptance prerequisite; preserve verification strength and recorded history.",
         "requirementRefs": [
-          "plan \u00a75.1",
-          "plan \u00a76.7",
-          "plan \u00a76.11"
+          "plan §5.1",
+          "plan §6.7",
+          "plan §6.11"
         ],
         "impact": "Local workflow-equivalent green CI and local integration commits are eligible acceptance evidence. No phase acceptance, before-start checkpoint or remote execution is manufactured."
       },
@@ -30430,9 +32402,12 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       ],
       "closeoutPolicyRevision": {
         "id": "p25-closeout-2026-10-11",
-        "instruction": "/subagents \u6536\u5c3ep2.5",
+        "instruction": "/subagents 收尾p2.5",
         "delegatedReviewer": "/root",
-        "requirementRefs": ["plan \u00a75.1", "plan \u00a76.11"],
+        "requirementRefs": [
+          "plan §5.1",
+          "plan §6.11"
+        ],
         "scope": "Completed P1/P2/P2.5 acceptance only; no P3/P4 execution authorization.",
         "historicalCheckpointException": "For completed P1/P2/P2.5 only, accept the missing historical before-start checkpoint as an explicit deviation and establish a verified committed green rollback baseline now. Preserve the original gap; do not backdate compliance. Record current predecessor and gate acceptance separately. Future phase starts require green immutable checkpoints before implementation. No P3/P4 authorization or technical/quota/production red-green waiver."
       }
@@ -30570,19 +32545,19 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "sha256": "d6d2f53820a3df7c5c217a3c8ae082da925fc7a46cc8dcb6084e5b6843001417"
         },
         {
-          "path": "apps/web/src/features/canvas/application/board-session/autosavePolicy.ts",
+          "path": "apps/web/src/features/canvas/session/board-session/autosavePolicy.ts",
           "sha256": "874eb9c6ec61c7474927a3c03842673b1b6674a2a4ecd11d3458c2b9c357c4e7"
         },
         {
-          "path": "apps/web/src/features/canvas/application/board-session/useBoardAutosave.ts",
+          "path": "apps/web/src/features/canvas/session/board-session/useBoardAutosave.ts",
           "sha256": "dd556c62870434fa57599d9f1163df2e56447c040059755487c3d1fbcacca49e"
         },
         {
-          "path": "apps/web/src/features/canvas/application/execution/workspace/canvasTaskContractMapping.ts",
+          "path": "apps/web/src/features/canvas/session/execution/workspace/canvasTaskContractMapping.ts",
           "sha256": "c6b3dc620cbeb37a4aaa9ce70392ce23f0df3ff76799257f4f06a4f7eb635f9d"
         },
         {
-          "path": "apps/web/src/features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+          "path": "apps/web/src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
           "sha256": "757496fa6dfb2fe712dfc56801a8d62b6888fdf0712ef186a8a2907c56896db8"
         },
         {
@@ -30985,7 +32960,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     },
     "auditRepairAttemptHistory": {
       "requestedBy": "user",
-      "instruction": "/subagents \u4f9d\u6b21\u4fee\u590d",
+      "instruction": "/subagents 依次修复",
       "status": "running-at-recording",
       "baselineSha": "fae76d454c9f1e4db008084c74f57df8efc2297c",
       "startedAt": "2026-10-11T10:27:43.196418+00:00",
@@ -31005,7 +32980,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
   "auditRepair": {
     "repairEvidence": {
       "status": "technical-verification-passed",
-      "artifactFingerprint": "6a9bc1b2166b932e8fe13b9fdb347c9f7e2bc434df69529c48f6e4ef678894c8",
+      "artifactFingerprint": "f60bc2a43ee01f31c19e082a26df3d406e2f6138ec9a2a793f0bf20f78dbc64d",
       "evidenceRefs": [
         "p3-repair-account",
         "p3-repair-board",
@@ -31028,7 +33003,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     "trioHistoricalRedDeviation": {
       "status": "accepted-scoped-deviation",
       "authorizedBy": "user / plan owner",
-      "instruction": "\u540c\u610f",
+      "instruction": "同意",
       "recordedAt": "2026-10-11",
       "scope": [
         "board/query-migration-trio-race",

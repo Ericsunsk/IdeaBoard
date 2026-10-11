@@ -2,7 +2,7 @@ import {
   resolvePreviewMimeType,
   WEBP_PREVIEW_MIME_TYPE,
   WEBP_PREVIEW_QUALITY,
-} from '../../../../../infrastructure/media/displayImagePreviewEncoding.ts'
+} from '../../../../../session/media/displayImagePreviewEncoding.ts'
 import type {
   ImageProcessingOutputEncoding,
   ImageProcessingOutputFileNameInput,

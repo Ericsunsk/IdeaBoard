@@ -5,7 +5,7 @@ import {
   flattenVisibleRetouchEffectLayers,
   flattenVisibleRetouchEffectLayersBeforeLayer,
 } from './layers/layerEffects'
-import { cloneImageData } from './imageDataUtils'
+import { clonePixelBuffer } from './clonePixelBuffer'
 
 type RetouchHistogramSourceCacheKey = {
   sourceImageData: ImageData
@@ -62,7 +62,7 @@ export function resolveRetouchHistogramSource({
     return cachedResolution
   }
 
-  const imageData = cloneImageData(sourceImageData)
+  const imageData = clonePixelBuffer(sourceImageData)
   const plan = buildImageRetouchPlanFromEffectLayers(upstreamLayers)
   if (plan.length > 0) executeImageRetouchPlan(imageData, plan)
 

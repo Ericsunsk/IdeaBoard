@@ -131,17 +131,29 @@ const selectorCountRules = [
 type SelectorCountRuleId = (typeof selectorCountRules)[number]['id']
 
 const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = {
-  'src/features/canvas/presentation/nodes/primitives/NodeToolIconButton.vue': {
+  'src/features/canvas/ui/nodes/primitives/NodeToolIconButton.vue': {
     counts: {
       'deep-selector': 1,
     },
     reason: 'Slot icon contract: external icon components render SVGs inside this slot.',
   },
-  'src/features/canvas/presentation/styles/canvas-vue-flow-adapter-skin.css': {
+  'src/features/canvas/ui/styles/canvas-vue-flow-adapter-skin.css': {
     counts: {
       'vue-flow-internal-selector': 40,
     },
     reason: 'Central adapter skin owns Vue Flow vendor DOM styling.',
+  },
+  'src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts': {
+    counts: {
+      'vue-flow-internal-selector': 17,
+    },
+    reason: 'Browser contract assertions inspect Vue Flow edge DOM exposed by the Canvas adapter.',
+  },
+  'src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts': {
+    counts: {
+      'vue-flow-internal-selector': 5,
+    },
+    reason: 'Browser state assertions inspect Vue Flow vendor DOM exposed by the Canvas adapter.',
   },
 }
 
@@ -227,37 +239,37 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
   },
-  'src/features/canvas/application/image-workflow/components/ImageOutpaintOverlay.vue': {
+  'src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue': {
     counts: {
       'hex-color': 1,
     },
     reason: 'Outpaint handle fill is a canvas drawing constant.',
   },
-  'src/features/canvas/presentation/nodes/home/ImageActionMenu.vue': {
+  'src/features/canvas/ui/nodes/home/ImageActionMenu.vue': {
     counts: {
       'hex-color': 1,
     },
     reason: 'Node tool icon color is a canvas drawing constant.',
   },
-  'src/features/canvas/presentation/nodes/primitives/NodeActionButton.vue': {
+  'src/features/canvas/ui/nodes/primitives/NodeActionButton.vue': {
     counts: {
       'hex-color': 1,
     },
     reason: 'Stage ghost/primary button ink colors are canvas drawing constants.',
   },
-  'src/features/canvas/presentation/nodes/styles/node-input-thumbnails.css': {
+  'src/features/canvas/ui/styles/node-input-thumbnails.css': {
     counts: {
       'hex-color': 2,
     },
     reason: 'Canvas node thumbnail chrome uses canvas drawing constants.',
   },
-  'src/features/canvas/presentation/nodes/styles/node-shared.css': {
+  'src/features/canvas/ui/styles/node-shared.css': {
     counts: {
       'hex-color': 2,
     },
     reason: 'Canvas node chrome uses canvas drawing constants.',
   },
-  'src/features/canvas/presentation/styles/editing-controls.css': {
+  'src/features/canvas/ui/styles/editing-controls.css': {
     counts: {
       'hex-color': 9,
     },
@@ -284,7 +296,7 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
 }
 
 const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+  'src/features/canvas/ui/pages/CanvasLandingPage.vue': {
     counts: {
       'font-stack': 2,
     },
@@ -336,7 +348,7 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Board catalog hero/display sizes sit outside the type scale.',
   },
-  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+  'src/features/canvas/ui/pages/CanvasLandingPage.vue': {
     counts: {
       'text-px': 1,
     },

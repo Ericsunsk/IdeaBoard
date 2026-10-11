@@ -335,7 +335,7 @@ const runtimeTargets = [
   'better-auth/vue',
   'src/api/generated-query/public/index.ts',
   'src/features/canvas/tools/retouch/session/session.ts',
-  'src/features/canvas/application/runtime.ts',
+  'src/features/canvas/session/board-session/useBoardAutosave.ts',
   'src/core/auth/client.ts',
   'src/core/query/queryClient.ts',
   'src/core/i18n/index.ts',
@@ -380,7 +380,7 @@ describe('Canvas runtime dependency graph policy', () => {
     expect(
       validateCanvasPurity([
         { source: core },
-        { source: 'src/features/canvas/domain/graph/application/runtime.ts' },
+        { source: 'src/features/canvas/core/graph/application/runtime.ts' },
       ]).map((issue) => issue.rule),
     ).toContain('canvas-runtime-location')
   })

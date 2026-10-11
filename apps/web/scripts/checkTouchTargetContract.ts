@@ -170,7 +170,7 @@ const RULES: Rule[] = [
   {
     kind: 'opt-in',
     label: 'node action button',
-    rel: 'features/canvas/presentation/nodes/primitives/NodeActionButton.vue',
+    rel: 'features/canvas/ui/nodes/primitives/NodeActionButton.vue',
     pattern: /\bmin-h-7\b/,
     fix: 'carry `hit-target-32-inline` so node chrome keeps its compact height',
   },
@@ -244,19 +244,19 @@ const CANVAS_CHROME_RULES: Array<{
   fix: string
 }> = [
   {
-    file: 'features/canvas/presentation/chrome/components/CanvasChrome.vue',
+    file: 'features/canvas/ui/chrome/components/CanvasChrome.vue',
     selector: '.canvas-chrome-status-button',
     hitClass: 'hit-target-32',
     fix: 'the 23px zoom button needs `hit-target-32` (below WCAG AA 2.5.8 without it)',
   },
   {
-    file: 'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
+    file: 'features/canvas/ui/chrome/components/CanvasChromeBoardHeader.vue',
     selector: '.canvas-chrome-board-icon-button',
     hitClass: 'hit-target-32',
     fix: 'the 29px icon button needs `hit-target-32`',
   },
   {
-    file: 'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
+    file: 'features/canvas/ui/chrome/components/CanvasChromeBoardHeader.vue',
     selector: '.canvas-chrome-catalog-recovery-action',
     hitClass: 'hit-target-32-inline',
     fix: 'the 22px recovery button needs `hit-target-32-inline` (below WCAG AA 2.5.8 without it)',

@@ -7,7 +7,7 @@ const canvasRoot = resolve(import.meta.dirname, '..')
 describe('Image Tool stage presentation contract', () => {
   it('keeps tool overlays and image-layer visibility outside the neutral media stage', () => {
     const stage = readFileSync(
-      resolve(canvasRoot, '../presentation/nodes/workflows/ImageNodeStage.vue'),
+      resolve(canvasRoot, '../ui/nodes/workflows/ImageNodeStage.vue'),
       'utf8',
     )
     const maskOverlay = readFileSync(

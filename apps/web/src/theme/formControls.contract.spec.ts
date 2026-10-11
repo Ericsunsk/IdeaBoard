@@ -38,7 +38,7 @@ describe('User form input contract', () => {
     // Borderless and transparent by design, so the ring is the only focus
     // indication keyboard users get.
     const composer = src(
-      'features/canvas/presentation/nodes/primitives',
+      'features/canvas/ui/nodes/primitives',
       'PromptComposerControls.vue',
     )
     expect(composer).toContain('focus-visible:ring-ring/20')
