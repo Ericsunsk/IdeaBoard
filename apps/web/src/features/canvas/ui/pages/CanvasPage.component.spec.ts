@@ -11,12 +11,12 @@ import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { makeSessionUser } from '../../../../test/factories'
 import { render } from '../../../../test/render'
 import type { BoardSnapshot } from '../../../board/ports/canvas'
-import type { BoardSessionRepository } from '../../session/board-session/repository'
 import {
   BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
   useBoardSession,
-} from '../../session/board-session/useBoardSession'
-import { makeBoardSnapshot, makeBoardState } from '../../session/board-session/boardFixtures'
+  type BoardSessionRepository,
+} from '../../session/board-session'
+import { makeBoardSnapshot, makeBoardState } from '../../../board/ports/testing'
 import CanvasPage from './CanvasPage.vue'
 
 let getUserIdentity: () => { userId: number; userUid: string }

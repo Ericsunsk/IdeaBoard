@@ -1,5 +1,15 @@
-import { assertLatestBoardSnapshot, assertLatestBoardState } from '../core/document/latestBoardState'
-import { BOARD_STATE_SCHEMA_VERSION, createEmptyBoardSnapshot, type BoardSnapshot, type BoardState, type ImageNodeItem, type ImageNodeOutputItem } from '../core/document/nodes'
+import {
+  assertLatestBoardSnapshot,
+  assertLatestBoardState,
+} from '../core/document/latestBoardState'
+import {
+  BOARD_STATE_SCHEMA_VERSION,
+  createEmptyBoardSnapshot,
+  type BoardSnapshot,
+  type BoardState,
+  type ImageNodeItem,
+  type ImageNodeOutputItem,
+} from '../core/document/nodes'
 
 export type MockBoardRecordFixture = {
   board: Record<string, unknown>

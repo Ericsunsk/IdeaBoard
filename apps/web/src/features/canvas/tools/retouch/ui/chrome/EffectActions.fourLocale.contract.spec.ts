@@ -39,9 +39,7 @@ function renderRail() {
 }
 
 function railAriaLabels(): string[] {
-  return screen
-    .getAllByRole('button')
-    .map((button) => button.getAttribute('aria-label') ?? '')
+  return screen.getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? '')
 }
 
 describe('retouch rail four-locale switch (i18n/retouch-call-time-locale-switch)', () => {
@@ -94,11 +92,9 @@ describe('retouch rail four-locale switch (i18n/retouch-call-time-locale-switch)
     await expect(setUserLocale('en')).resolves.toBe(true)
     await nextTick()
     expect(railAriaLabels()).toEqual([...RAIL_LABELS.en])
-    screen
-      .getAllByRole('button')
-      .forEach((button, index) => {
-        expect(button).toBe(firstButtons[index])
-      })
+    screen.getAllByRole('button').forEach((button, index) => {
+      expect(button).toBe(firstButtons[index])
+    })
   })
 
   it('renders four distinct rail copies, one per locale', async () => {

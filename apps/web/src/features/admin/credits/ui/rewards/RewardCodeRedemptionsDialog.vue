@@ -194,10 +194,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useAdminCursorCollection } from '../../../shared'
 import { Refresh } from '@iconoir/vue'
 import { AdminColumn } from '../../../shared'
-import type {
-  AdminTableRowCollapseEvent,
-  AdminTableRowExpandEvent,
-} from '../../../shared'
+import type { AdminTableRowCollapseEvent, AdminTableRowExpandEvent } from '../../../shared'
 import { AdminAlert } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import ActionButton from '../../../../../core/components/ActionButton.vue'

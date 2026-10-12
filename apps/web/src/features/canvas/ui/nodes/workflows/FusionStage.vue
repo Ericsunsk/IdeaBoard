@@ -92,8 +92,8 @@
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { FusionNodeItem } from '../../../../board/ports/canvas'
 import {
+  type FusionNodeItem,
   FUSION_SLOT_LAYOUT,
   buildFusionDisplayPercentages,
   computeFusionBlendWeights,
@@ -103,10 +103,12 @@ import {
   type FusionBlendPoint,
 } from '../../../../board/ports/canvas'
 import { useFusionBlendControl } from './useFusionBlendControl'
-import NodeEmptyStateIcon from '../primitives/NodeEmptyStateIcon.vue'
-import NodeInputThumbnail from '../primitives/NodeInputThumbnail.vue'
-import NodeStageFrame from '../primitives/NodeStageFrame.vue'
-import { useImageInputSlots } from '../primitives/useImageInputSlots'
+import {
+  NodeEmptyStateIcon,
+  NodeInputThumbnail,
+  NodeStageFrame,
+  useImageInputSlots,
+} from '../primitives'
 
 const props = defineProps<{
   active: boolean

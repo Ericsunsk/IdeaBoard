@@ -1,6 +1,6 @@
 import type { PromptAspectRatio } from '../../../board/ports/canvas'
-import type { CanvasNodePresentationIntent } from '.'
-import type { FlowSnapshotParamPatch } from '../../session/flow-adapter/projection/flowSnapshotParamMutations.ts'
+import type { CanvasNodePresentationIntent } from './canvasNodePresentation'
+import type { FlowSnapshotParamPatch } from '../../session/flow-adapter'
 import type { OutpaintDragAnchor } from '../../tools/outpaint/session/useImageOutpaintOverlay.ts'
 
 type FlowCanvasNodePromptSnapshot = {

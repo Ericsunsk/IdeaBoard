@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../../../../test/render'
 import AdminImageProvidersTable from './AdminImageProvidersTable.vue'
 import type { AdminSearchProviderResource } from '../../../session/image-library/searchProviderResource'
-import type { SearchProviderConfig, SearchProviderTestResult } from '../../../session/image-library/searchProviderTypes'
+import type {
+  SearchProviderConfig,
+  SearchProviderTestResult,
+} from '../../../session/image-library/searchProviderTypes'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 

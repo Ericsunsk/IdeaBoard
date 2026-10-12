@@ -17,11 +17,9 @@ import {
   addRemoteBoardFixture,
   makePromptBoardState,
   primeAuthenticatedWorkspace,
-} from '../../testing/syncFixtures'
-import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
-} from '../../testing/factories'
+} from '../../testing'
 import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { getBoardById, replaceBoards } from '../catalog/boards'
 import { boardDocumentOptions, boardListOptions } from './boardQueries'

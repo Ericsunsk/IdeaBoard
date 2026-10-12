@@ -3,17 +3,11 @@ import type { Connection, Edge, Node } from '@vue-flow/core'
 import { i18n } from '../../../../../core/i18n'
 import { createCanvasNodeAt } from '../../../core/nodes/canvasNodeFactory.ts'
 import { getDefaultCanvasNodeTitle } from '../../../core/nodes/canvasNodeRegistry.ts'
-import {
-  isFlowConnectionAllowed,
-  normalizeFlowConnection,
-} from '../../../session/flow-adapter/connections/flowConnectionAdapter.ts'
-import {
-  patchFlowSnapshotParam,
-  type FlowSnapshotParamPatch,
-} from '../../../session/flow-adapter/projection/flowSnapshotParamMutations.ts'
+import { isFlowConnectionAllowed, normalizeFlowConnection } from '../../../session/flow-adapter'
+import { patchFlowSnapshotParam, type FlowSnapshotParamPatch } from '../../../session/flow-adapter'
 import { createCanvasConnectionCommandLifecycle } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
-import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import {
   isCanvasGraphNodeId,
   type CanvasGraphNodeId,

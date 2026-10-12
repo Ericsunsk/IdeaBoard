@@ -1,7 +1,4 @@
-import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
-} from '../../../shared'
+import { buildControlMutationHeaders, requireOperatorReason } from '../../../shared'
 import {
   createControlPaymentRefund,
   getControlPaymentOrder,
@@ -12,7 +9,10 @@ import { requireContractData } from '../../../../../api/contractKernel'
 import { stripUndefined } from '../../../../../api/stripUndefined'
 import { PAGE_SIZES } from '../../../../../core/config/pagination'
 import { withControlCopy } from '../../../shared'
-import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from '../../core/orders/paymentOrderTypes'
+import type {
+  AdminPaymentOrderStatus,
+  SearchAdminPaymentOrdersInput,
+} from '../../core/orders/paymentOrderTypes'
 
 type PaymentOrderApiUser = {
   public_id: string

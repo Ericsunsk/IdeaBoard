@@ -2,7 +2,7 @@ import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { i18n } from '../../../../../core/i18n'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { BoardSnapshot, CanvasGroup } from '../../../../board/ports/canvas'
-import type { PendingImageExecutionLease } from '../../execution/pending-execution/core'
+import type { PendingImageExecutionLease } from '../../execution'
 import {
   commitCanvasGraphDeleteGroupIntent,
   isCanvasGraphNodeId,
@@ -23,9 +23,9 @@ import {
   type CanvasPoint,
   type CanvasRect,
 } from '../../../core/graph/canvasGroupGeometry.ts'
-import { resolveFlowNodeCanvasRef } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
-import { releaseCanvasGraphDeleteExecutions } from '../../../session/flow-adapter/projection/flowGraphDeleteProjection'
-import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import { resolveFlowNodeCanvasRef } from '../../../session/flow-adapter'
+import { releaseCanvasGraphDeleteExecutions } from '../../../session/flow-adapter'
+import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import { createGroupDragRuntime } from './groupDragRuntime'
 import { createGroupResizeRuntime, type GroupResizeRuntime } from './groupResizeRuntime'
 import {
@@ -38,18 +38,8 @@ type SelectableFlowItem = {
   selected?: boolean
 }
 
-export type CanvasSelectionGroupAction =
-  | {
-      kind: 'group'
-      label: string
-      nodeIds: CanvasGraphNodeId[]
-    }
-  | {
-      kind: 'ungroup'
-      label: string
-      groupId: CanvasGraphGroupId
-      nodeIds: CanvasGraphNodeId[]
-    }
+import type { CanvasSelectionGroupAction } from '../groupContracts'
+export type { CanvasSelectionGroupAction } from '../groupContracts'
 
 export type CanvasGroupRuntimeView = {
   groupFrames: ComputedRef<CanvasGroupFrame[]>

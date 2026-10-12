@@ -26,7 +26,8 @@ vi.mock('../../session/workspace', () => ({
   useCanvasWorkspaceRuntime: mocks.useCanvasWorkspaceRuntime,
 }))
 
-vi.mock('../../session/flow-adapter', () => ({
+vi.mock('../../session/flow-adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../session/flow-adapter')>()),
   createCanvasConnectionDropLifecycle: () => ({
     onConnectStart: vi.fn(),
     onConnectEnd: vi.fn(),
@@ -106,7 +107,10 @@ vi.mock('../nodes/groups', async (importOriginal) => {
   }
 })
 
-vi.mock('../overlays', () => ({ useCanvasCustomLayerOverlay: vi.fn() }))
+vi.mock('../overlays', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../overlays')>()),
+  useCanvasCustomLayerOverlay: vi.fn(),
+}))
 
 vi.mock('../../../workspace/shell/useWorkspaceAccountControls.ts', () => ({
   useWorkspaceAccountControls: () => ({

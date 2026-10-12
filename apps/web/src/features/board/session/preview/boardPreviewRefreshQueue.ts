@@ -1,11 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { normalizeLatestBoardState } from '../../core/document/latestBoardState'
 import { type BoardState } from '../../core/document/nodes'
-import {
-  getBoardState,
-  getBoardStates,
-  setBoardPreviewSnapshot,
-} from '../persistence/state'
+import { getBoardState, getBoardStates, setBoardPreviewSnapshot } from '../persistence/state'
 import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
 import { isBoardSyncConflictError, syncBoardToServer } from '../sync/boardSync'

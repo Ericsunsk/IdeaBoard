@@ -136,7 +136,10 @@ import {
 } from '../../core/orders/paymentOrderPresentation'
 import { createAdminPaymentOrderResource } from '../../session/orders/paymentOrderResource'
 import { PAYMENT_ORDERS_MESSAGES } from './messages'
-import type { AdminPaymentOrderDetail, SearchAdminPaymentOrdersInput } from '../../core/orders/paymentOrderTypes'
+import type {
+  AdminPaymentOrderDetail,
+  SearchAdminPaymentOrdersInput,
+} from '../../core/orders/paymentOrderTypes'
 
 const resource = createAdminPaymentOrderResource()
 const orderNumberSearch = ref('')

@@ -39,7 +39,13 @@ function createHarness() {
     }),
   )
   if (!overlay) throw new Error('Outpaint overlay requires an active Vue scope')
-  return { dispose: () => scope.stop(), onCommit, overlay, startCanvasInteraction, stopCanvasInteraction }
+  return {
+    dispose: () => scope.stop(),
+    onCommit,
+    overlay,
+    startCanvasInteraction,
+    stopCanvasInteraction,
+  }
 }
 
 function pointerDownOn(target: HTMLElement, clientX: number, clientY: number) {

@@ -7,8 +7,7 @@ const canvasMediaIOMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../../media/canvasMediaIo.ts', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../media/canvasMediaIo.ts')>()
+  const actual = await importOriginal<typeof import('../../media/canvasMediaIo.ts')>()
   return {
     ...actual,
     canvasToBlob: canvasMediaIOMocks.canvasToBlob,

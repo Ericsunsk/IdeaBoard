@@ -3,7 +3,7 @@ import {
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
 } from '../../../core/graph'
-import { parseFlowNodeId } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
+import { parseFlowNodeId } from '../../../session/flow-adapter'
 import type { CanvasRendererSelectableElement } from '../model.ts'
 
 type Selectable = { id: string; selected?: boolean }

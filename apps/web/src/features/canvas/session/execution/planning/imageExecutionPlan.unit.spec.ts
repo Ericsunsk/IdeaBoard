@@ -4,7 +4,7 @@ import { createImageExecutionPlanner, prepareFusionExecutionPlan } from './image
 import {
   resolveFlowSourceImageRatio,
   resolveSourceImageFromNode,
-} from '../../../session/flow-adapter/projection/flowNodeSourceResolution'
+} from '../../../session/flow-adapter'
 
 function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {

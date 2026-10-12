@@ -150,7 +150,10 @@ import {
   adminTableStyle,
 } from '../../../shared'
 import BillingStatusCell from './BillingStatusCell.vue'
-import { billingPricingColumnWidths, formatPricingCellValue } from '../../core/pricing/billingPricingColumns'
+import {
+  billingPricingColumnWidths,
+  formatPricingCellValue,
+} from '../../core/pricing/billingPricingColumns'
 import BillingServiceCell from './BillingServiceCell.vue'
 import ModelPoolSummaryCell from './ModelPoolSummaryCell.vue'
 import type { AdminBillableItemCard, AdminModelPool } from '../../core/pricing/billableCatalogTypes'

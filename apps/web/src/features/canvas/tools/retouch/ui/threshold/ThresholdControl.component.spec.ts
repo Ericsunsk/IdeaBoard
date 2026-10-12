@@ -185,7 +185,12 @@ describe('RetouchThresholdControl', () => {
     expect(screen.getByRole('button', { name: 'Invert threshold output' })).toBeVisible()
 
     const cases = [
-      { locale: 'es', marker: 'Umbral 64', invert: 'Invertir salida de umbral', tooltip: 'Invertir' },
+      {
+        locale: 'es',
+        marker: 'Umbral 64',
+        invert: 'Invertir salida de umbral',
+        tooltip: 'Invertir',
+      },
       { locale: 'zh-CN', marker: '阈值 64', invert: '反转阈值输出', tooltip: '反转' },
       { locale: 'ko', marker: '임계값 64', invert: '임계값 출력 반전', tooltip: '반전' },
     ] as const

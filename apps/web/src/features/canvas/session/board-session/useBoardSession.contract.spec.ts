@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BoardSnapshot, BoardState } from '../../../board'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
-import { makeBoardSnapshot, makeBoardState } from './boardFixtures'
+import { makeBoardSnapshot, makeBoardState } from '../../../board/ports/testing'
 import type { BoardSessionPreviewRenderer } from './preview'
 import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
 import {

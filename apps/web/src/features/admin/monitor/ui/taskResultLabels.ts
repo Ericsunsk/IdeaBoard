@@ -1,7 +1,4 @@
-import type {
-  AdminMonitorDetailModel,
-  AdminMonitorExecutionAttempt,
-} from '../resource'
+import type { AdminMonitorDetailModel, AdminMonitorExecutionAttempt } from '../resource'
 
 // Pure execution-attempt presentation labels for the task result dialog.
 // No component state, no i18n plumbing: same input, same string.

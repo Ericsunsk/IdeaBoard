@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
-import { CanvasGraphStore } from '../../../core/graph/canvasGraphStore'
 import {
+  CanvasGraphStore,
   noopCanvasGraphStoreTelemetry,
   type CanvasGraphStoreTelemetry,
-} from '../../../core/graph/canvasGraphStoreTelemetry'
+} from '../../../core/graph'
 import { canvasGraphStoreTelemetryProbe } from './canvasGraphStoreTelemetryProbe'
 
 describe('canvasGraphStoreTelemetryProbe', () => {

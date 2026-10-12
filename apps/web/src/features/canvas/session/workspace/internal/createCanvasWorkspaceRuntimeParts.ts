@@ -1,6 +1,6 @@
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { BoardSnapshot, ImageNodeItem } from '../../../../board/ports/canvas'
-import { useCanvasViewportRuntime } from '../../../session/flow-adapter/viewport/useCanvasViewportRuntime'
+import { useCanvasViewportRuntime } from '../../../session/flow-adapter'
 import { useBoardRuntime } from './useBoardRuntime'
 import { useCanvasFeedback } from '../useCanvasFeedback.ts'
 import type { CanvasVueFlowAdapter } from '../../../session/flow-adapter'
@@ -11,13 +11,13 @@ import {
 } from '../../graph-editing'
 import type { CanvasImageWorkflowUiAdapter } from '../../image-workflow'
 import { createCanvasTaskLifecycle } from '../../execution/task-lifecycle'
-import { cancelCanvasWorkspaceTask } from '../../execution/workspace/canvasWorkspaceTaskAdapter'
+import { cancelCanvasWorkspaceTask } from '../../execution'
 import type { CanvasWorkspaceRuntime } from '../model.ts'
 import { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'
 import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
 import { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
-import { createPendingImageExecutionCore } from '../../execution/pending-execution/core'
+import { createPendingImageExecutionCore } from '../../execution'
 import type { LibraryAssetMaterializer } from '../../../../library'
 
 export type UseCanvasWorkspaceRuntimeOptions = {

@@ -41,7 +41,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
+import { dialogContentBaseClass } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import {

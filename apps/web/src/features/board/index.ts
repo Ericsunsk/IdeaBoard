@@ -60,9 +60,18 @@ export { renderBoardPreviewDataUrl } from './session/preview/boardPreviewSeriali
 export { blankBoardPreviewSurfaceClass } from './session/preview/boardPreviewStyle'
 export { BOARD_PREVIEW_RENDERER_VERSION } from './session/preview/boardPreviewVersion'
 // Catalog presentation composition (route-level public surface).
-export type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './ui/gallery/contract'
+export type {
+  CatalogEntry,
+  CatalogSortMode,
+  Catalog,
+  CatalogNavigation,
+} from './ui/gallery/contract'
 export { createCatalog, formatCatalogDate, useCatalog } from './ui/gallery/useCatalog'
 export { createGalleryController } from './ui/gallery/controller'
 export { createCommandHandlers } from './ui/gallery/commandHandlers'
-export { createBoardFeedback, useBoardFeedback, type BoardFeedback } from './ui/gallery/useBoardFeedback'
+export {
+  createBoardFeedback,
+  useBoardFeedback,
+  type BoardFeedback,
+} from './ui/gallery/useBoardFeedback'
 export { default as BoardsPage } from './ui/gallery/BoardsPage.vue'

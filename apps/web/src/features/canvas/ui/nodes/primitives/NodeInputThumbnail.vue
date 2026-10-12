@@ -32,7 +32,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElementVisibility } from '@vueuse/core'
 import { Xmark } from '@iconoir/vue'
-import { useDisplayImagePreview } from '../../../session/flow-adapter/projection/useDisplayImagePreview'
+import { useDisplayImagePreview } from '../../../session/flow-adapter'
 
 const props = withDefaults(
   defineProps<{

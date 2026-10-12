@@ -101,10 +101,7 @@ import {
 import { DEMO_MODE_QUERY_VALUE, createDemoTaskDetail } from '../../session/demoData'
 import { useMonitorDemo } from '../../session/useMonitorDemo'
 import { useMonitorTimeline } from '../../session/useMonitorTimeline'
-import {
-  monitorChartSpecs,
-  type TaskMetricStatsSnapshot,
-} from '../../../shared'
+import { monitorChartSpecs, type TaskMetricStatsSnapshot } from '../../../shared'
 import { stringParam } from '../../../../../core/router/queryParams'
 import { MONITOR_MESSAGES } from './messages'
 

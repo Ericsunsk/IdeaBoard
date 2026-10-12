@@ -289,7 +289,12 @@ import { banDurationOptions } from '../../session/commands'
 import { useAdminUsersContext } from '../../session/context'
 import { useUsersFeedback } from '../../session/useUsersFeedback'
 import { USERS_MESSAGES } from './messages'
-import { getCountryFlag, getCountryLabel, type AdminUserRowView, type UserActionKey } from '../../core/view'
+import {
+  getCountryFlag,
+  getCountryLabel,
+  type AdminUserRowView,
+  type UserActionKey,
+} from '../../core/view'
 
 type ActionPopupPanel = {
   toggle: (event: Event) => void

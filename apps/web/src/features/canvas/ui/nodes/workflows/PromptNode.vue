@@ -83,17 +83,23 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChatLines, Plus } from '@iconoir/vue'
-import { requireImageNodeOutputCount, type PromptNodeItem } from '../../../../board/ports/canvas'
+import {
+  requireImageNodeOutputCount,
+  type PromptNodeItem,
+  normalizePromptAspectRatio,
+  type PromptAspectRatio,
+} from '../../../../board/ports/canvas'
 import type { PromptNodeUiState } from '../../../core/nodes/canvasNodeUi.ts'
-import NodeInputThumbnail from '../primitives/NodeInputThumbnail.vue'
-import NodeShell from '../primitives/NodeShell.vue'
-import NodeStageFrame from '../primitives/NodeStageFrame.vue'
-import PromptTextComposer from '../primitives/PromptTextComposer.vue'
-import { useImageInputSlots } from '../primitives/useImageInputSlots'
-import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../board/ports/canvas'
+import {
+  NodeInputThumbnail,
+  NodeShell,
+  NodeStageFrame,
+  PromptTextComposer,
+  useImageInputSlots,
+} from '../primitives'
 import { SERVICE } from '../../../../../core/contracts/imageServices'
 import { useCanvasBillingQuote } from '../../../session/execution'
-import { buildGenerationTaskRequest } from '../../../session/execution/commands/imageTaskRequests.ts'
+import { buildGenerationTaskRequest } from '../../../session/execution'
 
 const props = defineProps<{
   node: PromptNodeItem

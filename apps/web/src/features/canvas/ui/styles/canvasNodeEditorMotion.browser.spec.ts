@@ -31,7 +31,7 @@ import '../../../../app/style.css'
 import '../styles/canvas-surface-skin.css'
 import '../styles/canvas-style-contracts.css'
 import '../styles/node-input-thumbnails.css'
-import FusionStage from '../nodes/workflows/FusionStage.vue'
+import { FusionStage } from '../nodes/workflows'
 import { ImageInpaintOverlay } from '../../tools/inpaint'
 
 declare module 'vitest/internal/browser' {
@@ -64,7 +64,8 @@ function mountHost(inner: string) {
   document.body.append(root)
   return {
     root,
-    query: <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector),
+    query: <T extends HTMLElement = HTMLElement>(selector: string) =>
+      root.querySelector<T>(selector),
     unmount() {
       root.remove()
     },
@@ -90,7 +91,8 @@ function mountApp(node: () => unknown) {
   app.mount(root)
   return {
     root,
-    query: <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector),
+    query: <T extends HTMLElement = HTMLElement>(selector: string) =>
+      root.querySelector<T>(selector),
     unmount() {
       app.unmount()
       root.remove()
@@ -167,7 +169,9 @@ describe('Canvas Node and editor motion browser contract', () => {
   })
 
   it('stops continuous running and apply motion when reduced motion is requested', async () => {
-    const running = mountHost('<div class="workflow-node running" style="position: relative"></div>')
+    const running = mountHost(
+      '<div class="workflow-node running" style="position: relative"></div>',
+    )
     try {
       const node = running.query('.workflow-node.running')!
       expect(window.getComputedStyle(node, '::before').animationName).toBe(
@@ -177,9 +181,9 @@ describe('Canvas Node and editor motion browser contract', () => {
       await setMotion(true)
       expect(matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true)
       // The app motion policy zeroes every interaction token under reduce.
-      expect(styleOf(document.documentElement).getPropertyValue('--motion-control-duration').trim()).toBe(
-        '0ms',
-      )
+      expect(
+        styleOf(document.documentElement).getPropertyValue('--motion-control-duration').trim(),
+      ).toBe('0ms')
       expect(window.getComputedStyle(node, '::before').animationName).toBe('none')
     } finally {
       running.unmount()

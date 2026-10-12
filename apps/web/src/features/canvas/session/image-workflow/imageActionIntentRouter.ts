@@ -12,7 +12,7 @@ import {
   type ImageTaskAction,
 } from '../execution'
 import type { PromptAspectRatio } from '../../../board/ports/canvas'
-import type { FlowSnapshotParamPatch } from '../../session/flow-adapter/projection/flowSnapshotParamMutations.ts'
+import type { FlowSnapshotParamPatch } from '../../session/flow-adapter'
 import { i18n } from '../../../../core/i18n'
 import {
   ACTIVE_NODE_PANEL_KIND,

@@ -144,7 +144,10 @@ describe('credits/server boundary idempotency/expiry/403', () => {
 
     expect(created.plaintext).toBe('IDEA2026')
     expect(transport.request).toHaveBeenCalledTimes(1)
-    const [, config] = transport.request.mock.calls[0] as [string, { body?: string; headers?: Record<string, string> }]
+    const [, config] = transport.request.mock.calls[0] as [
+      string,
+      { body?: string; headers?: Record<string, string> },
+    ]
     expect(config.headers).toMatchObject({
       'Idempotency-Key': 'reward-create:seam-1',
       'X-Operator-Reason': '运营活动补码',

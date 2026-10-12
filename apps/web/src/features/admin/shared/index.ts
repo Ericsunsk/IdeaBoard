@@ -9,9 +9,14 @@
  *
  * Layout: `core` is pure (no vue/query/transport), `session` is
  * orchestration (composables, resources, adapters), `ui` is presentational
- * (SFCs plus their direct helpers). `ui/assets/*` (svg/ico) stay deep-only:
- * static assets cannot be re-exported through a type barrel.
+ * (SFCs plus their direct helpers). Shared asset URLs are exported explicitly.
  */
+
+import storageAlibabaCloudLogo from './ui/assets/storage-vendors/alibabacloud.svg'
+import storageAmazonS3Logo from './ui/assets/storage-vendors/amazons3.svg'
+import storageCloudflareLogo from './ui/assets/storage-vendors/cloudflare.svg'
+import storageMinioLogo from './ui/assets/storage-vendors/minio.svg'
+import storageTencentCloudLogo from './ui/assets/storage-vendors/tencentcloud.ico'
 
 // core — pure helpers, contracts, tokens (leaf, no framework imports)
 export * from './core/actionReasonContract'
@@ -56,6 +61,13 @@ export * from './ui/table/adminTableAtoms'
 export * from './ui/tabs/adminTabsAtoms'
 export * from './ui/chart/chart'
 export * from './ui/serviceIcons'
+export {
+  storageAlibabaCloudLogo,
+  storageAmazonS3Logo,
+  storageCloudflareLogo,
+  storageMinioLogo,
+  storageTencentCloudLogo,
+}
 
 // ui — components (default export plus any named contract types)
 export { default as AdminAlert } from './ui/feedback/AdminAlert.vue'

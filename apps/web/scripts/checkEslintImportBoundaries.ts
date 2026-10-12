@@ -25,10 +25,7 @@ const restrictedBoundaryCases: BoundaryCase[] = [
   },
   {
     name: 'Canvas route page cannot deep-import its overlay implementation',
-    filePath: path.join(
-      webRoot,
-      'src/features/canvas/ui/pages/import-boundary.fixture.ts',
-    ),
+    filePath: path.join(webRoot, 'src/features/canvas/ui/pages/import-boundary.fixture.ts'),
     code: `
       import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle/useCanvasCustomLayerOverlay'
 
@@ -40,10 +37,7 @@ const restrictedBoundaryCases: BoundaryCase[] = [
 const allowedBoundaryCases: BoundaryCase[] = [
   {
     name: 'Canvas route page can use dialog adapters and the Canvas overlay public barrel',
-    filePath: path.join(
-      webRoot,
-      'src/features/canvas/ui/pages/import-boundary.fixture.ts',
-    ),
+    filePath: path.join(webRoot, 'src/features/canvas/ui/pages/import-boundary.fixture.ts'),
     code: `
       import { useDialogOverlayLifecycle } from '../../../core/composables/useDialogOverlayLifecycle'
       import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'

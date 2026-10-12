@@ -140,7 +140,7 @@ import {
   DialogPortal,
   DialogRoot,
 } from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
+import { dialogContentBaseClass } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import IbFormField from '../../../core/components/IbFormField.vue'
 import { ibFormInputClass, ibFormInputErrorClass } from '../../../theme/formControls'

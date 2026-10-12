@@ -14,8 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import CanvasGroupFramesOverlay from '../../overlays/CanvasGroupFramesOverlay.vue'
-import CanvasSelectionGroupActionButton from '../../overlays/CanvasSelectionGroupActionButton.vue'
+import { CanvasGroupFramesOverlay, CanvasSelectionGroupActionButton } from '../../overlays'
 import type { CanvasGroupPresentationInteraction } from './useCanvasGroupPresentationInteraction'
 
 defineProps<{

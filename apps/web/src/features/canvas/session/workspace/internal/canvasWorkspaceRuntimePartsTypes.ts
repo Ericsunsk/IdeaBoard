@@ -1,6 +1,6 @@
 import type { useBoardRuntime } from './useBoardRuntime'
 import type { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
-import type { useCanvasViewportRuntime } from '../../../session/flow-adapter/viewport/useCanvasViewportRuntime'
+import type { useCanvasViewportRuntime } from '../../../session/flow-adapter'
 import type { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import type { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'
 

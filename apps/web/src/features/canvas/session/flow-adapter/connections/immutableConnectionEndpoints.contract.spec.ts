@@ -9,13 +9,14 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../../../board'
-import { CanvasGraphStore, toCanvasGraphEdgeId } from '../../../core/graph/canvasGraphStore'
 import {
+  CanvasGraphStore,
+  toCanvasGraphEdgeId,
   commitCanvasGraphConnectIntent,
   isSameCanvasConnectionEndpoint,
   shouldReplaceCanvasConnection,
   toCanvasConnectionEndpointKey,
-} from '../../../core/graph/canvasGraphMutationIntents'
+} from '../../../core/graph'
 import {
   flowConnectionToCanvasConnection,
   flowConnectionToCanvasConnectionEndpoint,
@@ -207,10 +208,7 @@ describe('immutable connection endpoints', () => {
         : edge,
     )
 
-    const materialized = flowToBoardSnapshot(
-      { nodes: flow.nodes, edges: movedEdges },
-      base,
-    )
+    const materialized = flowToBoardSnapshot({ nodes: flow.nodes, edges: movedEdges }, base)
 
     expect(materialized.connections).toEqual([
       {

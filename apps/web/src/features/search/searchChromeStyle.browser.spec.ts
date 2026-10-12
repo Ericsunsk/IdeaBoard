@@ -388,9 +388,7 @@ describe('Search chrome style browser contract', () => {
         } finally {
           document.documentElement.style.removeProperty('--color-page-chrome-border-hover')
         }
-        await expect.poll(() => styleOf(trigger).borderColor).toBe(
-          styleOf(hoverProbe).borderColor,
-        )
+        await expect.poll(() => styleOf(trigger).borderColor).toBe(styleOf(hoverProbe).borderColor)
       } finally {
         restProbe.remove()
         hoverProbe.remove()

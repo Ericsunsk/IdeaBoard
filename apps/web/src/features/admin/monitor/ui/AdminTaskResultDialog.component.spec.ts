@@ -4,10 +4,7 @@ import { expectDomOrder } from '../../../../test/domOrder'
 import { stripUndefined } from '../../../../api/stripUndefined'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from '../core/status'
-import type {
-  AdminMonitorDetailModel,
-  AdminMonitorExecutionAttempt,
-} from '../resource'
+import type { AdminMonitorDetailModel, AdminMonitorExecutionAttempt } from '../resource'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),

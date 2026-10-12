@@ -115,7 +115,10 @@ import { AdminDialogShell } from '../../../shared'
 import { useAdminConfirm } from '../../../shared'
 import { useAdminCreditsBillingOperationsFeedback } from '../../session/shared/feedback'
 import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
-import { useAdminCreditWalletResource, type AdminCreditLedgerTransaction } from '../../session/wallets/resource'
+import {
+  useAdminCreditWalletResource,
+  type AdminCreditLedgerTransaction,
+} from '../../session/wallets/resource'
 import {
   type AdminCreditCommandKind,
   isRefundableCharge,

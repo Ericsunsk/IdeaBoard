@@ -7,9 +7,9 @@ import { stringParam } from '../../../../../core/router/queryParams'
 import { useBoardSession, type SaveStatus } from '../../board-session'
 import { useBoardHeaderActions } from '../../../ui/chrome/useBoardHeaderActions.ts'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
-import type { CanvasVueFlowGraphActions } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphActions } from '../../../session/flow-adapter'
 import type { CanvasFeedback } from '../useCanvasFeedback.ts'
-import type { PendingImageExecutionCore } from '../../execution/pending-execution/core'
+import type { PendingImageExecutionCore } from '../../execution'
 
 type BoardRuntimeFeedback = CanvasFeedback['boardSession']
 

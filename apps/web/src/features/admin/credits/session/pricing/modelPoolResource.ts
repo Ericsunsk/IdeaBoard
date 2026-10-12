@@ -4,10 +4,7 @@ import {
 } from '../../../../../api/generated-query/control/control-billing/control-billing'
 import { requireContractData } from '../../../../../api/contractKernel'
 import { createAdminGatewayResource } from '../../../models/resource'
-import {
-  buildRoutineControlMutationHeaders,
-  type ControlMutationOptions,
-} from '../../../shared'
+import { buildRoutineControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 import { withControlCopy } from '../../../shared'
 import {
   OUTPUT_RESOLUTION_OPTIONS,

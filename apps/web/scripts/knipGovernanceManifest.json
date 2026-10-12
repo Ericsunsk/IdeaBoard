@@ -3867,7 +3867,6 @@
         "evidence": ["src/features/account/index.ts#UsageTrendPoint"]
       }
     },
-
     "src/features/account/core/money.ts": {
       "IdeaQuantityParseResult": {
         "kind": "canonical-origin",
@@ -9240,6 +9239,24 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/canvas/session/board-session/index.ts#useBoardSession"
         ]
+      },
+      "BOARD_SESSION_AUTH_UNAVAILABLE_CODE": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/pages/CanvasPage.component.spec.ts"]
+      },
+      "BoardSessionRepository": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/pages/CanvasPage.component.spec.ts"]
+      },
+      "createBoardAutosavePolicy": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/sync/boardFocusControls.contract.spec.ts"]
+      },
+      "createBoardSessionRepository": {
+        "kind": "test-contract",
+        "evidence": [
+          "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts"
+        ]
       }
     },
     "src/features/canvas/session/board-session/useBoardAutosave.ts": {
@@ -9836,6 +9853,16 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/canvas/session/execution/index.ts#useImageWorkflowExecution"
+        ]
+      },
+      "createCanvasBillingReadinessStore": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/nodes/home/ImageActionMenu.component.spec.ts"]
+      },
+      "collectPendingImageTasks": {
+        "kind": "test-contract",
+        "evidence": [
+          "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts"
         ]
       }
     },
@@ -11309,6 +11336,28 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/canvas/session/flow-adapter/index.ts#useVueFlowSelectionAdapter"
         ]
+      },
+      "resolveFlowSourceImageRatio": {
+        "kind": "test-contract",
+        "evidence": [
+          "src/features/canvas/session/execution/planning/imageExecutionPlan.unit.spec.ts"
+        ]
+      },
+      "readFlowGraphCommandSideEffects": {
+        "kind": "test-contract",
+        "evidence": [
+          "src/features/canvas/session/execution/runtime/imageWorkflowExecution.unit.spec.ts"
+        ]
+      },
+      "FLOW_NODE_DRAG_HANDLE": {
+        "kind": "test-contract",
+        "evidence": [
+          "src/features/canvas/session/graph-editing/mutations/useFlowNodeMutations.unit.spec.ts"
+        ]
+      },
+      "createCanvasHandleProximityCoordinator": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/nodes/FlowCanvasNodeHandleRail.component.spec.ts"]
       }
     },
     "src/features/canvas/session/flow-adapter/connections/nodeDragLifecycle.ts": {
@@ -17783,23 +17832,7 @@
     },
     "src/features/board/testing/syncFixtures.ts": {
       "kind": "test-support",
-      "evidence": [
-        "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
-        "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
-        "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
-        "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
-        "src/features/board/session/sync/boardSseMapping.contract.spec.ts"
-      ]
-    },
-    "src/features/canvas/session/board-session/boardFixtures.ts": {
-      "kind": "test-support",
-      "evidence": [
-        "src/features/canvas/session/board-session/repository.contract.spec.ts",
-        "src/features/canvas/session/board-session/uploadLifecycle.unit.spec.ts",
-        "src/features/canvas/session/board-session/useBoardSession.contract.spec.ts",
-        "src/features/canvas/session/graph-editing/inputs/useFlowNodeMediaInputs.unit.spec.ts",
-        "src/features/canvas/ui/pages/CanvasPage.component.spec.ts"
-      ]
+      "evidence": ["src/features/board/testing/index.ts"]
     },
     "src/features/canvas/session/media/serviceImageActionText.ts": {
       "kind": "retained-public-or-test-support",
@@ -18098,6 +18131,22 @@
         "src/shared/theme/composables/themeKeyboard.shim.ts",
         "src/theme/composables/themeKeyboard.contract.spec.ts"
       ]
+    },
+    "src/features/board/ports/testing.ts": {
+      "kind": "test-support",
+      "evidence": ["src/features/canvas/ui/pages/CanvasPage.component.spec.ts"]
+    },
+    "src/features/canvas/tools/inpaint/testing/index.ts": {
+      "kind": "test-support",
+      "evidence": ["src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts"]
+    },
+    "src/features/canvas/tools/retouch/testing/index.ts": {
+      "kind": "test-support",
+      "evidence": ["src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts"]
+    },
+    "src/features/canvas/tools/retouch/testing/browser.ts": {
+      "kind": "test-support",
+      "evidence": ["src/test/touchTarget.browser.spec.ts"]
     }
   }
 }

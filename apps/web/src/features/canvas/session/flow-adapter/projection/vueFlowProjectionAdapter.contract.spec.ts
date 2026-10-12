@@ -10,7 +10,7 @@ import { CanvasGraphStore, isCanvasGraphNodeId, type CanvasGraphNodeId } from '.
 import { createCanvasConnectionCommandLifecycle } from '../connections/connectionCommandLifecycle'
 import { createCanvasDeleteCommandLifecycle } from '../connections/deleteCommandLifecycle'
 import { toCanvasSemanticEdges } from './canvasEdgeProjection'
-import type { PendingImageExecutionLease } from '../../execution/pending-execution/core'
+import type { PendingImageExecutionLease } from '../../execution'
 
 function createImageNode(id: number): ImageNodeItem {
   return {

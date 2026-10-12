@@ -2,7 +2,7 @@ import type { CanvasGraphNodeRecord } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import { resolveImageNodeStageHeight, type ImageNodeItem } from '../../../../board/ports/canvas'
 import type { ImageResultAnchor } from '../planning/imageExecutionResultTypes'
-import { resolveImageNodeLayoutAnchor } from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+import { resolveImageNodeLayoutAnchor } from '../../../session/flow-adapter'
 
 export type ImageResultLayout = ImageResultAnchor & { ratio: number }
 export type PendingImageResultLookup = {

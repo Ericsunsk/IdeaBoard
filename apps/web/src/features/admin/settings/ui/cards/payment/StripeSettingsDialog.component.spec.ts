@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, renderWithUser, waitFor } from '../../../../../../test/render'
 import { createDeferred } from '../../../../../../test/deferred'
 import StripeSettingsDialog from './StripeSettingsDialog.vue'
-import type { AdminStripeSettingsResource, StripeConfigurationSummary } from '../../../session/payment/types'
+import type {
+  AdminStripeSettingsResource,
+  StripeConfigurationSummary,
+} from '../../../session/payment/types'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 

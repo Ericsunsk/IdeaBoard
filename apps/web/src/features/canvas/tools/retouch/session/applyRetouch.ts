@@ -11,7 +11,7 @@ import {
   resolveMediaAssetProcessingURL,
 } from '../../../../../api/mediaAssetDelivery'
 import { isCanvasGraphNodeId, type CanvasGraphNodeId } from '../../../core/graph'
-import type { ImageNodeDisplayPayload } from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+import type { ImageNodeDisplayPayload } from '../../../session/flow-adapter'
 import type { CanvasVueFlowConnectionAdapter } from '../../../session/flow-adapter'
 import type { CanvasNodeItem, ImageNodeItem } from '../../../../board/ports/canvas'
 import { i18n } from '../../../../../core/i18n'

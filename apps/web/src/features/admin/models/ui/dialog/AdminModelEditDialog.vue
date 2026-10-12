@@ -73,10 +73,7 @@ import { computed, ref, watch } from 'vue'
 import { watchDebounced } from '@vueuse/core'
 import { AdminDialogActions } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
-import {
-  createAdminGatewayResource,
-  type GatewayProviderOption,
-} from '../../resource'
+import { createAdminGatewayResource, type GatewayProviderOption } from '../../resource'
 import { type AdminModelItem } from '../../core/catalogData'
 import {
   blankModelForm,

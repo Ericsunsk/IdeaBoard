@@ -4,17 +4,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryObserver } from '@tanstack/vue-query'
 import { queryClient } from '../../../../core/query/queryClient'
-import { makeBoardState } from '../../testing'
-import { clearStoredAuth } from '../../../../core/utils/auth'
 import {
+  makeBoardState,
   addRemoteBoardFixture,
   makePromptBoardState,
   primeAuthenticatedWorkspace,
-} from '../../testing/syncFixtures'
-import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
-} from '../../testing/factories'
+} from '../../testing'
+import { clearStoredAuth } from '../../../../core/utils/auth'
 import { boardDocumentOptions, boardListOptions } from './boardQueries'
 import { boardQueryKeys } from './boardQueryKeys'
 

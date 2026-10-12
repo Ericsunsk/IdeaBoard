@@ -15,7 +15,11 @@ import {
   testControlStorageProfile,
   updateControlStorageProfile,
 } from '../../../../../api/generated-query/control/control-platform/control-platform'
-import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from '../../core/storage/profiles'
+import type {
+  StorageProfile,
+  StorageProfilePayload,
+  StorageProviderMeta,
+} from '../../core/storage/profiles'
 import { withControlCopy } from '../../../shared/index'
 
 // Admin storage boundary (W2 transports). Reads ride the Control Plane

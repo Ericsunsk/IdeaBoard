@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createEmptyBoardSnapshot,
-  type BoardSnapshot,
-  type ImageNodeItem,
-} from '../../../../board'
+import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../../board'
 import { CanvasGraphSession } from '../../../core/graph'
 import { BoardGraphSession, type PendingImageResultNodeId } from './boardGraphSession'
 import {
@@ -74,7 +70,10 @@ describe('flow cancel and render projection', () => {
     const firstLease = startRunning(core, attachment, imageNodeId(1), 'task-1')
     startRunning(core, attachment, imageNodeId(2), 'task-2')
 
-    const baseEdges = [imageInputEdge('edge-1', imageNodeId(1)), imageInputEdge('edge-2', imageNodeId(2))]
+    const baseEdges = [
+      imageInputEdge('edge-1', imageNodeId(1)),
+      imageInputEdge('edge-2', imageNodeId(2)),
+    ]
     for (const edge of baseEdges) Object.freeze(edge)
     Object.freeze(baseEdges)
 

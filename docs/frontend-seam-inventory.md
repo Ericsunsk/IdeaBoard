@@ -2,7 +2,7 @@
 
 此文件是 Frontend public Seam 的当前治理契约。`json seam-inventory` block 是 dependency boundary、public API surface 和 Knip governance 共用的 machine source of truth；修改 entry status 或 consumer edges 时必须同步更新契约。
 
-当前包含 406 records：256 active、2 planned、148 retired。只有 active entries 是当前可用入口，planned entries 不是已接受入口，retired entries 不授权新 imports。Inventory 记录 ownership、exports、consumers、dependency measurements 和治理 metadata；下方表格由 machine block 生成。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
+当前包含 428 records：278 active、2 planned、148 retired。只有 active entries 是当前可用入口，planned entries 不是已接受入口，retired entries 不授权新 imports。Inventory 记录 ownership、exports、consumers、dependency measurements 和治理 metadata；下方表格由 machine block 生成。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
 
 ## Schema
 
@@ -22,7 +22,7 @@
 | `notes`                                       | 当前职责或约束说明；无额外说明时使用空字符串。                                                                |
 | `purity`                                      | 只有 source review 确认无 runtime side effects 时才标记 pure；没有 forbidden dependency 并不足以证明 purity。 |
 
-Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/seamInventory.ts --self-test`。生成表格：同一 script 使用 `--render`。Dependency report：`npm run lint:dependencies`；只读检查可使用 `--report=/tmp/seam-report.json`。Public surface checker 使用 TypeScript AST，支持 multiline、aliased exports 和 Vue named exports。
+Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/seamInventory.ts --self-test`。生成表格：同一 script 使用 `--render`。Dependency report：`npm run lint:dependencies` 默认对所有 active entries 执行 strict check；只读检查可使用 `--report=/tmp/seam-report.json`。Public surface checker 使用 TypeScript AST，支持 multiline、aliased exports 和 Vue named exports。
 
 更新 active measurements：先运行 `npx depcruise --config .dependency-cruiser.cjs --output-type json src > /tmp/seam-graph.json`，再运行 `node --experimental-strip-types scripts/seamInventory.ts --freeze-measurements --graph=/tmp/seam-graph.json` 与 `--render`，并 review diff。命令只更新 active graph measurements，保留 paths、owners、exports、mappings 和 planned contracts。Planned projection 仅对唯一映射的 single-source paths 进行转换；ambiguous split sources 会明确报告，composite/split contracts 需 symbol-level review。Planned report entries 始终为 `accepted: false`。
 
@@ -23598,9 +23598,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 32,
-      "measuredFanOut": 5,
+      "measuredFanOut": 4,
       "targetFanIn": 32,
-      "targetFanOut": 5,
+      "targetFanOut": 4,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -23619,7 +23619,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanOutTargets": [
         "node_modules/clsx/dist/clsx.js",
         "node_modules/vue/index.js",
-        "src/components/ui/button/buttonChrome.ts",
         "src/components/ui/button/index.ts",
         "src/lib/utils.ts"
       ],
@@ -24271,9 +24270,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 3,
-      "measuredFanOut": 6,
+      "measuredFanOut": 5,
       "targetFanIn": 3,
-      "targetFanOut": 6,
+      "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -24287,7 +24286,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanOutTargets": [
         "node_modules/vue-i18n/index.js",
         "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/theme/dialogMask.ts"
@@ -27147,6 +27145,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -27162,12 +27165,22 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/chrome/useBoardHeaderActions.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27272,14 +27285,19 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/test/touchTarget.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/test/userAccountMenu.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 119,
+      "measuredFanIn": 123,
       "measuredFanOut": 5,
-      "targetFanIn": 119,
+      "targetFanIn": 123,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -31459,9 +31477,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 79,
+      "measuredFanOut": 78,
       "targetFanIn": 4,
-      "targetFanOut": 79,
+      "targetFanOut": 78,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -31624,7 +31642,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/app/style.css",
         "src/components/ui/avatar/index.ts",
         "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/input/index.ts",
@@ -33334,11 +33351,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
           "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/test/touchTarget.browser.spec.ts",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 14,
       "measuredFanOut": 0,
-      "targetFanIn": 13,
+      "targetFanIn": 14,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "2 phases — delete after P5",
@@ -34105,9 +34127,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 126,
-      "measuredFanOut": 48,
+      "measuredFanOut": 47,
       "targetFanIn": 126,
-      "targetFanOut": 48,
+      "targetFanOut": 47,
       "shims": [],
       "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
@@ -34439,6 +34461,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "resolveModelBrandLogo",
         "secretField",
         "shouldShowAdminTimeRangeTick",
+        "storageAlibabaCloudLogo",
+        "storageAmazonS3Logo",
+        "storageCloudflareLogo",
+        "storageMinioLogo",
+        "storageTencentCloudLogo",
         "taskMetricDefinitions",
         "useAdminBrandLogoResource",
         "useAdminChartReady",
@@ -35135,7 +35162,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/contractKernel.ts",
         "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/components/ui/badge/index.ts",
-        "src/components/ui/button/buttonChrome.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/input/index.ts",
         "src/components/ui/select/index.ts",
@@ -36093,9 +36119,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 8,
-      "measuredFanOut": 4,
+      "measuredFanOut": 3,
       "targetFanIn": 8,
-      "targetFanOut": 4,
+      "targetFanOut": 3,
       "shims": [],
       "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
@@ -36108,7 +36134,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
-        "src/components/ui/button/buttonChrome.ts",
         "src/components/ui/button/index.ts",
         "src/lib/utils.ts"
       ],
@@ -36807,11 +36832,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/admin/shared/ui/form/SwitchRow.vue",
           "to": "src/features/admin/shared/ui/form/AdminSwitch.vue",
           "kind": "runtime"
+        },
+        {
+          "from": "src/test/touchTarget.browser.spec.ts",
+          "to": "src/features/admin/shared/ui/form/AdminSwitch.vue",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 4,
       "measuredFanOut": 3,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 3,
       "shims": [],
       "shimTtl": "2 phases — delete after P5",
@@ -38246,9 +38276,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 29,
-      "measuredFanOut": 47,
+      "measuredFanOut": 46,
       "targetFanIn": 29,
-      "targetFanOut": 47,
+      "targetFanOut": 46,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -38301,7 +38331,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/userSession.ts",
         "src/api/workspaceEventStream.ts",
         "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/components/ui/spinner/index.ts",
@@ -38803,6 +38832,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/pending-execution/taskSnapshot.unit.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "runtime"
@@ -38839,6 +38873,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/canvas/session/flow-adapter/connections/flowConnectionIdentity.unit.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/connections/immutableConnectionEndpoints.contract.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "runtime"
         },
@@ -38993,10 +39032,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 48,
-      "measuredFanOut": 52,
-      "targetFanIn": 48,
-      "targetFanOut": 52,
+      "measuredFanIn": 50,
+      "measuredFanOut": 49,
+      "targetFanIn": 50,
+      "targetFanOut": 49,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -39220,7 +39259,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/workspaceEventStream.ts",
         "src/app/style.css",
         "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
@@ -39243,9 +39281,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
-        "src/features/canvas/session/board-session/autosavePolicy.ts",
-        "src/features/canvas/session/board-session/repository.ts",
-        "src/features/canvas/session/board-session/useBoardAutosave.ts",
+        "src/features/canvas/session/board-session/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -39348,11 +39384,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/core/nodes/flowTypes.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/board-session/boardFixtures.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/board-session/boardSyncCoordinator.ts",
@@ -39710,19 +39741,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/canvas/ui/nodes/workflows/FusionStage.vue",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/workflows/FusionStage.vue",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNode.vue",
@@ -39775,10 +39796,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 95,
-      "measuredFanOut": 52,
-      "targetFanIn": 95,
-      "targetFanOut": 52,
+      "measuredFanIn": 94,
+      "measuredFanOut": 49,
+      "targetFanIn": 94,
+      "targetFanOut": 49,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -39890,7 +39911,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/workspaceEventStream.ts",
         "src/app/style.css",
         "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
@@ -39913,9 +39933,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
-        "src/features/canvas/session/board-session/autosavePolicy.ts",
-        "src/features/canvas/session/board-session/repository.ts",
-        "src/features/canvas/session/board-session/useBoardAutosave.ts",
+        "src/features/canvas/session/board-session/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -39927,6 +39945,59 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/theme/dialogMask.ts",
         "vitest/browser"
       ]
+    },
+    {
+      "path": "src/features/board/ports/testing.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "frontend",
+      "activationPhase": "current",
+      "scope": "cross-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/board-session/repository.contract.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/board-session/uploadLifecycle.unit.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/board-session/useBoardSession.contract.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useFlowNodeMediaInputs.unit.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/pages/CanvasPage.component.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 1,
+      "targetFanIn": 5,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Test-only Board port exposes snapshot/state factories to external specs without exposing private Board sync fixtures or production dependencies.",
+      "sourcePaths": ["src/features/board/ports/testing.ts"],
+      "targetPath": "src/features/board/ports/testing.ts",
+      "ownershipScope": ["src/features/board/ports/testing.ts"],
+      "publicExports": ["makeBoardSnapshot", "makeBoardState"],
+      "targetFanOutTargets": ["src/features/board/testing/index.ts"],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/board/session/catalog/index.ts",
@@ -40294,6 +40365,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ports/testing.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/catalog/scope.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -40305,6 +40386,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardCacheTiming.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         },
@@ -40324,15 +40410,20 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 10,
-      "measuredFanOut": 3,
-      "targetFanIn": 10,
-      "targetFanOut": 3,
+      "measuredFanIn": 14,
+      "measuredFanOut": 4,
+      "targetFanIn": 14,
+      "targetFanOut": 4,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -40344,16 +40435,20 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "publicExports": [
         "MockBoardRecordFixture",
         "MockWorkspaceBoardApiState",
+        "addRemoteBoardFixture",
         "createMockWorkspaceBoardApiRequest",
         "createMockWorkspaceBoardApiState",
         "makeBoardSnapshot",
         "makeBoardState",
-        "makePendingImageNodeSnapshot"
+        "makePendingImageNodeSnapshot",
+        "makePromptBoardState",
+        "primeAuthenticatedWorkspace"
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
         "src/core/utils/auth.ts",
-        "src/features/board/core/index.ts",
+        "src/features/board/core/document/latestBoardState.ts",
+        "src/features/board/core/document/nodes.ts",
         "src/features/workspace/index.ts"
       ]
     },
@@ -40406,6 +40501,195 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanOutTargets": []
     },
     {
+      "path": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/usePendingImageResultExecution.ts",
+          "to": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useFlowMediaInputImages.ts",
+          "to": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
+          "to": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
+      "targetFanIn": 3,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Graph mutation port resolver used by execution and editing commands; a file-scoped entry keeps the mutation capability separate from graph read contracts.",
+      "sourcePaths": ["src/features/canvas/core/graph/canvasGraphStoreWriter.ts"],
+      "targetPath": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
+      "ownershipScope": ["src/features/canvas/core/graph/canvasGraphStoreWriter.ts"],
+      "publicExports": ["resolveWritableCanvasGraphStore"],
+      "targetFanOutTargets": [
+        "src/features/canvas/core/graph/canvasGraphStore.ts",
+        "src/features/canvas/core/graph/canvasGraphStoreTypes.ts"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/core/graph/canvasGraphPatchAlgebra.ts",
+          "to": "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphHistory.ts",
+          "to": "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 0,
+      "targetFanIn": 2,
+      "targetFanOut": 0,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "JSON graph-value comparison shared by patch algebra and history; a leaf entry keeps history comparison independent of the graph store runtime.",
+      "sourcePaths": ["src/features/canvas/core/graph/canvasGraphValueEquality.ts"],
+      "targetPath": "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
+      "ownershipScope": ["src/features/canvas/core/graph/canvasGraphValueEquality.ts"],
+      "publicExports": ["isSameJsonValue"],
+      "targetFanOutTargets": [],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/groupDragRuntime.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/groupMembershipRuntime.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/groupMembershipRuntime.unit.spec.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/groupResizeRuntime.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/groupResizeRuntime.unit.spec.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPointerInteraction.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPresentationInteraction.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPresentationInteraction.unit.spec.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.component.spec.ts",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.vue",
+          "to": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 11,
+      "measuredFanOut": 2,
+      "targetFanIn": 11,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Renderer-independent group geometry shared by Graph Editing and Node UI; separate entry avoids a geometry-to-graph-barrel re-export cycle.",
+      "sourcePaths": ["src/features/canvas/core/graph/canvasGroupGeometry.ts"],
+      "targetPath": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+      "ownershipScope": ["src/features/canvas/core/graph/canvasGroupGeometry.ts"],
+      "publicExports": [
+        "CANVAS_GROUP_FRAME_PADDING_PX",
+        "CanvasFlowNodeLike",
+        "CanvasFlowViewportTransform",
+        "CanvasGroupFrame",
+        "CanvasGroupResizeHandle",
+        "CanvasPoint",
+        "CanvasRect",
+        "CanvasSelectionGroupGeometryAction",
+        "canvasRectToGroupGeometry",
+        "findTopmostCanvasGroupFrameAtPoint",
+        "moveCanvasRect",
+        "projectCanvasGroupNodeLayers",
+        "rectContainsRect",
+        "rectsIntersect",
+        "resizeCanvasRectFromHandle",
+        "resolveCanvasGroupFrames",
+        "resolveCanvasSelectionGroupActionBounds",
+        "resolveCanvasSelectionGroupActionButtonPosition"
+      ],
+      "targetFanOutTargets": [
+        "src/features/board/ports/canvas.ts",
+        "src/features/canvas/core/graph/index.ts"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
       "path": "src/features/canvas/core/graph/index.ts",
       "kind": "canonical",
       "confidence": "high",
@@ -40416,11 +40700,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "exportStyle": "explicit (star=5, named=1, decl=0)",
       "surfaceBaseline": true,
       "allowedConsumers": [
-        {
-          "from": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
-          "to": "src/features/canvas/core/graph/index.ts",
-          "kind": "type-only"
-        },
         {
           "from": "src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.unit.spec.ts",
           "to": "src/features/canvas/core/graph/index.ts",
@@ -40433,6 +40712,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+          "to": "src/features/canvas/core/graph/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
           "to": "src/features/canvas/core/graph/index.ts",
           "kind": "runtime"
         },
@@ -40507,6 +40791,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/flow-adapter/connections/immutableConnectionEndpoints.contract.spec.ts",
+          "to": "src/features/canvas/core/graph/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/flow-adapter/connections/nodeDragLifecycle.ts",
           "to": "src/features/canvas/core/graph/index.ts",
           "kind": "runtime"
@@ -40555,6 +40844,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/session/flow-adapter/projection/vueFlowProjectionAdapter.contract.spec.ts",
           "to": "src/features/canvas/core/graph/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groupContracts.ts",
+          "to": "src/features/canvas/core/graph/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/graph-editing/groups/canvasGroupRuntimeOwnership.contract.spec.ts",
@@ -40618,6 +40912,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useFlowMediaInputImages.unit.spec.ts",
+          "to": "src/features/canvas/core/graph/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/canvasGraphStoreTelemetryProbe.ts",
+          "to": "src/features/canvas/core/graph/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/canvasGraphStoreTelemetryProbe.unit.spec.ts",
           "to": "src/features/canvas/core/graph/index.ts",
           "kind": "runtime"
         },
@@ -40712,9 +41016,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 59,
+      "measuredFanIn": 63,
       "measuredFanOut": 3,
-      "targetFanIn": 59,
+      "targetFanIn": 63,
       "targetFanOut": 3,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -41053,9 +41357,24 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "to": "src/features/canvas/session/board-session/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
+          "to": "src/features/canvas/session/board-session/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportRuntime.ts",
           "to": "src/features/canvas/session/board-session/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useFlowImageUploadActions.ts",
+          "to": "src/features/canvas/session/board-session/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
@@ -41073,19 +41392,19 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
           "to": "src/features/canvas/session/board-session/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
+          "from": "src/features/canvas/ui/pages/CanvasPage.component.spec.ts",
           "to": "src/features/canvas/session/board-session/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 9,
       "measuredFanOut": 18,
-      "targetFanIn": 5,
+      "targetFanIn": 9,
       "targetFanOut": 18,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -41096,13 +41415,18 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/features/canvas/session/board-session/index.ts",
       "ownershipScope": ["src/features/canvas/session/board-session/"],
       "publicExports": [
+        "BOARD_SESSION_AUTH_UNAVAILABLE_CODE",
         "BoardLoadResult",
         "BoardSaveReconciliation",
         "BoardSaveResult",
         "BoardSession",
+        "BoardSessionRepository",
         "BoardSyncCoordinator",
         "SaveStatus",
+        "createBoardAutosavePolicy",
+        "createBoardSessionRepository",
         "createBoardSyncCoordinator",
+        "readCurrentBoardIdRef",
         "useBoardAutosave",
         "useBoardSession"
       ],
@@ -41121,7 +41445,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/auth.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
-        "src/features/canvas/session/board-session/boardFixtures.ts",
+        "src/features/board/ports/testing.ts",
         "src/features/canvas/session/browser/canvasInteractionMetrics.ts",
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
@@ -41151,6 +41475,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/board-attachment/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
           "to": "src/features/canvas/session/execution/board-attachment/index.ts",
           "kind": "type-only"
         },
@@ -41200,9 +41529,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 13,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 13,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -41231,6 +41560,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "exportStyle": "explicit (star=0, named=11, decl=0)",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/vueFlowProjectionAdapter.contract.spec.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "type-only"
+        },
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
           "to": "src/features/canvas/session/execution/index.ts",
@@ -41263,6 +41602,46 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/canvas/session/image-workflow/useImageWorkflowExecution.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceImageWorkflow.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useBoardRuntime.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useBoardRuntime.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
+          "to": "src/features/canvas/session/execution/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "runtime"
         },
@@ -41342,10 +41721,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 21,
-      "measuredFanOut": 54,
-      "targetFanIn": 21,
-      "targetFanOut": 54,
+      "measuredFanIn": 31,
+      "measuredFanOut": 46,
+      "targetFanIn": 31,
+      "targetFanOut": 46,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -41357,6 +41736,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "publicExports": [
         "BoardGraphSession",
         "BoardGraphSessionOptions",
+        "CANVAS_WORKSPACE_REQUIRED_MESSAGE",
         "CanvasBillingPreflightError",
         "CanvasBillingQuoteState",
         "CanvasBillingReadinessStore",
@@ -41394,7 +41774,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "PendingImageResultNodeId",
         "PendingImageSupersededExecution",
         "buildFusionBillingReadinessRequest",
+        "buildGenerationTaskRequest",
+        "buildImageActionReadinessRequest",
+        "buildInpaintReadinessRequest",
+        "buildOutpaintReadinessRequest",
+        "cancelCanvasWorkspaceTask",
         "canvasBillingReadinessKey",
+        "collectPendingImageTasks",
+        "createCanvasBillingReadinessStore",
         "createCanvasExecutionRecoveryCoordinator",
         "createImageExecutionPlanner",
         "createImageWorkflowCommands",
@@ -41403,12 +41790,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "isCanvasBillingPreflightError",
         "isImageStrengthAction",
         "isImageTaskAction",
+        "projectPendingImageExecutionEdges",
         "provideCanvasBillingReadiness",
         "resolvePendingImageResultPosition",
         "useCanvasBillingQuote",
         "useCanvasBillingReadinessStore",
         "useCanvasExecutionWorkspace",
-        "useImageWorkflowExecution"
+        "useImageWorkflowExecution",
+        "waitExistingOrLiveTaskImageResults"
       ],
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
@@ -41453,20 +41842,136 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/nodes/canvasNodeFactory.ts",
         "src/features/canvas/core/nodes/flowTypes.ts",
         "src/features/canvas/core/nodes/imageActions.ts",
-        "src/features/canvas/session/flow-adapter/connections/flowConnectionAdapter.ts",
-        "src/features/canvas/session/flow-adapter/connections/flowGraphAdapterCommandSideEffects.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/bindCanvasGraphSessionProjection.ts",
-        "src/features/canvas/session/flow-adapter/projection/canvasEdgeProjection.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowNodeSourceResolution.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotAdapter.ts",
-        "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
         "src/features/canvas/tools/outpaint/core/geometry.ts",
         "src/features/workspace/index.ts",
         "src/test/msw.ts"
       ]
+    },
+    {
+      "path": "src/features/canvas/session/execution/pending-execution/core.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "frontend",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/index.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/edgeProjection.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.unit.spec.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/connections/deleteCommandLifecycle.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/flowGraphDeleteProjection.ts",
+          "to": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 14,
+      "measuredFanOut": 7,
+      "targetFanIn": 14,
+      "targetFanOut": 7,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Pending execution facts and lease contract. Flow deletion consumes this leaf directly to avoid the execution/flow-adapter barrel cycle.",
+      "sourcePaths": ["src/features/canvas/session/execution/pending-execution/core.ts"],
+      "targetPath": "src/features/canvas/session/execution/pending-execution/core.ts",
+      "ownershipScope": ["src/features/canvas/session/execution/pending-execution/core.ts"],
+      "publicExports": [
+        "PendingImageExecutionCore",
+        "PendingImageExecutionCoreOptions",
+        "PendingImageExecutionFact",
+        "PendingImageExecutionLease",
+        "PendingImageExecutionRejectionReason",
+        "PendingImageExecutionReleaseOutcome",
+        "PendingImageExecutionReleaseResult",
+        "PendingImageExecutionSnapshot",
+        "PendingImageExecutionStartResult",
+        "PendingImageExecutionStatus",
+        "PendingImageExecutionTransition",
+        "PendingImageMaterializationError",
+        "PendingImageMaterializationOutcome",
+        "PendingImageMaterializationResult",
+        "PendingImageMutationContractError",
+        "PendingImageSupersededExecution",
+        "createPendingImageExecutionCore"
+      ],
+      "targetFanOutTargets": [
+        "src/features/canvas/session/execution/board-attachment/index.ts",
+        "src/features/canvas/session/execution/pending-execution/boardGraphSession.ts",
+        "src/features/canvas/session/execution/pending-execution/materialization.ts",
+        "src/features/canvas/session/execution/pending-execution/publisher.ts",
+        "src/features/canvas/session/execution/pending-execution/release.ts",
+        "src/features/canvas/session/execution/pending-execution/types.ts",
+        "src/features/canvas/session/execution/pending-execution/validation.ts"
+      ],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/canvas/session/execution/pending-execution/index.ts",
@@ -41791,6 +42296,26 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/canvas/session/execution/pending-execution/edgeProjection.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/planning/imageExecutionPlan.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/planning/imageExecutionPlan.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/planning.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/result-nodes/planning.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
@@ -41798,12 +42323,27 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/canvas/session/execution/result-nodes/usePendingImageResultExecution.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/usePendingImageResultExecution.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/usePendingImageResultExecution.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
@@ -41816,9 +42356,79 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/session/graph-editing/groups/canvasGroupRuntimeOwnership.contract.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/groupDragRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useFlowMediaInputImages.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useFlowMediaInputImages.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/createCanvasGraphEditingNodeRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
@@ -41826,9 +42436,34 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/session/graph-editing/mutations/useFlowCanvasNodeHandlers.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useFlowImageNodeSnapshots.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/graph-editing/mutations/useFlowNodeMutations.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useFlowNodeMutations.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useFlowNodeMutations.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
@@ -41837,6 +42472,26 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasSelectionCoordinator.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasWorkspaceRuntimePartsTypes.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
         },
@@ -41853,10 +42508,25 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useBoardRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
         },
@@ -41881,7 +42551,87 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNode.vue",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeHandleRail.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNodeHandleRail.vue",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/canvasNodePresentation.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/flowCanvasNodeUiStateIsolation.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPointerInteraction.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPresentationInteraction.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/primitives/NodeInputThumbnail.vue",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/useFlowCanvasNodeIntents.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/createCanvasNodePresentationIntentRouter.unit.spec.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenImageToolUi.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
         },
@@ -41889,12 +42639,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/useFlowTransientUiDismissal.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "type-only"
         }
       ],
-      "measuredFanIn": 20,
-      "measuredFanOut": 27,
-      "targetFanIn": 20,
-      "targetFanOut": 27,
+      "measuredFanIn": 61,
+      "measuredFanOut": 28,
+      "targetFanIn": 61,
+      "targetFanOut": 28,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -41915,13 +42670,61 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "CanvasRendererPoint",
         "CanvasVueFlowAdapter",
         "CanvasVueFlowConnectionAdapter",
+        "CanvasVueFlowGraphActions",
+        "CanvasVueFlowGraphAdapter",
+        "DismissTransientCanvasUi",
+        "DismissTransientCanvasUiOptions",
+        "FLOW_NODE_DRAG_HANDLE",
+        "FlowExecutionGraphOptions",
+        "FlowGraphNode",
+        "FlowSnapshotParamPatch",
+        "ImageNodeDisplayPayload",
+        "ImageNodeLayoutAnchor",
+        "ResolvedFlowInputImage",
+        "bindCanvasGraphSessionProjection",
+        "boardSnapshotToFlow",
+        "canvasNodeToFlowNode",
         "createCanvasConnectionCommandLifecycle",
         "createCanvasConnectionDropLifecycle",
         "createCanvasDeleteCommandLifecycle",
+        "createCanvasHandleProximityCoordinator",
         "createCanvasNodeDragLifecycle",
         "createCanvasVueFlowConnectionAdapter",
         "createCanvasVueFlowRendererMetricsPort",
+        "createFlowGraphCommandOptions",
+        "flowConnectionToCanvasConnection",
+        "isFlowConnectionAllowed",
+        "normalizeFlowConnection",
+        "parseFlowNodeId",
+        "parseHandlePort",
+        "patchFlowSnapshotParam",
+        "projectCanvasRenderEdges",
+        "provideCanvasHandleProximityCoordinator",
+        "provideCanvasNodeUiStateContext",
+        "provideCanvasViewportContext",
+        "readFlowGraphCommandSideEffects",
+        "releaseCanvasGraphDeleteExecutions",
+        "resolveCanvasNodeUiScale",
+        "resolveConnectedImageInputs",
+        "resolveConnectedInput",
+        "resolveConnectedPromptText",
+        "resolveFlowNodeCanvasRef",
+        "resolveFlowSourceImageRatio",
+        "resolveImageNodeDisplayPayload",
+        "resolveImageNodeLayoutAnchor",
+        "resolveSourceImageFromNode",
+        "useCanvasImagePreviewQuality",
+        "useCanvasNodeUiStateContext",
+        "useCanvasViewportContext",
+        "useCanvasViewportRuntime",
+        "useCanvasVueFlowGraphAdapter",
         "useCanvasVueFlowHandleGeometryAdapter",
+        "useDisplayImagePreview",
+        "useFlowCanvasNodeAdapter",
+        "useFlowCanvasNodeHandleRail",
+        "useFlowNodeHandlesPresentation",
+        "useFlowNodeInternalsRefreshQueue",
+        "useImageStageRegistry",
         "useVueFlowAdapter",
         "useVueFlowSelectionAdapter"
       ],
@@ -41951,10 +42754,49 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/browser/canvasViewportPersistence.ts",
         "src/features/canvas/session/browser/interaction/useRafScheduler.ts",
-        "src/features/canvas/session/execution/pending-execution/index.ts",
+        "src/features/canvas/session/execution/index.ts",
+        "src/features/canvas/session/execution/pending-execution/core.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
         "src/features/canvas/session/media/displayImagePreviewEncoding.ts"
       ]
+    },
+    {
+      "path": "src/features/canvas/session/graph-editing/groupContracts.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "frontend",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+          "to": "src/features/canvas/session/graph-editing/groupContracts.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/overlays/CanvasSelectionGroupActionButton.vue",
+          "to": "src/features/canvas/session/graph-editing/groupContracts.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Pure selection group action contract shared with overlays; independent of graph-editing runtime and tool UI to avoid mutual barrel cycles.",
+      "sourcePaths": ["src/features/canvas/session/graph-editing/groupContracts.ts"],
+      "targetPath": "src/features/canvas/session/graph-editing/groupContracts.ts",
+      "ownershipScope": ["src/features/canvas/session/graph-editing/groupContracts.ts"],
+      "publicExports": ["CanvasSelectionGroupAction"],
+      "targetFanOutTargets": ["src/features/canvas/core/graph/index.ts"],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/canvas/session/graph-editing/index.ts",
@@ -41968,6 +42810,26 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/canvas/session/image-workflow/generationIntent.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.unit.spec.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/canvasGraphSessionRuntime.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
           "to": "src/features/canvas/session/graph-editing/index.ts",
           "kind": "runtime"
@@ -41976,6 +42838,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
           "to": "src/features/canvas/session/graph-editing/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
@@ -41988,15 +42855,30 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPointerInteraction.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPresentationInteraction.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPresentationInteraction.unit.spec.ts",
+          "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
           "to": "src/features/canvas/session/graph-editing/index.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 40,
-      "targetFanIn": 5,
-      "targetFanOut": 40,
+      "measuredFanIn": 12,
+      "measuredFanOut": 34,
+      "targetFanIn": 12,
+      "targetFanOut": 34,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42010,12 +42892,20 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "CanvasGraphEditingNodeInteractions",
         "CanvasGraphEditingNodeInteractionsOptions",
         "CanvasGraphEditingUploadAdapter",
+        "CanvasGraphHistory",
         "CanvasGraphInteractionBrowserAdapter",
+        "CanvasGroupRuntimeCommands",
+        "CanvasGroupRuntimeView",
         "CanvasImageNodeCreationResult",
+        "CanvasSelectionGroupAction",
+        "MediaInputImage",
+        "canvasGraphStoreTelemetryProbe",
         "createCanvasGraphEditingBrowserAdapter",
         "createCanvasGraphInteractionBrowserAdapter",
         "useCanvasGraphEditing",
-        "useCanvasGraphInteractions"
+        "useCanvasGraphHistory",
+        "useCanvasGraphInteractions",
+        "useCanvasGroupRuntime"
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
@@ -42033,31 +42923,25 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/imageUploadSupport.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
+        "src/features/board/ports/testing.ts",
         "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
+        "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
+        "src/features/canvas/core/graph/canvasGroupGeometry.ts",
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/core/nodes/canvasNodeFactory.ts",
         "src/features/canvas/core/nodes/canvasNodeRegistry.ts",
         "src/features/canvas/core/nodes/flowTypes.ts",
-        "src/features/canvas/session/board-session/boardFixtures.ts",
-        "src/features/canvas/session/board-session/currentBoardId.ts",
+        "src/features/canvas/session/board-session/index.ts",
+        "src/features/canvas/session/browser/canvasInteractionMetrics.ts",
+        "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/execution/board-attachment/index.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/flow-adapter/connections/flowConnectionAdapter.ts",
-        "src/features/canvas/session/flow-adapter/connections/flowGraphAdapterCommandSideEffects.ts",
-        "src/features/canvas/session/flow-adapter/handles/useFlowNodeInternalsRefreshQueue.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/bindCanvasGraphSessionProjection.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowNodeDragHandle.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotAdapter.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotParamMutations.ts",
-        "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.ts",
         "src/features/canvas/session/media/preloadImage.ts",
         "src/features/canvas/session/workspace/useCanvasFeedback.ts",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
         "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
-        "src/features/canvas/ui/screens/useFlowTransientUiDismissal.ts",
         "src/features/library/index.ts"
       ]
     },
@@ -42094,9 +42978,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 34,
+      "measuredFanOut": 22,
       "targetFanIn": 4,
-      "targetFanOut": 34,
+      "targetFanOut": 22,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42117,7 +43001,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
         "src/api/mediaAssetDelivery.ts",
-        "src/core/contracts/imageServices.ts",
         "src/core/i18n/index.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/taskResult.ts",
@@ -42125,27 +43008,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/core/nodes/imageActionRegistry.ts",
         "src/features/canvas/core/nodes/imageActions.ts",
-        "src/features/canvas/session/browser/domEventTargets.ts",
-        "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
-        "src/features/canvas/session/execution/commands/imageTaskRequests.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/execution/pending-execution/index.ts",
-        "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.ts",
-        "src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotParamMutations.ts",
-        "src/features/canvas/session/graph-editing/inputs/useFlowMediaInputImages.ts",
+        "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/session/workspace/useCanvasFeedback.ts",
         "src/features/canvas/tools/image-tools/index.ts",
-        "src/features/canvas/tools/outpaint/core/geometry.ts",
+        "src/features/canvas/tools/outpaint/session/outpaintIntent.ts",
+        "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/retouch/index.ts",
-        "src/features/canvas/ui/nodes/primitives/index.ts",
-        "src/features/canvas/ui/nodes/primitives/useNodeToolPopoverGroup.ts",
-        "src/features/canvas/ui/overlays/index.ts",
         "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
-        "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
-        "src/features/workspace/index.ts",
-        "src/test/render.ts"
+        "src/features/workspace/index.ts"
       ]
     },
     {
@@ -42265,9 +43137,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 30,
+      "measuredFanOut": 20,
       "targetFanIn": 4,
-      "targetFanOut": 30,
+      "targetFanOut": 20,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42292,24 +43164,125 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/nodes/canvasNodeUi.ts",
         "src/features/canvas/session/board-session/index.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/execution/pending-execution/index.ts",
         "src/features/canvas/session/execution/task-lifecycle/index.ts",
-        "src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.ts",
-        "src/features/canvas/session/flow-adapter/connections/flowGraphAdapterCommandSideEffects.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/bindCanvasGraphSessionProjection.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotAdapter.ts",
-        "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportRuntime.ts",
-        "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
         "src/features/canvas/session/graph-editing/index.ts",
-        "src/features/canvas/session/graph-editing/mutations/canvasGraphStoreTelemetryProbe.ts",
-        "src/features/canvas/session/graph-editing/mutations/useCanvasGraphHistory.ts",
         "src/features/canvas/session/image-workflow/index.ts",
         "src/features/canvas/ui/chrome/useBoardHeaderActions.ts",
         "src/features/library/index.ts",
         "src/features/workspace/routePaths.ts"
       ]
+    },
+    {
+      "path": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceImageWorkflow.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useBoardRuntime.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/useCanvasFeedback.unit.spec.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
+          "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 10,
+      "measuredFanOut": 2,
+      "targetFanIn": 10,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Canvas feedback capabilities shared by Board Session, task execution, graph commands and tools; kept separate from Workspace composition to avoid a runtime composition cycle.",
+      "sourcePaths": ["src/features/canvas/session/workspace/useCanvasFeedback.ts"],
+      "targetPath": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
+      "ownershipScope": ["src/features/canvas/session/workspace/useCanvasFeedback.ts"],
+      "publicExports": ["CanvasFeedback", "createCanvasFeedback", "useCanvasFeedback"],
+      "targetFanOutTargets": ["src/core/composables/useAppToast.ts", "src/core/i18n/index.ts"],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/canvas/tools/image-tools/core/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
+          "to": "src/features/canvas/tools/image-tools/core/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Image tool chrome geometry constants; the core-only public entry keeps tool UI dependencies out of math and layout consumers.",
+      "sourcePaths": ["src/features/canvas/tools/image-tools/core/index.ts"],
+      "targetPath": "src/features/canvas/tools/image-tools/core/index.ts",
+      "ownershipScope": ["src/features/canvas/tools/image-tools/core/index.ts"],
+      "publicExports": ["IMAGE_TOOL_CHROME_LAYOUT"],
+      "targetFanOutTargets": ["src/features/canvas/tools/image-tools/core/imageToolChrome.ts"],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/canvas/tools/image-tools/index.ts",
@@ -42322,6 +43295,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "exportStyle": "explicit (star=0, named=2, decl=0)",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/features/canvas/index.ts",
+          "to": "src/features/canvas/tools/image-tools/index.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
           "to": "src/features/canvas/tools/image-tools/index.ts",
@@ -42368,10 +43346,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
-      "measuredFanOut": 24,
-      "targetFanIn": 9,
-      "targetFanOut": 24,
+      "measuredFanIn": 10,
+      "measuredFanOut": 18,
+      "targetFanIn": 10,
+      "targetFanOut": 18,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42397,12 +43375,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "fs",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
-        "path",
         "src/api/mediaAssetDelivery.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userLocale.ts",
@@ -42410,18 +43386,85 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
         "src/features/canvas/session/workspace/useCanvasFeedback.ts",
         "src/features/canvas/tools/inpaint/index.ts",
-        "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
-        "src/features/canvas/tools/retouch/core/model.ts",
-        "src/features/canvas/tools/retouch/core/recipe.ts",
+        "src/features/canvas/tools/inpaint/testing/index.ts",
         "src/features/canvas/tools/retouch/index.ts",
-        "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
-        "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
+        "src/features/canvas/tools/retouch/testing/index.ts",
         "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
         "src/test/render.ts"
       ]
+    },
+    {
+      "path": "src/features/canvas/tools/image-tools/ui/chrome.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/chrome.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/retouch/ui/chrome/Chrome.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/chrome.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 1,
+      "targetFanIn": 2,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Cycle-safe image tool chrome component entry consumed by Inpaint and Retouch; importing the image-tools root would create a mutual tool-barrel cycle.",
+      "sourcePaths": ["src/features/canvas/tools/image-tools/ui/chrome.ts"],
+      "targetPath": "src/features/canvas/tools/image-tools/ui/chrome.ts",
+      "ownershipScope": ["src/features/canvas/tools/image-tools/ui/chrome.ts"],
+      "publicExports": ["ImageToolChromeFrame"],
+      "targetFanOutTargets": ["src/features/canvas/tools/image-tools/ui/ChromeFrame.vue"],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/canvas/tools/image-tools/ui/stage.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/stage.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Image tool stage component entry consumed by Node UI without importing the complete image-tools session.",
+      "sourcePaths": ["src/features/canvas/tools/image-tools/ui/stage.ts"],
+      "targetPath": "src/features/canvas/tools/image-tools/ui/stage.ts",
+      "ownershipScope": ["src/features/canvas/tools/image-tools/ui/stage.ts"],
+      "publicExports": ["ImageToolStagePresentation"],
+      "targetFanOutTargets": ["src/features/canvas/tools/image-tools/ui/StagePresentation.vue"],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/canvas/tools/inpaint/index.ts",
@@ -42434,6 +43477,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "exportStyle": "explicit (star=0, named=5, decl=0)",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/features/canvas/index.ts",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
@@ -42458,11 +43506,21 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 8,
       "measuredFanOut": 15,
-      "targetFanIn": 5,
+      "targetFanIn": 8,
       "targetFanOut": 15,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -42493,7 +43551,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/number.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue",
+        "src/features/canvas/tools/image-tools/ui/chrome.ts",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
@@ -42560,6 +43618,39 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       ]
     },
     {
+      "path": "src/features/canvas/tools/inpaint/testing/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "test-contract",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/inpaint/testing/index.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 1,
+      "targetFanIn": 1,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Inpaint test contract entry exposing only the mask-painting module type for external mock assertions.",
+      "sourcePaths": ["src/features/canvas/tools/inpaint/testing/index.ts"],
+      "targetPath": "src/features/canvas/tools/inpaint/testing/index.ts",
+      "ownershipScope": ["src/features/canvas/tools/inpaint/testing/index.ts"],
+      "publicExports": ["MaskPaintingCanvasModule"],
+      "targetFanOutTargets": ["src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts"],
+      "surfaceSeverity": "error"
+    },
+    {
       "path": "src/features/canvas/tools/retouch/index.ts",
       "kind": "canonical",
       "confidence": "high",
@@ -42571,12 +43662,22 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/canvas/index.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
@@ -42606,11 +43707,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
@@ -42619,6 +43715,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
@@ -42641,10 +43742,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
-      "measuredFanOut": 27,
-      "targetFanIn": 13,
-      "targetFanOut": 27,
+      "measuredFanIn": 16,
+      "measuredFanOut": 30,
+      "targetFanIn": 16,
+      "targetFanOut": 30,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42695,6 +43796,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@types/node/index.d.ts",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -42703,6 +43806,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/vue/index.js",
         "path",
         "src/api/mediaAssetDelivery.ts",
+        "src/app/style.css",
         "src/core/i18n/index.ts",
         "src/core/utils/number.ts",
         "src/features/board/ports/canvas.ts",
@@ -42712,15 +43816,99 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/browser/interaction/useRafScheduler.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
         "src/features/canvas/session/media/displayImagePreviewEncoding.ts",
-        "src/features/canvas/tools/image-tools/core/imageToolChrome.ts",
-        "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue",
+        "src/features/canvas/tools/image-tools/core/index.ts",
+        "src/features/canvas/tools/image-tools/ui/chrome.ts",
         "src/features/canvas/tools/outpaint/core/geometry.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "vitest/browser"
       ]
+    },
+    {
+      "path": "src/features/canvas/tools/retouch/testing/browser.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "test-contract",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/test/touchTarget.browser.spec.ts",
+          "to": "src/features/canvas/tools/retouch/testing/browser.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 1,
+      "measuredFanOut": 4,
+      "targetFanIn": 1,
+      "targetFanOut": 4,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Retouch curve control Browser testing entry with its required styles and point normalization; external tests use this explicit harness surface.",
+      "sourcePaths": ["src/features/canvas/tools/retouch/testing/browser.ts"],
+      "targetPath": "src/features/canvas/tools/retouch/testing/browser.ts",
+      "ownershipScope": ["src/features/canvas/tools/retouch/testing/browser.ts"],
+      "publicExports": ["CurveGraph", "normalizeCurveChannelPoints"],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/retouch/core/kinds/curves.ts",
+        "src/features/canvas/tools/retouch/ui/curves/CurveGraph.vue",
+        "src/features/canvas/tools/retouch/ui/shared/styles/retouch-curves.css",
+        "src/features/canvas/tools/retouch/ui/shared/styles/retouch-histogram-plot.css"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/canvas/tools/retouch/testing/index.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "test-contract",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "src/features/canvas/tools/retouch/testing/index.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 3,
+      "targetFanIn": 2,
+      "targetFanOut": 3,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Retouch test contract entry for recipe fixtures and runtime module types; test-only support stays separate from the production tool facade.",
+      "sourcePaths": ["src/features/canvas/tools/retouch/testing/index.ts"],
+      "targetPath": "src/features/canvas/tools/retouch/testing/index.ts",
+      "ownershipScope": ["src/features/canvas/tools/retouch/testing/index.ts"],
+      "publicExports": [
+        "RetouchFinalRenderModule",
+        "RetouchWebglEngineModule",
+        "deserializeImageRetouchPlan"
+      ],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/retouch/core/recipe.ts",
+        "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
+        "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts"
+      ],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/canvas/ui/chrome/components/index.ts",
@@ -42734,7 +43922,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/canvas/ui/chrome/index.ts",
+          "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
           "to": "src/features/canvas/ui/chrome/components/index.ts",
           "kind": "runtime"
         }
@@ -42859,15 +44047,20 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "to": "src/features/canvas/ui/nodes/groups/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
           "to": "src/features/canvas/ui/nodes/groups/index.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 10,
-      "targetFanIn": 3,
-      "targetFanOut": 10,
+      "measuredFanIn": 4,
+      "measuredFanOut": 8,
+      "targetFanIn": 4,
+      "targetFanOut": 8,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42889,11 +44082,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/vue/index.js",
         "src/features/canvas/core/graph/canvasGroupGeometry.ts",
         "src/features/canvas/core/graph/index.ts",
-        "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
-        "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.vue",
-        "src/features/canvas/ui/overlays/CanvasSelectionGroupActionButton.vue",
-        "src/features/canvas/ui/overlays/index.ts",
-        "src/features/canvas/ui/screens/useFlowTransientUiDismissal.ts"
+        "src/features/canvas/session/flow-adapter/index.ts",
+        "src/features/canvas/session/graph-editing/index.ts",
+        "src/features/canvas/ui/overlays/index.ts"
       ]
     },
     {
@@ -42907,6 +44098,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "exportStyle": "explicit (star=0, named=2, decl=0)",
       "surfaceBaseline": true,
       "allowedConsumers": [
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
+          "to": "src/features/canvas/ui/nodes/index.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/ui/screens/createCanvasNodePresentationIntentRouter.ts",
           "to": "src/features/canvas/ui/nodes/index.ts",
@@ -42923,10 +44119,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 50,
-      "targetFanIn": 3,
-      "targetFanOut": 50,
+      "measuredFanIn": 4,
+      "measuredFanOut": 38,
+      "targetFanIn": 4,
+      "targetFanOut": 38,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -42937,6 +44133,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "ownershipScope": ["src/features/canvas/ui/nodes/"],
       "publicExports": [
         "CanvasNodePresentationIntent",
+        "FlowCanvasNode",
         "FusionNodePresentationBinding",
         "FusionNodePresentationBindingSource",
         "FusionNodePresentationResolver",
@@ -42949,12 +44146,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/app/style.css",
         "src/core/contracts/generationContract.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/i18n/index.ts",
@@ -42974,30 +44173,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/nodes/imageActions.ts",
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
-        "src/features/canvas/session/execution/billing/readiness.ts",
-        "src/features/canvas/session/execution/commands/imageTaskRequests.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/flow-adapter/handles/canvasHandleProximityCoordinator.ts",
-        "src/features/canvas/session/flow-adapter/handles/useCanvasHandleProximity.ts",
-        "src/features/canvas/session/flow-adapter/handles/useCanvasNodeUiStateContext.ts",
-        "src/features/canvas/session/flow-adapter/handles/useFlowCanvasNodeHandleRail.ts",
-        "src/features/canvas/session/flow-adapter/handles/useFlowNodeHandlesPresentation.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowNodeSourceResolution.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotParamMutations.ts",
-        "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
-        "src/features/canvas/session/flow-adapter/projection/useFlowCanvasNodeAdapter.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
-        "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+        "src/features/canvas/session/flow-adapter/index.ts",
+        "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/tools/image-tools/index.ts",
-        "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
+        "src/features/canvas/tools/image-tools/ui/stage.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
-        "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.vue",
-        "src/features/canvas/ui/overlays/CanvasSelectionGroupActionButton.vue",
         "src/features/canvas/ui/overlays/index.ts",
-        "src/features/canvas/ui/screens/useFlowTransientUiDismissal.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "vitest/browser"
       ]
     },
     {
@@ -43013,6 +44198,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "allowedConsumers": [
         {
           "from": "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.vue",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.unit.spec.ts",
           "to": "src/features/canvas/ui/nodes/primitives/index.ts",
           "kind": "runtime"
         },
@@ -43035,12 +44225,52 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/ui/nodes/home/ImageActionMenu.vue",
           "to": "src/features/canvas/ui/nodes/primitives/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/FusionStage.vue",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNode.vue",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/test/touchTarget.browser.spec.ts",
+          "to": "src/features/canvas/ui/nodes/primitives/index.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 15,
-      "targetFanIn": 5,
-      "targetFanOut": 15,
+      "measuredFanIn": 14,
+      "measuredFanOut": 20,
+      "targetFanIn": 14,
+      "targetFanOut": 20,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -43075,21 +44305,73 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceSeverity": "error",
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/app/style.css",
         "src/core/contracts/generationContract.ts",
+        "src/core/i18n/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
         "src/core/interaction/interactiveControlState.ts",
         "src/core/motion/popoverMotion.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
+        "src/features/canvas/session/flow-adapter/index.ts",
         "src/features/canvas/ui/overlays/index.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "vitest/browser"
       ]
+    },
+    {
+      "path": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
+          "to": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.unit.spec.ts",
+          "to": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 8,
+      "targetFanIn": 2,
+      "targetFanOut": 8,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Node presentation-state adapter composed by Flow runtime; separate entry avoids loading Node SFCs and their Flow adapter dependencies through the Nodes barrel.",
+      "sourcePaths": ["src/features/canvas/ui/nodes/useFlowNodeUiState.ts"],
+      "targetPath": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
+      "ownershipScope": ["src/features/canvas/ui/nodes/useFlowNodeUiState.ts"],
+      "publicExports": ["useFlowNodeUiState"],
+      "targetFanOutTargets": [
+        "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+        "node_modules/vue/index.js",
+        "src/core/i18n/index.ts",
+        "src/features/board/ports/canvas.ts",
+        "src/features/canvas/core/nodes/canvasNodeRegistry.ts",
+        "src/features/canvas/core/nodes/canvasNodeUi.ts",
+        "src/features/canvas/session/browser/canvasPerfProbe.ts",
+        "src/features/canvas/session/flow-adapter/index.ts"
+      ],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/canvas/ui/nodes/workflows/index.ts",
@@ -43106,12 +44388,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/ui/nodes/FlowCanvasNode.vue",
           "to": "src/features/canvas/ui/nodes/workflows/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+          "to": "src/features/canvas/ui/nodes/workflows/index.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 1,
-      "measuredFanOut": 33,
-      "targetFanIn": 1,
-      "targetFanOut": 33,
+      "measuredFanIn": 2,
+      "measuredFanOut": 22,
+      "targetFanIn": 2,
+      "targetFanOut": 22,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -43144,25 +44431,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/nodes/canvasNodeUi.ts",
         "src/features/canvas/core/nodes/flowTypes.ts",
         "src/features/canvas/core/nodes/imageActionRegistry.ts",
-        "src/features/canvas/session/execution/commands/imageTaskRequests.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
+        "src/features/canvas/session/flow-adapter/index.ts",
         "src/features/canvas/tools/image-tools/index.ts",
-        "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
+        "src/features/canvas/tools/image-tools/ui/stage.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/nodes/home/ImageActionMenu.vue",
-        "src/features/canvas/ui/nodes/primitives/NodeActionButton.vue",
-        "src/features/canvas/ui/nodes/primitives/NodeEmptyStateIcon.vue",
-        "src/features/canvas/ui/nodes/primitives/NodeFloatingControls.vue",
-        "src/features/canvas/ui/nodes/primitives/NodeInputThumbnail.vue",
-        "src/features/canvas/ui/nodes/primitives/NodePromptComposer.vue",
-        "src/features/canvas/ui/nodes/primitives/NodeShell.vue",
-        "src/features/canvas/ui/nodes/primitives/NodeStageFrame.vue",
-        "src/features/canvas/ui/nodes/primitives/PromptTextComposer.vue",
-        "src/features/canvas/ui/nodes/primitives/useImageInputSlots.ts",
+        "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
       ]
     },
@@ -43183,12 +44459,32 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/nodes/groups/CanvasGroupPresentation.vue",
+          "to": "src/features/canvas/ui/overlays/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/nodes/groups/useCanvasGroupPresentationInteraction.ts",
           "to": "src/features/canvas/ui/overlays/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/primitives/useNodeToolPopoverGroup.ts",
+          "to": "src/features/canvas/ui/overlays/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+          "to": "src/features/canvas/ui/overlays/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
+          "to": "src/features/canvas/ui/overlays/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
           "to": "src/features/canvas/ui/overlays/index.ts",
           "kind": "runtime"
         },
@@ -43203,10 +44499,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
-      "measuredFanOut": 16,
-      "targetFanIn": 5,
-      "targetFanOut": 16,
+      "measuredFanIn": 9,
+      "measuredFanOut": 14,
+      "targetFanIn": 9,
+      "targetFanOut": 14,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -43216,26 +44512,27 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/features/canvas/ui/overlays/index.ts",
       "ownershipScope": ["src/features/canvas/ui/overlays/"],
       "publicExports": [
+        "CanvasGroupFramesOverlay",
+        "CanvasNodeContextMenu",
+        "CanvasSelectionGroupActionButton",
         "UseCanvasCustomLayerOverlayOptions",
         "useCanvasCustomLayerOverlay"
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
-        "path",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/interaction/menuKeyboardNavigation.ts",
         "src/core/lib/pageChrome.ts",
         "src/core/motion/popoverMotion.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/canvasGroupGeometry.ts",
-        "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
-        "src/features/canvas/ui/nodes/primitives/NodeToolPopover.vue",
+        "src/features/canvas/session/graph-editing/groupContracts.ts",
+        "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
       ]
     },
@@ -43256,14 +44553,19 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/index.ts",
+          "to": "src/features/canvas/ui/pages/CanvasLandingPage.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/routes/workspaceRoutes.ts",
           "to": "src/features/canvas/ui/pages/CanvasLandingPage.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 3,
       "measuredFanOut": 10,
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 10,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -43300,6 +44602,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/canvas/index.ts",
+          "to": "src/features/canvas/ui/pages/CanvasPage.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/pages/CanvasPage.component.spec.ts",
           "to": "src/features/canvas/ui/pages/CanvasPage.vue",
           "kind": "runtime"
@@ -43310,9 +44617,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 2,
+      "measuredFanIn": 3,
       "measuredFanOut": 4,
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 4,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -43349,9 +44656,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 51,
+      "measuredFanOut": 43,
       "targetFanIn": 1,
-      "targetFanOut": 51,
+      "targetFanOut": 43,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -43363,8 +44670,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "publicExports": ["CanvasScreen"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "fs",
-        "node_modules/@types/node/index.d.ts",
+        "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/@vue-flow/core/dist/style.css",
         "node_modules/@vue-flow/core/dist/theme-default.css",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -43373,11 +44679,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
         "photoswipe/lightbox",
         "photoswipe/style.css",
         "src/api/mediaAssetDelivery.ts",
         "src/api/upload.ts",
+        "src/app/style.css",
         "src/core/config/runtimeUrls.ts",
         "src/core/i18n/index.ts",
         "src/core/media/imageDimensions.ts",
@@ -43389,23 +44695,15 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/core/nodes/imageActionRegistry.ts",
         "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/domEventTargets.ts",
-        "src/features/canvas/session/flow-adapter/handles/useCanvasHandleProximity.ts",
-        "src/features/canvas/session/flow-adapter/handles/useCanvasNodeUiStateContext.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
-        "src/features/canvas/session/flow-adapter/projection/flowSnapshotParamMutations.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useImageStageRegistry.ts",
-        "src/features/canvas/session/flow-adapter/viewport/useVueFlowSelectionAdapter.ts",
         "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/session/image-workflow/index.ts",
         "src/features/canvas/session/workspace/index.ts",
         "src/features/canvas/tools/image-tools/index.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
-        "src/features/canvas/ui/chrome/index.ts",
-        "src/features/canvas/ui/nodes/FlowCanvasNode.vue",
+        "src/features/canvas/ui/chrome/components/index.ts",
         "src/features/canvas/ui/nodes/groups/index.ts",
         "src/features/canvas/ui/nodes/index.ts",
-        "src/features/canvas/ui/overlays/CanvasNodeContextMenu.vue",
         "src/features/canvas/ui/overlays/index.ts",
         "src/features/canvas/ui/styles/canvas-style-contracts.css",
         "src/features/canvas/ui/styles/canvas-surface-skin.css",
@@ -43413,8 +44711,115 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/library/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "vitest/browser"
       ]
+    },
+    {
+      "path": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/image-workflow/imageActionIntentRouter.ts",
+          "to": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts",
+          "to": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.ts",
+          "to": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenImageToolUi.ts",
+          "to": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
+          "to": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+          "kind": "type-only"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 1,
+      "targetFanIn": 5,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Active node-panel state shared by Screen and tools; separate entry avoids importing the Screen component composition root.",
+      "sourcePaths": ["src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"],
+      "targetPath": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
+      "ownershipScope": ["src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"],
+      "publicExports": [
+        "ACTIVE_NODE_PANEL_KIND",
+        "ActiveNodePanel",
+        "ActiveNodePanelKind",
+        "useFlowActiveNodePanels"
+      ],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "canvas",
+      "activationPhase": "current",
+      "scope": "intra-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphInteractions.ts",
+          "to": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
+          "to": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
+          "to": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.unit.spec.ts",
+          "to": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 1,
+      "targetFanIn": 4,
+      "targetFanOut": 1,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Canvas interaction lock state shared by Screen, workflow and Workspace runtimes; separate entry avoids importing the Screen component composition root.",
+      "sourcePaths": ["src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"],
+      "targetPath": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
+      "ownershipScope": ["src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"],
+      "publicExports": ["CanvasInteractionKey", "useFlowCanvasInteractionState"],
+      "targetFanOutTargets": ["node_modules/vue/index.js"],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/legal/contacts.ts",
@@ -43546,6 +44951,175 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "exportedAs": "PUBLIC_LEGAL_LINKS"
         }
       ]
+    },
+    {
+      "path": "src/features/legal/pages/AcceptableUsePage.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "legal",
+      "activationPhase": "current",
+      "scope": "route",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/legal/index.ts",
+          "to": "src/features/legal/pages/AcceptableUsePage.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routes/workspaceRoutes.ts",
+          "to": "src/features/legal/pages/AcceptableUsePage.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Lazy route component entry; router imports the component directly to preserve route chunk splitting.",
+      "sourcePaths": ["src/features/legal/pages/AcceptableUsePage.vue"],
+      "targetPath": "src/features/legal/pages/AcceptableUsePage.vue",
+      "ownershipScope": ["src/features/legal/pages/AcceptableUsePage.vue"],
+      "publicExports": ["default"],
+      "targetFanOutTargets": [
+        "src/features/legal/components/PublicLegalPage.vue",
+        "src/features/legal/documents.ts"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/legal/pages/PrivacyPolicyPage.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "legal",
+      "activationPhase": "current",
+      "scope": "route",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/legal/index.ts",
+          "to": "src/features/legal/pages/PrivacyPolicyPage.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routes/workspaceRoutes.ts",
+          "to": "src/features/legal/pages/PrivacyPolicyPage.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Lazy route component entry; router imports the component directly to preserve route chunk splitting.",
+      "sourcePaths": ["src/features/legal/pages/PrivacyPolicyPage.vue"],
+      "targetPath": "src/features/legal/pages/PrivacyPolicyPage.vue",
+      "ownershipScope": ["src/features/legal/pages/PrivacyPolicyPage.vue"],
+      "publicExports": ["default"],
+      "targetFanOutTargets": [
+        "src/features/legal/components/PublicLegalPage.vue",
+        "src/features/legal/documents.ts"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/legal/pages/RefundPolicyPage.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "legal",
+      "activationPhase": "current",
+      "scope": "route",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/legal/index.ts",
+          "to": "src/features/legal/pages/RefundPolicyPage.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routes/workspaceRoutes.ts",
+          "to": "src/features/legal/pages/RefundPolicyPage.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 2,
+      "measuredFanOut": 2,
+      "targetFanIn": 2,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Lazy route component entry; router imports the component directly to preserve route chunk splitting.",
+      "sourcePaths": ["src/features/legal/pages/RefundPolicyPage.vue"],
+      "targetPath": "src/features/legal/pages/RefundPolicyPage.vue",
+      "ownershipScope": ["src/features/legal/pages/RefundPolicyPage.vue"],
+      "publicExports": ["default"],
+      "targetFanOutTargets": [
+        "src/features/legal/components/PublicLegalPage.vue",
+        "src/features/legal/documents.ts"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/legal/pages/TermsPage.vue",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "legal",
+      "activationPhase": "current",
+      "scope": "route",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/legal/index.ts",
+          "to": "src/features/legal/pages/TermsPage.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/legal/routePreservation.contract.spec.ts",
+          "to": "src/features/legal/pages/TermsPage.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routes/workspaceRoutes.ts",
+          "to": "src/features/legal/pages/TermsPage.vue",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 2,
+      "targetFanIn": 3,
+      "targetFanOut": 2,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Lazy route component entry; router imports the component directly to preserve route chunk splitting.",
+      "sourcePaths": ["src/features/legal/pages/TermsPage.vue"],
+      "targetPath": "src/features/legal/pages/TermsPage.vue",
+      "ownershipScope": ["src/features/legal/pages/TermsPage.vue"],
+      "publicExports": ["default"],
+      "targetFanOutTargets": [
+        "src/features/legal/components/PublicLegalPage.vue",
+        "src/features/legal/documents.ts"
+      ],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/legal/routePaths.ts",
@@ -43751,9 +45325,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 22,
-      "measuredFanOut": 39,
+      "measuredFanOut": 38,
       "targetFanIn": 22,
-      "targetFanOut": 39,
+      "targetFanOut": 38,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -43848,7 +45422,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/mediaAssetDelivery.ts",
         "src/app/style.css",
         "src/components/ui/button/index.ts",
-        "src/components/ui/dialog/dialogClasses.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/core/components/IbFormField.vue",
@@ -44556,6 +46129,155 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": ["src/core/auth/routePolicy.ts"]
+    },
+    {
+      "path": "src/features/workspace/routes/workspaceRoutes.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "workspace",
+      "activationPhase": "current",
+      "scope": "app",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/app/router/authGate.ts",
+          "to": "src/features/workspace/routes/workspaceRoutes.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/app/router/index.ts",
+          "to": "src/features/workspace/routes/workspaceRoutes.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/routes/workspaceRoutes.contract.spec.ts",
+          "to": "src/features/workspace/routes/workspaceRoutes.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 3,
+      "measuredFanOut": 14,
+      "targetFanIn": 3,
+      "targetFanOut": 14,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "App router route table entry; kept separate from the Workspace shell barrel to preserve lazy route loading and avoid shell/account cycles.",
+      "sourcePaths": ["src/features/workspace/routes/workspaceRoutes.ts"],
+      "targetPath": "src/features/workspace/routes/workspaceRoutes.ts",
+      "ownershipScope": ["src/features/workspace/routes/workspaceRoutes.ts"],
+      "publicExports": ["WORKSPACE_DEFAULT_PATH", "workspaceRoutes"],
+      "targetFanOutTargets": [
+        "node_modules/vue-router/index.cjs",
+        "src/features/auth/index.ts",
+        "src/features/board/index.ts",
+        "src/features/canvas/ui/pages/CanvasLandingPage.vue",
+        "src/features/canvas/ui/pages/CanvasPage.vue",
+        "src/features/legal/pages/AcceptableUsePage.vue",
+        "src/features/legal/pages/PrivacyPolicyPage.vue",
+        "src/features/legal/pages/RefundPolicyPage.vue",
+        "src/features/legal/pages/TermsPage.vue",
+        "src/features/legal/routePaths.ts",
+        "src/features/search/index.ts",
+        "src/features/workspace/layout/WorkspaceLayout.vue",
+        "src/features/workspace/pages/WorkspaceShareJoinPage.vue",
+        "src/features/workspace/routePaths.ts"
+      ],
+      "surfaceSeverity": "error"
+    },
+    {
+      "path": "src/features/workspace/selection/workspaceContext.ts",
+      "kind": "canonical",
+      "confidence": "high",
+      "status": "active",
+      "owner": "workspace",
+      "activationPhase": "current",
+      "scope": "cross-feature",
+      "exportStyle": "explicit public subpath",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/session/accountWorkspace.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/index.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/index.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceContext.unit.spec.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceSelectionPort.ts",
+          "to": "src/features/workspace/selection/workspaceContext.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 11,
+      "targetFanIn": 5,
+      "targetFanOut": 11,
+      "shims": [],
+      "shimTtl": "1 phase (default)",
+      "retirementPhase": null,
+      "deletionOwner": null,
+      "notes": "Workspace selection runtime entry; Account consumes this leaf rather than the shell barrel to avoid the Workspace shell to Account cycle.",
+      "sourcePaths": ["src/features/workspace/selection/workspaceContext.ts"],
+      "targetPath": "src/features/workspace/selection/workspaceContext.ts",
+      "ownershipScope": ["src/features/workspace/selection/workspaceContext.ts"],
+      "publicExports": [
+        "ProvisionWorkspaceInput",
+        "UseWorkspaceSelectionOptions",
+        "WORKSPACE_SELECTION_STORAGE_KEY",
+        "WORKSPACE_URL_PARAM",
+        "WorkspaceProvisionFn",
+        "WorkspaceSelectionPersist",
+        "WorkspaceSelectionSource",
+        "WorkspaceSelectionStatus",
+        "WorkspaceSelectionStore",
+        "asWorkspaceId",
+        "createWorkspaceSelectionStore",
+        "getWorkspaceSelectionStore",
+        "installWorkspaceSelectionStore",
+        "localStorageWorkspacePersist",
+        "memoryWorkspacePersist",
+        "resetWorkspaceSelectionStore",
+        "resolveWorkspaceSelection",
+        "subscribeWorkspaceSelectionChange",
+        "toWorkspaceSelectionStatus",
+        "useWorkspaceSelection"
+      ],
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/vue-router/index.cjs",
+        "node_modules/vue/index.js",
+        "src/api/client.ts",
+        "src/api/contractKernel.ts",
+        "src/api/mediaWorkspaceScope.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/router/queryParams.ts",
+        "src/core/utils/auth.ts",
+        "src/core/utils/storage.ts",
+        "src/features/workspace/selection/workspaceResource.ts"
+      ],
+      "surfaceSeverity": "error"
     },
     {
       "path": "src/features/workspace/selection/workspaceSelectionPort.ts",
@@ -58224,7 +59946,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/auth/passwordPolicy.ts`                                                   | canonical | active  | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
 | `src/core/auth/routePolicy.ts`                                                      | canonical | active  | p1-lane         | 9       | 3 → 3                    | 0 → 0                     |
 | `src/core/auth/sessionPolicy.ts`                                                    | canonical | active  | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
-| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane         | 4       | 32 → 32                  | 5 → 5                     |
+| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane         | 4       | 32 → 32                  | 4 → 4                     |
 | `src/core/components/ChartCard.vue`                                                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 2 → 2                     |
 | `src/core/components/ChartPanel.vue`                                                | canonical | active  | p1-lane         | 2       | 2 → 2                    | 1 → 1                     |
 | `src/core/components/ChartRenderer.vue`                                             | canonical | active  | p1-lane         | 1       | 3 → 3                    | 3 → 3                     |
@@ -58235,7 +59957,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/components/SiteBrandLogo.vue`                                             | canonical | active  | p1-lane         | 1       | 4 → 4                    | 0 → 0                     |
 | `src/core/components/StatusBadge.vue`                                               | canonical | active  | p1-lane         | 3       | 4 → 4                    | 3 → 3                     |
 | `src/core/components/StudioName.vue`                                                | canonical | active  | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
-| `src/core/components/UserConfirmDialog.vue`                                         | canonical | active  | p1-lane         | 1       | 3 → 3                    | 6 → 6                     |
+| `src/core/components/UserConfirmDialog.vue`                                         | canonical | active  | p1-lane         | 1       | 3 → 3                    | 5 → 5                     |
 | `src/core/components/formFieldContract.ts`                                          | canonical | active  | p1-lane         | 2       | 2 → 2                    | 0 → 0                     |
 | `src/core/composables/useAppClipboard.ts`                                           | canonical | active  | p1-lane         | 1       | 5 → 5                    | 0 → 0                     |
 | `src/core/composables/useAppToast.ts`                                               | canonical | active  | p1-lane         | 2       | 17 → 17                  | 1 → 1                     |
@@ -58255,7 +59977,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/contracts/imageServices.ts`                                               | canonical | active  | p1-lane         | 3       | 29 → 29                  | 0 → 0                     |
 | `src/core/errors/errorCatalog.ts`                                                   | canonical | active  | p1-lane         | 5       | 30 → 30                  | 1 → 1                     |
 | `src/core/i18n/formatters.ts`                                                       | canonical | active  | p1-lane         | 5       | 21 → 21                  | 2 → 2                     |
-| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 119 → 119                | 5 → 5                     |
+| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 123 → 123                | 5 → 5                     |
 | `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
 | `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane         | 2       | 5 → 5                    | 5 → 5                     |
 | `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane         | 12      | 3 → 3                    | 0 → 0                     |
@@ -58298,7 +60020,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/utils/storage.ts`                                                         | canonical | active  | p1-lane         | 8       | 14 → 14                  | 0 → 0                     |
 | `src/core/utils/workspaceId.ts`                                                     | canonical | active  | p1-lane         | 2       | 8 → 8                    | 1 → 1                     |
 | `src/features/account/core/index.ts`                                                | cascading | retired | p3-lane         | 13      | 0 → 0                    | 79 → 79                   |
-| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane         | 130     | 4 → 4                    | 79 → 79                   |
+| `src/features/account/index.ts`                                                     | canonical | active  | p3-lane         | 130     | 4 → 4                    | 78 → 78                   |
 | `src/features/account/session/index.ts`                                             | cascading | retired | p3-lane         | 94      | 0 → 0                    | 79 → 79                   |
 | `src/features/account/ui/chrome/SupportChannelQr.vue`                               | canonical | active  | p1-lane         | 1       | 1 → 1                    | 9 → 9                     |
 | `src/features/account/ui/chrome/UserAccountMenu.vue`                                | canonical | active  | p1-lane         | 1       | 6 → 6                    | 14 → 14                   |
@@ -58321,8 +60043,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/serviceAdminMeta.ts`                                | canonical | active  | p4-lane         | 6       | 1 → 1                    | 1 → 1                     |
 | `src/features/admin/shared/core/tableColumns.ts`                                    | canonical | active  | p4-lane         | 2       | 2 → 2                    | 0 → 0                     |
 | `src/features/admin/shared/core/taskMetricTokens.ts`                                | canonical | active  | p4-lane         | 7       | 3 → 3                    | 1 → 1                     |
-| `src/features/admin/shared/core/uiClasses.ts`                                       | canonical | active  | p4-lane         | 38      | 13 → 13                  | 0 → 0                     |
-| `src/features/admin/shared/index.ts`                                                | canonical | active  | p4-admin-shared | 241     | 126 → 126                | 48 → 48                   |
+| `src/features/admin/shared/core/uiClasses.ts`                                       | canonical | active  | p4-lane         | 38      | 14 → 14                  | 0 → 0                     |
+| `src/features/admin/shared/index.ts`                                                | canonical | active  | p4-admin-shared | 246     | 126 → 126                | 47 → 47                   |
 | `src/features/admin/shared/session/anomalyRules.ts`                                 | canonical | active  | p4-lane         | 4       | 3 → 3                    | 3 → 3                     |
 | `src/features/admin/shared/session/brand/brandLogos.ts`                             | canonical | active  | p4-lane         | 14      | 6 → 6                    | 14 → 14                   |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts`                  | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
@@ -58338,7 +60060,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/session/timeRange.ts`                                    | canonical | active  | p4-lane         | 5       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/session/useAnomalyRadar.ts`                              | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
 | `src/features/admin/shared/ui/AdminBadge.vue`                                       | canonical | active  | p4-lane         | 2       | 2 → 2                    | 3 → 3                     |
-| `src/features/admin/shared/ui/AdminButton.vue`                                      | canonical | active  | p4-lane         | 3       | 8 → 8                    | 4 → 4                     |
+| `src/features/admin/shared/ui/AdminButton.vue`                                      | canonical | active  | p4-lane         | 3       | 8 → 8                    | 3 → 3                     |
 | `src/features/admin/shared/ui/AdminColumn.vue`                                      | canonical | active  | p4-lane         | 1       | 3 → 3                    | 0 → 0                     |
 | `src/features/admin/shared/ui/AdminMono.vue`                                        | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/admin/shared/ui/AdminSpinner.vue`                                     | canonical | active  | p4-lane         | 1       | 3 → 3                    | 2 → 2                     |
@@ -58353,7 +60075,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/form/AdminInput.vue`                                  | canonical | active  | p4-lane         | 1       | 3 → 3                    | 5 → 5                     |
 | `src/features/admin/shared/ui/form/AdminNumberInput.vue`                            | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/admin/shared/ui/form/AdminSelect.vue`                                 | canonical | active  | p4-lane         | 2       | 2 → 2                    | 5 → 5                     |
-| `src/features/admin/shared/ui/form/AdminSwitch.vue`                                 | canonical | active  | p4-lane         | 1       | 3 → 3                    | 3 → 3                     |
+| `src/features/admin/shared/ui/form/AdminSwitch.vue`                                 | canonical | active  | p4-lane         | 1       | 4 → 4                    | 3 → 3                     |
 | `src/features/admin/shared/ui/form/AdminTextarea.vue`                               | canonical | active  | p4-lane         | 1       | 1 → 1                    | 3 → 3                     |
 | `src/features/admin/shared/ui/form/SwitchRow.vue`                                   | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue`                   | canonical | active  | p4-lane         | 1       | 2 → 2                    | 6 → 6                     |
@@ -58380,60 +60102,82 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`                   | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                       | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/components/auth-fields/index.ts`                                 | cascading | retired | p2-lane         | 10      | 3 → 3                    | 11 → 11                   |
-| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane         | 28      | 29 → 29                  | 47 → 47                   |
+| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane         | 28      | 29 → 29                  | 46 → 46                   |
 | `src/features/board/core/document/index.ts`                                         | cascading | retired | p3-lane         | 87      | 1 → 1                    | 0 → 0                     |
 | `src/features/board/core/index.ts`                                                  | cascading | retired | p3-lane         | 92      | 14 → 14                  | 0 → 0                     |
 | `src/features/board/core/media/index.ts`                                            | cascading | retired | p3-lane         | 1       | 1 → 1                    | 0 → 0                     |
 | `src/features/board/core/schema/index.ts`                                           | cascading | retired | p3-lane         | 4       | 1 → 1                    | 0 → 0                     |
-| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane         | 195     | 48 → 48                  | 52 → 52                   |
-| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane         | 83      | 95 → 95                  | 52 → 52                   |
+| `src/features/board/index.ts`                                                       | canonical | active  | p3-lane         | 195     | 50 → 50                  | 49 → 49                   |
+| `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane         | 83      | 94 → 94                  | 49 → 49                   |
+| `src/features/board/ports/testing.ts`                                               | canonical | active  | frontend        | 2       | 5 → 5                    | 1 → 1                     |
 | `src/features/board/session/catalog/index.ts`                                       | cascading | retired | p3-lane         | 43      | 2 → 2                    | 0 → 0                     |
 | `src/features/board/session/persistence/index.ts`                                   | cascading | retired | p3-lane         | 13      | 12 → 12                  | 0 → 0                     |
 | `src/features/board/session/preview/index.ts`                                       | cascading | retired | p3-lane         | 5       | 7 → 7                    | 0 → 0                     |
 | `src/features/board/session/share-join/index.ts`                                    | cascading | retired | p3-lane         | 2       | 1 → 1                    | 0 → 0                     |
 | `src/features/board/session/sync/index.ts`                                          | cascading | retired | p3-lane         | 14      | 2 → 2                    | 0 → 0                     |
-| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane         | 7       | 10 → 10                  | 3 → 3                     |
+| `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane         | 10      | 14 → 14                  | 4 → 4                     |
 | `src/features/board/ui/gallery/index.ts`                                            | cascading | retired | p3-lane         | 14      | 1 → 1                    | 0 → 0                     |
-| `src/features/canvas/core/graph/index.ts`                                           | canonical | active  | p5-lane         | 58      | 59 → 59                  | 3 → 3                     |
+| `src/features/canvas/core/graph/canvasGraphStoreWriter.ts`                          | canonical | active  | canvas          | 1       | 3 → 3                    | 2 → 2                     |
+| `src/features/canvas/core/graph/canvasGraphValueEquality.ts`                        | canonical | active  | canvas          | 1       | 2 → 2                    | 0 → 0                     |
+| `src/features/canvas/core/graph/canvasGroupGeometry.ts`                             | canonical | active  | canvas          | 18      | 11 → 11                  | 2 → 2                     |
+| `src/features/canvas/core/graph/index.ts`                                           | canonical | active  | p5-lane         | 58      | 63 → 63                  | 3 → 3                     |
 | `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane         | 1       | 7 → 7                    | 1 → 1                     |
 | `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane         | 1       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane         | 2       | 2 → 2                    | 79 → 79                   |
-| `src/features/canvas/session/board-session/index.ts`                                | canonical | active  | p5-lane         | 9       | 5 → 5                    | 18 → 18                   |
-| `src/features/canvas/session/execution/board-attachment/index.ts`                   | canonical | active  | p5-lane         | 2       | 12 → 12                  | 0 → 0                     |
-| `src/features/canvas/session/execution/index.ts`                                    | canonical | active  | p5-lane         | 54      | 21 → 21                  | 54 → 54                   |
+| `src/features/canvas/session/board-session/index.ts`                                | canonical | active  | p5-lane         | 14      | 9 → 9                    | 18 → 18                   |
+| `src/features/canvas/session/execution/board-attachment/index.ts`                   | canonical | active  | p5-lane         | 2       | 13 → 13                  | 0 → 0                     |
+| `src/features/canvas/session/execution/index.ts`                                    | canonical | active  | p5-lane         | 64      | 31 → 31                  | 46 → 46                   |
+| `src/features/canvas/session/execution/pending-execution/core.ts`                   | canonical | active  | frontend        | 17      | 14 → 14                  | 7 → 7                     |
 | `src/features/canvas/session/execution/pending-execution/index.ts`                  | cascading | retired | p5-lane         | 27      | 22 → 22                  | 8 → 8                     |
 | `src/features/canvas/session/execution/result-nodes/index.ts`                       | cascading | retired | p5-lane         | 16      | 4 → 4                    | 23 → 23                   |
 | `src/features/canvas/session/execution/task-lifecycle/index.ts`                     | canonical | active  | p5-lane         | 3       | 1 → 1                    | 1 → 1                     |
-| `src/features/canvas/session/flow-adapter/index.ts`                                 | canonical | active  | p5-lane         | 20      | 20 → 20                  | 27 → 27                   |
-| `src/features/canvas/session/graph-editing/index.ts`                                | canonical | active  | p5-lane         | 10      | 5 → 5                    | 40 → 40                   |
-| `src/features/canvas/session/image-workflow/index.ts`                               | canonical | active  | p5-lane         | 3       | 4 → 4                    | 34 → 34                   |
+| `src/features/canvas/session/flow-adapter/index.ts`                                 | canonical | active  | p5-lane         | 68      | 61 → 61                  | 28 → 28                   |
+| `src/features/canvas/session/graph-editing/groupContracts.ts`                       | canonical | active  | frontend        | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/canvas/session/graph-editing/index.ts`                                | canonical | active  | p5-lane         | 18      | 12 → 12                  | 34 → 34                   |
+| `src/features/canvas/session/image-workflow/index.ts`                               | canonical | active  | p5-lane         | 3       | 4 → 4                    | 22 → 22                   |
 | `src/features/canvas/session/media/preloadImage.ts`                                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/canvas/session/media/serviceImageActionText.ts`                       | canonical | active  | p1-lane         | 2       | 2 → 2                    | 3 → 3                     |
-| `src/features/canvas/session/workspace/index.ts`                                    | canonical | active  | p5-lane         | 2       | 4 → 4                    | 30 → 30                   |
-| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane         | 13      | 9 → 9                    | 24 → 24                   |
-| `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane         | 6       | 5 → 5                    | 15 → 15                   |
+| `src/features/canvas/session/workspace/index.ts`                                    | canonical | active  | p5-lane         | 2       | 4 → 4                    | 20 → 20                   |
+| `src/features/canvas/session/workspace/useCanvasFeedback.ts`                        | canonical | active  | canvas          | 3       | 10 → 10                  | 2 → 2                     |
+| `src/features/canvas/tools/image-tools/core/index.ts`                               | canonical | active  | canvas          | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane         | 13      | 10 → 10                  | 18 → 18                   |
+| `src/features/canvas/tools/image-tools/ui/chrome.ts`                                | canonical | active  | canvas          | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/canvas/tools/image-tools/ui/stage.ts`                                 | canonical | active  | canvas          | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane         | 6       | 8 → 8                    | 15 → 15                   |
 | `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane         | 7       | 2 → 2                    | 6 → 6                     |
-| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane         | 37      | 13 → 13                  | 27 → 27                   |
+| `src/features/canvas/tools/inpaint/testing/index.ts`                                | canonical | active  | canvas          | 1       | 1 → 1                    | 1 → 1                     |
+| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane         | 36      | 16 → 16                  | 30 → 30                   |
+| `src/features/canvas/tools/retouch/testing/browser.ts`                              | canonical | active  | canvas          | 2       | 1 → 1                    | 4 → 4                     |
+| `src/features/canvas/tools/retouch/testing/index.ts`                                | canonical | active  | canvas          | 3       | 2 → 2                    | 3 → 3                     |
 | `src/features/canvas/ui/chrome/components/index.ts`                                 | canonical | active  | p5-lane         | 6       | 1 → 1                    | 12 → 12                   |
 | `src/features/canvas/ui/chrome/index.ts`                                            | cascading | retired | p5-lane         | 6       | 1 → 1                    | 21 → 21                   |
-| `src/features/canvas/ui/nodes/groups/index.ts`                                      | canonical | active  | p5-lane         | 4       | 3 → 3                    | 10 → 10                   |
-| `src/features/canvas/ui/nodes/index.ts`                                             | canonical | active  | p5-lane         | 9       | 3 → 3                    | 50 → 50                   |
-| `src/features/canvas/ui/nodes/primitives/index.ts`                                  | canonical | active  | p5-lane         | 21      | 5 → 5                    | 15 → 15                   |
-| `src/features/canvas/ui/nodes/workflows/index.ts`                                   | canonical | active  | p5-lane         | 7       | 1 → 1                    | 33 → 33                   |
-| `src/features/canvas/ui/overlays/index.ts`                                          | canonical | active  | p5-lane         | 2       | 5 → 5                    | 16 → 16                   |
-| `src/features/canvas/ui/pages/CanvasLandingPage.vue`                                | canonical | active  | p5-lane         | 1       | 2 → 2                    | 10 → 10                   |
-| `src/features/canvas/ui/pages/CanvasPage.vue`                                       | canonical | active  | p5-lane         | 1       | 2 → 2                    | 4 → 4                     |
-| `src/features/canvas/ui/screens/index.ts`                                           | canonical | active  | p5-lane         | 1       | 1 → 1                    | 51 → 51                   |
+| `src/features/canvas/ui/nodes/groups/index.ts`                                      | canonical | active  | p5-lane         | 4       | 4 → 4                    | 8 → 8                     |
+| `src/features/canvas/ui/nodes/index.ts`                                             | canonical | active  | p5-lane         | 10      | 4 → 4                    | 38 → 38                   |
+| `src/features/canvas/ui/nodes/primitives/index.ts`                                  | canonical | active  | p5-lane         | 21      | 14 → 14                  | 20 → 20                   |
+| `src/features/canvas/ui/nodes/useFlowNodeUiState.ts`                                | canonical | active  | canvas          | 1       | 2 → 2                    | 8 → 8                     |
+| `src/features/canvas/ui/nodes/workflows/index.ts`                                   | canonical | active  | p5-lane         | 7       | 2 → 2                    | 22 → 22                   |
+| `src/features/canvas/ui/overlays/index.ts`                                          | canonical | active  | p5-lane         | 5       | 9 → 9                    | 14 → 14                   |
+| `src/features/canvas/ui/pages/CanvasLandingPage.vue`                                | canonical | active  | p5-lane         | 1       | 3 → 3                    | 10 → 10                   |
+| `src/features/canvas/ui/pages/CanvasPage.vue`                                       | canonical | active  | p5-lane         | 1       | 3 → 3                    | 4 → 4                     |
+| `src/features/canvas/ui/screens/index.ts`                                           | canonical | active  | p5-lane         | 1       | 1 → 1                    | 43 → 43                   |
+| `src/features/canvas/ui/screens/useFlowActiveNodePanels.ts`                         | canonical | active  | canvas          | 4       | 5 → 5                    | 1 → 1                     |
+| `src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts`                   | canonical | active  | canvas          | 2       | 4 → 4                    | 1 → 1                     |
 | `src/features/legal/contacts.ts`                                                    | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/legal/index.ts`                                                       | canonical | active  | p2-lane         | 7       | 0 → 0                    | 6 → 6                     |
 | `src/features/legal/legalLinks.ts`                                                  | canonical | active  | p1-lane         | 1       | 3 → 3                    | 1 → 1                     |
+| `src/features/legal/pages/AcceptableUsePage.vue`                                    | canonical | active  | legal           | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/legal/pages/PrivacyPolicyPage.vue`                                    | canonical | active  | legal           | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/legal/pages/RefundPolicyPage.vue`                                     | canonical | active  | legal           | 1       | 2 → 2                    | 2 → 2                     |
+| `src/features/legal/pages/TermsPage.vue`                                            | canonical | active  | legal           | 1       | 3 → 3                    | 2 → 2                     |
 | `src/features/legal/routePaths.ts`                                                  | canonical | active  | p1-lane         | 4       | 4 → 4                    | 0 → 0                     |
-| `src/features/library/index.ts`                                                     | canonical | active  | p2-lane         | 69      | 22 → 22                  | 39 → 39                   |
+| `src/features/library/index.ts`                                                     | canonical | active  | p2-lane         | 69      | 22 → 22                  | 38 → 38                   |
 | `src/features/search/index.ts`                                                      | canonical | active  | p3-lane         | 21      | 2 → 2                    | 40 → 40                   |
 | `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane         | 41      | 20 → 20                  | 50 → 50                   |
 | `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | retired | workspace-p2    | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2    | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane         | 9       | 33 → 33                  | 1 → 1                     |
+| `src/features/workspace/routes/workspaceRoutes.ts`                                  | canonical | active  | workspace       | 2       | 3 → 3                    | 14 → 14                   |
+| `src/features/workspace/selection/workspaceContext.ts`                              | canonical | active  | workspace       | 20      | 5 → 5                    | 11 → 11                   |
 | `src/features/workspace/selection/workspaceSelectionPort.ts`                        | canonical | active  | workspace-p2    | 7       | 2 → 2                    | 3 → 3                     |
 | `src/shared/api/client.ts`                                                          | canonical | retired | p1-lane         | 6       | 12 → 12                  | 4 → 4                     |
 | `src/shared/api/contractKernel.ts`                                                  | canonical | retired | p1-lane         | 24      | 40 → 40                  | 2 → 2                     |

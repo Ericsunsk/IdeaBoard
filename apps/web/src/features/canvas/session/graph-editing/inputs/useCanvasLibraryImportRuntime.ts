@@ -12,8 +12,8 @@ import {
   retryLibraryImport,
   type CanvasGraphNodeIdForKind,
 } from '../../../core/graph'
-import { createFlowGraphCommandOptions } from '../../../session/flow-adapter/connections/flowGraphAdapterCommandSideEffects'
-import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from '../../../session/flow-adapter'
+import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import type { CanvasLibraryImportDescriptor } from '../../../../library'
 import type { LibraryAssetMaterializer } from '../../../../library'

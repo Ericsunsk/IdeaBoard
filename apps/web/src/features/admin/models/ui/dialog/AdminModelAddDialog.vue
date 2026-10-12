@@ -239,10 +239,7 @@ import { AdminButton } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminSelect } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
-import {
-  createAdminGatewayResource,
-  type DetectedGatewayModel,
-} from '../../resource'
+import { createAdminGatewayResource, type DetectedGatewayModel } from '../../resource'
 import { resolveModelBrandLogo } from '../../../shared'
 import type { AdminModelItem } from '../../core/catalogData'
 import { modelProviderBadgeClass } from '../../core/catalogData'

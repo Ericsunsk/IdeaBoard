@@ -1,5 +1,5 @@
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../board/ports/canvas'
-import type { MediaInputImage } from '../graph-editing/inputs/useFlowMediaInputImages.ts'
+import type { MediaInputImage } from '../graph-editing'
 import type { MediaRef } from '../../../../core/media/mediaRef'
 
 export type GenerationIntentOptions = {

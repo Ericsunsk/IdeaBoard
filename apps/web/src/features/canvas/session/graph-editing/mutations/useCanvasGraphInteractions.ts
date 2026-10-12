@@ -19,7 +19,7 @@ import { useFlowCanvasInteractionState } from '../../../ui/screens/useFlowCanvas
 import { useFlowNodeUiState } from '../../../ui/nodes/useFlowNodeUiState.ts'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import { createCanvasNodeAt } from '../../../core/nodes/canvasNodeFactory.ts'
-import { resolveImageNodeDisplayPayload } from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+import { resolveImageNodeDisplayPayload } from '../../../session/flow-adapter'
 import type { CanvasGraphInteractionBrowserAdapter } from '../inputs/interactionBrowserAdapter'
 import { resolveWritableCanvasGraphStore } from '../../../core/graph/canvasGraphStoreWriter'
 import { renderImageRetouchRecipeFile, type ImageRetouchRenderSource } from '../../../tools/retouch'

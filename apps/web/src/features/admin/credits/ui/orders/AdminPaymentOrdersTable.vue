@@ -137,7 +137,7 @@
 
 <script setup lang="ts">
 import { Eye } from '@iconoir/vue'
-import { AdminStatusPill, type AdminStatusPillVariant, } from '../../../shared'
+import { AdminStatusPill, type AdminStatusPillVariant } from '../../../shared'
 import { AdminColumn } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminMono } from '../../../shared'

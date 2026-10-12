@@ -63,8 +63,14 @@ import ActionButton from '../../../../../../core/components/ActionButton.vue'
 import { AdminSpinner } from '../../../../shared/index'
 import { AdminStatusPill } from '../../../../shared/index'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
-import { createOAuthProviderSettingsResource, type OAuthProviderSettingsResource } from '../../../session/oauth/resource'
-import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../../../../core/auth/oauthProviders'
+import {
+  createOAuthProviderSettingsResource,
+  type OAuthProviderSettingsResource,
+} from '../../../session/oauth/resource'
+import {
+  getOAuthProviderLabel,
+  type OAuthProviderCode,
+} from '../../../../../../core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 import { SETTINGS_MESSAGES as M } from '../../pages/messages'

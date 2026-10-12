@@ -209,10 +209,7 @@ import ActionButton from '../../../../../core/components/ActionButton.vue'
 import { AdminColumn } from '../../../shared'
 import { AdminSpinner } from '../../../shared'
 import { AdminTable } from '../../../shared'
-import type {
-  AdminTableRowCollapseEvent,
-  AdminTableRowExpandEvent,
-} from '../../../shared'
+import type { AdminTableRowCollapseEvent, AdminTableRowExpandEvent } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminPagerControls } from '../../../shared'
@@ -225,13 +222,12 @@ import {
   getRunStatusLabel,
   getRunStatusVariant,
 } from '../../core/shared/format'
-import {
-  adminTableClass,
-  adminTableFrameClass,
-  adminTextButtonClass,
-} from '../../../shared'
+import { adminTableClass, adminTableFrameClass, adminTextButtonClass } from '../../../shared'
 import { ADMIN_TABLE_EXPANDER_COLUMN_WIDTH } from '../../../shared'
-import { createAdminCreditRunHistoryResource, type AdminCreditRun } from '../../session/health/runHistoryResource'
+import {
+  createAdminCreditRunHistoryResource,
+  type AdminCreditRun,
+} from '../../session/health/runHistoryResource'
 import {
   formatReconciliationRunDuration,
   formatReconciliationRunResult,

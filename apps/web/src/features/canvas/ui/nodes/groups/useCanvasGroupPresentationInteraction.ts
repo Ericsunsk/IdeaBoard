@@ -7,8 +7,8 @@ import type {
   CanvasGroupResizeHandle,
   CanvasPoint,
 } from '../../../core/graph/canvasGroupGeometry.ts'
-import type { CanvasSelectionGroupAction } from '../../../session/graph-editing/groups/useCanvasGroupRuntime.ts'
-import type { DismissTransientCanvasUi } from '../../screens/useFlowTransientUiDismissal.ts'
+import type { CanvasSelectionGroupAction } from '../../../session/graph-editing'
+import type { DismissTransientCanvasUi } from '../../../session/flow-adapter'
 import { useCanvasCustomLayerOverlay } from '../../overlays'
 import { useCanvasGroupPointerInteraction } from './useCanvasGroupPointerInteraction'
 

@@ -35,13 +35,13 @@ import { defineComponent, h } from 'vue'
 import { renderWithUser, screen, waitFor } from './render'
 import { i18n } from '../core/i18n'
 import AdminSwitch from '../features/admin/shared/ui/form/AdminSwitch.vue'
-import NodeActionButton from '../features/canvas/ui/nodes/primitives/NodeActionButton.vue'
-import CurveGraph from '../features/canvas/tools/retouch/ui/curves/CurveGraph.vue'
+import { NodeActionButton } from '../features/canvas/ui/nodes/primitives'
 import { adminCompactIconButtonClass } from '../features/admin/shared/core/uiClasses'
-import { normalizeCurveChannelPoints } from '../features/canvas/tools/retouch/core/kinds/curves'
 import '../app/style.css'
-import '../features/canvas/tools/retouch/ui/shared/styles/retouch-curves.css'
-import '../features/canvas/tools/retouch/ui/shared/styles/retouch-histogram-plot.css'
+import {
+  CurveGraph,
+  normalizeCurveChannelPoints,
+} from '../features/canvas/tools/retouch/testing/browser'
 
 const FLOOR_PX = 32
 const AA_PX = 24
@@ -101,11 +101,7 @@ describe('touch-target floor browser contract', () => {
     expect(small.offsetHeight).toBe(20)
     expect(afterBox(small)).toEqual({ width: FLOOR_PX, height: FLOOR_PX })
 
-    const chip = probeHost(
-      'button',
-      'hit-target-32-inline',
-      'width: 80px; height: 20px;',
-    )
+    const chip = probeHost('button', 'hit-target-32-inline', 'width: 80px; height: 20px;')
     expect(afterBox(chip).height).toBe(FLOOR_PX)
     expect(afterBox(chip).width).toBe(80)
 
@@ -152,19 +148,18 @@ describe('touch-target floor browser contract', () => {
     }
     renderWithUser(
       defineComponent({
-        setup: () =>
-          () =>
-            h(CurveGraph, {
-              activeCurvePath: 'M 0 100 L 100 0',
-              ghostCurvePaths: [],
-              histogramPath: '',
-              points,
-              selectedPointId: 'mid',
-              onAddPoint: events.addPoint,
-              onMovePoint: events.movePoint,
-              onRemovePoint: events.removePoint,
-              onSelectPoint: events.selectPoint,
-            }),
+        setup: () => () =>
+          h(CurveGraph, {
+            activeCurvePath: 'M 0 100 L 100 0',
+            ghostCurvePaths: [],
+            histogramPath: '',
+            points,
+            selectedPointId: 'mid',
+            onAddPoint: events.addPoint,
+            onMovePoint: events.movePoint,
+            onRemovePoint: events.removePoint,
+            onSelectPoint: events.selectPoint,
+          }),
       }),
     )
     const mid = screen.getByRole('button', { name: 'Curve point In 50 Out 50' })

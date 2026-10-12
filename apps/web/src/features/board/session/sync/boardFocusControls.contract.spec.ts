@@ -10,8 +10,7 @@ import type { BoardRepository } from '../catalog/repository'
 import type { BoardMeta } from '../catalog/boards'
 import type { BoardPreviewRefreshQueue } from '../preview/boardPreviewRefreshQueue'
 import { createGalleryController } from '../../ui/gallery/controller'
-import { createBoardAutosavePolicy } from '../../../canvas/session/board-session/autosavePolicy'
-import { useBoardAutosave } from '../../../canvas/session/board-session/useBoardAutosave'
+import { createBoardAutosavePolicy, useBoardAutosave } from '../../../canvas/session/board-session'
 
 const disposeControllers: (() => void)[] = []
 

@@ -3,7 +3,11 @@ import { useAsyncAction } from '../../../../../core/composables/useAsyncAction'
 import { createDeferred } from '../../../../../test/deferred'
 import { createAdminStorageWorkspace } from './workspace'
 import type { AdminStorageResource } from './resource'
-import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from '../../core/storage/profiles'
+import type {
+  StorageProfile,
+  StorageProfilePayload,
+  StorageProviderMeta,
+} from '../../core/storage/profiles'
 
 const mockResource = {
   applyProfile: vi.fn(),

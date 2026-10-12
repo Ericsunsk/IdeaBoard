@@ -16,8 +16,7 @@ const referenceFakes = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../resource', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../../resource')>()
+  const actual = await importOriginal<typeof import('../../../resource')>()
   return {
     ...actual,
     createAdminGatewayResource: () => ({

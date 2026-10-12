@@ -5,7 +5,10 @@ import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 vi.mock('../../../../shared/session/brand/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
 }))
-import type { OAuthProviderSettingsResource, OAuthProviderSettingsSummary } from '../../../session/oauth/resource'
+import type {
+  OAuthProviderSettingsResource,
+  OAuthProviderSettingsSummary,
+} from '../../../session/oauth/resource'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 

@@ -48,7 +48,7 @@ import '../styles/canvas-surface-skin.css'
 import '../styles/canvas-style-contracts.css'
 import '../styles/canvas-vue-flow-adapter-skin.css'
 import CanvasMiniMap from '../chrome/CanvasMiniMap.vue'
-import NodeStageFrame from '../nodes/primitives/NodeStageFrame.vue'
+import { NodeStageFrame } from '../nodes/primitives'
 import { ImageInpaintChrome } from '../../tools/inpaint'
 
 vi.mock('../../session/execution', () => ({
@@ -88,10 +88,10 @@ function mountApp(node: () => unknown) {
   app.mount(root)
   return {
     root,
-    query: <T extends Element = HTMLElement>(selector: string) =>
-      root.querySelector<T>(selector),
-    queryAll: <T extends Element = HTMLElement>(selector: string) =>
-      [...root.querySelectorAll<T>(selector)],
+    query: <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector),
+    queryAll: <T extends Element = HTMLElement>(selector: string) => [
+      ...root.querySelectorAll<T>(selector),
+    ],
     unmount() {
       app.unmount()
       root.remove()
@@ -122,8 +122,18 @@ const ANCHOR_RECT = { top: 0, left: 0, width: 320, height: 480 }
 
 function flowHost() {
   const nodes = ref([
-    { id: 'node-a', position: { x: 50, y: 60 }, data: {}, style: { width: '120px', height: '60px' } },
-    { id: 'node-b', position: { x: 400, y: 60 }, data: {}, style: { width: '120px', height: '60px' } },
+    {
+      id: 'node-a',
+      position: { x: 50, y: 60 },
+      data: {},
+      style: { width: '120px', height: '60px' },
+    },
+    {
+      id: 'node-b',
+      position: { x: 400, y: 60 },
+      data: {},
+      style: { width: '120px', height: '60px' },
+    },
   ])
   const edges = ref([{ id: 'edge-a-b', source: 'node-a', target: 'node-b' }])
   let selectEdge: (() => void) | null = null
@@ -184,9 +194,7 @@ describe('Canvas surface states browser contract', () => {
       // this.
       document.documentElement.style.setProperty('--color-page-chrome-focus-ring', 'rgb(255, 0, 0)')
       try {
-        await expect
-          .poll(() => styleOf(button).boxShadow)
-          .toBe('rgb(255, 0, 0) 0px 0px 0px 3px')
+        await expect.poll(() => styleOf(button).boxShadow).toBe('rgb(255, 0, 0) 0px 0px 0px 3px')
       } finally {
         document.documentElement.style.removeProperty('--color-page-chrome-focus-ring')
       }
@@ -203,10 +211,7 @@ describe('Canvas surface states browser contract', () => {
   it('paints selected edges and minimap nodes from the surface contract', async () => {
     const { host, selectEdge } = flowHost()
     try {
-      const path = await waitFor(
-        () => host.query<SVGElement>('.vue-flow__edge-path'),
-        'edge path',
-      )
+      const path = await waitFor(() => host.query<SVGElement>('.vue-flow__edge-path'), 'edge path')
       const restStroke = styleOf(path).stroke
       expect(restStroke.length).toBeGreaterThan(0)
 

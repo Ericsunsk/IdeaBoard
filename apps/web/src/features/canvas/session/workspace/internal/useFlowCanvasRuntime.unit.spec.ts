@@ -9,13 +9,15 @@ import {
   type CanvasGroup,
 } from '../../../../board'
 import { CanvasGraphSession, type CanvasGraphTransaction } from '../../../core/graph'
-import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
+import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
-import { createFlowGraphCommandOptions } from '../../../session/flow-adapter/connections/flowGraphAdapterCommandSideEffects'
-import { BoardGraphSession } from '../../execution/pending-execution/boardGraphSession'
-import { createPendingImageExecutionCore } from '../../execution/pending-execution/core'
-import { collectPendingImageTasks } from '../../execution/pending-execution/taskSnapshot'
+import { createFlowGraphCommandOptions } from '../../../session/flow-adapter'
+import {
+  BoardGraphSession,
+  createPendingImageExecutionCore,
+  collectPendingImageTasks,
+} from '../../execution'
 
 type MutableHarnessNode = Node & {
   selected?: boolean

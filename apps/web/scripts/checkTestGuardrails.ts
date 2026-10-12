@@ -78,8 +78,6 @@ const grandfatheredMakeFactories = new Set([
   'src/features/admin/credits/session/health/testing.ts:makeReconciliationRun',
   'src/features/admin/credits/session/health/testing.ts:makeCreditFinding',
   'src/features/admin/credits/session/pricing/testing.ts:makeCatalogItems',
-  'src/features/canvas/session/board-session/boardFixtures.ts:makeBoardSnapshot',
-  'src/features/canvas/session/board-session/boardFixtures.ts:makeBoardState',
   'src/features/canvas/tools/retouch/core/ids.ts:makeRetouchLayerId',
   'src/features/canvas/tools/retouch/core/ids.ts:makeCurvePointId',
   'src/features/canvas/tools/retouch/core/ids.ts:makeCurvePointFallbackId',

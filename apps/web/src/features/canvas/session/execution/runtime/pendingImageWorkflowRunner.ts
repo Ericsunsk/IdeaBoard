@@ -11,7 +11,10 @@ import type {
 } from '../planning/imageExecutionPlan'
 import type { ResolvedTaskImageResult } from '../result-nodes/resolvedTaskImageResult'
 import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultExecution.ts'
-import { type PendingImageExecutionCore, type PendingImageExecutionLease } from '../pending-execution/core'
+import {
+  type PendingImageExecutionCore,
+  type PendingImageExecutionLease,
+} from '../pending-execution/core'
 import type { BoardAttachment } from '../board-attachment'
 import {
   createCanvasTaskClientActionId,

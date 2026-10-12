@@ -10,14 +10,14 @@ import {
   useCanvasExecutionWorkspace,
   useImageWorkflowExecution as useRuntimeImageWorkflowExecution,
   type PendingImageExecutionCore,
+  waitExistingOrLiveTaskImageResults,
+  CANVAS_WORKSPACE_REQUIRED_MESSAGE,
 } from '../execution'
 import type { BoardSnapshot } from '../../../board/ports/canvas'
 import type { CanvasGraphStore } from '../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../session/flow-adapter'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
 import type { TaskImageResult } from '../../../../core/query/taskResult'
-import { waitExistingOrLiveTaskImageResults } from '../execution/task-runner/imageDirectActionExecutor'
-import { CANVAS_WORKSPACE_REQUIRED_MESSAGE } from '../execution/workspace/canvasWorkspaceTaskAdapter'
 import { getWorkspaceSelectionStore } from '../../../workspace'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']

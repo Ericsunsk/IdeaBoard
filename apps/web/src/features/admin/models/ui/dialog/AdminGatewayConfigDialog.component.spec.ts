@@ -3,10 +3,7 @@ import { fireEvent, within } from '@testing-library/vue'
 import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminGatewayConfigDialog from './AdminGatewayConfigDialog.vue'
 import { ADMIN_PROBE_OPERATOR_REASON } from '../../../shared'
-import type {
-  AdminGatewayConnection,
-  GatewayConnectionSummary,
-} from '../../resource'
+import type { AdminGatewayConnection, GatewayConnectionSummary } from '../../resource'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 

@@ -155,9 +155,7 @@ function scanBoardDeepImports(
       const target = resolveSourceModule(root, absoluteSource, specifier)
       if (
         !target ||
-        !/^src\/features\/board\/(?:core|session|ui|gallery|testing)(?:\/|$)/.test(
-          target,
-        )
+        !/^src\/features\/board\/(?:core|session|ui|gallery|testing)(?:\/|$)/.test(target)
       )
         continue
       edges.add(`${module.source}|${target}`)
@@ -585,13 +583,13 @@ const cruiseViolations = prodOutput.summary?.violations ?? []
 const scannedBoardEdges = scanBoardDeepImports(webRoot)
 
 /**
- * P0 deliverable B: stable-sorted per-seam fan-in/out JSON report.
+ * Stable-sorted per-seam fan-in/out JSON report.
  *
  * Built from the same depcruise pass that gates production, so the report
  * can never describe a different graph than the one that passed/failed.
- * `undeclaredDeepImports` per seam = deep-import rule violations + Board
- * scanner edges whose target sits behind that seam; the production gate
- * requires every one of these arrays to be empty (§6.2 criterion 1).
+ * Per-seam deep imports include every external edge into private ownership,
+ * including tests and nested Seams; strict acceptance requires these arrays
+ * to be empty alongside the dependency-cruiser rules and Board scanner.
  */
 async function writeFanReport(): Promise<void> {
   const edges = graphEdges(prodOutput.modules ?? [])
@@ -676,7 +674,7 @@ async function writeFanReport(): Promise<void> {
   console.log(`  fan-in/out report: ${path.relative(webRoot, reportPathFromArgs())}`)
   if (advisoryDeepEdges.size)
     console.warn(
-      `  P0 inventory advisory: ${advisoryDeepEdges.size} distinct undeclared deep edges; see report before P1 acceptance.`,
+      `  Seam inventory: ${advisoryDeepEdges.size} distinct undeclared deep edges; see report.`,
     )
   const impurePaths = Object.values(seams).flatMap(
     (value) => (value as { impureRuntimePaths: string[][] }).impureRuntimePaths,

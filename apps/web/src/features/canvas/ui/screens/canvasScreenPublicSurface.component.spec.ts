@@ -143,7 +143,9 @@ describe('CanvasScreen public surface', () => {
       sourcePort: 'output',
       targetPort: 'input',
     })
-    expect(flagged.benchmark.onNodesChange).toHaveBeenCalledWith([{ id: 'fusion-1', type: 'remove' }])
+    expect(flagged.benchmark.onNodesChange).toHaveBeenCalledWith([
+      { id: 'fusion-1', type: 'remove' },
+    ])
 
     await flagged.view.rerender({ visible: false })
     expect(

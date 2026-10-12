@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../../../test/render'
 import { mockAppToast } from '../../../../../../test/toast'
-import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../../../session/testing'
+import {
+  createOutboundPolicyHandlers,
+  createOutboundPolicyMswState,
+} from '../../../session/testing'
 import AdminOutboundPolicyCard from './AdminOutboundPolicyCard.vue'
 
 vi.mock('../../../../../../core/composables/useAppToast')

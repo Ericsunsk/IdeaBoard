@@ -14,8 +14,8 @@ import type {
   CanvasGraphStore,
 } from '../../../core/graph'
 import type { BoardAttachment } from '../board-attachment'
-import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter/connections/flowConnectionAdapter.ts'
-import { canvasNodeToFlowNode } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
+import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter'
+import { canvasNodeToFlowNode } from '../../../session/flow-adapter'
 import { createPrefixedId } from '../../../../../core/utils/ids'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import { resolveWritableCanvasGraphStore } from '../../../core/graph/canvasGraphStoreWriter'

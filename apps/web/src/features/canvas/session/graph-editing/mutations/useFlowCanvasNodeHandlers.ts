@@ -1,6 +1,8 @@
 import { getCurrentScope, onScopeDispose } from 'vue'
-import type { DismissTransientCanvasUi } from '../../../ui/screens/useFlowTransientUiDismissal.ts'
-import type { FlowSnapshotParamPatch } from '../../../session/flow-adapter/projection/flowSnapshotParamMutations.ts'
+import type {
+  DismissTransientCanvasUi,
+  FlowSnapshotParamPatch,
+} from '../../../session/flow-adapter'
 
 type UseFlowCanvasNodeHandlersOptions = {
   dismissTransientCanvasUi: DismissTransientCanvasUi

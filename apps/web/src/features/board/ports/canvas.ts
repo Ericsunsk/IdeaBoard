@@ -95,7 +95,11 @@ export {
 export { rebuildBoardMediaRefs } from '../core/media/references'
 
 // Local persistence and preview adapters.
-export { loadBoardState, setBoardPreviewSnapshot, setBoardState } from '../session/persistence/state'
+export {
+  loadBoardState,
+  setBoardPreviewSnapshot,
+  setBoardState,
+} from '../session/persistence/state'
 export { serializeBoardState } from '../session/persistence/boardStateSerialization'
 export { BOARD_PREVIEW_RENDERER_VERSION } from '../session/preview/boardPreviewVersion'
 export { renderBoardPreviewDataUrl } from '../session/preview/boardPreviewSerializer'

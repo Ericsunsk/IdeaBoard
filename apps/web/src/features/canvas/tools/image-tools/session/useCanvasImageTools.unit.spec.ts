@@ -8,7 +8,8 @@ import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '../'
 import { i18n } from '../../../../../core/i18n'
 import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
-import { deserializeImageRetouchPlan } from '../../retouch/core/recipe.ts'
+import { deserializeImageRetouchPlan, type RetouchFinalRenderModule } from '../../retouch/testing'
+import type { MaskPaintingCanvasModule } from '../../inpaint/testing'
 import * as mediaAssetDelivery from '../../../../../api/mediaAssetDelivery'
 import {
   resetMediaWorkspaceIdResolver,
@@ -16,8 +17,7 @@ import {
 } from '../../../../../api/mediaAssetDelivery'
 
 vi.mock('../../retouch/session/stage/runtime/finalRender', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../retouch/session/stage/runtime/finalRender')>()
+  const actual = await importOriginal<RetouchFinalRenderModule>()
   return {
     ...actual,
     renderRetouchLayerStackFile: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('../../retouch/session/stage/runtime/finalRender', async (importOriginal
 })
 
 vi.mock('../../inpaint/session/maskPaintingCanvas', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../inpaint/session/maskPaintingCanvas')>()
+  const actual = await importOriginal<MaskPaintingCanvasModule>()
   return {
     ...actual,
     buildMaskCommitResult: vi.fn(() => ({

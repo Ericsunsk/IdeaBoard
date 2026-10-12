@@ -9,8 +9,8 @@ import {
   type CanvasGroupResizeHandle,
   type CanvasPoint,
 } from '../../../core/graph/canvasGroupGeometry.ts'
-import type { CanvasSelectionGroupAction } from '../../../session/graph-editing/groups/useCanvasGroupRuntime.ts'
-import type { DismissTransientCanvasUi } from '../../screens/useFlowTransientUiDismissal.ts'
+import type { CanvasSelectionGroupAction } from '../../../session/graph-editing'
+import type { DismissTransientCanvasUi } from '../../../session/flow-adapter'
 
 export type CanvasGroupResizeStartPayload = {
   event: PointerEvent

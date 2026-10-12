@@ -21,7 +21,7 @@ import { resolveOutpaintIntent, type OutpaintRect } from '../../../tools/outpain
 import {
   resolveImageNodeLayoutAnchor,
   type ImageNodeLayoutAnchor,
-} from '../../../session/flow-adapter/projection/flowImageNodeSelectors'
+} from '../../../session/flow-adapter'
 import {
   resolveConnectedImageInputs,
   resolveConnectedInput,
@@ -29,7 +29,7 @@ import {
   type FlowExecutionGraphOptions,
   type FlowGraphNode,
   type ResolvedFlowInputImage,
-} from '../../../session/flow-adapter/projection/flowNodeSourceResolution'
+} from '../../../session/flow-adapter'
 import { resolveFusionOutputSize, type FusionOutputImageSize } from './fusionOutputSizing'
 import type {
   ImageExecutionInput,

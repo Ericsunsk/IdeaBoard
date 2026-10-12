@@ -1,8 +1,7 @@
 import type { Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
-import { effectScope, nextTick, ref, shallowRef } from 'vue'
+import { type Ref, effectScope, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { useNodeToolPopoverGroup } from '../../../ui/nodes/primitives/useNodeToolPopoverGroup.ts'
+import { useNodeToolPopoverGroup } from '../../../ui/nodes/primitives'
 import { useImageOutpaintOverlay } from './useImageOutpaintOverlay'
 
 function createStageElement() {

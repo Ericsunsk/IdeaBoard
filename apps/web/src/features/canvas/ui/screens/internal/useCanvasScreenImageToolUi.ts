@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
-import { useImageStageRegistry } from '../../../session/flow-adapter/viewport/useImageStageRegistry.ts'
+import { useImageStageRegistry } from '../../../session/flow-adapter'
 import type { CanvasImageWorkflowUiAdapter } from '../../../session/image-workflow'
 
 export function useCanvasScreenImageToolUi(options: {

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../core/graph'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
-import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 
 type SelectableHarnessNode = Node & {
   selected?: boolean

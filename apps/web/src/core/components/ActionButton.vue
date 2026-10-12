@@ -32,7 +32,7 @@ import {
   resolveButtonChromeVariant,
   type ButtonChromeSeverity as ActionButtonSeverity,
   type ButtonChromeVariant as ActionButtonVariant,
-} from '@/components/ui/button/buttonChrome'
+} from '@/components/ui/button'
 
 // Shared action buttons reuse the Admin variant and severity contract.
 export type { ActionButtonSeverity, ActionButtonVariant }

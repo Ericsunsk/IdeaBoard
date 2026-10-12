@@ -9,7 +9,10 @@ import {
 } from '../../../../../api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '../../../../../api/contractKernel'
 import { withControlCopy } from '../../../shared/index'
-import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from '../../core/outbound/contract'
+import type {
+  OutboundPolicySetting,
+  UpdateOutboundPolicyRequest,
+} from '../../core/outbound/contract'
 
 // Admin outbound policy boundary (W2 transports). Reads and writes go
 // through the Control Plane (`getControlOutboundPolicy` /

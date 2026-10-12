@@ -144,7 +144,11 @@ import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { useUsage } from '../../session/usage/useUsage'
 import { DEFAULT_USAGE_RANGE, type UsageRange } from '../../session/usage/resource'
-import { buildUsageTrendChart, createUsageChartPlugins, resolveUsageChartTheme } from '../../session/chart'
+import {
+  buildUsageTrendChart,
+  createUsageChartPlugins,
+  resolveUsageChartTheme,
+} from '../../session/chart'
 import AccountPane from '../shared/AccountPane.vue'
 
 const props = defineProps<{ active: boolean }>()

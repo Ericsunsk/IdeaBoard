@@ -1,7 +1,7 @@
 import type {
   DismissTransientCanvasUi,
   DismissTransientCanvasUiOptions,
-} from '../../session/flow-adapter/viewport/useVueFlowSelectionAdapter'
+} from '../../session/flow-adapter'
 
 export type { DismissTransientCanvasUi, DismissTransientCanvasUiOptions }
 

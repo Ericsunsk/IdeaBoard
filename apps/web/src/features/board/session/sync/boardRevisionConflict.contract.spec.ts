@@ -10,12 +10,10 @@ import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
   type MockWorkspaceBoardApiState,
-} from '../../testing'
-import {
   addRemoteBoardFixture,
   makePromptBoardState,
   primeAuthenticatedWorkspace,
-} from '../../testing/syncFixtures'
+} from '../../testing'
 import { clearStoredAuth } from '../../../../core/utils/auth'
 
 import { getBoardState, replaceBoardStateMap } from '../persistence/state'

@@ -12,9 +12,9 @@ import { CanvasGraphSession } from '../../../core/graph'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphAdapter,
-} from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
-import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter/projection/bindCanvasGraphSessionProjection'
-import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
+} from '../../../session/flow-adapter'
+import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
+import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'
 import {

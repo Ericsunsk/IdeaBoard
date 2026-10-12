@@ -129,19 +129,17 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElementVisibility } from '@vueuse/core'
-import { useCanvasViewportContext } from '../../../session/flow-adapter/viewport/useCanvasViewportContext'
+import { useCanvasViewportContext } from '../../../session/flow-adapter'
 import type { OutpaintDragAnchor } from '../../../tools/outpaint/session/useImageOutpaintOverlay.ts'
 import { ImageToolStagePresentation as StagePresentation } from '../../../tools/image-tools/ui/stage'
 import type { ImageToolStageBinding } from '../../../tools/image-tools'
 import type { LibraryImportFact } from '../../../../board/ports/canvas'
 import type { FlowLocalUploadState } from '../../../core/nodes/flowTypes.ts'
-import { useCanvasImagePreviewQuality } from '../../../session/flow-adapter/viewport/useCanvasImagePreviewQuality'
-import { useDisplayImagePreview } from '../../../session/flow-adapter/projection/useDisplayImagePreview'
+import { useCanvasImagePreviewQuality } from '../../../session/flow-adapter'
+import { useDisplayImagePreview } from '../../../session/flow-adapter'
 import ImageOutpaintOverlay from '../../../tools/outpaint/ui/ImageOutpaintOverlay.vue'
 import ComposingOrb from './ComposingOrb.vue'
-import NodeActionButton from '../primitives/NodeActionButton.vue'
-import NodeEmptyStateIcon from '../primitives/NodeEmptyStateIcon.vue'
-import NodeStageFrame from '../primitives/NodeStageFrame.vue'
+import { NodeActionButton, NodeEmptyStateIcon, NodeStageFrame } from '../primitives'
 
 const props = defineProps<{
   nodeId: string | number

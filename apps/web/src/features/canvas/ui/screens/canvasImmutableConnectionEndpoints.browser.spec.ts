@@ -55,6 +55,7 @@ vi.mock('../../session/flow-adapter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../session/flow-adapter')>()
   return {
     ...actual,
+    provideCanvasViewportContext: vi.fn(),
     createCanvasConnectionDropLifecycle: () => ({
       onConnectStart: vi.fn(),
       onConnectEnd: vi.fn(),
@@ -113,16 +114,6 @@ vi.mock('./useCanvasImageLightbox', () => ({
   }),
 }))
 
-vi.mock('../../session/flow-adapter/viewport/useCanvasViewportContext.ts', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('../../session/flow-adapter/viewport/useCanvasViewportContext.ts')
-  >()
-  return {
-    ...actual,
-    provideCanvasViewportContext: vi.fn(),
-  }
-})
-
 vi.mock('../nodes/groups', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../nodes/groups')>()
   return {
@@ -141,7 +132,10 @@ vi.mock('../nodes/groups', async (importOriginal) => {
   }
 })
 
-vi.mock('../overlays', () => ({ useCanvasCustomLayerOverlay: vi.fn() }))
+vi.mock('../overlays', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../overlays')>()
+  return { ...actual, useCanvasCustomLayerOverlay: vi.fn() }
+})
 
 vi.mock('../../../workspace/shell/useWorkspaceAccountControls.ts', () => ({
   useWorkspaceAccountControls: () => ({
@@ -309,7 +303,11 @@ function createRuntime(flowNodes: { id: string; position: { x: number; y: number
         isGenerationAvailable: vi.fn(() => true),
         tools: {
           lifecycle: { enter: vi.fn(), cancel: vi.fn(), discardNodeEdits: vi.fn() },
-          editor: { onCanvasWheel: vi.fn(), focusAndShowChrome: vi.fn(), scheduleChromeAnchorUpdate: vi.fn() },
+          editor: {
+            onCanvasWheel: vi.fn(),
+            focusAndShowChrome: vi.fn(),
+            scheduleChromeAnchorUpdate: vi.fn(),
+          },
           chrome: {},
         },
         interactions: {

@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminLogoPickerPopover from './AdminLogoPickerPopover.vue'
-import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from '../../session/brand/brandLogos'
+import {
+  getAdminBrandLogoOverride,
+  replaceAdminBrandLogoOverrides,
+} from '../../session/brand/brandLogos'
 
 const logoResource = vi.hoisted(() => ({
   save: vi.fn().mockResolvedValue(undefined),

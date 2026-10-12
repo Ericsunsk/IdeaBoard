@@ -5,10 +5,7 @@ import { useAdminConfirm } from '../../shared'
 import { requireDestructiveReason } from '../../shared'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
 import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
-import {
-  createAdminGatewayResource,
-  type AdminGatewayCatalog,
-} from '../resource'
+import { createAdminGatewayResource, type AdminGatewayCatalog } from '../resource'
 import type { AdminModelItem, ModelObservedSnapshot } from '../core/catalogData'
 import { matchesModelKeyword, MODEL_HOSTING_OPTIONS } from '../core/catalogData'
 

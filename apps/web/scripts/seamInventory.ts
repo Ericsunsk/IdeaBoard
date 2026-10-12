@@ -436,6 +436,28 @@ function runSelfTests(): void {
   assert.equal(measured.undeclaredDeepImports.length, 1)
   assert.equal(measured.missingConsumers.length, 0)
   assert.equal(measured.fanOutTargets.includes('src/card/Card.vue'), false)
+  const nestedSeam = {
+    ...seam,
+    path: 'src/features/canvas/session/projection/index.ts',
+    ownershipScope: ['src/features/canvas/session/projection/'],
+    allowedConsumers: [],
+  }
+  const nestedEdges: ConsumerEdge[] = [
+    {
+      from: 'src/features/canvas/ui/Node.vue',
+      to: 'src/features/canvas/session/projection/internal.ts',
+      kind: 'runtime',
+    },
+    {
+      from: 'src/features/canvas/ui/node.unit.spec.ts',
+      to: 'src/features/canvas/session/projection/internal.ts',
+      kind: 'runtime',
+    },
+  ]
+  assert.deepEqual(
+    measureSeam(nestedSeam, nestedEdges, new Set([nestedSeam.path])).undeclaredDeepImports,
+    nestedEdges,
+  )
   const planned = {
     ...seam,
     path: 'src/core/card.ts',
@@ -465,7 +487,7 @@ function runSelfTests(): void {
   assert.deepEqual(split.fanOutTargets, ['src/shared/helpers.ts'])
   assert.deepEqual(split.splitSourcePaths, ['src/shared/helpers.ts'])
   console.log(
-    '✓ Seam schema: 1 valid / 12 invalid fixtures; external runtime/type/deep-edge and planned relocation/split measurement passed.',
+    '✓ Seam schema: 1 valid / 12 invalid fixtures; external runtime/type/deep-edge, nested ownership (including tests), and planned relocation/split measurement passed.',
   )
 }
 

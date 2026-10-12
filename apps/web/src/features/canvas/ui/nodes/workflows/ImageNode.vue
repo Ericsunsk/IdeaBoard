@@ -100,10 +100,8 @@ import type { OutpaintDragAnchor } from '../../../tools/outpaint/session/useImag
 import type { ImageActionBinding, ImageToolStageBinding } from '../../../tools/image-tools'
 import type { FlowLocalUploadState } from '../../../core/nodes/flowTypes.ts'
 import HomeCanvasImageActionMenu from '../home/ImageActionMenu.vue'
-import NodePromptComposer from '../primitives/NodePromptComposer.vue'
-import NodeFloatingControls from '../primitives/NodeFloatingControls.vue'
+import { NodePromptComposer, NodeFloatingControls, NodeShell } from '../primitives'
 import ImageNodeStage from './ImageNodeStage.vue'
-import NodeShell from '../primitives/NodeShell.vue'
 
 const props = defineProps<{
   node: ImageNodeItem

@@ -10,7 +10,7 @@ import {
   type BoardSnapshot,
   type BoardState,
 } from '../../../board'
-import { makeBoardSnapshot, makeBoardState } from './boardFixtures'
+import { makeBoardSnapshot, makeBoardState } from '../../../board/ports/testing'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'

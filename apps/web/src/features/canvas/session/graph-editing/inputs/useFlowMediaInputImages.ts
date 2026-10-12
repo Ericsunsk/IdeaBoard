@@ -10,7 +10,7 @@ import type {
   PromptNodeItem,
 } from '../../../../board/ports/canvas'
 import { getCanvasNodeImageInputLimit } from '../../../../board/ports/canvas'
-import { type ImageNodeDisplayPayload } from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+import { type ImageNodeDisplayPayload } from '../../../session/flow-adapter'
 import {
   type CanvasGraphEdgeRecord,
   type CanvasGraphNodeRecord,

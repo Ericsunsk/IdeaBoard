@@ -118,9 +118,9 @@ import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useCanvasImageLightbox } from './useCanvasImageLightbox'
-import { provideCanvasHandleProximityCoordinator } from '../../session/flow-adapter/handles/useCanvasHandleProximity.ts'
-import { provideCanvasNodeUiStateContext } from '../../session/flow-adapter/handles/useCanvasNodeUiStateContext.ts'
-import { provideCanvasViewportContext } from '../../session/flow-adapter/viewport/useCanvasViewportContext.ts'
+import { provideCanvasHandleProximityCoordinator } from '../../session/flow-adapter'
+import { provideCanvasNodeUiStateContext } from '../../session/flow-adapter'
+import { provideCanvasViewportContext } from '../../session/flow-adapter'
 import { CanvasGroupPresentation } from '../nodes/groups'
 import {
   createCanvasConnectionDropLifecycle,
@@ -132,8 +132,8 @@ import {
   createCanvasGraphInteractionBrowserAdapter,
 } from '../../session/graph-editing'
 import { useCanvasWorkspaceRuntime } from '../../session/workspace'
-import FlowCanvasNode from '../nodes/FlowCanvasNode.vue'
-import CanvasNodeContextMenu from '../overlays/CanvasNodeContextMenu.vue'
+import { FlowCanvasNode } from '../nodes'
+import { CanvasNodeContextMenu } from '../overlays'
 import { ImageToolPresentation } from '../../tools/image-tools'
 import {
   CanvasChrome,

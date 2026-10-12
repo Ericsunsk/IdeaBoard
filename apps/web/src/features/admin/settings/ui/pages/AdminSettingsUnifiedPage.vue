@@ -119,14 +119,15 @@ import AdminRegistrationRateLimitEditor from '../cards/access/AdminRegistrationR
 import AdminLoginLockoutEditor from '../cards/access/AdminLoginLockoutEditor.vue'
 import AdminSupportChannelsEditor from '../cards/support/AdminSupportChannelsEditor.vue'
 import AdminStoragePage from '../cards/storage/AdminStoragePage.vue'
-import AdminSettingsOnThisPage, {
-  type OnThisPageItem,
-} from './AdminSettingsOnThisPage.vue'
+import AdminSettingsOnThisPage, { type OnThisPageItem } from './AdminSettingsOnThisPage.vue'
 import {
   createAdminSearchProviderResource,
   type AdminSearchProviderResource,
 } from '../../session/image-library/searchProviderResource'
-import { SEARCH_PROVIDERS, type SearchProviderConfig } from '../../session/image-library/searchProviderTypes'
+import {
+  SEARCH_PROVIDERS,
+  type SearchProviderConfig,
+} from '../../session/image-library/searchProviderTypes'
 import { useAdminSearchProviderFeedback } from '../../session/useSettingsFeedback'
 import { useScrollSpy } from './useScrollSpy'
 

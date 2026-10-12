@@ -1,7 +1,11 @@
 import { listWorkspaceBillingRecords } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { PaginatedBillingRecords } from '../../../../api/generated-query/public/model'
 import { i18n } from '../../../../core/i18n'
-import { asWorkspaceBillingError, readContractListBody, requireAccountWorkspaceId } from '../workspaceBilling'
+import {
+  asWorkspaceBillingError,
+  readContractListBody,
+  requireAccountWorkspaceId,
+} from '../workspaceBilling'
 
 // User billing records boundary (W2 transports). Reads go through the Public
 // Data Plane (`GET /api/v1/workspaces/{id}/billing-records`, cursor

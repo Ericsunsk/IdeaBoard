@@ -1,5 +1,5 @@
 import type { CanvasNodeItem } from '../../../../board/ports/canvas'
-import type { FlowSnapshotParamPatch } from '../../../session/flow-adapter/projection/flowSnapshotParamMutations.ts'
+import type { FlowSnapshotParamPatch } from '../../../session/flow-adapter'
 import { useFlowCanvasNodeHandlers } from './useFlowCanvasNodeHandlers'
 import { useFlowNodeMediaInputs } from '../inputs/useFlowNodeMediaInputs'
 import type { CanvasGraphEditingBrowserAdapter } from '../inputs/browserAdapter'

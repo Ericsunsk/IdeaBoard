@@ -8,7 +8,10 @@ import {
   type CanvasConnectionPort,
 } from '../../../../board/ports/canvas'
 import { useCanvasHandleProximity } from './useCanvasHandleProximity'
-import { resolveCanvasNodeUiScale, useCanvasViewportContext } from '../viewport/useCanvasViewportContext'
+import {
+  resolveCanvasNodeUiScale,
+  useCanvasViewportContext,
+} from '../viewport/useCanvasViewportContext'
 
 export type FlowNodeHandleDirection = 'input' | 'output'
 

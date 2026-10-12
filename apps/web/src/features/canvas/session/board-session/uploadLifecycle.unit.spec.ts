@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { uploadApi } from '../../../../api/upload'
-import { makeBoardSnapshot } from './boardFixtures'
+import { makeBoardSnapshot } from '../../../board/ports/testing'
 import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
 import {
   resetMediaWorkspaceIdResolver,

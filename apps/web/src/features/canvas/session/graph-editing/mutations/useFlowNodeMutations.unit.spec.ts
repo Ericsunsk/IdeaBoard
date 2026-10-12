@@ -9,10 +9,10 @@ import {
   type PromptNodeItem,
 } from '../../../../board'
 import { CanvasGraphSession } from '../../../core/graph'
-import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter/connections/flowConnectionAdapter.ts'
-import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter/projection/bindCanvasGraphSessionProjection'
-import { FLOW_NODE_DRAG_HANDLE } from '../../../session/flow-adapter/projection/flowNodeDragHandle.ts'
-import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import { flowConnectionToCanvasConnection } from '../../../session/flow-adapter'
+import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
+import { FLOW_NODE_DRAG_HANDLE } from '../../../session/flow-adapter'
+import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
 
 function makePromptSnapshot(id: number): PromptNodeItem {

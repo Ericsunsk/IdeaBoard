@@ -32,7 +32,8 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `renderBoardPreviewDataUrl` / `createBoardPreviewRefreshQueue` — preview generation and refresh queue in `session/preview`.
 - `createCatalog` / `useCatalog` / `BoardsPage` — gallery page, controller, and views (via root `board/index.ts`) in `ui/gallery`.
 - Gallery copy keys are canonical under `board.*` in the locale bundles (including the h1: `board.title`). New callers use `board.*`; existing `workspace.boards.*` aliases have matching locale values.
-- `board/testing` — snapshot/state factories for tests only; never enters the production barrel.
+- `board/testing` — Board-internal factories and sync fixtures; never enters the production barrel.
+- `board/ports/testing.ts` — test-only snapshot/state factories for other contexts; production callers use `board/ports/canvas.ts`.
 - `board/index.ts` — public entry for non-Canvas consumers and route composition; Canvas uses the narrow port below.
 - `board/ports/canvas.ts` — narrow BoardCanvas port for Canvas callers (issue #861): snapshot facts, local persistence, revision-gated sync, preview rendering, and media-ref extraction only; Canvas production code must use this subpath, never the full barrel.
 

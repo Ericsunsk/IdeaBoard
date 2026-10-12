@@ -1,4 +1,5 @@
 export type { CanvasNodePresentationIntent } from './canvasNodePresentation'
+export { default as FlowCanvasNode } from './FlowCanvasNode.vue'
 export {
   createFusionNodePresentationResolver,
   type FusionNodePresentationBinding,

@@ -162,7 +162,10 @@ import { useStripeSettingsFeedback } from '../../../session/payment/useStripeSet
 import { secretField } from '../../../../shared/index'
 import { createAdminStripeSettingsResource } from '../../../session/payment/resource'
 import { PAYMENTS_MESSAGES } from '../../../session/payment/messages'
-import type { AdminStripeSettingsResource, StripeConfigurationSummary } from '../../../session/payment/types'
+import type {
+  AdminStripeSettingsResource,
+  StripeConfigurationSummary,
+} from '../../../session/payment/types'
 
 const props = withDefaults(
   defineProps<{

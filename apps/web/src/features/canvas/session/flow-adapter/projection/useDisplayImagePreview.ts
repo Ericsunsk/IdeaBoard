@@ -7,18 +7,17 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
-import {
-  canvasToBlob,
-  fetchImageBlobFromUrl,
-  resolveFetchUrl,
-} from '../../media/canvasMediaIo.ts'
+import { canvasToBlob, fetchImageBlobFromUrl, resolveFetchUrl } from '../../media/canvasMediaIo.ts'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,
   WEBP_PREVIEW_MIME_TYPE,
   WEBP_PREVIEW_QUALITY,
 } from '../../media/displayImagePreviewEncoding.ts'
-import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../../core/config/runtimeUrls'
+import {
+  canonicalizeRuntimeUploadRef,
+  resolveAssetUrl,
+} from '../../../../../core/config/runtimeUrls'
 import {
   normalizeMediaAssetId,
   useMediaAssetDelivery,

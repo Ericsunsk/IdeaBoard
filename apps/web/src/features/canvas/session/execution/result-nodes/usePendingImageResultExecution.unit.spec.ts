@@ -3,8 +3,8 @@ import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphStore, CanvasGraphSession } from '../../../core/graph'
-import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter/projection/bindCanvasGraphSessionProjection'
-import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
+import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
+import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import { usePendingImageResultExecution } from './usePendingImageResultExecution.ts'
 
 function imageNode(id: number, x: number, sourceImageUrl = 'source'): Node {

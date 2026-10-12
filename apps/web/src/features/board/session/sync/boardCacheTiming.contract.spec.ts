@@ -5,12 +5,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryObserver } from '@tanstack/vue-query'
 import { clearStoredAuth } from '../../../../core/utils/auth'
-import { addRemoteBoardFixture, primeAuthenticatedWorkspace } from '../../testing/syncFixtures'
 import {
+  addRemoteBoardFixture,
+  primeAuthenticatedWorkspace,
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
   makeBoardState,
-} from '../../testing/factories'
+} from '../../testing'
 import { boardDocumentOptions, boardListOptions } from './boardQueries'
 import { queryClient } from '../../../../core/query/queryClient'
 import { accountScoped, STALE_TIME_MS } from '../../../../core/query/queryDefaults'

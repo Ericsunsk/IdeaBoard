@@ -16,7 +16,7 @@ import {
 } from '../../retouch'
 import { useImageInpaintOverlay } from '../../inpaint'
 import { useInpaintChromeState } from '../../inpaint'
-import type { ImageNodeDisplayPayload } from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+import type { ImageNodeDisplayPayload } from '../../../session/flow-adapter'
 import type { CanvasFeedback } from '../../../session/workspace/useCanvasFeedback.ts'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
 import { createImageToolApplyScopeHost } from './applyScope'

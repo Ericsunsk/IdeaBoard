@@ -9,10 +9,7 @@ import {
 } from '../../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
-import {
-  BoardPayloadError,
-  BoardWorkspaceUnavailableError,
-} from '../adapters/boardsResource'
+import { BoardPayloadError, BoardWorkspaceUnavailableError } from '../adapters/boardsResource'
 import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
 import {

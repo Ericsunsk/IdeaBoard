@@ -4,7 +4,7 @@ import type { ImageNodeItem } from '../../../../board/ports/canvas'
 import {
   resolveImageNodeDisplayPayload,
   type ImageNodeDisplayPayload,
-} from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+} from '../../../session/flow-adapter'
 
 type UseFlowImageNodeSnapshotsOptions = {
   nodes: Ref<Node[]>

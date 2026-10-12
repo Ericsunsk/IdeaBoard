@@ -3,7 +3,10 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import { renderWithUser, screen, waitFor, within } from '../../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
-import { createBillingCatalogHandlers, createBillingCatalogMswState } from '../../session/pricing/testing'
+import {
+  createBillingCatalogHandlers,
+  createBillingCatalogMswState,
+} from '../../session/pricing/testing'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('pool review'))

@@ -48,8 +48,8 @@ import { Handle, useVueFlow } from '@vue-flow/core'
 import { Plus } from '@iconoir/vue'
 import { computed, watch } from 'vue'
 import type { FlowNodeData } from '../../core/nodes/flowTypes.ts'
-import { useFlowCanvasNodeHandleRail } from '../../session/flow-adapter/handles/useFlowCanvasNodeHandleRail'
-import { useFlowNodeHandlesPresentation } from '../../session/flow-adapter/handles/useFlowNodeHandlesPresentation'
+import { useFlowCanvasNodeHandleRail } from '../../session/flow-adapter'
+import { useFlowNodeHandlesPresentation } from '../../session/flow-adapter'
 
 const props = defineProps<{
   nodeId: string

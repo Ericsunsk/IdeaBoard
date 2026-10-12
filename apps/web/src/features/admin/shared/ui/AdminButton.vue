@@ -31,7 +31,7 @@ import {
   resolveButtonChromeVariant,
   type ButtonChromeSeverity,
   type ButtonChromeVariant,
-} from '@/components/ui/button/buttonChrome'
+} from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export type AdminButtonVariant = ButtonChromeVariant

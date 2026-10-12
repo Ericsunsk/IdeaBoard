@@ -12,7 +12,10 @@ export {
   type ImageTaskAction,
 } from '../../core/execution/imageActionExecution.ts'
 export { createImageExecutionPlanner } from './planning/imageExecutionPlan'
-export { resolvePendingImageResultPosition, type PendingImageResultLookup } from './result-nodes/planning'
+export {
+  resolvePendingImageResultPosition,
+  type PendingImageResultLookup,
+} from './result-nodes/planning'
 export { useImageWorkflowExecution } from './runtime/imageWorkflowExecution'
 export {
   createImageWorkflowCommands,
@@ -59,9 +62,23 @@ export {
 } from './task-runner/canvasBillingPreflight'
 export {
   canvasBillingReadinessKey,
+  createCanvasBillingReadinessStore,
   provideCanvasBillingReadiness,
   useCanvasBillingQuote,
   useCanvasBillingReadinessStore,
   type CanvasBillingQuoteState,
   type CanvasBillingReadinessStore,
 } from './billing/readiness.ts'
+export {
+  buildGenerationTaskRequest,
+  buildImageActionReadinessRequest,
+  buildInpaintReadinessRequest,
+  buildOutpaintReadinessRequest,
+} from './commands/imageTaskRequests'
+export { waitExistingOrLiveTaskImageResults } from './task-runner/imageDirectActionExecutor'
+export {
+  CANVAS_WORKSPACE_REQUIRED_MESSAGE,
+  cancelCanvasWorkspaceTask,
+} from './workspace/canvasWorkspaceTaskAdapter'
+export { projectPendingImageExecutionEdges } from './pending-execution/edgeProjection'
+export { collectPendingImageTasks } from './pending-execution/taskSnapshot'

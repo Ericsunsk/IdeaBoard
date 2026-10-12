@@ -1,27 +1,34 @@
 import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
-import { useCanvasGraphHistory } from '../../graph-editing/mutations/useCanvasGraphHistory.ts'
-import { useBoardAutosave, createBoardSyncCoordinator, type SaveStatus } from '../../board-session'
+import { useCanvasGraphHistory } from '../../graph-editing'
+import {
+  useBoardAutosave,
+  createBoardSyncCoordinator,
+  type SaveStatus,
+  type BoardSession,
+} from '../../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphActions,
   type CanvasVueFlowGraphAdapter,
-} from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+} from '../../../session/flow-adapter'
 import {
   createCanvasGraphSessionRuntime,
   type CanvasGraphSessionRuntime,
 } from './canvasGraphSessionRuntime'
-import { useCanvasGroupRuntime } from '../../graph-editing/groups/useCanvasGroupRuntime.ts'
+import { useCanvasGroupRuntime } from '../../graph-editing'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
-import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
-import type { BoardSession } from '../../board-session'
+import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycle,
 } from '../../../session/flow-adapter'
-import { type PendingImageExecutionCore, type PendingImageExecutionLease } from '../../execution/pending-execution/core'
-import { projectPendingImageExecutionEdges } from '../../execution/pending-execution/edgeProjection'
+import {
+  type PendingImageExecutionCore,
+  type PendingImageExecutionLease,
+  projectPendingImageExecutionEdges,
+} from '../../execution'
 import type { CanvasRendererSelectableElement } from '../model.ts'
 import {
   preserveCanvasRendererSelection,

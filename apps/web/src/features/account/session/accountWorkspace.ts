@@ -1,9 +1,9 @@
 import { computed, type MaybeRefOrGetter } from 'vue'
 // Workspace selection for the account surface (W2 transports).
 //
-// Deep import (not the workspace entrypoint): the entrypoint re-exports the
-// workspace shell, which itself imports the account feature, so going
-// through it would close a module cycle (`no-circular`). The chain below
+// The selection public subpath avoids the Workspace shell entrypoint,
+// which imports the account feature and would close a module cycle
+// (`no-circular`). The chain below
 // (`selection/workspaceContext -> selection/workspaceResource`) never touches
 // account, matching the existing board precedent.
 import { useWorkspaceSelection } from '../../workspace/selection/workspaceContext'

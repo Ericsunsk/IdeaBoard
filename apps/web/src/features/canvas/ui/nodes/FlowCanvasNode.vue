@@ -133,18 +133,13 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { NodeUiState, PromptNodeUiState } from '../../core/nodes/canvasNodeUi.ts'
 import type { FlowNodeData } from '../../core/nodes/flowTypes.ts'
-import { useFlowCanvasNodeAdapter } from '../../session/flow-adapter/projection/useFlowCanvasNodeAdapter'
-import type {
-  CanvasNodePresentationIntent,
-  FusionNodePresentationBinding,
-  ImageNodePresentationBinding,
-} from '.'
+import { useFlowCanvasNodeAdapter } from '../../session/flow-adapter'
+import type { CanvasNodePresentationIntent } from './canvasNodePresentation'
+import type { FusionNodePresentationBinding } from './fusionNodePresentation'
+import type { ImageNodePresentationBinding } from './imageNodePresentation'
 import { useFlowCanvasNodeIntents } from './useFlowCanvasNodeIntents'
-import {
-  resolveCanvasNodeUiScale,
-  useCanvasViewportContext,
-} from '../../session/flow-adapter/viewport/useCanvasViewportContext'
-import { useCanvasNodeUiStateContext } from '../../session/flow-adapter/handles/useCanvasNodeUiStateContext'
+import { resolveCanvasNodeUiScale, useCanvasViewportContext } from '../../session/flow-adapter'
+import { useCanvasNodeUiStateContext } from '../../session/flow-adapter'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 import { FusionNode, ImageNode, PromptNode } from './workflows'
 

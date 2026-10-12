@@ -13,7 +13,7 @@ import {
   type CanvasPoint,
   type CanvasRect,
 } from '../../../core/graph/canvasGroupGeometry.ts'
-import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 
 type ActiveGroupDrag = {
   transaction: CanvasGraphTransaction

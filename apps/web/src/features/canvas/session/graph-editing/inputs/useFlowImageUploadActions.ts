@@ -13,7 +13,7 @@ import { buildMediaBrowserURL, type MediaRef } from '../../../../../core/media/m
 import { userFacingErrorCopy } from '../../../../../core/errors/errorCatalog'
 import { i18n } from '../../../../../core/i18n'
 import { resolveImageNodeFrameSize } from '../../../../board/ports/canvas'
-import { readCurrentBoardIdRef } from '../../board-session/currentBoardId.ts'
+import { readCurrentBoardIdRef } from '../../board-session'
 import type { CanvasGraphNodeIdForKind } from '../../../core/graph'
 import type { FlowLocalUploadState } from '../../../core/nodes/flowTypes.ts'
 

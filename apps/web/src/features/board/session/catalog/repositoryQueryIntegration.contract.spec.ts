@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
-import { createBoardSessionRepository } from '../../../canvas/session/board-session/repository'
+import { createBoardSessionRepository } from '../../../canvas/session/board-session'
 import { queryClient } from '../../../../core/query/queryClient'
 import { clearStoredAuth } from '../../../../core/utils/auth'
 import { resetWorkspaceEventStreamsForTests } from '../../../../api/workspaceEventStream'
@@ -8,12 +8,10 @@ import { getWorkspaceSelectionStore } from '../../../workspace'
 import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
-} from '../../testing/factories'
-import {
   addRemoteBoardFixture,
   makePromptBoardState,
   primeAuthenticatedWorkspace,
-} from '../../testing/syncFixtures'
+} from '../../testing'
 import { getBoardState, replaceBoardStateMap, setBoardState } from '../persistence/state'
 import { boardQueryKeys } from '../sync/boardQueryKeys'
 import {

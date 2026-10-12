@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ImageNodeAction } from '../../core/nodes/imageActionRegistry.ts'
 import type { OutpaintDragAnchor } from '../../tools/outpaint/session/useImageOutpaintOverlay.ts'
 import type { CanvasNodePresentationIntent } from '../nodes'
-import type { FlowSnapshotParamPatch } from '../../session/flow-adapter/projection/flowSnapshotParamMutations.ts'
+import type { FlowSnapshotParamPatch } from '../../session/flow-adapter'
 import { createCanvasNodePresentationIntentRouter } from './createCanvasNodePresentationIntentRouter'
 
 type RoutingCase = {

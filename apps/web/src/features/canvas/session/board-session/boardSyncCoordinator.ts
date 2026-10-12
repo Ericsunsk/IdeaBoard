@@ -11,10 +11,7 @@ import {
 } from './useBoardSession'
 import { i18n } from '../../../../core/i18n'
 import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
-import {
-  measureCanvasPerf,
-  measureCanvasPerfAsync,
-} from '../browser/canvasPerfProbe.ts'
+import { measureCanvasPerf, measureCanvasPerfAsync } from '../browser/canvasPerfProbe.ts'
 import { rebaseStabilizedMedia } from './boardSyncMediaReconciliation'
 
 export type SaveStatus =

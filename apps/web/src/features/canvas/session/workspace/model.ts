@@ -1,10 +1,7 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { ComputedRef, Ref } from 'vue'
 import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../../board/ports/canvas'
-import type {
-  CanvasGroupRuntimeCommands,
-  CanvasGroupRuntimeView,
-} from '../graph-editing/groups/useCanvasGroupRuntime.ts'
+import type { CanvasGroupRuntimeCommands, CanvasGroupRuntimeView } from '../graph-editing'
 import type { CanvasVueFlowConnectionAdapter } from '../../session/flow-adapter'
 import type { CanvasGraphNodeIdForKind } from '../../core/graph'
 import type { CanvasImageWorkflow } from '../image-workflow'

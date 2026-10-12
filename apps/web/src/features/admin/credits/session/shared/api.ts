@@ -25,10 +25,7 @@ import type {
   ListControlCreditLedgerParams,
 } from '../../../../../api/generated-query/control/model'
 import { requireContractData } from '../../../../../api/contractKernel'
-import {
-  buildControlMutationHeaders,
-  type ControlMutationOptions,
-} from '../../../shared'
+import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 
 // Reconciliation views (issue #809). The legacy `admin-credits` generated
 // client is gone; the same domain service now serves the Control Plane

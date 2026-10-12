@@ -1,4 +1,4 @@
-import type { CanvasGraphStoreTelemetry } from '../../../core/graph/canvasGraphStoreTelemetry'
+import type { CanvasGraphStoreTelemetry } from '../../../core/graph'
 import { recordCanvasInteractionCount } from '../../../session/browser/canvasInteractionMetrics'
 import { measureCanvasPerf } from '../../../session/browser/canvasPerfProbe'
 

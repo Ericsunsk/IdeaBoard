@@ -10,7 +10,7 @@ import {
   canvasBillingReadinessKey,
   type CanvasBillingReadinessStore,
 } from '../../../session/execution'
-import { createCanvasBillingReadinessStore } from '../../../session/execution/billing/readiness.ts'
+import { createCanvasBillingReadinessStore } from '../../../session/execution'
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void

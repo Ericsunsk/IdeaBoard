@@ -72,12 +72,10 @@ import {
   getImageActionStrengthConfig,
   useCanvasBillingReadinessStore,
   type ImageStrengthAction,
-} from '../../../session/execution'
-import type { ImageActionStrengthControl } from '../../../tools/image-tools'
-import {
   buildImageActionReadinessRequest,
   buildInpaintReadinessRequest,
-} from '../../../session/execution/commands/imageTaskRequests.ts'
+} from '../../../session/execution'
+import type { ImageActionStrengthControl } from '../../../tools/image-tools'
 import type { OutputResolution } from '../../../../../core/contracts/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import { NodeToolIconButton } from '../../nodes/primitives'

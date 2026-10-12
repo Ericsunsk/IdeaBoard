@@ -1,5 +1,9 @@
 // Public entrypoint for account feature
-export { MIN_IDEA_QUANTITY, normalizeIdeaQuantity, type IdeaQuantityParseResult } from './core/money'
+export {
+  MIN_IDEA_QUANTITY,
+  normalizeIdeaQuantity,
+  type IdeaQuantityParseResult,
+} from './core/money'
 export * from './core/return'
 export * from './core/chart'
 export * from './core/tabs'
@@ -25,7 +29,11 @@ export * from './session/overlay'
 export * from './session/chart'
 export * from './session/formatters'
 export * from './session/money'
-export { accountTabRegistry, resolveAccountTab, type AccountTabEntry } from './ui/shared/tabRegistry'
+export {
+  accountTabRegistry,
+  resolveAccountTab,
+  type AccountTabEntry,
+} from './ui/shared/tabRegistry'
 export { default as AccountDialogHost } from './ui/dialog/AccountDialogHost.vue'
 export { default as AccountDialog } from './ui/dialog/AccountDialog.vue'
 export { default as AccountDialogContent } from './ui/dialog/AccountDialogContent.vue'

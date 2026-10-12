@@ -3,14 +3,14 @@ import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError } from '../task-runner/taskResultErrors'
 import { createEmptyBoardSnapshot } from '../../../../board'
-import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
+import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
-} from '../../../session/flow-adapter/connections/flowGraphAdapterCommandSideEffects'
+} from '../../../session/flow-adapter'
 import { CanvasGraphSession } from '../../../core/graph'
-import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter/projection/bindCanvasGraphSessionProjection'
-import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
+import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
+import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import { BoardGraphSession } from '../pending-execution/boardGraphSession'
 import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { useImageWorkflowExecution } from './imageWorkflowExecution'

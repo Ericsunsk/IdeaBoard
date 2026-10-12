@@ -96,8 +96,7 @@ export const ADAPTER_SKIN_FILE = 'features/canvas/ui/styles/canvas-vue-flow-adap
 export const MINIMAP_FILE = 'features/canvas/ui/chrome/CanvasMiniMap.vue'
 export const HANDLE_RAIL_FILE = 'features/canvas/ui/nodes/FlowCanvasNodeHandleRail.vue'
 export const NODE_STAGE_FRAME_FILE = 'features/canvas/ui/nodes/primitives/NodeStageFrame.vue'
-export const STAGE_PRESENTATION_FILE =
-  'features/canvas/tools/image-tools/ui/StagePresentation.vue'
+export const STAGE_PRESENTATION_FILE = 'features/canvas/tools/image-tools/ui/StagePresentation.vue'
 export const RETOUCH_LAYER_ACTIONS_FILE = 'features/canvas/tools/retouch/ui/layers/LayerActions.vue'
 export const RETOUCH_HISTOGRAM_FILE =
   'features/canvas/tools/retouch/ui/shared/styles/retouch-histogram-plot.css'
