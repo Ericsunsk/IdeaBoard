@@ -241,10 +241,10 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | 入口                                                                                                              | 用途                                |
 | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| [CanvasPage.vue](./apps/web/src/features/canvas/presentation/pages/CanvasPage.vue)                                             | Canvas route page                   |
-| [executionContract.ts](./apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts)                   | 前端 workflow feature contract      |
-| [generationIntent.ts](./apps/web/src/features/canvas/application/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
-| [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/application/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
+| [CanvasPage.vue](./apps/web/src/features/canvas/ui/pages/CanvasPage.vue)                                             | Canvas route page                   |
+| [executionContract.ts](./apps/web/src/features/canvas/core/execution/executionContract.ts)                   | 前端 workflow feature contract      |
+| [generationIntent.ts](./apps/web/src/features/canvas/session/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
+| [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
 | [workspaceEventStream.ts](./apps/web/src/api/workspaceEventStream.ts)                                                          | Task SSE events                     |
 | [features.go](./apps/api/internal/workflow/features.go)                                                           | 后端 canonical feature contract     |
 
@@ -263,7 +263,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 | 入口                                                                                                     | 用途               |
 | -------------------------------------------------------------------------------------------------------- | ------------------ |
-| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/prompts/pages/AdminPromptConfigPage.vue) | Admin prompt UI    |
+| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue) | Admin prompt UI    |
 | [engine.go](./apps/api/internal/prompts/engine.go)                                                       | Prompt rendering   |
 | [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)                                     | 运营模板和变量规则 |
 

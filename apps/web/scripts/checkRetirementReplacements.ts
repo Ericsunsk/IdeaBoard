@@ -822,7 +822,7 @@ export function validateCanvasPurity(modules: PurityModule[]): RetirementViolati
     /^(?:vue(?:-router|-i18n)?|pinia|axios|ofetch|better-auth)(?:$|\/)|^@(?:tanstack|vue-flow)\//.test(
       target,
     ) ||
-    /^src\/(?:api\/generated-query|features\/(?:library|search)|features\/canvas\/(?:session|ui)|features\/canvas\/tools\/image-tools)(?:\/|$)/.test(
+    /^src\/(?:api\/generated-query|features\/(?:library|search)|features\/canvas\/(?:session|ui)|features\/canvas\/tools\/image-tools(?!\/core\/))(?:\/|$)/.test(
       target,
     ) ||
     (/^src\/features\/canvas\/tools\//.test(target) && !target.includes('/core/')) ||

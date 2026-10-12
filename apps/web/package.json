@@ -42,6 +42,8 @@
     "benchmark:canvas-interactions": "tsx scripts/canvasInteractionsBenchmark.ts",
     "preview": "vite preview",
     "smoke:user": "tsx scripts/userRouteSmoke.ts",
+    "test:routes-visual": "tsx scripts/captureRouteScreenshots.ts",
+    "test:routes-visual:check": "tsx scripts/captureRouteScreenshots.ts --check",
     "test": "vitest",
     "test:guardrails": "tsx scripts/checkTestGuardrails.ts && tsx scripts/checkBoardStateContractDrift.ts && npm run admin-collection:check-contract",
     "test:browser": "vitest run --config vitest.browser.config.ts",

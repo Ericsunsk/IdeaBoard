@@ -10,12 +10,12 @@ import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageResultAtIndexDisplay,
   type ImageSizeLoader,
-  type PendingImageResultExecution,
-} from '../result-nodes'
+} from '../result-nodes/resultDisplay'
+import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultExecution.ts'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
 import type { ClientActionIdFactory } from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/imageTaskRequests'
-import type { PendingImageExecutionCore } from '../pending-execution'
+import type { PendingImageExecutionCore } from '../pending-execution/core'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
 import { type CanvasTaskSubmissionAdapter } from './canvasTaskSubmissionAdapter'
 import { assemblePendingImageWorkflow } from '../runtime/pendingWorkflowAssembly'

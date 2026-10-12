@@ -1,6 +1,6 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type { PaymentReturnContext } from '../../core'
+import type { PaymentReturnContext } from '../../core/return'
 import { i18n } from '../../../../core/i18n'
 import { createUniqueId } from '../../../../core/utils/ids'
 import {

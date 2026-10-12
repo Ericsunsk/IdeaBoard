@@ -1,13 +1,6 @@
-import {
-  type BoardSnapshot,
-  type CanvasConnectionNodeKind,
-  DEFAULT_FUSION_BLEND_POINT,
-  FUSION_SLOT_LAYOUT,
-  getFusionLineAnchors,
-  getFusionSlotAnchors,
-  normalizeFusionBlendPoint,
-  resolveImageNodeStageHeight,
-} from '../../core'
+import { DEFAULT_FUSION_BLEND_POINT, FUSION_SLOT_LAYOUT, getFusionLineAnchors, getFusionSlotAnchors, normalizeFusionBlendPoint } from '../../core/document/fusionBlend'
+import { resolveImageNodeStageHeight } from '../../core/document/imageNodeSizing'
+import { type BoardSnapshot, type CanvasConnectionNodeKind } from '../../core/document/nodes'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../core/config/runtimeUrls'
 import {
   BLANK_BOARD_PREVIEW_BACKGROUND,

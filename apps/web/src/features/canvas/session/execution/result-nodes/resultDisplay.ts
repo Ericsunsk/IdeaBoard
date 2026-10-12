@@ -10,7 +10,7 @@ import { buildMediaBrowserURL, type MediaRef } from '../../../../../core/media/m
 import { normalizeNaturalSize } from '../../../../../core/media/imageDimensions'
 import { sleep } from '../../../../../core/utils/polling'
 
-export type ImageSize = {
+type ImageSize = {
   width: number
   height: number
 }

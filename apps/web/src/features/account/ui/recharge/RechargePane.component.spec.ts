@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
-import type { PaymentReturnContext } from '../../core'
+import type { PaymentReturnContext } from '../../core/return'
 import {
   paymentsContextKey,
   type PaymentPurchaseOptions,

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BoardWorkspaceUnavailableError } from '../adapters/boardsResource'
-import { BOARD_STATE_SCHEMA_VERSION } from '../../core'
+import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { joinSharedBoardByToken } from './joinSharedBoardWorkflow'
 

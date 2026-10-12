@@ -5,7 +5,7 @@ import {
   type CanvasGraphTransactionSummary,
 } from '../../../core/graph'
 import { resolveFlowNodeCanvasRef } from './flowSnapshotAdapter.ts'
-import type { PendingImageExecutionLease } from '../../execution/pending-execution'
+import type { PendingImageExecutionLease } from '../../execution/pending-execution/core'
 
 type CanvasGraphDeleteExecutionReleaseOptions = {
   summary: CanvasGraphTransactionSummary

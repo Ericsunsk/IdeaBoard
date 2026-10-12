@@ -22,7 +22,7 @@ import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
 } from '../../testing/factories'
-import { getBoardState, replaceBoardStateMap } from '../persistence'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { getBoardById, replaceBoards } from '../catalog/boards'
 import { boardDocumentOptions, boardListOptions } from './boardQueries'
 import { boardQueryKeys } from './boardQueryKeys'

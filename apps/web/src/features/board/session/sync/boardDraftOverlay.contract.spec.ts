@@ -17,7 +17,7 @@ import {
 } from '../../testing/syncFixtures'
 import { clearStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore } from '../../../workspace'
-import { getBoardState, replaceBoardStateMap } from '../persistence'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { listBoards, replaceBoards } from '../catalog/boards'
 import { hydrateBoardsFromServer } from './boardSync'
 

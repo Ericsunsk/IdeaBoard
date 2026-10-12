@@ -2,11 +2,9 @@ import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../core/graph'
-import {
-  BoardGraphSession,
-  collectPendingImageTasks,
-  createPendingImageExecutionCore,
-} from '../pending-execution'
+import { BoardGraphSession } from '../pending-execution/boardGraphSession'
+import { createPendingImageExecutionCore } from '../pending-execution/core'
+import { collectPendingImageTasks } from '../pending-execution/taskSnapshot'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import {

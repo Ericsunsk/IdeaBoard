@@ -377,7 +377,7 @@ describe('RetouchLevelsControl', () => {
     })
   })
 
-  it('re-translates level markers on locale switch without remount', async () => {
+  it('re-translates level markers and fields across all four locales without remount', async () => {
     renderLevelsControl({
       shadows: 10,
       midtones: 128,
@@ -386,11 +386,54 @@ describe('RetouchLevelsControl', () => {
       outputWhite: 255,
     })
 
-    expect(screen.getByRole('slider', { name: 'Blacks 10' })).toBeVisible()
+    const marker = screen.getByRole('slider', { name: 'Blacks 10' })
+    expect(marker).toBeVisible()
+    expect(screen.getByRole('spinbutton', { name: 'Blacks' })).toBeVisible()
 
-    await setUserLocale('es')
+    const cases = [
+      {
+        locale: 'es',
+        marker: 'Negros 10',
+        fields: ['Negros', 'Tonos medios', 'Blancos'],
+        output: 'Negros de salida',
+      },
+      {
+        locale: 'zh-CN',
+        marker: '暗部 10',
+        fields: ['暗部', '中间调', '高光'],
+        output: '输出暗部',
+      },
+      {
+        locale: 'ko',
+        marker: '블랙 10',
+        fields: ['블랙', '미드톤', '화이트'],
+        output: '출력 블랙',
+      },
+    ] as const
+
+    // Static baked labels would collapse every switch to the English copy.
+    const seenMarkers = new Set<string>(['Blacks 10'])
+    for (const item of cases) {
+      await setUserLocale(item.locale)
+      await nextTick()
+
+      // Same marker node, patched in place — no remount.
+      expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)
+      // LevelsFields re-translate via t(labelKey) from LEVEL_FIELD_LABEL_KEYS.
+      for (const field of item.fields) {
+        expect(screen.getByRole('spinbutton', { name: field })).toBeVisible()
+      }
+      expect(screen.getByRole('spinbutton', { name: item.output })).toBeVisible()
+      // No baked English field survives a non-English locale.
+      expect(screen.queryByRole('spinbutton', { name: 'Blacks' })).toBeNull()
+      expect(screen.queryByRole('slider', { name: 'Blacks 10' })).toBeNull()
+      seenMarkers.add(item.marker)
+    }
+    expect(seenMarkers.size).toBe(4)
+
+    await setUserLocale('en')
     await nextTick()
-
-    expect(screen.getByRole('slider', { name: 'Negros 10' })).toBeVisible()
+    expect(screen.getByRole('slider', { name: 'Blacks 10' })).toBe(marker)
+    expect(screen.getByRole('spinbutton', { name: 'Blacks' })).toBeVisible()
   })
 })

@@ -70,7 +70,7 @@ import { useTimeoutFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
-import type { PaymentReturnSource } from '../../core'
+import type { PaymentReturnSource } from '../../core/return'
 import type { PaymentOrderReturnStatus } from '../../session/payments/resource'
 
 const props = defineProps<{

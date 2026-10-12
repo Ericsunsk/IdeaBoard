@@ -15,7 +15,7 @@ import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../core/utils/workspaceId'
 import { PAGE_SIZES } from '../../../../core/config/pagination'
 import { getWorkspaceSelectionStore } from '../../../workspace'
-import type { BoardState } from '../../core'
+import type { BoardState } from '../../core/document/nodes'
 
 // Workspace board transport (Public Data Plane, `/api/v1`).
 //

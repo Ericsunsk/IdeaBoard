@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeBoardState } from '../../testing'
-import { BOARD_STATE_SCHEMA_VERSION } from '../../core'
+import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
 import {
   deserializeRemoteBoardStateEnvelope,
   normalizeBoardState,

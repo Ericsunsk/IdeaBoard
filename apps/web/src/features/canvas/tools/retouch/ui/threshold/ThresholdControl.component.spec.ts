@@ -177,14 +177,40 @@ describe('RetouchThresholdControl', () => {
     expect(events.updateParams).toHaveBeenCalledWith({ threshold: 63, invert: false })
   })
 
-  it('re-translates the threshold marker on locale switch without remount', async () => {
+  it('re-translates the threshold marker across all four locales without remount', async () => {
     renderThresholdControl({ threshold: 64, invert: false })
 
-    expect(screen.getByRole('slider', { name: 'Threshold 64' })).toBeVisible()
+    const marker = screen.getByRole('slider', { name: 'Threshold 64' })
+    expect(marker).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Invert threshold output' })).toBeVisible()
 
-    await setUserLocale('es')
+    const cases = [
+      { locale: 'es', marker: 'Umbral 64', invert: 'Invertir salida de umbral', tooltip: 'Invertir' },
+      { locale: 'zh-CN', marker: '阈值 64', invert: '反转阈值输出', tooltip: '反转' },
+      { locale: 'ko', marker: '임계값 64', invert: '임계값 출력 반전', tooltip: '반전' },
+    ] as const
+
+    // Static baked labels would collapse every switch to the English copy.
+    const seenMarkers = new Set<string>(['Threshold 64'])
+    for (const item of cases) {
+      await setUserLocale(item.locale)
+      await nextTick()
+
+      // Same range node, patched in place — no remount.
+      expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)
+      const invertButton = screen.getByRole('button', { name: item.invert })
+      expect(invertButton).toBeVisible()
+      expect(invertButton.querySelector('.canvas-tool-tooltip')?.textContent?.trim()).toBe(
+        item.tooltip,
+      )
+      // No baked English marker survives a non-English locale.
+      expect(screen.queryByRole('slider', { name: 'Threshold 64' })).toBeNull()
+      seenMarkers.add(item.marker)
+    }
+    expect(seenMarkers.size).toBe(4)
+
+    await setUserLocale('en')
     await nextTick()
-
-    expect(screen.getByRole('slider', { name: 'Umbral 64' })).toBeVisible()
+    expect(screen.getByRole('slider', { name: 'Threshold 64' })).toBe(marker)
   })
 })

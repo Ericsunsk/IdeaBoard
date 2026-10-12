@@ -3,7 +3,7 @@ import type { CanvasFeedback } from '../useCanvasFeedback.ts'
 import type { CanvasVueFlowAdapter } from '../../../session/flow-adapter'
 import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'
 import type { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
-import type { PendingImageExecutionCore } from '../../execution/pending-execution'
+import type { PendingImageExecutionCore } from '../../execution/pending-execution/core'
 
 type CreateCanvasWorkspaceImageWorkflowOptions = {
   board: ReturnType<typeof useBoardRuntime>

@@ -39,9 +39,9 @@ type UsePendingImageResultNodesOptions = {
   isNodeExecutionActive: (nodeId: string) => boolean
 }
 
-export type PendingImageResultOptions = ImageExecutionResultOptions
+type PendingImageResultOptions = ImageExecutionResultOptions
 
-export type PendingImageResultReservationParams = {
+type PendingImageResultReservationParams = {
   source: ImageExecutionInput
   sourceNodeId: string
   outputCount: number
@@ -63,7 +63,7 @@ export type PendingImageResultExecution = {
   removePendingResults: (resultNodeIds: readonly string[]) => void
 }
 
-export type PendingImageResultReservation = {
+type PendingImageResultReservation = {
   resultNodeIds: string[]
 }
 

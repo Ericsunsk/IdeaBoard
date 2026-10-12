@@ -198,16 +198,16 @@ import { authTransport } from '../session/transport'
 import { PASSWORD_LENGTH_LIMIT } from '../../../core/auth/passwordPolicy'
 import { resolveInteractiveControlState } from '../../../core/interaction/interactiveControlState'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
+import EmailField from './auth-fields/EmailField.vue'
+import OtpField from './auth-fields/OtpField.vue'
+import PasswordField from './auth-fields/PasswordField.vue'
 import {
-  EmailField,
-  OtpField,
-  PasswordField,
   emailFormatError,
   otpFieldError,
   passwordLengthFieldError,
   requiredFieldError,
   useAuthForm,
-} from './auth-fields'
+} from './auth-fields/useAuthForm'
 import { useAuthPanelControls } from './panelControls'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../core/auth/oauthProviders'
 import {

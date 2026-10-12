@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BoardState } from '../../core'
-import { BOARD_STATE_SCHEMA_VERSION } from '../../core'
+import type { BoardState } from '../../core/document/nodes'
+import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
 import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
@@ -13,7 +13,7 @@ import {
   BoardPayloadError,
   BoardWorkspaceUnavailableError,
 } from '../adapters/boardsResource'
-import { getBoardState, replaceBoardStateMap } from '../persistence'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
 import {
   hydrateBoardsFromServer,

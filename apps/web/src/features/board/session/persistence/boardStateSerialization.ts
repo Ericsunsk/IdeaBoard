@@ -1,15 +1,6 @@
-import {
-  BOARD_STATE_SCHEMA_VERSION,
-  assertLatestBoardSnapshot,
-  assertLatestBoardState,
-  normalizeLatestBoardState,
-  type LatestBoardStateNullableOptions,
-  type LatestBoardStateResultOptions,
-  type LatestBoardStateValidationResult,
-  type BoardStateEnvelopeContract,
-  type BoardSnapshot,
-  type BoardState,
-} from '../../core'
+import { assertLatestBoardSnapshot, assertLatestBoardState, normalizeLatestBoardState, type LatestBoardStateNullableOptions, type LatestBoardStateResultOptions, type LatestBoardStateValidationResult } from '../../core/document/latestBoardState'
+import { BOARD_STATE_SCHEMA_VERSION, type BoardSnapshot, type BoardState } from '../../core/document/nodes'
+import { type BoardStateEnvelopeContract } from '../../core/schema/boardStateEnvelopeContract'
 
 export type BoardStateSerializationTarget =
   'local-state' | 'local-preview-fallback' | 'session-snapshot' | 'remote-envelope'

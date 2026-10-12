@@ -4,7 +4,7 @@ P0 freeze, 2026-10-10. Checkpoint: `70e5758eddad32b588eaf641d1a470848283b0d4`.
 
 This document's schema-validated JSON block is the single source of truth for current/public and future entry contracts. Status changes and consumer rewrites must be reviewed atomically. Planned records are not accepted entries.
 
-- 406 records: 274 active (255 canonical, 19 cascading), 2 planned, 130 retired. P1 relocations preserve legacy exports and declare actual public subpaths; the historical P1 compatibility shims have been retired from the current tree; no active shim files remain. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P3 2026-10-11 deleted the workspace context shim (TTL expired, zero importers verified). P4 2026-10-11 activates the sole Admin shared barrel `shared/index.ts` and relocates 68 shared subpaths to core/session/ui. The 70 temporary Admin shared bridge shims were retired early after zero importers were verified; current vertical consumers use the shared barrel or canonical deep paths, and no P4 Admin bridge shims remain. P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
+- 406 records: 256 active (254 canonical, 2 cascading), 2 planned, 148 retired (123 canonical, 25 cascading). P1 relocations preserve legacy exports and declare actual public subpaths; the historical P1 compatibility shims have been retired from the current tree; no active shim files remain. P2 adds one registered workspace context shim (delete after P2, deletion owner workspace-p2) plus the selection port canonical seam; the unused resource wrapper is retired. P3 2026-10-11 deleted the workspace context shim (TTL expired, zero importers verified). P4 2026-10-11 activates the sole Admin shared barrel `shared/index.ts` and relocates 68 shared subpaths to core/session/ui. The 70 temporary Admin shared bridge shims were retired early after zero importers were verified; current vertical consumers use the shared barrel or canonical deep paths, and no P4 Admin bridge shims remain. P1 local acceptance passed; its gates are rerun after P2 changes. CI/checkpoint evidence remains unset.
 - Hypothetical API/theme root wrappers are replaced by direct public subpaths actually consumed today. CSS/token files move with the theme directory and remain governed by existing token contracts; no runtime barrel is introduced for CSS.
 - Explicit ownership scopes define external edges; nested scopes overlap intentionally and their totals must not be summed. For pure single-file entries ownership is exactly that file. The Board Canvas port owns Board, so private Board reexports do not count as outbound.
 - Frozen targets preserve source export/import behavior. Composite Admin/Canvas/account entries expose explicitly mapped exports and redirect the frozen external source consumers. Internal consumers remain within their owning scope; API/generated paths retain their P1a carve-out.
@@ -5448,7 +5448,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P7 variance: retained — Orval-generated barrel; hand deletion is forbidden, regenerates only via orval.config.ts (see knipGovernanceManifest generated-capability).",
       "sourcePaths": ["src/api/generated-query/control/index.ts"],
       "targetPath": "src/api/generated-query/control/index.ts",
       "ownershipScope": ["src/api/generated-query/control/index.ts"],
@@ -12718,7 +12718,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing.",
+      "notes": "P0-frozen direct public subpath relocation; preserve exported symbols and external runtime/type-only consumers. Source behavior/singleton identity must be preserved; generated files move only through configured regeneration/parent rename, never hand editing. P7 variance: retained — Orval-generated barrel; hand deletion is forbidden, regenerates only via orval.config.ts (see knipGovernanceManifest generated-capability).",
       "sourcePaths": ["src/api/generated-query/public/index.ts"],
       "targetPath": "src/api/generated-query/public/index.ts",
       "ownershipScope": ["src/api/generated-query/public/index.ts"],
@@ -31316,7 +31316,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/account/core/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -31329,9 +31329,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 79,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/account root; ",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/account root; Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 0 recorded external consumers).",
       "sourcePaths": ["src/features/account/core/index.ts"],
       "targetPath": "src/features/account/core/index.ts",
       "ownershipScope": ["src/features/account/"],
@@ -31696,7 +31696,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/account/session/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -31709,9 +31709,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 79,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/account root; sole consumer is the parent.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/account root; sole consumer is the parent. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 0 recorded external consumers).",
       "sourcePaths": ["src/features/account/session/index.ts"],
       "targetPath": "src/features/account/session/index.ts",
       "ownershipScope": ["src/features/account/"],
@@ -32253,7 +32253,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/account/ui/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -32266,9 +32266,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 79,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "declared knip entry surface, but sole consumer is the features/account parent; P3 decides promote-or-fold.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "declared knip entry surface, but sole consumer is the features/account parent; P3 decides promote-or-fold. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 0 recorded external consumers).",
       "sourcePaths": ["src/features/account/ui/index.ts"],
       "targetPath": "src/features/account/ui/index.ts",
       "ownershipScope": ["src/features/account/"],
@@ -38033,7 +38033,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/auth/components/auth-fields/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p2-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -38062,9 +38062,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 11,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/auth root; ",
+      "retirementPhase": "P7",
+      "deletionOwner": "p2-lane",
+      "notes": "re-exported by features/auth root; Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 3 recorded external consumers).",
       "sourcePaths": ["src/features/auth/components/auth-fields/index.ts"],
       "targetPath": "src/features/auth/components/auth-fields/index.ts",
       "ownershipScope": ["src/features/auth/components/auth-fields/"],
@@ -38349,7 +38349,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/core/document/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -38368,9 +38368,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by board/domain barrel.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by board/domain barrel. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 1 recorded external consumers).",
       "sourcePaths": ["src/features/board/core/document/index.ts"],
       "targetPath": "src/features/board/core/document/index.ts",
       "ownershipScope": ["src/features/board/domain/document/"],
@@ -38470,7 +38470,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/core/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -38564,9 +38564,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root; ",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root; Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 14 recorded external consumers).",
       "sourcePaths": ["src/features/board/core/index.ts"],
       "targetPath": "src/features/board/core/index.ts",
       "ownershipScope": ["src/features/board/domain/"],
@@ -38671,7 +38671,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/core/media/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -38690,9 +38690,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by board/domain barrel.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by board/domain barrel. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 1 recorded external consumers).",
       "sourcePaths": ["src/features/board/core/media/index.ts"],
       "targetPath": "src/features/board/core/media/index.ts",
       "ownershipScope": ["src/features/board/domain/media/"],
@@ -38704,7 +38704,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/core/schema/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -38723,9 +38723,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by board/domain barrel.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by board/domain barrel. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 1 recorded external consumers).",
       "sourcePaths": ["src/features/board/core/schema/index.ts"],
       "targetPath": "src/features/board/core/schema/index.ts",
       "ownershipScope": ["src/features/board/domain/schema/"],
@@ -39939,7 +39939,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/session/catalog/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -39963,9 +39963,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 2 recorded external consumers).",
       "sourcePaths": ["src/features/board/session/catalog/index.ts"],
       "targetPath": "src/features/board/session/catalog/index.ts",
       "ownershipScope": ["src/features/board/application/catalog/"],
@@ -40021,7 +40021,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/session/persistence/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -40095,9 +40095,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root; ",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root; Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 12 recorded external consumers).",
       "sourcePaths": ["src/features/board/session/persistence/index.ts"],
       "targetPath": "src/features/board/session/persistence/index.ts",
       "ownershipScope": ["src/features/board/infrastructure/persistence/"],
@@ -40123,7 +40123,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/session/preview/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -40172,9 +40172,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root; ",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root; Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 7 recorded external consumers).",
       "sourcePaths": ["src/features/board/session/preview/index.ts"],
       "targetPath": "src/features/board/session/preview/index.ts",
       "ownershipScope": ["src/features/board/infrastructure/preview/"],
@@ -40192,7 +40192,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/session/share-join/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -40211,9 +40211,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 1 recorded external consumers).",
       "sourcePaths": ["src/features/board/session/share-join/index.ts"],
       "targetPath": "src/features/board/session/share-join/index.ts",
       "ownershipScope": ["src/features/board/application/collaboration/"],
@@ -40225,7 +40225,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/session/sync/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -40249,9 +40249,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 2 recorded external consumers).",
       "sourcePaths": ["src/features/board/session/sync/index.ts"],
       "targetPath": "src/features/board/session/sync/index.ts",
       "ownershipScope": ["src/features/board/application/sync/"],
@@ -40368,7 +40368,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/board/ui/gallery/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p3-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -40387,9 +40387,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by features/board root.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p3-lane",
+      "notes": "re-exported by features/board root. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 1 recorded external consumers).",
       "sourcePaths": ["src/features/board/ui/gallery/index.ts"],
       "targetPath": "src/features/board/ui/gallery/index.ts",
       "ownershipScope": ["src/features/board/presentation/catalog/"],
@@ -41479,7 +41479,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/canvas/session/execution/pending-execution/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p5-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -41603,9 +41603,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 8,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by canvas execution seam; ",
+      "retirementPhase": "P7",
+      "deletionOwner": "p5-lane",
+      "notes": "re-exported by canvas execution seam; Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 22 recorded external consumers).",
       "sourcePaths": [
         "src/features/canvas/session/execution/pending-execution/index.ts"
       ],
@@ -41658,7 +41658,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/canvas/session/execution/result-nodes/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p5-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -41692,9 +41692,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 23,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "re-exported by canvas execution seam.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p5-lane",
+      "notes": "re-exported by canvas execution seam. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 4 recorded external consumers).",
       "sourcePaths": [
         "src/features/canvas/session/execution/result-nodes/index.ts"
       ],
@@ -42383,7 +42383,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
       "deletionOwner": null,
-      "notes": "legacy flat-scope tool seam;  cross-tool (inpaint) debt; P6 applies standard governance.",
+      "notes": "legacy flat-scope tool seam;  cross-tool (inpaint) debt; P6 applies standard governance. P7 variance: sub-barrel src/features/canvas/tools/image-tools/core/index.ts stays — it is the governed cross-tool seam for IMAGE_TOOL_CHROME_LAYOUT (consumer: retouch/session/useRetouchCoordinateAdapter.ts); deleting it would force retouch into a deep module import with no consumer gain.",
       "sourcePaths": ["src/features/canvas/tools/image-tools/index.ts"],
       "targetPath": "src/features/canvas/tools/image-tools/index.ts",
       "ownershipScope": ["src/features/canvas/tools/image-tools/"],
@@ -42689,7 +42689,6 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "cancelImageRetouchFinalRender",
         "createRetouchApplyCommands",
         "createRetouchChromeSource",
-        "deserializeImageRetouchPlan",
         "hasRenderableRetouchLayerStack",
         "isWebGLRetouchSupported",
         "renderImageRetouchFile",
@@ -42787,7 +42786,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "path": "src/features/canvas/ui/chrome/index.ts",
       "kind": "cascading",
       "confidence": "high",
-      "status": "active",
+      "status": "retired",
       "owner": "p5-lane",
       "activationPhase": "pre-P0",
       "scope": "intra-feature",
@@ -42806,9 +42805,9 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "targetFanOut": 21,
       "shims": [],
       "shimTtl": "1 phase (default)",
-      "retirementPhase": null,
-      "deletionOwner": null,
-      "notes": "star-forwards chrome/components; sole consumer is CanvasScreen.",
+      "retirementPhase": "P7",
+      "deletionOwner": "p5-lane",
+      "notes": "star-forwards chrome/components; sole consumer is CanvasScreen. Retired P7: barrel file deleted audit-clean (zero importers verified repo-wide; frozen record preserves 1 recorded external consumers).",
       "sourcePaths": ["src/features/canvas/ui/chrome/index.ts"],
       "targetPath": "src/features/canvas/ui/chrome/index.ts",
       "ownershipScope": ["src/features/canvas/ui/chrome/"],
@@ -58263,7 +58262,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/core/contracts/imageServices.ts`                                               | canonical | active  | p1-lane         | 3       | 29 → 29                  | 0 → 0                     |
 | `src/core/errors/errorCatalog.ts`                                                   | canonical | active  | p1-lane         | 5       | 30 → 30                  | 1 → 1                     |
 | `src/core/i18n/formatters.ts`                                                       | canonical | active  | p1-lane         | 5       | 21 → 21                  | 2 → 2                     |
-| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 117 → 117                | 5 → 5                     |
+| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 119 → 119                | 5 → 5                     |
 | `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
 | `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane         | 2       | 5 → 5                    | 5 → 5                     |
 | `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane         | 12      | 3 → 3                    | 0 → 0                     |
@@ -58305,15 +58304,15 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/core/utils/polling.ts`                                                         | canonical | active  | p1-lane         | 5       | 4 → 4                    | 0 → 0                     |
 | `src/core/utils/storage.ts`                                                         | canonical | active  | p1-lane         | 8       | 14 → 14                  | 0 → 0                     |
 | `src/core/utils/workspaceId.ts`                                                     | canonical | active  | p1-lane         | 2       | 8 → 8                    | 1 → 1                     |
-| `src/features/account/core/index.ts`                                                | cascading | active  | p3-lane         | 13      | 0 → 0                    | 79 → 79                   |
+| `src/features/account/core/index.ts`                                                | cascading | retired | p3-lane         | 13      | 0 → 0                    | 79 → 79                   |
 | `src/features/account/index.ts`                                                     | canonical | active  | p3-lane         | 130     | 4 → 4                    | 79 → 79                   |
-| `src/features/account/session/index.ts`                                             | cascading | active  | p3-lane         | 94      | 0 → 0                    | 79 → 79                   |
+| `src/features/account/session/index.ts`                                             | cascading | retired | p3-lane         | 94      | 0 → 0                    | 79 → 79                   |
 | `src/features/account/ui/chrome/SupportChannelQr.vue`                               | canonical | active  | p1-lane         | 1       | 1 → 1                    | 9 → 9                     |
 | `src/features/account/ui/chrome/UserAccountMenu.vue`                                | canonical | active  | p1-lane         | 1       | 6 → 6                    | 14 → 14                   |
 | `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                        | canonical | active  | p1-lane         | 1       | 1 → 1                    | 2 → 2                     |
 | `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane         | 5       | 8 → 8                    | 13 → 13                   |
 | `src/features/account/ui/chrome/userAccountMenu.types.ts`                           | canonical | active  | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
-| `src/features/account/ui/index.ts`                                                  | cascading | active  | p3-lane         | 23      | 0 → 0                    | 79 → 79                   |
+| `src/features/account/ui/index.ts`                                                  | cascading | retired | p3-lane         | 23      | 0 → 0                    | 79 → 79                   |
 | `src/features/admin/credits/wallets/index.ts`                                       | canonical | retired | p4-lane         | 1       | 1 → 1                    | 31 → 31                   |
 | `src/features/admin/prompts/core/promptVariables.ts`                                | canonical | active  | p1-lane         | 3       | 3 → 3                    | 1 → 1                     |
 | `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane         | 14      | 16 → 16                  | 1 → 1                     |
@@ -58387,30 +58386,30 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue`                     | canonical | active  | p4-lane         | 1       | 1 → 1                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`                   | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                       | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
-| `src/features/auth/components/auth-fields/index.ts`                                 | cascading | active  | p2-lane         | 10      | 3 → 3                    | 11 → 11                   |
+| `src/features/auth/components/auth-fields/index.ts`                                 | cascading | retired | p2-lane         | 10      | 3 → 3                    | 11 → 11                   |
 | `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane         | 28      | 29 → 29                  | 47 → 47                   |
-| `src/features/board/core/document/index.ts`                                         | cascading | active  | p3-lane         | 87      | 1 → 1                    | 0 → 0                     |
-| `src/features/board/core/index.ts`                                                  | cascading | active  | p3-lane         | 92      | 14 → 14                  | 0 → 0                     |
-| `src/features/board/core/media/index.ts`                                            | cascading | active  | p3-lane         | 1       | 1 → 1                    | 0 → 0                     |
-| `src/features/board/core/schema/index.ts`                                           | cascading | active  | p3-lane         | 4       | 1 → 1                    | 0 → 0                     |
+| `src/features/board/core/document/index.ts`                                         | cascading | retired | p3-lane         | 87      | 1 → 1                    | 0 → 0                     |
+| `src/features/board/core/index.ts`                                                  | cascading | retired | p3-lane         | 92      | 14 → 14                  | 0 → 0                     |
+| `src/features/board/core/media/index.ts`                                            | cascading | retired | p3-lane         | 1       | 1 → 1                    | 0 → 0                     |
+| `src/features/board/core/schema/index.ts`                                           | cascading | retired | p3-lane         | 4       | 1 → 1                    | 0 → 0                     |
 | `src/features/board/index.ts`                                                       | canonical | active  | p3-lane         | 195     | 48 → 48                  | 52 → 52                   |
 | `src/features/board/ports/canvas.ts`                                                | canonical | active  | p3-lane         | 83      | 95 → 95                  | 52 → 52                   |
-| `src/features/board/session/catalog/index.ts`                                       | cascading | active  | p3-lane         | 43      | 2 → 2                    | 0 → 0                     |
-| `src/features/board/session/persistence/index.ts`                                   | cascading | active  | p3-lane         | 13      | 12 → 12                  | 0 → 0                     |
-| `src/features/board/session/preview/index.ts`                                       | cascading | active  | p3-lane         | 5       | 7 → 7                    | 0 → 0                     |
-| `src/features/board/session/share-join/index.ts`                                    | cascading | active  | p3-lane         | 2       | 1 → 1                    | 0 → 0                     |
-| `src/features/board/session/sync/index.ts`                                          | cascading | active  | p3-lane         | 14      | 2 → 2                    | 0 → 0                     |
+| `src/features/board/session/catalog/index.ts`                                       | cascading | retired | p3-lane         | 43      | 2 → 2                    | 0 → 0                     |
+| `src/features/board/session/persistence/index.ts`                                   | cascading | retired | p3-lane         | 13      | 12 → 12                  | 0 → 0                     |
+| `src/features/board/session/preview/index.ts`                                       | cascading | retired | p3-lane         | 5       | 7 → 7                    | 0 → 0                     |
+| `src/features/board/session/share-join/index.ts`                                    | cascading | retired | p3-lane         | 2       | 1 → 1                    | 0 → 0                     |
+| `src/features/board/session/sync/index.ts`                                          | cascading | retired | p3-lane         | 14      | 2 → 2                    | 0 → 0                     |
 | `src/features/board/testing/index.ts`                                               | canonical | active  | p3-lane         | 7       | 10 → 10                  | 3 → 3                     |
-| `src/features/board/ui/gallery/index.ts`                                            | cascading | active  | p3-lane         | 14      | 1 → 1                    | 0 → 0                     |
+| `src/features/board/ui/gallery/index.ts`                                            | cascading | retired | p3-lane         | 14      | 1 → 1                    | 0 → 0                     |
 | `src/features/canvas/core/graph/index.ts`                                           | canonical | active  | p5-lane         | 58      | 59 → 59                  | 3 → 3                     |
-| `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
-| `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane         | 1       | 4 → 4                    | 1 → 1                     |
+| `src/features/canvas/core/nodes/imageActions.ts`                                    | canonical | active  | p1-lane         | 1       | 7 → 7                    | 1 → 1                     |
+| `src/features/canvas/core/nodes/serviceLabelKey.ts`                                 | canonical | active  | p1-lane         | 1       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/index.ts`                                                      | canonical | planned | p5-lane         | 2       | 2 → 2                    | 79 → 79                   |
 | `src/features/canvas/session/board-session/index.ts`                                | canonical | active  | p5-lane         | 9       | 5 → 5                    | 18 → 18                   |
 | `src/features/canvas/session/execution/board-attachment/index.ts`                   | canonical | active  | p5-lane         | 2       | 12 → 12                  | 0 → 0                     |
 | `src/features/canvas/session/execution/index.ts`                                    | canonical | active  | p5-lane         | 54      | 21 → 21                  | 54 → 54                   |
-| `src/features/canvas/session/execution/pending-execution/index.ts`                  | cascading | active  | p5-lane         | 27      | 22 → 22                  | 8 → 8                     |
-| `src/features/canvas/session/execution/result-nodes/index.ts`                       | cascading | active  | p5-lane         | 16      | 4 → 4                    | 23 → 23                   |
+| `src/features/canvas/session/execution/pending-execution/index.ts`                  | cascading | retired | p5-lane         | 27      | 22 → 22                  | 8 → 8                     |
+| `src/features/canvas/session/execution/result-nodes/index.ts`                       | cascading | retired | p5-lane         | 16      | 4 → 4                    | 23 → 23                   |
 | `src/features/canvas/session/execution/task-lifecycle/index.ts`                     | canonical | active  | p5-lane         | 3       | 1 → 1                    | 1 → 1                     |
 | `src/features/canvas/session/flow-adapter/index.ts`                                 | canonical | active  | p5-lane         | 20      | 20 → 20                  | 27 → 27                   |
 | `src/features/canvas/session/graph-editing/index.ts`                                | canonical | active  | p5-lane         | 10      | 5 → 5                    | 40 → 40                   |
@@ -58418,12 +58417,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
 | `src/features/canvas/session/media/preloadImage.ts`                                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/canvas/session/media/serviceImageActionText.ts`                       | canonical | active  | p1-lane         | 2       | 2 → 2                    | 3 → 3                     |
 | `src/features/canvas/session/workspace/index.ts`                                    | canonical | active  | p5-lane         | 2       | 4 → 4                    | 30 → 30                   |
-| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane         | 10      | 9 → 9                    | 24 → 24                   |
+| `src/features/canvas/tools/image-tools/index.ts`                                    | canonical | active  | p6-lane         | 13      | 9 → 9                    | 24 → 24                   |
 | `src/features/canvas/tools/inpaint/index.ts`                                        | canonical | active  | p5-lane         | 6       | 5 → 5                    | 15 → 15                   |
 | `src/features/canvas/tools/inpaint/session/fabric/index.ts`                         | canonical | active  | p5-lane         | 7       | 2 → 2                    | 6 → 6                     |
-| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane         | 34      | 13 → 13                  | 27 → 27                   |
+| `src/features/canvas/tools/retouch/index.ts`                                        | canonical | active  | p5-lane         | 37      | 13 → 13                  | 27 → 27                   |
 | `src/features/canvas/ui/chrome/components/index.ts`                                 | canonical | active  | p5-lane         | 6       | 1 → 1                    | 12 → 12                   |
-| `src/features/canvas/ui/chrome/index.ts`                                            | cascading | active  | p5-lane         | 6       | 1 → 1                    | 21 → 21                   |
+| `src/features/canvas/ui/chrome/index.ts`                                            | cascading | retired | p5-lane         | 6       | 1 → 1                    | 21 → 21                   |
 | `src/features/canvas/ui/nodes/groups/index.ts`                                      | canonical | active  | p5-lane         | 4       | 3 → 3                    | 10 → 10                   |
 | `src/features/canvas/ui/nodes/index.ts`                                             | canonical | active  | p5-lane         | 9       | 3 → 3                    | 50 → 50                   |
 | `src/features/canvas/ui/nodes/primitives/index.ts`                                  | canonical | active  | p5-lane         | 21      | 5 → 5                    | 15 → 15                   |

@@ -17,7 +17,7 @@ import { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'
 import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
 import { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
-import { createPendingImageExecutionCore } from '../../execution/pending-execution'
+import { createPendingImageExecutionCore } from '../../execution/pending-execution/core'
 import type { LibraryAssetMaterializer } from '../../../../library'
 
 export type UseCanvasWorkspaceRuntimeOptions = {

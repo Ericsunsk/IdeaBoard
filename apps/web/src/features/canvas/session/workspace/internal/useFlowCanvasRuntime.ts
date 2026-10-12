@@ -20,11 +20,8 @@ import {
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycle,
 } from '../../../session/flow-adapter'
-import {
-  projectPendingImageExecutionEdges,
-  type PendingImageExecutionCore,
-  type PendingImageExecutionLease,
-} from '../../execution/pending-execution'
+import { type PendingImageExecutionCore, type PendingImageExecutionLease } from '../../execution/pending-execution/core'
+import { projectPendingImageExecutionEdges } from '../../execution/pending-execution/edgeProjection'
 import type { CanvasRendererSelectableElement } from '../model.ts'
 import {
   preserveCanvasRendererSelection,

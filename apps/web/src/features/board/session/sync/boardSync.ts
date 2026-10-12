@@ -32,18 +32,10 @@ import {
   setBoardRevision,
   type BoardMeta,
 } from '../catalog/boards'
-import {
-  getBoardState,
-  normalizeBoardState,
-  replaceBoardStateMap,
-  serializeBoardState,
-} from '../persistence'
-import {
-  createEmptyBoardState,
-  InvalidBoardStateError,
-  type BoardStateValidationErrorContext,
-  type BoardState,
-} from '../../core'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
+import { normalizeBoardState, serializeBoardState } from '../persistence/boardStateSerialization'
+import { InvalidBoardStateError, type BoardStateValidationErrorContext } from '../../core/document/latestBoardState'
+import { createEmptyBoardState, type BoardState } from '../../core/document/nodes'
 import { queryClient } from '../../../../core/query/queryClient'
 import { QueryObserver } from '@tanstack/vue-query'
 import { workspaceQueryKeys } from '../../../workspace'

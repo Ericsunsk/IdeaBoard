@@ -13,11 +13,9 @@ import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/fl
 import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from '../../../session/flow-adapter/connections/flowGraphAdapterCommandSideEffects'
-import {
-  BoardGraphSession,
-  collectPendingImageTasks,
-  createPendingImageExecutionCore,
-} from '../../execution/pending-execution'
+import { BoardGraphSession } from '../../execution/pending-execution/boardGraphSession'
+import { createPendingImageExecutionCore } from '../../execution/pending-execution/core'
+import { collectPendingImageTasks } from '../../execution/pending-execution/taskSnapshot'
 
 type MutableHarnessNode = Node & {
   selected?: boolean

@@ -8,7 +8,7 @@ function makeBoard(id: string, name = id, updatedAt = 1) {
 describe('Boards Catalog public interface', () => {
   afterEach(() => {
     vi.doUnmock('../../session/catalog/repository')
-    vi.doUnmock('../../session/preview')
+    vi.doUnmock('../../session/preview/boardPreviewRefreshQueue')
     vi.doUnmock('./feedback/useFeedback')
     vi.resetModules()
   })
@@ -76,7 +76,7 @@ describe('Boards Catalog public interface', () => {
         dispose: vi.fn(),
       }),
     }))
-    vi.doMock('../../session/preview', () => ({
+    vi.doMock('../../session/preview/boardPreviewRefreshQueue', () => ({
       createBoardPreviewRefreshQueue: () => preview,
     }))
     vi.doMock('./useBoardFeedback', () => ({ useBoardFeedback: () => feedback }))

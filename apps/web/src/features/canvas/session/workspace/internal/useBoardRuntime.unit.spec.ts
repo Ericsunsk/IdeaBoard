@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { HOME_PATH } from '../../../../workspace/routePaths'
 import { useBoardRuntime } from './useBoardRuntime'
-import { createPendingImageExecutionCore } from '../../execution/pending-execution'
+import { createPendingImageExecutionCore } from '../../execution/pending-execution/core'
 
 const mocks = vi.hoisted(() => ({
   useBoardSession: vi.fn(),

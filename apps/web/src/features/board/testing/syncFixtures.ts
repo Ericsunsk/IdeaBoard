@@ -1,6 +1,6 @@
 import { setStoredAuth } from '../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../workspace'
-import { BOARD_STATE_SCHEMA_VERSION, type BoardState } from '../core'
+import { BOARD_STATE_SCHEMA_VERSION, type BoardState } from '../core/document/nodes'
 import { makeBoardState, type MockWorkspaceBoardApiState } from './factories'
 
 export function primeAuthenticatedWorkspace(workspaceId: string) {

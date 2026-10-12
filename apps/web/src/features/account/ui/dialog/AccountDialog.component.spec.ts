@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountDialog from './AccountDialog.vue'
 import { renderWithUser, screen } from '../../../../test/render'
 import { ibDialogMaskClass } from '../../../../theme/dialogMask'
-import { defaultAccountTab, type AccountTab } from '../../core'
+import { defaultAccountTab, type AccountTab } from '../../core/tabs'
 
 const DialogRootStub = defineComponent({
   props: {

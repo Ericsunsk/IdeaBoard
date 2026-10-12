@@ -14,7 +14,7 @@ import {
   makePromptBoardState,
   primeAuthenticatedWorkspace,
 } from '../../testing/syncFixtures'
-import { getBoardState, replaceBoardStateMap, setBoardState } from '../persistence'
+import { getBoardState, replaceBoardStateMap, setBoardState } from '../persistence/state'
 import { boardQueryKeys } from '../sync/boardQueryKeys'
 import {
   hydrateBoardsFromServer,

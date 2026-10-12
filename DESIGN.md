@@ -84,7 +84,7 @@ Contract rules:
 
 实现入口：
 
-- [executionContract.ts](./apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts)
+- [executionContract.ts](./apps/web/src/features/canvas/core/execution/executionContract.ts)
 - [features.go](./apps/api/internal/workflow/features.go)
 
 ### 3. Tasking 的事实源是 PostgreSQL + River
@@ -230,33 +230,23 @@ Dependency direction:
 
 匿名公开落地页不是独立 context：`/` 路由直接渲染 `features/canvas/presentation/pages/CanvasLandingPage.vue`，公开访问与 SEO 由 router meta 表达（见 [router/index.ts](./apps/web/src/app/router/index.ts)）。新增公开页面属于 Canvas presentation 层，不要为此新建 `public-site` 之类的平行 vertical。
 
-### 2. Complex Feature Layering Contract (Architecture Contract)
+### 2. Feature Layering Contract (Architecture Contract)
 
-> **Revision (ADR-0013, 2026-10-10):** the Tiered DDD four-layer mandate below
-> no longer applies to frontend code. Frontend uses the feature-first SaaS
-> layout (`core/` pure math+types / `session/` stateful orchestration+adapters
-> / `ui/` control-colocated views, one `index.ts` seam per scope); domain
-> purity is enforced only in `core/`. See
-> [ADR-0013](./docs/adr/0013-frontend-feature-first-saas-layout.md). Original
-> text retained for history.
+复杂业务特性使用 feature-first SaaS 布局（`core/` 纯类型与数学 / `session/` 状态编排与适配器 / `ui/` 按 control colocate 的视图，每个 scope 以根 `index.ts` 为唯一合法出口）。简单展示型特性保持轻量结构，不得为了满足模板创建空目录或空抽象：
 
-复杂业务特性在进行 DDD 物理重构或代码演进时，可采用如下分层契约。简单展示型特性保持轻量结构，不得为了满足模板创建空目录或空抽象：
-
-- **`domain/`（纯领域层）**：
-  - 拥有纯业务模型、实体与值对象、状态机转换纯函数、领域校验规则。
+- **`core/`（纯领域区，唯一强制纯净区）**：
+  - 拥有纯业务模型、实体与值对象、类型、状态机转换纯函数、领域校验规则与纯数学。
   - **Hard Constraint**：严禁导入 Vue 响应式 API（如 `ref`, `reactive`）、Vue Router、Pinia、TanStack Query 或网络传输层（Generated API DTOs）。
   - 核心领域规则和状态转换必须具备 focused、deterministic 的单元测试；这不等同于要求 100% 全量 coverage。
-- **`application/`（用例编排层）**：
-  - 拥有具体业务用例（Use Cases）与工作流编排 Composables（如 `useUserRecharge`, `useTaskExecution`）。
-  - 负责协调领域逻辑、资源适配器与交互状态；管理生命周期、轮询与缓存失效机制。
-- **`infrastructure/`（基础设施与适配层）**：
-  - 拥有网络传输、本地存储（IndexedDB/LocalStorage）、外部 SDK 与 API 资源适配器（Resource / Adapter）。
-  - 负责将传输层 DTO 翻译为特性领域模型（DTO <-> Domain Model mapping），集中处理 HTTP 错误归一化。
-- **`ui/`（视图呈现层）**：
-  - 拥有 Vue SFC 组件、页面和弹窗。
-  - 仅负责状态渲染、交互事件分发与动画，不直接包含复杂业务逻辑或网络请求。
-- **`ports/`（外部契约层，可选）**：
-  - 定义跨特性或外部依赖的反向接口契约，用于解耦强依赖或用于测试 Mock。
+- **`session/`（状态编排与适配区）**：
+  - 拥有具体业务用例与工作流编排 Composables（如 `useUserRecharge`, `useTaskExecution`）、`useXSession`/`useXMode`、coordinate/histogram/stage adapters、apply pipelines 与 runtime render handoffs。
+  - 负责协调领域逻辑、资源适配器与交互状态；管理生命周期、轮询与缓存失效机制。可以导入 Vue 响应式与 `core/`；拥有 reactivity、lifecycle 与 IO 边界。
+- **`ui/`（视图呈现区，按 control colocate）**：
+  - 拥有 Vue SFC 组件、页面和弹窗；一个 control 一个目录（SFC、local helpers 与 specs colocate）。
+  - 仅负责状态渲染、交互事件分发与动画，不直接包含复杂业务逻辑或网络请求。跨 control 契约收口到 `ui/` 根或 `core/`。
+- **Seam**：每个 scope 的根 `index.ts` 是唯一合法跨 scope 出口（model 类型、session 入口、apply/chrome 工厂与 chrome 组件的 named re-exports）；scope 内部保持 private，禁止跨 tool scope 深层导入。
+
+布局决策记录见 [ADR-0013](./docs/adr/0013-frontend-feature-first-saas-layout.md)（bounded-context map 不变）。
 
 ### 3. 状态归属契约 (State Ownership Contract)
 
@@ -290,10 +280,10 @@ Vue UI -> application use case -> resource/adapter -> generated API
 
 当对一个高复杂度模块执行绞杀者迁移（Strangler Migration）时，只有满足以下条件才视作完成：
 
-1. 对采用分层的复杂特性，`domain` 零 Vue 响应式与网络传输依赖，且核心规则通过独立 Unit Tests 验证。（**Revision, ADR-0013:** 新迁移范围按 `core/` 纯数学与类型执行此条，`session/` 允许 Vue 响应式。）
-2. `application` 独立拥有用例编排与错误/加载态处理。
-3. `infrastructure` 收敛所有外部 API 调用与 DTO 转换。
-4. `ui` 纯化为展示与交互。
+1. 复杂特性的 scope `core/` 零 Vue 响应式与网络传输依赖（`session/` 允许 Vue 响应式），且核心规则通过独立 Unit Tests 验证。
+2. `session/` 独立拥有用例编排与错误/加载态处理（lifecycle、轮询与缓存失效）。
+3. 外部 API 调用与 DTO 转换收敛到 `session/` 的 adapters/resources；传输层 DTO 不得进入 `core/`。
+4. `ui/` 纯化为展示与交互。
 5. 核心状态机转换（Task 生命周期、支付收银台、Board 同步等）拥有确定性测试覆盖。
 6. 特性通过根目录 `index.ts` 或明确的 public subpath 暴露清晰公共 API，移除所有废弃旧门面（Facade）和无引用的兼容路径。
 
@@ -301,10 +291,9 @@ Vue UI -> application use case -> resource/adapter -> generated API
 
 为保持工程架构一致性、可预测性与长期整洁度，全库执行统一的目录组织、文件命名与边界导出治理标准：
 
-1. **分级架构范式 (Tiered DDD Architecture)**：
-   - **重度核心子域**（如 `board`, `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
+1. **特性优先范式 (Feature-first layout)**：
+   - **复杂特性域**（如 `board`, `canvas`, `search`, `account`, `admin`）：采用 `core/` / `session/` / `ui/` 三区（`core/` 纯类型与数学，`session/` 状态编排与适配器，`ui/` 按 control colocate），每个 scope 以根 `index.ts` 为唯一合法出口。细节见 [ADR-0013](./docs/adr/0013-frontend-feature-first-saas-layout.md)。
    - **轻量特性模块**（如 `legal`, `auth`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
-   - **Revision (ADR-0013, 2026-10-10):** 前端新迁移范围改用 feature-first SaaS 三区（`core/` / `session/` / `ui/` + 按 control colocate + `index.ts` 缝），替代本条对前端的 4 层硬性要求；原文保留，细节见 [ADR-0013](./docs/adr/0013-frontend-feature-first-saas-layout.md)。
 
 2. **文件与目录命名规范 (Naming Conventions)**：
    - **目录命名**：全小写短横线 `kebab-case`（如 `board/`, `image-tools/`, `workspace-runtime/`）。
@@ -315,7 +304,7 @@ Vue UI -> application use case -> resource/adapter -> generated API
 3. **消除前缀冗余守则 (Anti-Stuttering Rule)**：
    - **严禁在子文件/子目录内重复父级目录名前缀**。
    - 错误范式（Stuttering）：`features/library/libraryResource.ts`、`features/canvas/retouch/utils/retouchCurves.ts`、`features/board/catalog/boardCatalog.ts`。
-   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/core/kinds/curves.ts`、`features/board/presentation/catalog/contract.ts`。
+   - 正确范式（Clean）：`features/library/resource.ts`、`features/canvas/tools/retouch/core/kinds/curves.ts`、`features/board/ui/catalog/contract.ts`。
    - **防命名冲突机制**：跨模块向外暴露能力时，必须通过特性的根 `index.ts` 进行语义清晰的 Named Export（例如 `export { createLibraryResource } from './resource'`），在消费方上下文保证语义清晰，无需在内部文件名冗余堆叠前缀。
 
 4. **公共 API 出口与边界隔离 (Public API Seams & Boundary Enforcement)**：

@@ -122,7 +122,7 @@ import {
   type AccountTab,
 } from '../shared/tabRegistry'
 import { useProfileFeedback } from '../../session/profile/useProfileFeedback'
-import type { PaymentReturnContext } from '../../core'
+import type { PaymentReturnContext } from '../../core/return'
 import {
   accountCloseButtonClass,
   accountContentPaneClass,

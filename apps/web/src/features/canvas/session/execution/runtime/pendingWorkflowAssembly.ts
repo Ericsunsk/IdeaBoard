@@ -5,13 +5,15 @@ import type { TaskImageResult } from '../../../../../core/query/taskResult'
 import type { CanvasGraphStore } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import { loadImageSizeFromUrl } from '../media/imageSize'
-import type { PendingImageExecutionCore } from '../pending-execution'
+import type { PendingImageExecutionCore } from '../pending-execution/core'
 import {
   resolveTaskImageResultAtIndexDisplay,
-  usePendingImageResultExecution,
   type ImageSizeLoader,
+} from '../result-nodes/resultDisplay'
+import {
+  usePendingImageResultExecution,
   type PendingImageResultExecution,
-} from '../result-nodes'
+} from '../result-nodes/usePendingImageResultExecution.ts'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
 import {
   createCanvasTaskClientActionId,

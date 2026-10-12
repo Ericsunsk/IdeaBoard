@@ -1,11 +1,7 @@
 /// <reference types="node" />
 
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ibFormInputClass, ibFormInputErrorClass } from './formControls'
-
-const src = (...parts: string[]) => readFileSync(resolve(process.cwd(), 'src', ...parts), 'utf8')
 
 /**
  * User-side form inputs (everything except the search bar) keep the Admin
@@ -34,15 +30,11 @@ describe('User form input contract', () => {
   // (scripts/checkThemeContractRetirements.ts, rule redeem-error-wiring),
   // which asserts the aria-describedby -> id -> role="alert" linkage.
 
-  it('gives the canvas prompt textarea a visible focus ring', () => {
-    // Borderless and transparent by design, so the ring is the only focus
-    // indication keyboard users get.
-    const composer = src(
-      'features/canvas/ui/nodes/primitives',
-      'PromptComposerControls.vue',
-    )
-    expect(composer).toContain('focus-visible:ring-ring/20')
-  })
+  // P5 retirement (computed-style/fef79256): the "gives the canvas prompt
+  // textarea a visible focus ring" source-string assertion is replaced by
+  // the computed-style browser contract
+  // (`features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts`),
+  // which asserts the rendered textarea ring paint rides the live ring token.
 
   it('keeps the shared error chrome on the user danger tokens', () => {
     // `!` is load-bearing: the base chrome's hover border (0,2,0) otherwise

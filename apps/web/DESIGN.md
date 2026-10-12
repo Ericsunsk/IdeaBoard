@@ -7,7 +7,7 @@ It is not a product design essay, system architecture doc, API contract, or loca
 ## Read Before UI Work
 
 1. Read this file for UI rules.
-2. Read [../../DESIGN.md](../../DESIGN.md) for system contracts, Frontend Context Map, Architecture Contract, and DDD layering rules.
+2. Read [../../DESIGN.md](../../DESIGN.md) for system contracts, Frontend Context Map, Architecture Contract, and feature-first layout rules.
 3. Read [../../DEVELOPMENT.md](../../DEVELOPMENT.md) for commands and code entry points.
 4. Read [src/features/canvas/CONTEXT.md](./src/features/canvas/CONTEXT.md) for Canvas domain language.
 
@@ -335,17 +335,14 @@ DO NOT promote a component just because two places look similar. Similar visuals
 
 ## Directory Structure & File Naming Governance
 
-Follow the system architecture contract in [../../DESIGN.md](../../DESIGN.md) for full DDD details. In `apps/web`, all modules MUST adhere to:
+Follow the system architecture contract in [../../DESIGN.md](../../DESIGN.md) for the feature-first layout. In `apps/web`, all modules MUST adhere to:
 
 - **Directories**: `kebab-case` (e.g., `board/`, `image-tools/`, `workspace-runtime/`).
 - **Vue SFC Components**: `PascalCase.vue` (e.g., `BoardCard.vue`, `CanvasScreen.vue`).
 - **Non-component TS Modules**: `camelCase.ts` (e.g., `useCatalog.ts`, `contract.ts`, `feed.ts`; do NOT use PascalCase for non-component files).
 - **Anti-Stuttering Rule**: MUST NOT repeat the parent directory name inside filenames (e.g., use `resource.ts` instead of `libraryResource.ts`, use `curves.ts` instead of `retouchCurves.ts`). Use named exports from the feature's root `index.ts` to disambiguate.
 - **Public API & Boundary Isolation**: Features that expose cross-feature APIs MUST use a root `index.ts`; route- or parent-owned internal features may keep explicit internal entrypoints. Outside modules MUST NOT deep-import private files or internal components across feature boundaries.
-- **Tiered DDD**: Complex core domains (`board`, `canvas`, `search`, `account`, `admin`) use layered structures (`domain/`, `application/`, `infrastructure/`, `presentation/` or `ui/`). Lightweight features stay flat.
-  - **Revision (ADR-0013, 2026-10-10):** the four-layer mandate above no longer
-    applies to frontend code; migrated tool/feature scopes use the SaaS
-    `core/` / `session/` / `ui/` layout below. Original rule retained for history.
+- **Feature-first layout**: Complex feature domains (`board`, `canvas`, `search`, `account`, `admin`) use the `core/` / `session/` / `ui/` zones with control-colocated views and one `index.ts` seam per scope (see Tool-Scoped SaaS Layout below). Lightweight features stay flat.
 
 ### Tool-Scoped SaaS Layout (core / session / ui)
 

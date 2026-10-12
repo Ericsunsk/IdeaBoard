@@ -1,14 +1,9 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../task-runner/taskResultErrors'
 import { i18n } from '../../../../../core/i18n'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
-import {
-  PendingImageMaterializationError,
-  collectPendingImageTasks,
-  type PendingImageExecutionCore,
-  type PendingImageMaterializationResult,
-  type PendingImageResolvedResult,
-  type PendingImageTaskSnapshot,
-} from '../pending-execution'
+import { type PendingImageResolvedResult } from '../pending-execution/boardGraphSession'
+import { PendingImageMaterializationError, type PendingImageExecutionCore, type PendingImageMaterializationResult } from '../pending-execution/core'
+import { collectPendingImageTasks, type PendingImageTaskSnapshot } from '../pending-execution/taskSnapshot'
 
 export type CanvasExecutionRecoveryResult = Readonly<{
   attachment: Readonly<{ boardId: string; epoch: number }>

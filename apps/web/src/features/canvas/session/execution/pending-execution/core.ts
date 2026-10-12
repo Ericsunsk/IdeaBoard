@@ -21,7 +21,6 @@ export type {
   PendingImageExecutionStatus,
   PendingImageExecutionFact,
   PendingImageExecutionLease,
-  PendingImageHydrationIdentity,
   PendingImageExecutionSnapshot,
   PendingImageExecutionRejectionReason,
   PendingImageExecutionTransition,

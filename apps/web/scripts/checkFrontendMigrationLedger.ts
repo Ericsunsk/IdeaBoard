@@ -347,8 +347,8 @@ function validateLedger(value: Ledger): Ledger {
       `${disposition}: measured count mismatch`,
     )
   requireCondition(
-    value.counts.retire === 403,
-    'Retirement denominator is 403 after the approved P3 final integration (P0 403 frozen; 20 search matchers retired via red-proven browser replacements; see ledger re-scope record)',
+    value.counts.retire === 421,
+    'Retirement denominator is 421 after the approved P7 close-out (P0 403 frozen; 20 search matchers retired via red-proven browser replacements; 18 frozen i18n candidates assigned P5 and retired via verified four-locale behavior replacements; see ledger re-scope records)',
   )
   requireCondition(
     value.quotas.find((row) => row.phase === 'P1b')?.R_p === 149,
@@ -866,7 +866,13 @@ function runFixtures(ledger: Ledger): void {
     [
       'candidate silently assigned',
       (value) => {
-        value.constraints.find((row) => row.disposition === 'frozen-i18n-candidate')!.phase = 'P5'
+        // All 18 frozen i18n candidates are assigned since the P7 close-out,
+        // so the fixture builds a synthetic silent assignment instead of
+        // depending on a live candidate: a frozen-i18n-candidate carrying a
+        // non-null phase must still be rejected.
+        const row = value.constraints[0]!
+        row.disposition = 'frozen-i18n-candidate'
+        row.phase = 'P5'
       },
     ],
     [

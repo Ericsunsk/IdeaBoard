@@ -2,7 +2,8 @@ import { TaskCancelledError } from '../task-runner/taskResultErrors'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../core/graph'
-import { BoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
+import { BoardGraphSession } from '../pending-execution/boardGraphSession'
+import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { createCanvasExecutionRecoveryCoordinator } from './canvasExecutionRecoveryCoordinator'
 
 function pendingSnapshot() {

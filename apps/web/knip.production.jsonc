@@ -31,7 +31,6 @@
     "src/app/router/index.ts!",
     "src/app/App.vue!",
     "src/features/canvas/index.ts!",
-    "src/features/canvas/tools/outpaint/index.ts!",
   ],
   "project": [
     // Production file set: TS + Vue SFC (Vue plugin default) + CSS.

@@ -10,7 +10,7 @@ import {
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { listBoards, replaceBoards } from './boards'
 import { createBoardRepository } from './repository'
-import { getBoardState, replaceBoardStateMap } from '../persistence'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import {
   boardScopeKey,
   getBoardScope,

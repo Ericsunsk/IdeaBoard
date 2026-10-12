@@ -7,12 +7,8 @@ import RechargePane from '../recharge/RechargePane.vue'
 import RewardsPane from '../rewards/RewardsPane.vue'
 import SecurityPane from '../security/SecurityPane.vue'
 import UsagePane from '../usage/UsagePane.vue'
-import {
-  defaultAccountTab,
-  resolveAccountTabKey,
-  type AccountTab,
-  type PaymentReturnContext,
-} from '../../core'
+import { defaultAccountTab, resolveAccountTabKey, type AccountTab } from '../../core/tabs'
+import type { PaymentReturnContext } from '../../core/return'
 
 export { defaultAccountTab, resolveAccountTabKey, type AccountTab }
 

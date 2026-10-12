@@ -8,10 +8,8 @@ import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter/
 import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../../core/graph'
 import { canvasGraphStoreTelemetryProbe } from '../../graph-editing/mutations/canvasGraphStoreTelemetryProbe'
-import {
-  BoardGraphSession,
-  type PendingImageExecutionCore,
-} from '../../execution/pending-execution'
+import { BoardGraphSession } from '../../execution/pending-execution/boardGraphSession'
+import { type PendingImageExecutionCore } from '../../execution/pending-execution/core'
 
 type CanvasGraphSessionRuntimeOptions = {
   nodes: Ref<Node[]>

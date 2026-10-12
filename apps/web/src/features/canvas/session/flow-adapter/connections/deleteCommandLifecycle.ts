@@ -14,7 +14,7 @@ import {
   type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
 import { releaseCanvasGraphDeleteExecutions } from '../projection/flowGraphDeleteProjection'
-import type { PendingImageExecutionLease } from '../../execution/pending-execution'
+import type { PendingImageExecutionLease } from '../../execution/pending-execution/core'
 
 type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 

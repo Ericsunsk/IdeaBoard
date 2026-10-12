@@ -9,7 +9,7 @@ import { useBoardHeaderActions } from '../../../ui/chrome/useBoardHeaderActions.
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
 import type { CanvasVueFlowGraphActions } from '../../../session/flow-adapter/projection/useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../useCanvasFeedback.ts'
-import type { PendingImageExecutionCore } from '../../execution/pending-execution'
+import type { PendingImageExecutionCore } from '../../execution/pending-execution/core'
 
 type BoardRuntimeFeedback = CanvasFeedback['boardSession']
 

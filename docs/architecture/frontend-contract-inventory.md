@@ -45,11 +45,11 @@ Reproduce from `apps/web`: `npx tsx scripts/checkFrontendMigrationLedger.ts`; ap
 | P6    |          6 |             5 | Not started                                           |
 | P7    |          0 |             5 | Coverage/finalization only; explicit zero scope       |
 
-Measured `R=403`, plus 18 frozen i18n candidates awaiting assignment; mandatory `B=57` distinct scenarios. At the P0 freeze, twenty-five existing observable scenarios have exact mappings and local verification evidence from the full non-browser test run; 32 scenarios were pending. Missing scenarios retain concrete expected assertions. The P3 Query trio has an accepted P2.5 design and is now bound to production Query ownership; original implementation-before red evidence and formal P3 acceptance remain pending. P7 cannot pass with pending requirements or unassigned i18n candidates.
+Measured `R=421` after the P7 close-out assignment (18 frozen i18n candidates assigned P5 and retired with verified four-locale behavior replacements; 6 ring retirements completed with verified browser replacements); mandatory `B=57` distinct scenarios, all verified locally in the working tree. At the P0 freeze, twenty-five existing observable scenarios have exact mappings and local verification evidence from the full non-browser test run; 32 scenarios were pending. Missing scenarios retain concrete expected assertions. The P3 Query trio has an accepted P2.5 design and is now bound to production Query ownership; original implementation-before red evidence and formal P3 acceptance remain pending. P7 close-out records zero pending behaviors and zero unassigned i18n candidates; formal P2.5/P3 acceptances remain separate and are not claimed.
 
 P1b has eight planned packages totaling 56 net working hours. The working-day baseline is 2026-10-12 through 2026-10-21; these are estimates, not actual hours or completed dates. This is the frozen estimate; current execution evidence is recorded in the ledger below. Calendar dates do not start a lane. Actual hours, completion dates, rolling HEAD, immutable green rollback SHA and CI evidence remain distinct. Fix-forward is limited to 8 net working hours or one working day, whichever comes first; the integrator then stops assigning packages until the plan owner chooses revert or replanning.
 
-All 680 measured `src/shared` files have destinations: 263 ordinary files are listed individually, and 417 generated files use a directory pattern, count and sorted source-path SHA-256. Generated drift verifies contents. Consumers refer to canonical Seam records when available; other files carry direct runtime/type cruiser evidence. Exact file overrides precede horizontal directory rules. Generic UI/browser/auth capabilities remain horizontal with documented reasons even when current consumers belong to one feature. All canonical CONTEXT paths are mapped; they remain English. Public export/surface/shim/fan targets belong only to `docs/frontend-seam-inventory.md`.
+All 679 measured `src/shared` files have destinations: 262 ordinary files are listed individually (the `iconButtonAccessibleName` self-map was dropped at P7 close-out: the file is deleted and all six of its retirement obligations are retired with verified replacements), and 417 generated files use a directory pattern, count and sorted source-path SHA-256. Generated drift verifies contents. Consumers refer to canonical Seam records when available; other files carry direct runtime/type cruiser evidence. Exact file overrides precede horizontal directory rules. Generic UI/browser/auth capabilities remain horizontal with documented reasons even when current consumers belong to one feature. All canonical CONTEXT paths are mapped; they remain English. Public export/surface/shim/fan targets belong only to `docs/frontend-seam-inventory.md`.
 
 Historical P1 audit correction, 2026-10-10: relocation preserves the original 494 frozen matcher IDs and `R=403`; the 90 relocated P1b source constraints remain retirement obligations within the original `R_p=149`. Three ownership-path-only assertion updates have separate reviewed mappings. Current destinations are checked individually; generated targets project back to the original 417 source paths and SHA-256. The new theme keyboard spec is inventoried separately (28 behavior matchers and five source-text constraints pending at that audit; their completed retirement is recorded below) without changing frozen IDs or quotas.
 
@@ -62,6 +62,8 @@ P2.5 evidence re-anchor, 2026-10-11 (integrator): the P3 board lane migrated the
 P3 final integration, 2026-10-11 (plan-owner APPROVED deletion of all 20, not retention): the 20 retained searchChrome matchers retire with red-proven computed-style browser replacements passing first (`src/features/search/searchChromeStyle.browser.spec.ts` 5/5 chromium green, rerun by the integrator). Group coverage: batch-dock test + SearchPage hover-border test cover 9a88ea3e (5); popover-treatment test covers b149bb99 (7); overlay-gutter test covers 918f5c82 (4); overlay-btn-fills test covers e1406aae (4). Bookkeeping decision per quota formulas (`R_p` must equal `len(retirementIds)`; `counts` must equal measured dispositions): restore the P0-frozen denominators rather than keeping `R_p=31` with 20 additionally-retired outliers — counts retire 383->403 and retain-behavior 78->58; P3 `R_p` 31->51 with the 20 IDs restored to `retirementIds`. All 51 frozen P3 IDs (494 total, `R=403`) preserved; only dispositions/statuses changed. No silent shrink at any step (51->31 recorded with rationale; 31->51 restores the frozen denominator with this approval record). Formal P3 acceptance still pending.
 
 P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment authority; desktop plan v4 §5.9 + §6 read-only): the admin target root is 7 domains (`credits`, `models`, `monitor`, `prompts`, `settings`, `statistics`, `users`) plus `shared` (plus `app` shell for routes/login/layout). `storage/` as an independent vertical is removed: provider/profile ownership moves to `settings/session/storage` with cards in `settings/ui/cards/storage`. `payments/` as an independent vertical is removed: order query/refund presentation moves to `credits/core/orders` with resources in `credits/session/orders` and views in `credits/ui/orders`; Stripe configuration moves to `settings/session/payment` with cards in `settings/ui/cards/payment`. The `pages/` directory is gone: the login assembly moves to `app/login/` (`AdminLoginPage.vue`, `messages.ts`, `useAdminLoginFeedback.ts`). Proposal Phase 1 moves (storage→settings/storage, stripe→settings/payment, orders→credits/orders, `payments/` + `pages/` dirs gone, login→app/login) and Phase 2 moves (three-tier `core/`/`session/`/`ui/` for `prompts`, `statistics`, `users`, `credits`, and `settings`) are complete with no business logic, moves, or renames beyond the listed relocations. `support-channels/` is renamed to `support/` (`settings/session/support/` + `settings/ui/cards/support/`). The `credits/wallets/index.ts` barrel is deleted audit-clean (zero importers; `AdminUsersPage` imports `credits/ui/wallets/AdminUserWalletDialog.vue` directly; seam flipped to retired). Shared regroup `shared/{lib,composables,components,logos,validation}/` → `shared/{core,session,ui}/` is complete. `core/` stays flat by owner ruling (no subdirs); `session/` keeps per-scope subdirs (`brand`, `collection`, `feedback`, plus vertical scopes) and `ui/` keeps group dirs (`form`, `feedback`, `shell`, `chart`, `toolbar`, `popover`, `tabs`). Governance matchers, `CONTEXT.md` refs, and the Knip/boolean baselines are re-keyed to the final tree; P4 bridge shims are retired early with zero importers verified.
+
+P7 close-out, 2026-10-12 (plan-owner pre-approvals i-iv; desktop plan v4 §5.12 + §6 + §6.5 read-only; working-tree evidence only, no CI/checkpoint claim): (a) the 18 frozen i18n candidates are assigned P5 and retired with verified rail/control four-locale behavior replacements re-run green in the current tree (rail 3 + curves 5 + levels 8 + threshold 7 tests across en/zh-CN/es/ko); denominators honestly revised, never shrunk: counts retire 403->421, frozen-i18n-candidate 18->0, P5 `R_p` 191->209 with the 18 IDs recorded; the P0 frozen 494 IDs are untouched and the `lint:migration-ledger` 403 denominator guard now pins 421. (b) The 6 ring retirements complete with verified computed-style browser replacements re-run green in real chromium (retouchFocusRing 4 + promptComposerRing 2); all 6 original source-string assertions verified gone from the source specs (only prose pointers remain). (c) The P3 trio flips to verified with production `repositoryQueryIntegration` (16 tests) + helper evidence (race 8, broadcast 13, conflict 8) re-run green; pre-integration red was not recorded and formal P2.5 acceptance/merge remain pending (recorded in each `missingEvidence`). (d) The 5 P7 behaviors flip to verified: tabs 8/8, table 7/7 (loading/empty live in the AdminTable consumer by design), touch 6/6 chromium, routes-visual 10/10 captures with manifest (0 pageErrors; 10 benign anonymous 401 console errors), browser-retry-quarantine factual retries=0/quarantined=0 from the 22-file/82-test browser run; P7 quota status not-started->verified-local. (e) Five verified behaviors re-anchored at identical scenario+assertion after P5 relocation (serviceLocale 8, CanvasScreen 2, pending-execution core 2, NodeToolIconButton 2); one self-inconsistent replacement fingerprint corrected to the algorithm hash (`source-9fcb2023e26d3a4f-1` evidence[1]); 30 supplemental retain-behavior rows inventoried for the two new direct-source specs (EffectActions.fourLocale 19, canvasExecutionOwnership 11). The stale `iconButtonAccessibleName` self-map is dropped (file deleted; all six obligations retired verified). Three deleted-barrel `syncDesign` artifacts are dropped with this rationale (account/core, account/session, board/session/sync index barrels no longer exist; P2.5 record otherwise untouched). Seventeen deleted-barrel seams flip to retired with per-seam deletion evidence; `image-tools/core/index.ts` and the two generated-query barrels stay with variance rationale (see seam inventory notes). Dated historical records (P1/P3 re-scope numbers, prior `verifiedRun` residuals) are left intact. C/R 494/421 with method (frozen constraint IDs / retire-disposition count, quota sums checked); S/B 406 seams by status with method (inventory status counter) / 57 behaviors all verified with method (ledger status counter).
 
 ```json migration-ledger
 {
@@ -110,10 +112,10 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     "exclusions": []
   },
   "counts": {
-    "retire": 403,
+    "retire": 421,
     "retain-behavior": 58,
     "retain-fixture": 15,
-    "frozen-i18n-candidate": 18
+    "frozen-i18n-candidate": 0
   },
   "quotas": [
     {
@@ -443,199 +445,217 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
     {
       "phase": "P5",
       "retirementIds": [
-        "source-13a11cdd28052579-1",
-        "source-9ee3a5c966eae383-1",
-        "source-373ce7f371788041-1",
         "source-02138458db63eaa9-1",
-        "source-53d87ffc378c0413-1",
-        "source-cb27f36e1b0a7f80-1",
-        "source-35e26008aadad368-1",
-        "source-9ef6fad418cbe77f-1",
-        "source-13b19badc81efd58-1",
-        "source-4e6e989762d73a1b-1",
-        "source-8e3c566d511df3a7-1",
-        "source-d880bb7135287592-1",
-        "source-6afca5dc03ee30d2-1",
-        "source-2f051ca903761065-1",
-        "source-e488601f448c871a-1",
-        "source-521edb4dab2d2fa4-1",
-        "source-88b49d390f914daa-1",
-        "source-cf435087c7b3738e-1",
-        "source-0d3e74c0973b8ac9-1",
-        "source-a7fd5fc7b03ac059-1",
-        "source-9dd6ef8aadece83a-1",
-        "source-4360ef867cad170c-1",
-        "source-5404f60b223237ef-1",
-        "source-9e1760faffc557fc-1",
-        "source-9434cad2a8ccca1b-1",
-        "source-882db99d507b5ee9-1",
-        "source-32f906d1a654a6de-1",
-        "source-baf5c9cee0d4d893-1",
-        "source-fc5dbdefe87aeac6-1",
-        "source-58cb63984ad83eb9-1",
-        "source-60d4e51f8c4813d2-1",
-        "source-91a639580721c761-1",
-        "source-62b52924bcc799d5-1",
-        "source-615ffabcf4ac1f34-1",
-        "source-498978357cd48d08-1",
-        "source-64fc397568dbb16e-1",
-        "source-f889ec29dc9581ef-1",
-        "source-5ff411e2b135da3e-1",
-        "source-55f59fee49593b3b-1",
-        "source-7e788375fbc8a351-1",
-        "source-1ecea638cb16a353-1",
-        "source-59a7f44cb620ac78-1",
-        "source-18a3a1d23775d13a-1",
-        "source-b0aab60e729bef18-1",
-        "source-583ae902858348ab-1",
-        "source-cbb53e8d751f7d90-1",
-        "source-f863f8e6fd196af2-1",
-        "source-2e7c73d0621703cc-1",
-        "source-2261bcbec46a22ec-1",
-        "source-c4b3e602dd038600-1",
-        "source-e37d78538a4e6369-1",
-        "source-21782940f9c55895-1",
-        "source-94863a14606f0588-1",
-        "source-f72164aecac9fdd5-1",
-        "source-0831b086ceea2f29-1",
-        "source-ba66c20605992e5d-1",
-        "source-f8b03acbfe464962-1",
-        "source-fffdba1e51a2839f-1",
-        "source-4040ff9363eb8d3c-1",
-        "source-6f4542e6a258101e-1",
-        "source-f21e2607de460d53-1",
-        "source-cd7b3c0014b358fc-1",
-        "source-b3c62ab940a4c28e-1",
-        "source-23d573d40df1d45d-1",
-        "source-aa1d6400dbb4b8ff-1",
-        "source-b2566bde23ad4ae0-1",
-        "source-3033fc5535b9505e-1",
-        "source-9d5e0f40caca71f5-1",
-        "source-0ccd3ef86a137186-1",
-        "source-efc8a17019ab05ec-1",
-        "source-7526af95b9b11a49-1",
-        "source-28876c8c84e9ac7e-1",
-        "source-22168f5d74911f13-1",
-        "source-d349e8a783307ea9-1",
-        "source-eda38b858e02dfbd-1",
-        "source-85d5b1140482006e-1",
-        "source-5cbdaa0b0a2f6af7-1",
-        "source-a00662a7f507474a-1",
-        "source-50fd70d4c9b08b12-1",
-        "source-3aa244e23db0f9cf-1",
-        "source-d9cc52d45b859544-1",
-        "source-581007a4c54df411-1",
-        "source-71de9d6f85b10e5c-1",
-        "source-5c8a7bee17b737a9-1",
-        "source-3572840319d201ba-1",
-        "source-2f0e192464d7bcc5-1",
-        "source-35de90e251e45dd6-1",
-        "source-0c22c3f289630453-1",
-        "source-46fb4d5c3334fedd-1",
-        "source-c5d71481f7b76c30-1",
-        "source-6033358578151d51-1",
-        "source-f9160f6f138a2416-1",
-        "source-30a9df87eae66bad-1",
-        "source-71b3a7af8c09204b-1",
-        "source-7335b64819300a32-1",
-        "source-118580e359fff593-1",
-        "source-5fa05fdccce90709-1",
-        "source-9b897e3fc0067b5c-1",
-        "source-833d8577061054d5-1",
-        "source-93606640160e47f4-1",
-        "source-fc95dcb455956a8a-1",
-        "source-62a98523c616ac0e-1",
-        "source-ca6da6876e67de05-1",
-        "source-3e3d974edb3ce067-1",
-        "source-14e1038f88bbb394-1",
-        "source-fdce7286c24e9944-1",
-        "source-defab72b5a91e0db-1",
+        "source-04f81d93fcebfe77-1",
         "source-06b78aaf141804ec-1",
-        "source-aec9e01591e7087f-1",
-        "source-6c61056858c8a0ff-1",
-        "source-65c4dbc9a7245988-1",
-        "source-a094aaedb3988626-1",
-        "source-33732885ae4ed90f-1",
-        "source-7080d725339d5030-1",
-        "source-33089bafd852e074-1",
-        "source-cff379eec51315f1-1",
-        "source-5685e225c7d710a9-1",
-        "source-b1494287a7ee0b80-1",
-        "source-b7117d432dcd1bda-1",
-        "source-469f99e9a1158d84-1",
-        "source-4a87cf6246c6f457-1",
-        "source-9ab622f1920f4d29-1",
-        "source-77069bdc47c63289-1",
-        "source-91d0365467e8a8b4-1",
-        "source-838cf626a0aa9f79-1",
-        "source-0f5a2f3310242018-1",
-        "source-8f7370d5b82388f6-1",
-        "source-96fea834d69063f9-1",
-        "source-ca5efbf6d8478ef8-1",
-        "source-f14285a2dac05058-1",
-        "source-3395c863148d8311-1",
-        "source-da8dd21e25fe47d8-1",
+        "source-074610845d97cec0-1",
+        "source-0831b086ceea2f29-1",
         "source-084b84aa499f6ee5-1",
-        "source-b9853b5899fe1eec-1",
-        "source-9db5daf9f26664b7-1",
-        "source-ab44d40a92fc344f-1",
+        "source-0b046b21a0683a40-1",
+        "source-0c22c3f289630453-1",
+        "source-0ccd3ef86a137186-1",
+        "source-0d3e74c0973b8ac9-1",
+        "source-0eccbdb43577aa22-1",
+        "source-0f5a2f3310242018-1",
+        "source-118580e359fff593-1",
+        "source-119a9f456f23434a-1",
+        "source-13a11cdd28052579-1",
+        "source-13b19badc81efd58-1",
+        "source-14e1038f88bbb394-1",
+        "source-18a3a1d23775d13a-1",
+        "source-1ecea638cb16a353-1",
+        "source-21782940f9c55895-1",
+        "source-22168f5d74911f13-1",
+        "source-2247529231fc456f-1",
+        "source-2261bcbec46a22ec-1",
+        "source-23d573d40df1d45d-1",
+        "source-23d8ff29ef0cb426-1",
+        "source-242c860c14fef25c-1",
+        "source-251c43b210b837f7-1",
+        "source-257b2e9cbe7caeac-1",
+        "source-2816b96c908f89e7-1",
+        "source-28876c8c84e9ac7e-1",
+        "source-2c78b78ef0298ced-1",
+        "source-2e201a3e785f4641-1",
+        "source-2e7c73d0621703cc-1",
+        "source-2f051ca903761065-1",
+        "source-2f0e192464d7bcc5-1",
+        "source-3033fc5535b9505e-1",
+        "source-30a9df87eae66bad-1",
+        "source-31133286f5e690e1-1",
+        "source-32f906d1a654a6de-1",
+        "source-33089bafd852e074-1",
+        "source-335edb5a9fbe9bc5-1",
+        "source-33732885ae4ed90f-1",
+        "source-3395c863148d8311-1",
+        "source-3572840319d201ba-1",
+        "source-35de90e251e45dd6-1",
+        "source-35e26008aadad368-1",
+        "source-373ce7f371788041-1",
+        "source-37be5b518a2abbee-1",
+        "source-3a5139e9b4138568-1",
+        "source-3aa244e23db0f9cf-1",
+        "source-3bdbcec16b7499aa-1",
+        "source-3cd14ebc85f78833-1",
+        "source-3e3d974edb3ce067-1",
+        "source-3e9b5b463dbe287e-1",
         "source-3f5e9c085b28ff4e-1",
-        "source-cec247ffaf1e7004-1",
+        "source-4040ff9363eb8d3c-1",
         "source-405667778cf9cdfc-1",
+        "source-4360ef867cad170c-1",
+        "source-44dead6e867fab94-1",
+        "source-454c4ea7e9100077-1",
+        "source-469f99e9a1158d84-1",
+        "source-46af5e716e82b700-1",
+        "source-46fb4d5c3334fedd-1",
+        "source-498978357cd48d08-1",
+        "source-4a87cf6246c6f457-1",
+        "source-4aca935a1c8dc57c-1",
+        "source-4c0fab8729ce6c14-1",
+        "source-4d96252c7f8cfa34-1",
+        "source-4e6e989762d73a1b-1",
+        "source-50fd70d4c9b08b12-1",
+        "source-51c0ee76f13e53da-1",
+        "source-521edb4dab2d2fa4-1",
+        "source-53d87ffc378c0413-1",
+        "source-5404f60b223237ef-1",
+        "source-55f59fee49593b3b-1",
+        "source-5685e225c7d710a9-1",
+        "source-581007a4c54df411-1",
+        "source-583ae902858348ab-1",
+        "source-58cb63984ad83eb9-1",
+        "source-59a7f44cb620ac78-1",
+        "source-5c8a7bee17b737a9-1",
+        "source-5cbdaa0b0a2f6af7-1",
+        "source-5e4e7a1aaac2ba50-1",
+        "source-5fa05fdccce90709-1",
+        "source-5ff411e2b135da3e-1",
+        "source-6033358578151d51-1",
+        "source-60d4e51f8c4813d2-1",
+        "source-615ffabcf4ac1f34-1",
+        "source-6231a99803d49893-1",
+        "source-62a98523c616ac0e-1",
+        "source-62b52924bcc799d5-1",
+        "source-64fc397568dbb16e-1",
+        "source-65c4dbc9a7245988-1",
+        "source-6afca5dc03ee30d2-1",
+        "source-6c61056858c8a0ff-1",
+        "source-6f4542e6a258101e-1",
+        "source-6fb079cabb880071-1",
+        "source-7080d725339d5030-1",
+        "source-71b3a7af8c09204b-1",
+        "source-71de9d6f85b10e5c-1",
+        "source-72d10c1416508e26-1",
+        "source-7335b64819300a32-1",
+        "source-7526af95b9b11a49-1",
+        "source-7572f5f4c52446d7-1",
+        "source-75ee0bd92b2c24fc-1",
+        "source-7604bed0714f18bb-1",
+        "source-77069bdc47c63289-1",
+        "source-7d4333d63f5e2855-1",
+        "source-7e788375fbc8a351-1",
+        "source-7f3513d53b59e08d-1",
+        "source-800e4dd916113b91-1",
+        "source-80bdf79275ef0f12-1",
+        "source-8283f12b08185b2a-1",
+        "source-833d8577061054d5-1",
+        "source-838cf626a0aa9f79-1",
+        "source-85d5b1140482006e-1",
+        "source-882db99d507b5ee9-1",
+        "source-88b49d390f914daa-1",
+        "source-8c5b6416fbaa9a53-1",
+        "source-8dae562ac7c69bf6-1",
+        "source-8e2daf86f53220a2-1",
+        "source-8e3c566d511df3a7-1",
+        "source-8f7370d5b82388f6-1",
+        "source-91a639580721c761-1",
+        "source-91d0365467e8a8b4-1",
+        "source-93606640160e47f4-1",
+        "source-9390812c7634177b-1",
+        "source-9434cad2a8ccca1b-1",
+        "source-94863a14606f0588-1",
+        "source-96fea834d69063f9-1",
+        "source-9ab622f1920f4d29-1",
+        "source-9b0d501922a1fe82-1",
+        "source-9b897e3fc0067b5c-1",
+        "source-9d5e0f40caca71f5-1",
+        "source-9db5daf9f26664b7-1",
+        "source-9dd6ef8aadece83a-1",
+        "source-9e1760faffc557fc-1",
+        "source-9ee3a5c966eae383-1",
+        "source-9ef456a3db029024-1",
+        "source-9ef6fad418cbe77f-1",
+        "source-a00662a7f507474a-1",
+        "source-a094aaedb3988626-1",
+        "source-a20f37fe64df1d34-1",
+        "source-a2dc0f8b9fb9c3e2-1",
+        "source-a6cff98c81c4bf4f-1",
+        "source-a7fd5fc7b03ac059-1",
+        "source-a9d65d903c1a8131-1",
+        "source-aa1d6400dbb4b8ff-1",
+        "source-ab44d40a92fc344f-1",
+        "source-aec9e01591e7087f-1",
+        "source-b0aab60e729bef18-1",
+        "source-b1494287a7ee0b80-1",
+        "source-b1518233a405e75b-1",
+        "source-b166e4f1708fe1f8-1",
+        "source-b2566bde23ad4ae0-1",
+        "source-b3c62ab940a4c28e-1",
+        "source-b7117d432dcd1bda-1",
+        "source-b802473409410b92-1",
+        "source-b9853b5899fe1eec-1",
+        "source-ba66c20605992e5d-1",
+        "source-baf5c9cee0d4d893-1",
+        "source-bcd3f9f7c169938b-1",
+        "source-c13bd860a702b4af-1",
+        "source-c2f4072ea4068bda-1",
+        "source-c4b3e602dd038600-1",
+        "source-c5d71481f7b76c30-1",
+        "source-c812cc480428e08b-1",
+        "source-c92342a786df9acc-1",
+        "source-ca5efbf6d8478ef8-1",
+        "source-ca6da6876e67de05-1",
+        "source-cb27f36e1b0a7f80-1",
+        "source-cbb53e8d751f7d90-1",
+        "source-cd7b3c0014b358fc-1",
+        "source-cec247ffaf1e7004-1",
+        "source-cf435087c7b3738e-1",
+        "source-cff379eec51315f1-1",
+        "source-d349e8a783307ea9-1",
+        "source-d627abfa492712b4-1",
+        "source-d880bb7135287592-1",
+        "source-d9cc52d45b859544-1",
+        "source-da1058d0663d8951-1",
+        "source-da8dd21e25fe47d8-1",
+        "source-defab72b5a91e0db-1",
+        "source-e04a94a09c720ffb-1",
+        "source-e0a4fd202b9b9f4c-1",
+        "source-e37d78538a4e6369-1",
+        "source-e414524d1dcaa0ed-1",
+        "source-e488601f448c871a-1",
+        "source-e4b7ca71d48e9196-1",
         "source-e9f1797e907e8503-1",
         "source-ed9626e5fc31dcf0-1",
-        "source-7f3513d53b59e08d-1",
-        "source-3bdbcec16b7499aa-1",
-        "source-51c0ee76f13e53da-1",
-        "source-da1058d0663d8951-1",
-        "source-242c860c14fef25c-1",
-        "source-31133286f5e690e1-1",
-        "source-5e4e7a1aaac2ba50-1",
-        "source-23d8ff29ef0cb426-1",
-        "source-454c4ea7e9100077-1",
-        "source-9390812c7634177b-1",
-        "source-4aca935a1c8dc57c-1",
-        "source-0b046b21a0683a40-1",
-        "source-7572f5f4c52446d7-1",
-        "source-6231a99803d49893-1",
+        "source-eda38b858e02dfbd-1",
         "source-ee68696bfa692cf7-1",
+        "source-efc8a17019ab05ec-1",
+        "source-f14285a2dac05058-1",
+        "source-f1e63f10bb5f7b97-1",
+        "source-f21e2607de460d53-1",
+        "source-f72164aecac9fdd5-1",
         "source-f81387fc46a798b9-1",
-        "source-3a5139e9b4138568-1",
-        "source-119a9f456f23434a-1",
-        "source-800e4dd916113b91-1",
-        "source-7604bed0714f18bb-1",
-        "source-9b0d501922a1fe82-1",
-        "source-8dae562ac7c69bf6-1",
-        "source-2816b96c908f89e7-1",
-        "source-d627abfa492712b4-1",
-        "source-a20f37fe64df1d34-1",
-        "source-c812cc480428e08b-1",
-        "source-6fb079cabb880071-1",
-        "source-074610845d97cec0-1",
-        "source-2c78b78ef0298ced-1",
-        "source-46af5e716e82b700-1",
-        "source-0eccbdb43577aa22-1",
-        "source-7d4333d63f5e2855-1",
-        "source-257b2e9cbe7caeac-1",
-        "source-44dead6e867fab94-1",
-        "source-80bdf79275ef0f12-1",
-        "source-e414524d1dcaa0ed-1",
-        "source-4d96252c7f8cfa34-1",
-        "source-c92342a786df9acc-1",
-        "source-251c43b210b837f7-1",
-        "source-a2dc0f8b9fb9c3e2-1",
-        "source-3cd14ebc85f78833-1",
-        "source-b802473409410b92-1",
-        "source-b166e4f1708fe1f8-1",
-        "source-3e9b5b463dbe287e-1",
-        "source-2247529231fc456f-1",
-        "source-c2f4072ea4068bda-1",
-        "source-4c0fab8729ce6c14-1",
-        "source-04f81d93fcebfe77-1",
+        "source-f863f8e6fd196af2-1",
+        "source-f889ec29dc9581ef-1",
+        "source-f8b03acbfe464962-1",
+        "source-f9160f6f138a2416-1",
+        "source-fc5dbdefe87aeac6-1",
         "source-fc7f7724ce3193b0-1",
-        "source-72d10c1416508e26-1"
+        "source-fc95dcb455956a8a-1",
+        "source-fdce7286c24e9944-1",
+        "source-fe7e5ce018997e80-1",
+        "source-fffdba1e51a2839f-1"
       ],
-      "R_p": 191,
+      "R_p": 209,
       "behaviorIds": [
         "canvas/screen-public-interactions",
         "canvas/board-route-recovery",
@@ -649,7 +669,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "B_p": 8,
       "zeroRetirementReason": null,
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local"
     },
     {
       "phase": "P6",
@@ -688,7 +708,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "B_p": 5,
       "zeroRetirementReason": "Finalization validates replacement and behavior coverage; all selected source constraints retire in owning P1b-P6 phases, with frozen i18n candidates assigned separately before P7.",
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local"
     }
   ],
   "constraints": [
@@ -4407,12 +4427,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4436,12 +4487,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4465,12 +4547,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4494,12 +4607,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4523,12 +4667,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4552,12 +4727,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4581,12 +4787,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4610,12 +4847,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4639,12 +4907,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4668,12 +4967,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4697,12 +5027,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "high",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "pending-execution/core-release-and-edge-projection",
         "requirement": "core.unit.spec.ts shared Task final-slot release exists; add flowRuntime component assertion that release invokes cancellation and projection derives renderEdges without duplicate mutable state.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 310,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
+            "fingerprint": "08221427d27b1bc6"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
+            "line": 314,
+            "scenario": "returns a shared Task only after its final active slot is cancelled or released",
+            "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
+            "fingerprint": "c2d56194e03560b2"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 87,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+            "fingerprint": "ed3ed5e74c451cf9"
+          },
+          {
+            "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+            "line": 95,
+            "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+            "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+            "fingerprint": "7aa679bf23949583"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` 1+15+flow/edge green (ownership 1/1, core 15/15, flow-cancel 2/2); single Core owner + renderEdges projection without duplicate mutable store cover 11 execution IDs."
       },
       "reviewRequired": false
     },
@@ -4787,20 +5148,20 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "evidence": [
           {
             "source": "src/test/retirementLint.contract.spec.ts",
-            "line": 288,
+            "line": 345,
             "scenario": "accepts pure contracts and type-only references while walking cyclic pure graphs",
             "assertion": "expect(validateCanvasPurity([\n    {\n        source: core,\n        dependencies: [\n            { module: pure, resolved: pure },\n            { module: 'vue', dependencyTypes: ['type-only'] },\n            { module: 'src/core/i18n/localeCore.ts' },\n        ],\n    },\n    { source: pure, dependencies: [{ module: core }] },\n])).toEqual([])",
             "fingerprint": "8507c204b02900f1"
           },
           {
             "source": "src/test/retirementLint.contract.spec.ts",
-            "line": 323,
+            "line": 380,
             "scenario": "rejects a relocated graph application runtime inside domain",
             "assertion": "expect(validateCanvasPurity([\n    { source: core },\n    { source: 'src/features/canvas/core/graph/application/runtime.ts' },\n]).map((issue) => issue.rule)).toContain('canvas-runtime-location')",
-            "fingerprint": "9de15613927f0f86"
+            "fingerprint": "c33459f3941a4d43"
           }
         ],
-        "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed.",
+        "verifiedRun": "2026-10-11: retirementLint.contract.spec.ts 84 tests passed; checkRetirementReplacements.ts production PostCSS/SFC/TS AST and actual depcruise graph passed; node typecheck, ESLint and Prettier passed. Re-pointed 2026-10-12 P7 close-out: evidence[1] fingerprint was self-inconsistent with its own recorded triple (9de15613927f0f86); corrected to the algorithm hash c33459f3941a4d43 and lines 288/323->345/380 after spec growth; assertion text unchanged.",
         "ruleRefs": [
           "canvas-runtime-location"
         ],
@@ -4951,12 +5312,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -4980,12 +5343,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -5009,12 +5374,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -5038,12 +5405,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -5067,12 +5436,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -5096,12 +5467,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -5125,12 +5498,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/CanvasGroupFramesOverlay.component/89c121de",
         "requirement": "uses the cursor selection stroke width for the selected group frame ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -5560,12 +5935,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5589,12 +6002,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5618,12 +6069,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5647,12 +6136,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5676,12 +6203,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5705,12 +6270,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5734,12 +6337,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5763,12 +6404,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5792,12 +6471,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5821,12 +6538,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5850,12 +6605,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5879,12 +6672,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5908,12 +6739,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5937,12 +6806,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5966,12 +6873,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -5995,12 +6940,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -6024,12 +7007,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -6053,12 +7074,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -6082,12 +7141,50 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "canvas-screen/public-interactions-and-immutable-edges",
         "requirement": "CanvasScreen.component.spec.ts public interactions/board recovery exists; surface export baseline replaces literal barrel; add immutable connection endpoint browser behavior.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 470,
+            "scenario": "renders and forwards Canvas interactions through the public Screen seam",
+            "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
+            "fingerprint": "cfb753d7ce84156d"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+            "line": 552,
+            "scenario": "recovers the next Board session when the route switches",
+            "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
+            "fingerprint": "6b9a5e81464d3bd6"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 82,
+            "scenario": "exposes CanvasScreen as the sole public workspace-ui seam",
+            "assertion": "expect(Object.keys(screenBarrel).sort()).toEqual(['CanvasScreen'])",
+            "fingerprint": "cab2b37d4e0387c3"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts",
+            "line": 98,
+            "scenario": "provides an Image Workflow ui adapter without locks or selection pass-through",
+            "assertion": "expect('isCanvasInteractionLocked' in imageWorkflowUi).toBe(false)",
+            "fingerprint": "72a8cb448418b3cd"
+          },
+          {
+            "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+            "line": 393,
+            "scenario": "binds the rendered edges to the projected renderEdges ref",
+            "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+            "fingerprint": "b913288053004962"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/screens/CanvasScreen.component.spec.ts src/features/canvas/ui/screens/canvasScreenPublicSurface.component.spec.ts` 9/9 green + `npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; public interactions/board recovery + immutable endpoint browser behavior cover 19 canvas-screen IDs."
       },
       "reviewRequired": false
     },
@@ -6105,12 +7202,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/7bbbb76c",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: maps Node and editor presentation to semantic Motion Policy tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6128,12 +7249,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/7bbbb76c",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: maps Node and editor presentation to semantic Motion Policy tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6151,12 +7296,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/7bbbb76c",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: maps Node and editor presentation to semantic Motion Policy tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6174,12 +7343,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/7bbbb76c",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: maps Node and editor presentation to semantic Motion Policy tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6197,12 +7390,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/7bbbb76c",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: maps Node and editor presentation to semantic Motion Policy tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6220,12 +7437,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/d05c9530",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: stops continuous running and apply motion when reduced motion is requested",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6243,12 +7484,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/d05c9530",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: stops continuous running and apply motion when reduced motion is requested",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6266,12 +7531,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/86d199c8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps precision cursors free from transform animation",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 136,
+            "scenario": "maps Node and editor presentation to the semantic Motion Policy tokens",
+            "assertion": "expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')",
+            "fingerprint": "a670c022ae4fcc62"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 173,
+            "scenario": "stops continuous running and apply motion when reduced motion is requested",
+            "assertion": "expect(window.getComputedStyle(node, '::before').animationName).toBe('node-running-border-flow')",
+            "fingerprint": "5e26f6f3e7674254"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts",
+            "line": 228,
+            "scenario": "keeps precision cursors free from transform animation",
+            "assertion": "expect(styleOf(cursor).transitionProperty).toBe('opacity')",
+            "fingerprint": "13315572ba968355"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasNodeEditorMotion.browser.spec.ts` 3/3 chromium green; covers 7bbbb76c (5 motion-token mapping), d05c9530 (2 reduced-motion stops), 86d199c8 (1 precision cursor)."
       },
       "reviewRequired": false
     },
@@ -6289,12 +7578,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/da951dfd",
         "requirement": "mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6312,12 +7603,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/da951dfd",
         "requirement": "mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6335,12 +7628,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/da951dfd",
         "requirement": "mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6358,12 +7653,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/da951dfd",
         "requirement": "mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6381,12 +7678,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/da951dfd",
         "requirement": "mounts one feature-local surface owner instead of declaring the stable token table in Canvas Screen",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6404,12 +7703,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6427,12 +7728,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6450,12 +7753,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6473,12 +7778,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6496,12 +7803,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6519,12 +7828,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6542,12 +7853,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6565,12 +7878,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6588,12 +7903,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6611,12 +7928,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6634,12 +7953,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/7fbea095",
         "requirement": "maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6657,12 +7978,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/bf5c696a",
         "requirement": "sources the tonal-range wash from the app canvas wash token",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6680,12 +8003,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/bf5c696a",
         "requirement": "sources the tonal-range wash from the app canvas wash token",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6703,12 +8028,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/c9d2db74",
         "requirement": "keeps Canvas consumers on the named surface contract instead of direct app token aliases",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6726,12 +8053,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/c9d2db74",
         "requirement": "keeps Canvas consumers on the named surface contract instead of direct app token aliases",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6749,12 +8078,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/c9d2db74",
         "requirement": "keeps Canvas consumers on the named surface contract instead of direct app token aliases",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -6772,12 +8103,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6795,12 +8150,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6818,12 +8197,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6841,12 +8244,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6864,12 +8291,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6887,12 +8338,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6910,12 +8385,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6933,12 +8432,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6956,12 +8479,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -6979,12 +8526,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7002,12 +8573,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7025,12 +8620,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7048,12 +8667,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7071,12 +8714,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7094,12 +8761,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7117,12 +8808,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7140,12 +8855,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7163,12 +8902,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7186,12 +8949,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7209,12 +8996,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7232,12 +9043,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7255,12 +9090,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
+        "kind": "browser",
         "id": "computed-style/b611fda8",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 173,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(button.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "d3655a9a23229a7f"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 197,
+            "scenario": "keeps the chrome focus ring on the shared token and the status rail responsive",
+            "assertion": "expect(styleOf(status).maxWidth).toBe('1368px')",
+            "fingerprint": "0ce21b4ec001a71d"
+          },
+          {
+            "source": "src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts",
+            "line": 269,
+            "scenario": "paints selected edges and minimap nodes from the surface contract",
+            "assertion": "expect(styleOf(minimapNode).fill).toBe(styleOf(nodeProbe).color)",
+            "fingerprint": "a1c7e944912a09c3"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/styles/canvasSurfaceStates.browser.spec.ts` 4/4 chromium green; computed-style replacement for 22 b611fda8 IDs (focus/selected/active/disabled/loading/reduced-motion/responsive)."
       },
       "reviewRequired": false
     },
@@ -7278,12 +9137,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7301,12 +9162,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7324,12 +9187,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7347,12 +9212,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7370,12 +9237,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7393,12 +9262,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7416,12 +9287,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/54661dc6",
         "requirement": "owns tooltips at the Canvas feature boundary without legacy node-only contracts",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7439,12 +9312,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7462,12 +9337,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7485,12 +9362,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7508,12 +9387,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7531,12 +9412,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7554,12 +9437,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7577,12 +9462,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7600,12 +9487,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7623,12 +9512,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7646,12 +9537,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/canvasSurfaceSkin.contract/5d107033",
         "requirement": "contains rendered retouch previews within the existing image stage geometry",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkCanvasUiStyleContracts.ts` self-test 34 cases + production passed; 7 rules (surface-owner, token-mapping, wash, consumer-boundary, tooltip-boundary, retouch-geometry, group-ring) with red-proof fixtures; replaces 38 surfaceSkin + 7 overlay assertions deleted with those spec files."
       },
       "reviewRequired": false
     },
@@ -7993,12 +9886,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/36d47aae",
         "requirement": "serves both histogram and curves frames from one contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8016,12 +9911,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/36d47aae",
         "requirement": "serves both histogram and curves frames from one contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8039,12 +9936,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/36d47aae",
         "requirement": "serves both histogram and curves frames from one contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8062,12 +9961,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/36d47aae",
         "requirement": "serves both histogram and curves frames from one contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8085,12 +9986,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/36d47aae",
         "requirement": "serves both histogram and curves frames from one contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8108,12 +10011,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/57f03081",
         "requirement": "keeps the veil and histogram wash on Canvas surface tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8131,12 +10036,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/57f03081",
         "requirement": "keeps the veil and histogram wash on Canvas surface tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8154,12 +10061,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/57f03081",
         "requirement": "keeps the veil and histogram wash on Canvas surface tokens",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8177,12 +10086,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/b3ff8835",
         "requirement": "leaves grid strokes and marker accents on the surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8200,12 +10111,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/b3ff8835",
         "requirement": "leaves grid strokes and marker accents on the surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8223,12 +10136,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/b3ff8835",
         "requirement": "leaves grid strokes and marker accents on the surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8246,12 +10161,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/b3ff8835",
         "requirement": "leaves grid strokes and marker accents on the surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8269,12 +10186,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4c9978a2",
         "requirement": "defines handle sizing once and reuses it in curves and histogram markers",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8292,12 +10211,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4c9978a2",
         "requirement": "defines handle sizing once and reuses it in curves and histogram markers",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8315,12 +10236,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4c9978a2",
         "requirement": "defines handle sizing once and reuses it in curves and histogram markers",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8338,12 +10261,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4c9978a2",
         "requirement": "defines handle sizing once and reuses it in curves and histogram markers",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8361,12 +10286,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4c9978a2",
         "requirement": "defines handle sizing once and reuses it in curves and histogram markers",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8384,12 +10311,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/b9588c5b",
         "requirement": "rounds instrument dots with the pill token",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8407,12 +10336,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/b9588c5b",
         "requirement": "rounds instrument dots with the pill token",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8430,12 +10361,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1420557f",
         "requirement": "sources panel metrics from the Canvas surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8453,12 +10386,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1420557f",
         "requirement": "sources panel metrics from the Canvas surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8476,12 +10411,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1420557f",
         "requirement": "sources panel metrics from the Canvas surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8499,12 +10436,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1420557f",
         "requirement": "sources panel metrics from the Canvas surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8522,12 +10461,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1420557f",
         "requirement": "sources panel metrics from the Canvas surface contract",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8545,12 +10486,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/6fa1c8ad",
         "requirement": "keeps both button groups on the shared action row",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8568,12 +10511,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/6fa1c8ad",
         "requirement": "keeps both button groups on the shared action row",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8591,12 +10536,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/66820f2a",
         "requirement": "derives the layer thumb radius from the panel control radius",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8614,12 +10561,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/15f3f640",
         "requirement": "keeps apply as the single primary commit control without local overrides",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8637,12 +10586,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/15f3f640",
         "requirement": "keeps apply as the single primary commit control without local overrides",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8660,12 +10611,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/15f3f640",
         "requirement": "keeps apply as the single primary commit control without local overrides",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8683,12 +10636,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/aa277691",
         "requirement": "keeps Chrome wiring preview state to the commit control",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8706,12 +10661,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/aa277691",
         "requirement": "keeps Chrome wiring preview state to the commit control",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8729,12 +10686,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/aa277691",
         "requirement": "keeps Chrome wiring preview state to the commit control",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8752,12 +10711,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/20d5f590",
         "requirement": "injects the apply gate from the parent instead of reading the stack directly",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8775,12 +10736,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/20d5f590",
         "requirement": "injects the apply gate from the parent instead of reading the stack directly",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8798,12 +10761,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/20d5f590",
         "requirement": "injects the apply gate from the parent instead of reading the stack directly",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8821,12 +10786,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/20d5f590",
         "requirement": "injects the apply gate from the parent instead of reading the stack directly",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8844,12 +10811,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1093d62f",
         "requirement": "keeps listbox, slider, and tooltip markers that the behavioral specs pin",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8867,12 +10836,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1093d62f",
         "requirement": "keeps listbox, slider, and tooltip markers that the behavioral specs pin",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8890,12 +10861,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1093d62f",
         "requirement": "keeps listbox, slider, and tooltip markers that the behavioral specs pin",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8913,12 +10886,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1093d62f",
         "requirement": "keeps listbox, slider, and tooltip markers that the behavioral specs pin",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8936,12 +10911,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1093d62f",
         "requirement": "keeps listbox, slider, and tooltip markers that the behavioral specs pin",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8959,12 +10936,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/1093d62f",
         "requirement": "keeps listbox, slider, and tooltip markers that the behavioral specs pin",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -8982,12 +10961,78 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
         "id": "computed-style/3a1e8303",
+        "kind": "browser",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps focus rings on motion-safe outline tokens without layout shift",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 95,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(marker).outlineStyle).toBe('none')",
+            "fingerprint": "797a9a696fc54777"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 99,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(marker.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "8298b72696c75a6e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 102,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(marker).outlineStyle).toBe('solid')",
+            "fingerprint": "d454d972558c007d"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 103,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(marker).outlineWidth).toBe('2px')",
+            "fingerprint": "f4afac2b3c554299"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 105,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(marker.offsetWidth).toBe(restWidth)",
+            "fingerprint": "5938da0f41d50007"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 114,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(marker).outlineColor).toBe(styleOf(colorProbe).outlineColor)",
+            "fingerprint": "df4807d6c6bc3fa9"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 117,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => afterStyleOf(marker).outlineColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "23c8f88d013daf30"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 126,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => afterStyleOf(marker).outlineWidth).toBe('5px')",
+            "fingerprint": "e08b35594e3c42b3"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 130,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => afterStyleOf(marker).outlineWidth).toBe('2px')",
+            "fingerprint": "8aab4b9b8dae93ea"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts` -> 2 files / 6 tests passed in real chromium (histogram/curve/layer rings ride live focus tokens with no layout shift; composer ring rides the live ring token; reduced-motion variants green); residual formControls.contract.spec.ts 2/2 green."
       },
       "reviewRequired": false
     },
@@ -9005,12 +11050,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
         "id": "computed-style/3a1e8303",
+        "kind": "browser",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps focus rings on motion-safe outline tokens without layout shift",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 104,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(marker).outlineOffset).toBe('2px')",
+            "fingerprint": "b3b970691e399087"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 168,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(dot).outlineStyle).toBe('solid')",
+            "fingerprint": "cf8c59da331d794b"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 169,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(dot).outlineWidth).toBe('2px')",
+            "fingerprint": "cbd38a160983343e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 170,
+            "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+            "assertion": "expect(afterStyleOf(dot).outlineOffset).toBe('2px')",
+            "fingerprint": "c5748f881cc6f743"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts` -> 2 files / 6 tests passed in real chromium (histogram/curve/layer rings ride live focus tokens with no layout shift; composer ring rides the live ring token; reduced-motion variants green); residual formControls.contract.spec.ts 2/2 green."
       },
       "reviewRequired": false
     },
@@ -9028,12 +11104,57 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
         "id": "computed-style/3a1e8303",
+        "kind": "browser",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps focus rings on motion-safe outline tokens without layout shift",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 194,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect(point.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "6c7ad1e36a731857"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 195,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(point).outlineStyle).toBe('solid')",
+            "fingerprint": "b8596d4a367d6cd2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 196,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(point).outlineWidth).toBe('2px')",
+            "fingerprint": "fb9e1975f76b20c0"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 199,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(point).borderWidth).toBe(restBorder)",
+            "fingerprint": "d729f637138d77cd"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 215,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(point).outlineWidth).toBe('5px')",
+            "fingerprint": "b88aa7ef9a63409f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 219,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(point).outlineWidth).toBe('2px')",
+            "fingerprint": "80eae1e3dcf7e4ae"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts` -> 2 files / 6 tests passed in real chromium (histogram/curve/layer rings ride live focus tokens with no layout shift; composer ring rides the live ring token; reduced-motion variants green); residual formControls.contract.spec.ts 2/2 green."
       },
       "reviewRequired": false
     },
@@ -9051,12 +11172,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
         "id": "computed-style/3a1e8303",
+        "kind": "browser",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps focus rings on motion-safe outline tokens without layout shift",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 205,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(point).outlineColor).toBe(styleOf(colorProbe).outlineColor)",
+            "fingerprint": "8a237fd02d349ab8"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 208,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(point).outlineColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "6a24e92daca5240d"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 212,
+            "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(point).outlineColor).toBe(styleOf(colorProbe).outlineColor)",
+            "fingerprint": "9f5a96dc260c426b"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts` -> 2 files / 6 tests passed in real chromium (histogram/curve/layer rings ride live focus tokens with no layout shift; composer ring rides the live ring token; reduced-motion variants green); residual formControls.contract.spec.ts 2/2 green."
       },
       "reviewRequired": false
     },
@@ -9074,12 +11219,85 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
         "id": "computed-style/3a1e8303",
+        "kind": "browser",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: keeps focus rings on motion-safe outline tokens without layout shift",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 238,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(row.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "13fda861d1fb8e04"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 239,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(row).outlineStyle).toBe('solid')",
+            "fingerprint": "98d2d6418133212d"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 240,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(row).outlineWidth).toBe('2px')",
+            "fingerprint": "4d2b8a953ce327ed"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 241,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(row).outlineOffset).toBe('2px')",
+            "fingerprint": "a77169210fe1e04b"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 243,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(row.offsetWidth).toBe(restWidth)",
+            "fingerprint": "bc677dc2b399069d"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 249,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(row).outlineOffset).toBe(styleOf(offsetProbe).outlineOffset)",
+            "fingerprint": "0308d50378e722fd"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 252,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(row).outlineOffset).toBe('7px')",
+            "fingerprint": "8f3fd451d4b852b2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 256,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(row).outlineOffset).toBe('2px')",
+            "fingerprint": "9598ca783cedcbfb"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 265,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect(styleOf(row).outlineColor).toBe(styleOf(colorProbe).outlineColor)",
+            "fingerprint": "42f3c9ebd964417b"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+            "line": 268,
+            "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+            "assertion": "expect.poll(() => styleOf(row).outlineColor).toBe('rgb(255, 0, 0)')",
+            "fingerprint": "f4a2b73a2972586b"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts` -> 2 files / 6 tests passed in real chromium (histogram/curve/layer rings ride live focus tokens with no layout shift; composer ring rides the live ring token; reduced-motion variants green); residual formControls.contract.spec.ts 2/2 green."
       },
       "reviewRequired": false
     },
@@ -9097,12 +11315,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/f58ec046",
         "requirement": "folds the threshold/levels marker pair with zero-specificity :where()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9120,12 +11340,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/f58ec046",
         "requirement": "folds the threshold/levels marker pair with zero-specificity :where()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9143,12 +11365,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/f58ec046",
         "requirement": "folds the threshold/levels marker pair with zero-specificity :where()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9166,12 +11390,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/371d3c69",
         "requirement": "keeps marker modes distinct across Levels button and Threshold range",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9189,12 +11415,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/371d3c69",
         "requirement": "keeps marker modes distinct across Levels button and Threshold range",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9212,12 +11440,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9235,12 +11465,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9258,12 +11490,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9281,12 +11515,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9304,12 +11540,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9327,12 +11565,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9350,12 +11590,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9373,12 +11615,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/24efd8bc",
         "requirement": "renders the four effect controls from one kind map behind component :is",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9396,12 +11640,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/45774b8f",
         "requirement": "keeps the hsl branch and the sharpen histogram exception",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9419,12 +11665,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/45774b8f",
         "requirement": "keeps the hsl branch and the sharpen histogram exception",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9436,18 +11684,42 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 188,
       "scenario": "derives kind icon/label/rail tables from definitions with call-time t()",
       "assertion": "expect(viewModel).toContain('RETOUCH_KIND_LABEL_KEYS')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 58,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).toContain('RETOUCH_KIND_LABEL_KEYS')",
+            "fingerprint": "5de7670feb23f2f2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 59,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).toContain('RETOUCH_EFFECT_RAIL_ORDER')",
+            "fingerprint": "ce6d4072c33bf557"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 60,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).toContain('labelKey')",
+            "fingerprint": "1c2410fb87a1f1b6"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9465,12 +11737,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/0a8bb689",
         "requirement": "derives kind icon/label/rail tables from definitions with call-time t()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9488,12 +11762,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/0a8bb689",
         "requirement": "derives kind icon/label/rail tables from definitions with call-time t()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9505,18 +11781,42 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 191,
       "scenario": "derives kind icon/label/rail tables from definitions with call-time t()",
       "assertion": "expect(viewModel).toContain('labelKey')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 58,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).toContain('RETOUCH_KIND_LABEL_KEYS')",
+            "fingerprint": "5de7670feb23f2f2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 59,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).toContain('RETOUCH_EFFECT_RAIL_ORDER')",
+            "fingerprint": "ce6d4072c33bf557"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 60,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).toContain('labelKey')",
+            "fingerprint": "1c2410fb87a1f1b6"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9528,18 +11828,42 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 194,
       "scenario": "derives kind icon/label/rail tables from definitions with call-time t()",
       "assertion": "expect(viewModel).not.toContain('useI18n')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 61,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).not.toContain('useI18n')",
+            "fingerprint": "d9abf91a9bcc0c4c"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 62,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).not.toContain('vue-i18n')",
+            "fingerprint": "85c65365bc8c3513"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 63,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).not.toContain('i18n.global')",
+            "fingerprint": "3e3083a5e1d52aae"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9551,18 +11875,42 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 195,
       "scenario": "derives kind icon/label/rail tables from definitions with call-time t()",
       "assertion": "expect(viewModel).not.toContain('i18n.global.t')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 61,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).not.toContain('useI18n')",
+            "fingerprint": "d9abf91a9bcc0c4c"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 62,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).not.toContain('vue-i18n')",
+            "fingerprint": "85c65365bc8c3513"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 63,
+            "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+            "assertion": "expect(kindLabels).not.toContain('i18n.global')",
+            "fingerprint": "3e3083a5e1d52aae"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9580,12 +11928,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/0a8bb689",
         "requirement": "derives kind icon/label/rail tables from definitions with call-time t()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9597,18 +11947,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 197,
       "scenario": "derives kind icon/label/rail tables from definitions with call-time t()",
       "assertion": "expect(effectActions).toContain('t(item.labelKey)')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 70,
+            "scenario": "re-translates every rail kind label across all four locales without remount",
+            "assertion": "expect(railAriaLabels()).toEqual([...RAIL_LABELS.en])",
+            "fingerprint": "10adb731e7e980e8"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 86,
+            "scenario": "re-translates every rail kind label across all four locales without remount",
+            "assertion": "expect(railAriaLabels()).toEqual([...RAIL_LABELS[locale]])",
+            "fingerprint": "266648942727a200"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 91,
+            "scenario": "re-translates every rail kind label across all four locales without remount",
+            "assertion": "expect(new Set(rendered).size).toBe(ALL_LOCALES.length)",
+            "fingerprint": "42d1f9d5e73424d9"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 112,
+            "scenario": "renders four distinct rail copies, one per locale",
+            "assertion": "expect(labels).toEqual([...RAIL_LABELS[locale]])",
+            "fingerprint": "e14aff39bd26406b"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+            "line": 117,
+            "scenario": "renders four distinct rail copies, one per locale",
+            "assertion": "expect(new Set(rendered).size).toBe(ALL_LOCALES.length)",
+            "fingerprint": "8f8a80c3a69be5d2"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9626,12 +12014,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/7f127e21",
         "requirement": "keeps LayersPanel table-driven with a generic fallback instead of throwing",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9649,12 +12039,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/7f127e21",
         "requirement": "keeps LayersPanel table-driven with a generic fallback instead of throwing",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9672,12 +12064,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/7f127e21",
         "requirement": "keeps LayersPanel table-driven with a generic fallback instead of throwing",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9695,12 +12089,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/7f127e21",
         "requirement": "keeps LayersPanel table-driven with a generic fallback instead of throwing",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9718,12 +12114,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/7f127e21",
         "requirement": "keeps LayersPanel table-driven with a generic fallback instead of throwing",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9741,12 +12139,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/78ec4640",
         "requirement": "resolves Chrome rail and list selection through one view-model function",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9764,12 +12164,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/78ec4640",
         "requirement": "resolves Chrome rail and list selection through one view-model function",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9787,12 +12189,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/78ec4640",
         "requirement": "resolves Chrome rail and list selection through one view-model function",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9810,12 +12214,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/78ec4640",
         "requirement": "resolves Chrome rail and list selection through one view-model function",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9833,12 +12239,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/bf9a5ad7",
         "requirement": "exposes Chrome as RetouchChrome through the unique exit",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9856,12 +12264,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/bf9a5ad7",
         "requirement": "exposes Chrome as RetouchChrome through the unique exit",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9879,12 +12289,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/bf9a5ad7",
         "requirement": "exposes Chrome as RetouchChrome through the unique exit",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9896,18 +12308,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 230,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(levelsProcessing).toContain('labelKey')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 421,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "2944485bdfc04f2e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 424,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: field })).toBeVisible()",
+            "fingerprint": "d505d5fa2ac8d2ab"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 426,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: item.output })).toBeVisible()",
+            "fingerprint": "dc19fc4b28c96928"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 432,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "934a32eb6a08601f"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9919,18 +12362,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 231,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(levelsProcessing).not.toContain('i18n.global.t')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 421,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "2944485bdfc04f2e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 424,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: field })).toBeVisible()",
+            "fingerprint": "d505d5fa2ac8d2ab"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 426,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: item.output })).toBeVisible()",
+            "fingerprint": "dc19fc4b28c96928"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 432,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "934a32eb6a08601f"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9948,12 +12422,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4a90da6a",
         "requirement": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -9965,18 +12441,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 233,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(thresholdProcessing).toContain('labelKey')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 200,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "f3e6187b0adafcf4"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 202,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(invertButton).toBeVisible()",
+            "fingerprint": "4680da5d2c2f79b0"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 203,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(invertButton.querySelector('.canvas-tool-tooltip')?.textContent?.trim()).toBe(item.tooltip)",
+            "fingerprint": "528b05af1846b5e2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 210,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "9c72743234a5c101"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -9988,18 +12495,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 234,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(thresholdProcessing).not.toContain('i18n.global.t')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 200,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "f3e6187b0adafcf4"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 202,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(invertButton).toBeVisible()",
+            "fingerprint": "4680da5d2c2f79b0"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 203,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(invertButton.querySelector('.canvas-tool-tooltip')?.textContent?.trim()).toBe(item.tooltip)",
+            "fingerprint": "528b05af1846b5e2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 210,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "9c72743234a5c101"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10017,12 +12555,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4a90da6a",
         "requirement": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -10034,18 +12574,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 236,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(curvesProcessing).toContain('labelKey')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 167,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(screen.getByRole('combobox', { name: item.aria })).toBe(presetSelect)",
+            "fingerprint": "69de45717781024f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 168,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.brighten })).toBeVisible()",
+            "fingerprint": "348221dbdd9209fe"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 169,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.linear })).toBeVisible()",
+            "fingerprint": "5ed23da06bc5ec74"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 170,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.matte })).toBeVisible()",
+            "fingerprint": "dda25c0a71e036bf"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 171,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.custom })).toBeVisible()",
+            "fingerprint": "e10f0a6816c7a3ed"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10057,18 +12635,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 237,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(curvesProcessing).not.toContain('i18n.global.t')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 167,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(screen.getByRole('combobox', { name: item.aria })).toBe(presetSelect)",
+            "fingerprint": "69de45717781024f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 168,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.brighten })).toBeVisible()",
+            "fingerprint": "348221dbdd9209fe"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 169,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.linear })).toBeVisible()",
+            "fingerprint": "5ed23da06bc5ec74"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 170,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.matte })).toBeVisible()",
+            "fingerprint": "dda25c0a71e036bf"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 171,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.custom })).toBeVisible()",
+            "fingerprint": "e10f0a6816c7a3ed"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10080,18 +12696,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 238,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(curvesProcessing).not.toContain('label: i18n')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 167,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(screen.getByRole('combobox', { name: item.aria })).toBe(presetSelect)",
+            "fingerprint": "69de45717781024f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 168,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.brighten })).toBeVisible()",
+            "fingerprint": "348221dbdd9209fe"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 169,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.linear })).toBeVisible()",
+            "fingerprint": "5ed23da06bc5ec74"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 170,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.matte })).toBeVisible()",
+            "fingerprint": "dda25c0a71e036bf"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 171,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.custom })).toBeVisible()",
+            "fingerprint": "e10f0a6816c7a3ed"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10103,18 +12757,49 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 239,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(levelsControl).toContain('t(marker.labelKey')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 421,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "2944485bdfc04f2e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 424,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: field })).toBeVisible()",
+            "fingerprint": "d505d5fa2ac8d2ab"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 426,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: item.output })).toBeVisible()",
+            "fingerprint": "dc19fc4b28c96928"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 432,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "934a32eb6a08601f"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10126,18 +12811,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 240,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(thresholdControl).toContain('t(marker.labelKey')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 200,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "f3e6187b0adafcf4"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 202,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(invertButton).toBeVisible()",
+            "fingerprint": "4680da5d2c2f79b0"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 203,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(invertButton.querySelector('.canvas-tool-tooltip')?.textContent?.trim()).toBe(item.tooltip)",
+            "fingerprint": "528b05af1846b5e2"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 210,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "9c72743234a5c101"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts",
+            "line": 207,
+            "scenario": "re-translates the threshold marker across all four locales without remount",
+            "assertion": "expect(screen.queryByRole('slider', { name: 'Threshold 64' })).toBeNull()",
+            "fingerprint": "7f2a939e3be3c395"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10149,18 +12872,56 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 241,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(curvesControl).toContain('t(preset.labelKey)')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 167,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(screen.getByRole('combobox', { name: item.aria })).toBe(presetSelect)",
+            "fingerprint": "69de45717781024f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 168,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.brighten })).toBeVisible()",
+            "fingerprint": "348221dbdd9209fe"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 169,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.linear })).toBeVisible()",
+            "fingerprint": "5ed23da06bc5ec74"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 170,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.matte })).toBeVisible()",
+            "fingerprint": "dda25c0a71e036bf"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 171,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.custom })).toBeVisible()",
+            "fingerprint": "e10f0a6816c7a3ed"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10172,18 +12933,70 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 242,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(curvesControl).not.toContain('CURVE_PRESET_LABEL_KEYS')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 167,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(screen.getByRole('combobox', { name: item.aria })).toBe(presetSelect)",
+            "fingerprint": "69de45717781024f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 168,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.brighten })).toBeVisible()",
+            "fingerprint": "348221dbdd9209fe"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 169,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.linear })).toBeVisible()",
+            "fingerprint": "5ed23da06bc5ec74"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 170,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.matte })).toBeVisible()",
+            "fingerprint": "dda25c0a71e036bf"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 171,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).getByRole('option', { name: item.custom })).toBeVisible()",
+            "fingerprint": "e10f0a6816c7a3ed"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 176,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(within(presetSelect).queryByRole('option', { name: 'Brighten' })).toBeNull()",
+            "fingerprint": "daa26357b5051e42"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts",
+            "line": 179,
+            "scenario": "re-translates preset options across all four locales without remount",
+            "assertion": "expect(seenBrighten.size).toBe(4)",
+            "fingerprint": "d8b13fb40d54d038"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10195,18 +13008,63 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 243,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(levelsFields).toContain('LEVEL_FIELD_LABEL_KEYS')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 421,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "2944485bdfc04f2e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 424,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: field })).toBeVisible()",
+            "fingerprint": "d505d5fa2ac8d2ab"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 426,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: item.output })).toBeVisible()",
+            "fingerprint": "dc19fc4b28c96928"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 432,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "934a32eb6a08601f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 428,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.queryByRole('spinbutton', { name: 'Blacks' })).toBeNull()",
+            "fingerprint": "f161bb703b19b336"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 429,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.queryByRole('slider', { name: 'Blacks 10' })).toBeNull()",
+            "fingerprint": "f7a176d9caa10d83"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -10224,12 +13082,14 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "lint-planned",
+        "kind": "lint",
         "id": "source-policy/retouchShared.contract/4a90da6a",
         "requirement": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npx tsx scripts/checkRetouchSharedContract.ts` self-test 101 cases (80 negative, all armed) + production passed; 21 policies cover 76 retired source-string assertions deleted from retouchShared.contract.spec.ts (residual 5 focus-ring + frozen i18n remain)."
       },
       "reviewRequired": false
     },
@@ -10241,18 +13101,63 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "line": 245,
       "scenario": "keeps levels/threshold markers and curve presets locale-free with call-time t()",
       "assertion": "expect(levelsFields).toContain('t(labelKey)')",
-      "disposition": "frozen-i18n-candidate",
-      "reason": "Tool decision pending; preserve current assertion and assign before P7 without dropping its frozen ID.",
-      "phase": null,
-      "proposedPhase": "P5",
+      "disposition": "retire",
+      "reason": "P7 assigned P5 and retired after effective four-locale behavior replacements passed; frozen ID preserved.",
+      "phase": "P5",
+      "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "retained",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "tool-decision-frozen",
         "id": "i18n/retouch-call-time-locale-switch",
+        "kind": "behavior",
         "requirement": "Select i18n governance tool; prove all four locale switches update labels without core importing runtime.",
-        "status": "decision-pending"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 421,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('slider', { name: item.marker })).toBe(marker)",
+            "fingerprint": "2944485bdfc04f2e"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 424,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: field })).toBeVisible()",
+            "fingerprint": "d505d5fa2ac8d2ab"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 426,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.getByRole('spinbutton', { name: item.output })).toBeVisible()",
+            "fingerprint": "dc19fc4b28c96928"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 432,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(seenMarkers.size).toBe(4)",
+            "fingerprint": "934a32eb6a08601f"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 428,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.queryByRole('spinbutton', { name: 'Blacks' })).toBeNull()",
+            "fingerprint": "f161bb703b19b336"
+          },
+          {
+            "source": "src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts",
+            "line": 429,
+            "scenario": "re-translates level markers and fields across all four locales without remount",
+            "assertion": "expect(screen.queryByRole('slider', { name: 'Blacks 10' })).toBeNull()",
+            "fingerprint": "f7a176d9caa10d83"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
       },
       "reviewRequired": false
     },
@@ -11707,12 +14612,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "icon-buttons/accessible-name-fallback-and-explicit-label",
         "requirement": "NodeToolIconButton keyboard tooltip name and ActionButton explicit ariaLabel/title exist; add both explicit-label precedence and NodeActionButton cases.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 18,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(control).toHaveFocus()",
+            "fingerprint": "f0e0fa3a34890087"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 19,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(onClick).toHaveBeenCalledTimes(2)",
+            "fingerprint": "28d365ef80de36dd"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 14,
+            "scenario": "prefers explicit aria label over tooltip for NodeToolIconButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8f322058ec082151"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 28,
+            "scenario": "prefers explicit aria label over tooltip for NodeActionButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8bd0c2cb528a8823"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts` green (iconButton 2/2 + precedence 3/3); keyboard tooltip name + explicit-label precedence over fallback cover 4 iconButton IDs."
       },
       "reviewRequired": false
     },
@@ -11730,12 +14666,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "icon-buttons/accessible-name-fallback-and-explicit-label",
         "requirement": "NodeToolIconButton keyboard tooltip name and ActionButton explicit ariaLabel/title exist; add both explicit-label precedence and NodeActionButton cases.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 18,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(control).toHaveFocus()",
+            "fingerprint": "f0e0fa3a34890087"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 19,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(onClick).toHaveBeenCalledTimes(2)",
+            "fingerprint": "28d365ef80de36dd"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 14,
+            "scenario": "prefers explicit aria label over tooltip for NodeToolIconButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8f322058ec082151"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 28,
+            "scenario": "prefers explicit aria label over tooltip for NodeActionButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8bd0c2cb528a8823"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts` green (iconButton 2/2 + precedence 3/3); keyboard tooltip name + explicit-label precedence over fallback cover 4 iconButton IDs."
       },
       "reviewRequired": false
     },
@@ -11753,12 +14720,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "icon-buttons/accessible-name-fallback-and-explicit-label",
         "requirement": "NodeToolIconButton keyboard tooltip name and ActionButton explicit ariaLabel/title exist; add both explicit-label precedence and NodeActionButton cases.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 18,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(control).toHaveFocus()",
+            "fingerprint": "f0e0fa3a34890087"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 19,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(onClick).toHaveBeenCalledTimes(2)",
+            "fingerprint": "28d365ef80de36dd"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 14,
+            "scenario": "prefers explicit aria label over tooltip for NodeToolIconButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8f322058ec082151"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 28,
+            "scenario": "prefers explicit aria label over tooltip for NodeActionButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8bd0c2cb528a8823"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts` green (iconButton 2/2 + precedence 3/3); keyboard tooltip name + explicit-label precedence over fallback cover 4 iconButton IDs."
       },
       "reviewRequired": false
     },
@@ -11776,12 +14774,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "behavior-existing-partial",
+        "kind": "behavior",
         "id": "icon-buttons/accessible-name-fallback-and-explicit-label",
         "requirement": "NodeToolIconButton keyboard tooltip name and ActionButton explicit ariaLabel/title exist; add both explicit-label precedence and NodeActionButton cases.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 18,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(control).toHaveFocus()",
+            "fingerprint": "f0e0fa3a34890087"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
+            "line": 19,
+            "scenario": "supports pointer and keyboard activation through its accessible name",
+            "assertion": "expect(onClick).toHaveBeenCalledTimes(2)",
+            "fingerprint": "28d365ef80de36dd"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 14,
+            "scenario": "prefers explicit aria label over tooltip for NodeToolIconButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8f322058ec082151"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+            "line": 28,
+            "scenario": "prefers explicit aria label over tooltip for NodeActionButton icon-only rendering",
+            "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+            "fingerprint": "8bd0c2cb528a8823"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts` green (iconButton 2/2 + precedence 3/3); keyboard tooltip name + explicit-label precedence over fallback cover 4 iconButton IDs."
       },
       "reviewRequired": false
     },
@@ -14798,12 +17827,71 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p5-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
-        "kind": "browser-planned",
         "id": "computed-style/fef79256",
+        "kind": "browser",
         "requirement": "Read computed styles while exercising default, hover, focus and reduced-motion states: gives the canvas prompt textarea a visible focus ring",
-        "status": "not-implemented"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 83,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect(styleOf(textarea).borderWidth).toBe('0px')",
+            "fingerprint": "c4bd6a8c9aae0745"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 84,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect(styleOf(textarea).boxShadow).toBe('none')",
+            "fingerprint": "70baa8ef3763ac77"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 88,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect(textarea.matches(':focus-visible')).toBe(true)",
+            "fingerprint": "5129181774207072"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 91,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect.poll(() => styleOf(textarea).boxShadow).not.toBe('none')",
+            "fingerprint": "bd1db6b58bab2461"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 92,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect(styleOf(textarea).boxShadow).toContain('2px')",
+            "fingerprint": "02bbe18a4553e3b5"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 95,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect(styleOf(textarea).borderWidth).toBe(restBorder)",
+            "fingerprint": "affeb6b40ccb8fa1"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 102,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect.poll(() => styleOf(textarea).boxShadow).not.toBe(before)",
+            "fingerprint": "ea41704c30864843"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+            "line": 107,
+            "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+            "assertion": "expect.poll(() => styleOf(textarea).boxShadow).toBe(before)",
+            "fingerprint": "d7ff194551d7a74b"
+          }
+        ],
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts` -> 2 files / 6 tests passed in real chromium (histogram/curve/layer rings ride live focus tokens with no layout shift; composer ring rides the live ring token; reduced-motion variants green); residual formControls.contract.spec.ts 2/2 green."
       },
       "reviewRequired": false
     },
@@ -17690,60 +20778,60 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "line": 58,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(SERVICE_SLUGS).toHaveLength(8)",
-          "fingerprint": "18c1b156302c1a39"
+          "fingerprint": "68148f58733f7821"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 61,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(setUserLocale(locale)).resolves.toBe(true)",
-          "fingerprint": "f9e62fa6d4fe3770"
+          "fingerprint": "7921f2275e3818f8"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 63,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(serviceLabelKey(slug)).toBe(`canvas.features.${slug}`)",
-          "fingerprint": "9d2fa3d05d7c73ca"
+          "fingerprint": "e85c620bfd835c6e"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 65,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(text).toEqual({ label: labels[locale][slug], title: labels[locale][slug] })",
-          "fingerprint": "0e33e338e8f5068c"
+          "fingerprint": "4f8745d86856392a"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 68,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(i18n.global.locale.value).toBe(locale)",
-          "fingerprint": "11e46134ae5b7142"
+          "fingerprint": "d8c88d5ae480d95c"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 70,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(snapshots['en']).not.toEqual(snapshots['zh-CN'])",
-          "fingerprint": "47397f79170ecbac"
+          "fingerprint": "cf681c638699633e"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 71,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(snapshots['en']).not.toEqual(snapshots['es'])",
-          "fingerprint": "6eccb4211bfd9df7"
+          "fingerprint": "50acd4e1f6f1dc04"
         },
         {
           "source": "src/features/canvas/session/media/serviceLocale.contract.spec.ts",
           "line": 72,
           "scenario": "resolves all eight services through the real session seam after every locale switch",
           "assertion": "expect(snapshots['en']).not.toEqual(snapshots['ko'])",
-          "fingerprint": "e424551404855604"
+          "fingerprint": "4bd6a03909c88d51"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "2026-10-10: 7 specs / 52 tests passed, including real Orval regeneration and MSW transport.",
+      "verifiedRun": "2026-10-10: 7 specs / 52 tests passed, including real Orval regeneration and MSW transport. Re-anchored 2026-10-12 P7 close-out: identical scenario+assertion re-pointed at current path/lines after P5 relocation (was src/features/canvas/session/serviceLocale.contract.spec.ts); `npx vitest run src/features/canvas/session/media/serviceLocale.contract.spec.ts` -> 1/1 green.",
       "auditReason": "FourLocale spec switches en/zh-CN/es/ko and translates one billing.insufficientCredits string, not every relocated service label. No evidence invokes actual relocated service-label/action seams across all four locales while feature core remains free of i18n runtime.",
       "missingEvidence": [
         "FourLocale spec switches en/zh-CN/es/ko and translates one billing.insufficientCredits string, not every relocated service label. No evidence invokes actual relocated service-label/action seams across all four locales while feature core remains free of i18n runtime."
@@ -19722,34 +22810,62 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "After formal P2.5 acceptance and merge, bind the frozen race scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
-      "status": "pending",
+      "status": "verified",
       "evidence": [
         {
           "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
-          "line": 205,
+          "line": 203,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(oldSignal).toBeInstanceOf(AbortSignal)",
           "fingerprint": "d25d164ae6179043"
         },
         {
           "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
-          "line": 209,
+          "line": 207,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(9)",
           "fingerprint": "bfae8d296f20b3f8"
         },
         {
           "source": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts",
-          "line": 220,
+          "line": 218,
           "scenario": "cancels the old workspace read and ignores its late response after observer navigation",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
           "fingerprint": "ef0df92beadacea0"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 175,
+          "scenario": "aborts the actual hydrate on workspace navigation and ignores a late document",
+          "assertion": "expect(oldSignal?.aborted).toBe(true)",
+          "fingerprint": "725be686860cacae"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 179,
+          "scenario": "aborts the actual hydrate on workspace navigation and ignores a late document",
+          "assertion": "expect(hydrate).resolves.toMatchObject({ ok: false })",
+          "fingerprint": "b0ea23a3b7214396"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 183,
+          "scenario": "aborts the actual hydrate on workspace navigation and ignores a late document",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('other workspace')",
+          "fingerprint": "e55c8a49f3ee3d2e"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 184,
+          "scenario": "aborts the actual hydrate on workspace navigation and ignores a late document",
+          "assertion": "expect(catalog.viewModel.boards.value[0]?.revision).toBe(9)",
+          "fingerprint": "08ffd0afbc7c001b"
         }
       ],
       "plannedAssertion": "src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts :: cancels the old workspace read and ignores its late response after observer navigation; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
-      "verifiedRun": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts src/features/board/session/sync/boardSseMapping.contract.spec.ts src/features/board/session/sync/boardRevisionConflict.contract.spec.ts` -> 4 files / 45 tests passed (integration 16 + race helper 8 + broadcast helper 13 + conflict helper 8); production Query binding green post-integration, no pre-integration red recorded; formal P2.5 acceptance still pending, no CI/checkpoint claim.",
       "missingEvidence": [
-        "Production navigation/observer integration and real pre-integration red/green not yet recorded. Prior helper green remains historical only."
+        "Pre-integration red was not recorded; production Query binding is verified green post-integration via repositoryQueryIntegration (see verifiedRun). Formal P2.5 acceptance still pending; no CI/checkpoint claim."
       ],
       "historicalVerifiedRun": "2026-10-11 integrator: `npm run test:run -- src/features/board/application/sync/boardSourceOfTruth.contract.spec.ts -t 'cancels the old workspace read and ignores its late response after observer navigation'` -> 1 passed | 7 skipped."
     },
@@ -19758,34 +22874,62 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "After formal P2.5 acceptance and merge, bind the frozen broadcast scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
-      "status": "pending",
+      "status": "verified",
       "evidence": [
         {
           "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
-          "line": 212,
+          "line": 213,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(1)",
           "fingerprint": "d6b11782fd41010b"
         },
         {
           "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
-          "line": 213,
+          "line": 214,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(observer.getCurrentResult().data?.revision).toBe(7)",
           "fingerprint": "4332ca1e6dd93ac8"
         },
         {
           "source": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
-          "line": 216,
+          "line": 217,
           "scenario": "invalidates the document on document_replaced with 500ms coalesce",
           "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
           "fingerprint": "b30be3648fd322bb"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 132,
+          "scenario": "refetches and projects a clean document through the production observer after SSE",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(2)",
+          "fingerprint": "318c4813eb081905"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 134,
+          "scenario": "refetches and projects a clean document through the production observer after SSE",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('latest from HTTP')",
+          "fingerprint": "32597e02dce50c1f"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 135,
+          "scenario": "refetches and projects a clean document through the production observer after SSE",
+          "assertion": "expect(getBoardById('board-1')?.revision).toBe(10)",
+          "fingerprint": "2edd165a93bd7565"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 136,
+          "scenario": "refetches and projects a clean document through the production observer after SSE",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(3)",
+          "fingerprint": "e78dad0ca130e286"
         }
       ],
       "plannedAssertion": "src/features/board/session/sync/boardSseMapping.contract.spec.ts :: invalidates the document on document_replaced with 500ms coalesce; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
-      "verifiedRun": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts src/features/board/session/sync/boardSseMapping.contract.spec.ts src/features/board/session/sync/boardRevisionConflict.contract.spec.ts` -> 4 files / 45 tests passed (integration 16 + race helper 8 + broadcast helper 13 + conflict helper 8); production Query binding green post-integration, no pre-integration red recorded; formal P2.5 acceptance still pending, no CI/checkpoint claim.",
       "missingEvidence": [
-        "Production navigation/observer integration and real pre-integration red/green not yet recorded. Prior helper green remains historical only."
+        "Pre-integration red was not recorded; production Query binding is verified green post-integration via repositoryQueryIntegration (see verifiedRun). Formal P2.5 acceptance still pending; no CI/checkpoint claim."
       ],
       "historicalVerifiedRun": "2026-10-11 integrator: `npm run test:run -- src/features/board/application/sync/boardSseMapping.contract.spec.ts -t 'invalidates the document on document_replaced with 500ms coalesce'` -> 1 passed | 12 skipped."
     },
@@ -19794,7 +22938,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P3",
       "owner": "/root/p3-lane",
       "requirement": "After formal P2.5 acceptance and merge, bind the frozen conflict scenario to production Query, record real red before implementation and green afterward. See syncDesign.p3Trio.",
-      "status": "pending",
+      "status": "verified",
       "evidence": [
         {
           "source": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts",
@@ -19816,12 +22960,68 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "scenario": "keeps the draft and the conflict status on 409, then converges on explicit reload",
           "assertion": "expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })",
           "fingerprint": "5f10b0976f5d2987"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 209,
+          "scenario": "marks a conflicted local draft stale without a GET or advancing its base",
+          "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
+          "fingerprint": "20d6abd5f05d1169"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 214,
+          "scenario": "marks a conflicted local draft stale without a GET or advancing its base",
+          "assertion": "expect(mocks.request).toHaveBeenCalledTimes(reads)",
+          "fingerprint": "33ac218c3a068b07"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 215,
+          "scenario": "marks a conflicted local draft stale without a GET or advancing its base",
+          "assertion": "expect(queryClient.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated).toBe(true)",
+          "fingerprint": "23aadf00501780e3"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 218,
+          "scenario": "marks a conflicted local draft stale without a GET or advancing its base",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('unsaved edit')",
+          "fingerprint": "929ad46901a0d144"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 349,
+          "scenario": "keeps server catalog separate from conflict drafts and fetches fresh on explicit reload",
+          "assertion": "expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })",
+          "fingerprint": "7b28c095bef21dc7"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 352,
+          "scenario": "keeps server catalog separate from conflict drafts and fetches fresh on explicit reload",
+          "assertion": "expect(await catalog.commands.hydrate({ preserveLocalNewer: false })).toEqual({ ok: true })",
+          "fingerprint": "3d46bc9994603d69"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 353,
+          "scenario": "keeps server catalog separate from conflict drafts and fetches fresh on explicit reload",
+          "assertion": "expect(getBoardById('board-1')?.revision).toBe(8)",
+          "fingerprint": "31a76e42f7ea8389"
+        },
+        {
+          "source": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
+          "line": 354,
+          "scenario": "keeps server catalog separate from conflict drafts and fetches fresh on explicit reload",
+          "assertion": "expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote winner')",
+          "fingerprint": "e4f98f50b6da9093"
         }
       ],
       "plannedAssertion": "src/features/board/session/sync/boardRevisionConflict.contract.spec.ts :: keeps the draft and the conflict status on 409, then converges on explicit reload; preserve exact reference assertions in syncDesign.p3Trio. Production binding remains pending.",
-      "verifiedRun": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts src/features/board/session/sync/boardSourceOfTruth.contract.spec.ts src/features/board/session/sync/boardSseMapping.contract.spec.ts src/features/board/session/sync/boardRevisionConflict.contract.spec.ts` -> 4 files / 45 tests passed (integration 16 + race helper 8 + broadcast helper 13 + conflict helper 8); production Query binding green post-integration, no pre-integration red recorded; formal P2.5 acceptance still pending, no CI/checkpoint claim.",
       "missingEvidence": [
-        "Production navigation/observer integration and real pre-integration red/green not yet recorded. Prior helper green remains historical only."
+        "Pre-integration red was not recorded; production Query binding is verified green post-integration via repositoryQueryIntegration (see verifiedRun). Formal P2.5 acceptance still pending; no CI/checkpoint claim."
       ],
       "historicalVerifiedRun": "2026-10-11 integrator: `npm run test:run -- src/features/board/application/sync/boardRevisionConflict.contract.spec.ts -t 'keeps the draft and the conflict status on 409, then converges on explicit reload'` -> 1 passed | 7 skipped."
     },
@@ -20166,11 +23366,11 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "line": 470,
           "scenario": "renders and forwards Canvas interactions through the public Screen seam",
           "assertion": "expect(view.getByTestId('chrome-region')).toBeInTheDocument()",
-          "fingerprint": "b4b4933012c1bcaa"
+          "fingerprint": "cfb753d7ce84156d"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof. Re-anchored 2026-10-12 P7 close-out: identical assertion re-pointed at current lines; `npx vitest run src/features/canvas/ui/screens/CanvasScreen.component.spec.ts` -> 5/5 green."
     },
     {
       "id": "canvas/board-route-recovery",
@@ -20184,11 +23384,11 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "line": 552,
           "scenario": "recovers the next Board session when the route switches",
           "assertion": "expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)",
-          "fingerprint": "08617705e20bef6b"
+          "fingerprint": "6b9a5e81464d3bd6"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof. Re-anchored 2026-10-12 P7 close-out: identical assertion re-pointed at current lines; `npx vitest run src/features/canvas/ui/screens/CanvasScreen.component.spec.ts` -> 5/5 green."
     },
     {
       "id": "canvas/task-last-slot-release",
@@ -20199,41 +23399,85 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "evidence": [
         {
           "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
-          "line": 310,
+          "line": 309,
           "scenario": "returns a shared Task only after its final active slot is cancelled or released",
           "assertion": "expect(core.cancel([firstLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: [],\n})",
-          "fingerprint": "6e88bfd5ae00d2e8"
+          "fingerprint": "08221427d27b1bc6"
         },
         {
           "source": "src/features/canvas/session/execution/pending-execution/core.unit.spec.ts",
-          "line": 314,
+          "line": 313,
           "scenario": "returns a shared Task only after its final active slot is cancelled or released",
           "assertion": "expect(core.release([secondLease])).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(2), kind: 'released' }],\n    cancellableTaskIds: ['task-shared'],\n})",
-          "fingerprint": "7e0a5f884bd8480b"
+          "fingerprint": "c2d56194e03560b2"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof. Re-anchored 2026-10-12 P7 close-out: identical assertions re-pointed at current lines; `npx vitest run src/features/canvas/session/execution/pending-execution/core.unit.spec.ts` -> 15/15 green."
     },
     {
       "id": "canvas/flow-cancel-and-render-projection",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "Flow runtime performs returned cancellation and derives renderEdges from immutable projected facts without a duplicate mutable edge store.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Flow runtime performs returned cancellation and derives renderEdges from immutable projected facts without a duplicate mutable edge store.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+          "line": 83,
+          "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+          "assertion": "expect(running.edges[0]).toMatchObject({ animated: true })",
+          "fingerprint": "7921d6a32c2fbf74"
+        },
+        {
+          "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+          "line": 87,
+          "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+          "assertion": "expect(cancellation).toEqual({\n    outcomes: [{ resultNodeId: imageNodeId(1), kind: 'cancelled' }],\n    cancellableTaskIds: ['task-1'],\n})",
+          "fingerprint": "ed3ed5e74c451cf9"
+        },
+        {
+          "source": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+          "line": 95,
+          "scenario": "performs the returned cancellation and projects render edges from immutable facts",
+          "assertion": "expect(Object.isFrozen(snapshot)).toBe(true)",
+          "fingerprint": "7aa679bf23949583"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts src/features/canvas/session/execution/pending-execution/core.unit.spec.ts src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts` 6 files / 25 tests green (flow-cancel 2/2, core 15/15); cancellation invoked + renderEdges from immutable frozen facts, no duplicate mutable edge store."
     },
     {
       "id": "canvas/immutable-connection-endpoints",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "Dragging/connect gestures preserve immutable endpoint identities and reject stale Graph Session edges through observable Screen/Flow behavior.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Dragging/connect gestures preserve immutable endpoint identities and reject stale Graph Session edges through observable Screen/Flow behavior.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "line": 393,
+          "scenario": "binds the rendered edges to the projected renderEdges ref",
+          "assertion": "expect(container.querySelectorAll('.vue-flow__edge')).toHaveLength(1)",
+          "fingerprint": "b913288053004962"
+        },
+        {
+          "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "line": 445,
+          "scenario": "renders no edge-update handles and creates no edge on node click",
+          "assertion": "expect(container.querySelectorAll('.vue-flow__edgeupdater')).toHaveLength(0)",
+          "fingerprint": "938ad2dc7b353cc3"
+        },
+        {
+          "source": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "line": 479,
+          "scenario": "animates no edge by default",
+          "assertion": "expect(edge.classList.contains('animated')).toBe(false)",
+          "fingerprint": "04ecbb93c4bda046"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:browser -- src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts` 5/5 chromium green; rendered edges track projected renderEdges, no culling, no update handles, no click-connect, no animation."
     },
     {
       "id": "canvas/icon-accessible-name",
@@ -20247,38 +23491,96 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
           "line": 18,
           "scenario": "supports pointer and keyboard activation through its accessible name",
           "assertion": "expect(control).toHaveFocus()",
-          "fingerprint": "ccff7d7f218fd503"
+          "fingerprint": "f0e0fa3a34890087"
         },
         {
           "source": "src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts",
           "line": 19,
           "scenario": "supports pointer and keyboard activation through its accessible name",
           "assertion": "expect(onClick).toHaveBeenCalledTimes(2)",
-          "fingerprint": "b5fd466012c31c1c"
+          "fingerprint": "28d365ef80de36dd"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof. Re-anchored 2026-10-12 P7 close-out: identical assertions re-pointed at current lines; `npx vitest run src/features/canvas/ui/nodes/primitives/NodeToolIconButton.component.spec.ts` -> 3/3 green."
     },
     {
       "id": "canvas/icon-explicit-name-precedence",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "NodeActionButton/NodeToolIconButton explicit aria label wins over fallback tooltip and survives icon-only rendering.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "NodeActionButton/NodeToolIconButton explicit aria label wins over fallback tooltip and survives icon-only rendering.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+          "line": 14,
+          "scenario": "prefers explicit aria label over tooltip for NodeToolIconButton icon-only rendering",
+          "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+          "fingerprint": "8f322058ec082151"
+        },
+        {
+          "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+          "line": 28,
+          "scenario": "prefers explicit aria label over tooltip for NodeActionButton icon-only rendering",
+          "assertion": "expect(control).toHaveAttribute('aria-label', 'Explicit action')",
+          "fingerprint": "8bd0c2cb528a8823"
+        },
+        {
+          "source": "src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts",
+          "line": 40,
+          "scenario": "falls back to tooltip when no explicit aria label is given",
+          "assertion": "expect(control).toHaveAttribute('aria-label', 'Fallback tooltip')",
+          "fingerprint": "23fef9abd38066e9"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/ui/nodes/primitives/nodeIconExplicitNamePrecedence.component.spec.ts` 3/3 green; explicit aria-label wins over tooltip for both buttons, fallback preserved, icon-only survives."
     },
     {
       "id": "canvas/outpaint-tool-lifecycle",
       "phase": "P5",
       "owner": "/root/p5-lane",
       "requirement": "Outpaint enters/exits tool session, preserves node identity and draft mask bounds, then restores neutral Canvas state without stale overlays.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Outpaint enters/exits tool session, preserves node identity and draft mask bounds, then restores neutral Canvas state without stale overlays.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/tools/outpaint/session/outpaintToolLifecycle.unit.spec.ts",
+          "line": 55,
+          "scenario": "enters a session with node identity, preserves draft bounds through commit, then restores neutral state",
+          "assertion": "expect(harness.overlay.enterOutpaintMode('image-1')).toBe(true)",
+          "fingerprint": "514cb3f0294b5518"
+        },
+        {
+          "source": "src/features/canvas/tools/outpaint/session/outpaintToolLifecycle.unit.spec.ts",
+          "line": 75,
+          "scenario": "enters a session with node identity, preserves draft bounds through commit, then restores neutral state",
+          "assertion": "expect(harness.onCommit).toHaveBeenCalledOnce()",
+          "fingerprint": "5885e2d6227b44b7"
+        },
+        {
+          "source": "src/features/canvas/tools/outpaint/session/outpaintToolLifecycle.unit.spec.ts",
+          "line": 97,
+          "scenario": "restores neutral default bounds on re-enter instead of leaking the previous draft",
+          "assertion": "expect(harness.overlay.enterOutpaintMode('image-1')).toBe(true)",
+          "fingerprint": "84eb758e839b3869"
+        },
+        {
+          "source": "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.browser.spec.ts",
+          "line": 22,
+          "scenario": "submits an outpaint prompt and exposes resize handles",
+          "assertion": "expect(document.querySelectorAll('.image-node-outpaint-handle')).toHaveLength(8)",
+          "fingerprint": "64c0c6865f84af47"
+        },
+        {
+          "source": "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.browser.spec.ts",
+          "line": 56,
+          "scenario": "keeps handle pointer drags inside the overlay",
+          "assertion": "expect(handlePointerDown).toHaveBeenCalledOnce()",
+          "fingerprint": "e0cb76edbeaf2f30"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P5 catch-up: `cd apps/web && npm run test:run -- src/features/canvas/tools/outpaint/session/outpaintToolLifecycle.unit.spec.ts` 2/2 green + `npm run test:browser -- src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.browser.spec.ts` 2/2 chromium green; enter/exit session, node identity + draft bounds preserved, neutral restore, no stale overlays."
     },
     {
       "id": "image-tools/neutral-media-mask-release",
@@ -20508,50 +23810,398 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "phase": "P7",
       "owner": "/root/p7-lane",
       "requirement": "Tabs primitive supports arrow/home/end navigation, selected state, disabled tabs and accessible tab/panel linkage.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Tabs primitive supports arrow/home/end navigation, selected state, disabled tabs and accessible tab/panel linkage.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 40,
+          "scenario": "advertises tablist semantics with a single selected tab",
+          "assertion": "expect(screen.getByRole('tablist', { name: 'Account sections' })).toBeInTheDocument()",
+          "fingerprint": "753558de9a7b81aa"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 43,
+          "scenario": "advertises tablist semantics with a single selected tab",
+          "assertion": "expect(tabs[0]).toHaveAttribute('aria-selected', 'true')",
+          "fingerprint": "e6e217a54545cc1f"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 56,
+          "scenario": "keeps a single tab stop with roving tabindex",
+          "assertion": "expect(tabs.filter((tab) => tab.getAttribute('tabindex') === '0')).toEqual([tabAt(tabs, 2)])",
+          "fingerprint": "fb4a25506b80eec8"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 60,
+          "scenario": "keeps a single tab stop with roving tabindex",
+          "assertion": "expect(document.activeElement).toBe(tabs[0])",
+          "fingerprint": "a08d7ec4183a73c8"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 69,
+          "scenario": "shows only the selected tab panel",
+          "assertion": "expect(screen.getByRole('tabpanel', { name: 'Overview' })).toHaveTextContent('Overview panel')",
+          "fingerprint": "f70fbae010f289b8"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 70,
+          "scenario": "shows only the selected tab panel",
+          "assertion": "expect(screen.queryByRole('tabpanel', { name: 'Settings' })).not.toBeInTheDocument()",
+          "fingerprint": "773c37cebe6afe31"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 79,
+          "scenario": "marks the disabled tab inert so it never takes selection",
+          "assertion": "expect((activity as HTMLButtonElement).disabled).toBe(true)",
+          "fingerprint": "771bd6a6415f3a13"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 82,
+          "scenario": "marks the disabled tab inert so it never takes selection",
+          "assertion": "expect(activity).toHaveAttribute('aria-selected', 'false')",
+          "fingerprint": "7b6c586f88f9663b"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 96,
+          "scenario": "moves focus with arrow keys and skips disabled tabs",
+          "assertion": "expect(document.activeElement).toBe(tabs[2])",
+          "fingerprint": "780746ba526deffa"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 97,
+          "scenario": "moves focus with arrow keys and skips disabled tabs",
+          "assertion": "expect(tabs[2]).toHaveAttribute('aria-selected', 'true')",
+          "fingerprint": "a1b6050ea2e1aad6"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 109,
+          "scenario": "jumps to the first and last enabled tabs with Home and End",
+          "assertion": "expect(document.activeElement).toBe(tabs[0])",
+          "fingerprint": "82fc7328bbc22eb7"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 112,
+          "scenario": "jumps to the first and last enabled tabs with Home and End",
+          "assertion": "expect(document.activeElement).toBe(tabs[2])",
+          "fingerprint": "d34215f2527dff0e"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 121,
+          "scenario": "selects a tab and reveals its panel on click",
+          "assertion": "expect(screen.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'true')",
+          "fingerprint": "8e4b8f7017494bfc"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 132,
+          "scenario": "links the visible panel back to its tab",
+          "assertion": "expect(labelledBy).toBeTruthy()",
+          "fingerprint": "d78a94e96f1cce7e"
+        },
+        {
+          "source": "src/components/ui/tabs/tabs.component.spec.ts",
+          "line": 134,
+          "scenario": "links the visible panel back to its tab",
+          "assertion": "expect(tab?.getAttribute('role')).toBe('tab')",
+          "fingerprint": "8d56d2b97ddb6603"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/components/ui/tabs/tabs.component.spec.ts` -> 8/8 passed (tablist semantics, roving tabindex, panel linkage, disabled inertness, arrows/home/end, click selection)."
     },
     {
       "id": "final/table-semantics",
       "phase": "P7",
       "owner": "/root/p7-lane",
       "requirement": "Table primitive retains table/header/cell semantics with keyboard-reachable actions and loading/empty states.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Table primitive retains table/header/cell semantics with keyboard-reachable actions and loading/empty states.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 52,
+          "scenario": "renders native table semantics with caption, headers, rows and cells",
+          "assertion": "expect(screen.getByRole('table')).toBeInTheDocument()",
+          "fingerprint": "6f65a13114ac6afb"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 53,
+          "scenario": "renders native table semantics with caption, headers, rows and cells",
+          "assertion": "expect(document.querySelector('table caption')).toHaveTextContent('Recent orders')",
+          "fingerprint": "d6c5a70745976b8e"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 54,
+          "scenario": "renders native table semantics with caption, headers, rows and cells",
+          "assertion": "expect(screen.getAllByRole('columnheader')).toHaveLength(2)",
+          "fingerprint": "c5aeb597e8de91ea"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 55,
+          "scenario": "renders native table semantics with caption, headers, rows and cells",
+          "assertion": "expect(screen.getAllByRole('row')).toHaveLength(3)",
+          "fingerprint": "4a58111068884909"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 56,
+          "scenario": "renders native table semantics with caption, headers, rows and cells",
+          "assertion": "expect(screen.getAllByRole('cell')).toHaveLength(4)",
+          "fingerprint": "60ceccee862af509"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 63,
+          "scenario": "marks column headers with column scope",
+          "assertion": "expect(header.tagName).toBe('TH')",
+          "fingerprint": "6b4fd0ca7a091067"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 64,
+          "scenario": "marks column headers with column scope",
+          "assertion": "expect(header).toHaveAttribute('scope', 'col')",
+          "fingerprint": "809d7ee179f0e531"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 72,
+          "scenario": "exposes the sortable header as a button carrying aria-sort",
+          "assertion": "expect(header).toHaveAttribute('aria-sort', 'descending')",
+          "fingerprint": "f270fc7f14ab76be"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 74,
+          "scenario": "exposes the sortable header as a button carrying aria-sort",
+          "assertion": "expect(button.tagName).toBe('BUTTON')",
+          "fingerprint": "8f94959a911c738f"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 95,
+          "scenario": "activates sorting from the keyboard alone",
+          "assertion": "expect(document.activeElement).toBe(button)",
+          "fingerprint": "507c40c4ed920726"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 98,
+          "scenario": "activates sorting from the keyboard alone",
+          "assertion": "expect(onSort).toHaveBeenCalledTimes(1)",
+          "fingerprint": "1dc198514885787c"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 106,
+          "scenario": "makes rows with an explicit tabindex keyboard-reachable",
+          "assertion": "expect((row as HTMLTableRowElement).tabIndex).toBe(0)",
+          "fingerprint": "360bd5c9fe5c6271"
+        },
+        {
+          "source": "src/components/ui/table/table.component.spec.ts",
+          "line": 108,
+          "scenario": "makes rows with an explicit tabindex keyboard-reachable",
+          "assertion": "expect(document.activeElement).toBe(row)",
+          "fingerprint": "6305c043c2a33466"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/components/ui/table/table.component.spec.ts` -> 7/7 passed (native semantics, scope, sort button + keyboard activation, tab order); loading/empty states live in the AdminTable consumer (AdminTableEmpty.vue + empty slot), not the neutral primitive by design."
     },
     {
       "id": "final/touch-targets",
       "phase": "P7",
       "owner": "/root/p7-lane",
       "requirement": "Existing 32px controls and 24px drag-handle exception remain enforceable; new interactive controls meet designed target sizes without layout overlap.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Existing 32px controls and 24px drag-handle exception remain enforceable; new interactive controls meet designed target sizes without layout overlap.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 82,
+          "scenario": "declares the 32px floor and the 24px drag exception as live tokens",
+          "assertion": "expect(rootToken('--spacing-touch-target-min')).toBe(`${FLOOR_PX}px`)",
+          "fingerprint": "8a2ed5ba4f1f5e68"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 83,
+          "scenario": "declares the 32px floor and the 24px drag exception as live tokens",
+          "assertion": "expect(rootToken('--spacing-touch-target-aa')).toBe(`${AA_PX}px`)",
+          "fingerprint": "b7be845cb45b4874"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 95,
+          "scenario": "declares the 32px floor and the 24px drag exception as live tokens",
+          "assertion": "expect.poll(() => afterBox(host).width).toBe(FLOOR_PX)",
+          "fingerprint": "9c2d6c4512c373f9"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 102,
+          "scenario": "grows visually-small controls to the floor without changing the design",
+          "assertion": "expect(afterBox(small)).toEqual({ width: FLOOR_PX, height: FLOOR_PX })",
+          "fingerprint": "eebec167a1df49df"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 117,
+          "scenario": "grows visually-small controls to the floor without changing the design",
+          "assertion": "expect(clicked).toHaveBeenCalledOnce()",
+          "fingerprint": "ba8f985906f84f5f"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 123,
+          "scenario": "keeps the AdminSwitch track on the floor without inflating the design",
+          "assertion": "expect(track.className).toContain('hit-target-32')",
+          "fingerprint": "ab2c3c7efc4ece73"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 125,
+          "scenario": "keeps the AdminSwitch track on the floor without inflating the design",
+          "assertion": "expect(afterBox(track).height).toBe(FLOOR_PX)",
+          "fingerprint": "523776358ddc3b2e"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 136,
+          "scenario": "keeps node action buttons on the floor inside compact chrome",
+          "assertion": "expect(afterBox(action).height).toBe(FLOOR_PX)",
+          "fingerprint": "63eca56c4acd92fb"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 141,
+          "scenario": "keeps the compact admin icon button on a real 32px box",
+          "assertion": "expect(icon.offsetWidth).toBe(FLOOR_PX)",
+          "fingerprint": "8c2312439908ae8a"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 142,
+          "scenario": "keeps the compact admin icon button on a real 32px box",
+          "assertion": "expect(icon.offsetHeight).toBe(FLOOR_PX)",
+          "fingerprint": "98064dd679fd5e8c"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 171,
+          "scenario": "stops retouch drag handles at the 24px exception and keeps them keyboard-operable",
+          "assertion": "expect(mid.className).toContain('hit-target-drag')",
+          "fingerprint": "20268d00add41294"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 174,
+          "scenario": "stops retouch drag handles at the 24px exception and keeps them keyboard-operable",
+          "assertion": "expect(afterBox(mid)).toEqual({ width: AA_PX, height: AA_PX })",
+          "fingerprint": "27c3678de406f43a"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 177,
+          "scenario": "stops retouch drag handles at the 24px exception and keeps them keyboard-operable",
+          "assertion": "expect(events.movePoint).toHaveBeenCalledWith('mid', { input: 50, output: 51 })",
+          "fingerprint": "f1b830afc0536bde"
+        },
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 185,
+          "scenario": "stops retouch drag handles at the 24px exception and keeps them keyboard-operable",
+          "assertion": "expect(marker.offsetWidth).toBe(AA_PX)",
+          "fingerprint": "22129abb86ed3f01"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run --config vitest.browser.config.ts src/test/touchTarget.browser.spec.ts` -> 6/6 passed in real chromium (32px floor + 24px drag exception as live tokens, small-control growth, switch/track/node/chip floors, drag-handle exception with keyboard operability)."
     },
     {
       "id": "final/routes-browser-visual",
       "phase": "P7",
       "owner": "/root/p7-lane",
       "requirement": "Desktop/mobile screenshots of auth, Workspace/Board, Canvas, Library, Account and Admin show nonblank assets, no overlapping text, preserved CSS import order and keyboard focus.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Desktop/mobile screenshots of auth, Workspace/Board, Canvas, Library, Account and Admin show nonblank assets, no overlapping text, preserved CSS import order and keyboard focus.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+          "line": 88,
+          "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+          "assertion": "expect(textarea.matches(':focus-visible')).toBe(true)",
+          "fingerprint": "5129181774207072"
+        },
+        {
+          "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+          "line": 99,
+          "scenario": "keeps histogram marker rings on the shared outline tokens without layout shift",
+          "assertion": "expect(marker.matches(':focus-visible')).toBe(true)",
+          "fingerprint": "8298b72696c75a6e"
+        },
+        {
+          "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+          "line": 194,
+          "scenario": "keeps curve point rings on the shared outline tokens without layout shift",
+          "assertion": "expect(point.matches(':focus-visible')).toBe(true)",
+          "fingerprint": "6c7ad1e36a731857"
+        },
+        {
+          "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+          "line": 238,
+          "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+          "assertion": "expect(row.matches(':focus-visible')).toBe(true)",
+          "fingerprint": "13fda861d1fb8e04"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npm run test:routes-visual` -> 10/10 captures passed (5 routes x desktop/mobile) with manifest at apps/web/node_modules/.cache/route-screenshots/manifest.json; all PNGs nonblank (110-598KB), 0 pageErrors, 10 benign 401 console errors (anonymous smoke, no session — documented lane gap; boards/canvas redirect to login as designed); keyboard-focus pinned by browser assertions (see evidence)."
     },
     {
       "id": "final/browser-retry-quarantine",
       "phase": "P7",
       "owner": "/root/p7-lane",
       "requirement": "Browser retries are <=2, quarantine <=5%, removals require consecutive green runs, and separate daily quarantined-job evidence is attached.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "Browser retries are <=2, quarantine <=5%, removals require consecutive green runs, and separate daily quarantined-job evidence is attached.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/test/touchTarget.browser.spec.ts",
+          "line": 117,
+          "scenario": "grows visually-small controls to the floor without changing the design",
+          "assertion": "expect(clicked).toHaveBeenCalledOnce()",
+          "fingerprint": "ba8f985906f84f5f"
+        },
+        {
+          "source": "src/features/canvas/ui/nodes/primitives/promptComposerRing.browser.spec.ts",
+          "line": 107,
+          "scenario": "gives the borderless prompt textarea a visible ring on focus without layout shift",
+          "assertion": "expect.poll(() => styleOf(textarea).boxShadow).toBe(before)",
+          "fingerprint": "d7ff194551d7a74b"
+        },
+        {
+          "source": "src/features/canvas/tools/retouch/ui/retouchFocusRing.browser.spec.ts",
+          "line": 256,
+          "scenario": "keeps layer row rings on the shared outline tokens without layout shift",
+          "assertion": "expect.poll(() => styleOf(row).outlineOffset).toBe('2px')",
+          "fingerprint": "9598ca783cedcbfb"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npm run test:browser` -> 22 files / 82 tests passed, exit 0; retries=0 (no retry lines; config sets no retry), quarantined=0 (no .skip/.todo in tree; no quarantine mechanism exists); representative browser assertions green in the same run (see evidence). No CI claim; working-tree evidence only."
     }
   ],
   "budget": {
@@ -23121,23 +26771,6 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "entries": [
           "src/shared/components/formFieldContract.ts"
         ]
-      }
-    },
-    {
-      "source": "src/shared/components/iconButtonAccessibleName.contract.spec.ts",
-      "targets": [
-        "src/shared/components/iconButtonAccessibleName.contract.spec.ts"
-      ],
-      "phase": "P1b",
-      "owner": "/root/p1b-lane",
-      "status": "retained-pending-retirement",
-      "consumers": [],
-      "productionFeatureConsumers": [],
-      "disposition": "horizontal-or-companion",
-      "evidence": "Retained in place while its two frozen P1b retirement obligations remain pending; no move or retirement claimed.",
-      "consumerEvidence": {
-        "kind": "direct-cruise-edges",
-        "count": 0
       }
     },
     {
@@ -29705,6 +33338,726 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "status": "verified"
       },
       "reviewRequired": false
+    },
+    {
+      "id": "source-5de7670feb23f2f2-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 58,
+      "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+      "assertion": "expect(kindLabels).toContain('RETOUCH_KIND_LABEL_KEYS')",
+      "fingerprint": "5de7670feb23f2f2",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-5de7670feb23f2f2",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-ce6d4072c33bf557-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 59,
+      "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+      "assertion": "expect(kindLabels).toContain('RETOUCH_EFFECT_RAIL_ORDER')",
+      "fingerprint": "ce6d4072c33bf557",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-ce6d4072c33bf557",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-1c2410fb87a1f1b6-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 60,
+      "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+      "assertion": "expect(kindLabels).toContain('labelKey')",
+      "fingerprint": "1c2410fb87a1f1b6",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-1c2410fb87a1f1b6",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-d9abf91a9bcc0c4c-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 61,
+      "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+      "assertion": "expect(kindLabels).not.toContain('useI18n')",
+      "fingerprint": "d9abf91a9bcc0c4c",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-d9abf91a9bcc0c4c",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-85c65365bc8c3513-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 62,
+      "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+      "assertion": "expect(kindLabels).not.toContain('vue-i18n')",
+      "fingerprint": "85c65365bc8c3513",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-85c65365bc8c3513",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-3e3083a5e1d52aae-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 63,
+      "scenario": "keeps kind labels locale-free in core without importing the i18n runtime",
+      "assertion": "expect(kindLabels).not.toContain('i18n.global')",
+      "fingerprint": "3e3083a5e1d52aae",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-3e3083a5e1d52aae",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-10adb731e7e980e8-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 70,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(railAriaLabels()).toEqual([...RAIL_LABELS.en])",
+      "fingerprint": "10adb731e7e980e8",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-10adb731e7e980e8",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-9b2f77476d71688f-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 72,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(firstButtons).toHaveLength(RAIL_LABELS.en.length)",
+      "fingerprint": "9b2f77476d71688f",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-9b2f77476d71688f",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-96a692772cddcf50-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 76,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(setUserLocale(locale)).resolves.toBe(true)",
+      "fingerprint": "96a692772cddcf50",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-96a692772cddcf50",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-1c9f0a2ddeeddaa3-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 82,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(buttons).toHaveLength(RAIL_LABELS.en.length)",
+      "fingerprint": "1c9f0a2ddeeddaa3",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-1c9f0a2ddeeddaa3",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-feb595f07023526e-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 84,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(button).toBe(firstButtons[index])",
+      "fingerprint": "feb595f07023526e",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-feb595f07023526e",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-266648942727a200-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 86,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(railAriaLabels()).toEqual([...RAIL_LABELS[locale]])",
+      "fingerprint": "266648942727a200",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-266648942727a200",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-42d1f9d5e73424d9-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 91,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(new Set(rendered).size).toBe(ALL_LOCALES.length)",
+      "fingerprint": "42d1f9d5e73424d9",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-42d1f9d5e73424d9",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-16652f846996d044-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 94,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(setUserLocale('en')).resolves.toBe(true)",
+      "fingerprint": "16652f846996d044",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-16652f846996d044",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-10adb731e7e980e8-2",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 96,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(railAriaLabels()).toEqual([...RAIL_LABELS.en])",
+      "fingerprint": "10adb731e7e980e8",
+      "occurrence": 2,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-10adb731e7e980e8",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-feb595f07023526e-2",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 100,
+      "scenario": "re-translates every rail kind label across all four locales without remount",
+      "assertion": "expect(button).toBe(firstButtons[index])",
+      "fingerprint": "feb595f07023526e",
+      "occurrence": 2,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-feb595f07023526e",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-87490d4a600016b8-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 109,
+      "scenario": "renders four distinct rail copies, one per locale",
+      "assertion": "expect(setUserLocale(locale)).resolves.toBe(true)",
+      "fingerprint": "87490d4a600016b8",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-87490d4a600016b8",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-e14aff39bd26406b-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 112,
+      "scenario": "renders four distinct rail copies, one per locale",
+      "assertion": "expect(labels).toEqual([...RAIL_LABELS[locale]])",
+      "fingerprint": "e14aff39bd26406b",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-e14aff39bd26406b",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-8f8a80c3a69be5d2-1",
+      "source": "src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts",
+      "line": 117,
+      "scenario": "renders four distinct rail copies, one per locale",
+      "assertion": "expect(new Set(rendered).size).toBe(ALL_LOCALES.length)",
+      "fingerprint": "8f8a80c3a69be5d2",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-8f8a80c3a69be5d2",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental retouch rail four-locale regression (i18n/retouch-call-time-locale-switch); retain its locale-free core and 4-locale rendering pins.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/tools/retouch/ui/chrome/EffectActions.fourLocale.contract.spec.ts src/features/canvas/tools/retouch/ui/curves/CurvesControl.component.spec.ts src/features/canvas/tools/retouch/ui/levels/LevelsControl.component.spec.ts src/features/canvas/tools/retouch/ui/threshold/ThresholdControl.component.spec.ts` -> 4 files / 23 tests passed (rail 3 + curves 5 + levels 8 + threshold 7; locales en/zh-CN/es/ko, no remount); residual retouchShared.contract.spec.ts 2/2 green (18 frozen source-string pins retained in place)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-eb97c8e992b807d5-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 15,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(existsSync(legacyRuntimePath)).toBe(false)",
+      "fingerprint": "eb97c8e992b807d5",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-eb97c8e992b807d5",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-742690bd45104717-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 21,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(core).toMatch(/export function createPendingImageExecutionCore\\(/)",
+      "fingerprint": "742690bd45104717",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-742690bd45104717",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-40bce7bf66084067-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 22,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(core).toMatch(/captureActiveLeases/)",
+      "fingerprint": "40bce7bf66084067",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-40bce7bf66084067",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-74cf1259c033afa4-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 23,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(core).toMatch(/cancellableTaskIds/)",
+      "fingerprint": "74cf1259c033afa4",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-74cf1259c033afa4",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-98366aea6ea4d95a-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 24,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).toMatch(/projectPendingImageExecutionEdges\\(edges, executionSnapshot\\.value\\)\\.edges/)",
+      "fingerprint": "98366aea6ea4d95a",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-98366aea6ea4d95a",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-c18dc2671331b4ca-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 27,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).toMatch(/const renderEdges = computed\\(/)",
+      "fingerprint": "c18dc2671331b4ca",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-c18dc2671331b4ca",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-1c4ff4833e74832a-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 28,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).toMatch(/graphAdapter\\.applyIncrementalProjection\\(/)",
+      "fingerprint": "1c4ff4833e74832a",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-1c4ff4833e74832a",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-553de55381a30fb2-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 29,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).not.toMatch(/watch\\(\\s*\\[options\\.edges, executionSnapshot\\]/)",
+      "fingerprint": "553de55381a30fb2",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-553de55381a30fb2",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-c36509b974b873c9-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 30,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).toMatch(/options\\.executionCore\\.release\\(leases\\)/)",
+      "fingerprint": "c36509b974b873c9",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-c36509b974b873c9",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-6f9d31e3cc3c319c-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 31,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).toMatch(/options\\.cancelTasks\\(release\\.cancellableTaskIds\\)/)",
+      "fingerprint": "6f9d31e3cc3c319c",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-6f9d31e3cc3c319c",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
+    },
+    {
+      "id": "source-9319c04fb95b85e4-1",
+      "source": "src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts",
+      "line": 32,
+      "scenario": "keeps one Core owner and derives Flow edge animation from its snapshot",
+      "assertion": "expect(flowRuntime).not.toMatch(/runningNodeIds\\s*=\\s*ref/)",
+      "fingerprint": "9319c04fb95b85e4",
+      "occurrence": 1,
+      "disposition": "retain-behavior",
+      "phase": "P5",
+      "proposedPhase": null,
+      "owner": "/root/p5-lane",
+      "risk": "medium",
+      "reason": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+      "retirementStatus": "retained",
+      "replacement": {
+        "id": "supplemental-9319c04fb95b85e4",
+        "kind": "retained-behavior",
+        "requirement": "Supplemental pending-execution single-owner structural pin; retain its core/flow-runtime text contract.",
+        "status": "verified-local",
+        "verifiedRun": "2026-10-12 P7 close-out: `cd apps/web && npx vitest run src/features/canvas/session/execution/runtime/canvasExecutionOwnership.contract.spec.ts` -> 1/1 passed (single Core owner, Flow edge animation derived, no dual watchers)."
+      },
+      "reviewRequired": false
     }
   ],
   "migrationProgress": {
@@ -29916,10 +34269,6 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
         "sha256": "3be5d841f2c4f479cd8095ce7e1d40fc2171257402733e72864d7fbe1bb16eb2"
       },
       {
-        "path": "apps/web/src/features/account/core/index.ts",
-        "sha256": "b04c026b822c55838ec871522bb84e3473ed9999e1d58524264a9a94194a835b"
-      },
-      {
         "path": "apps/web/src/features/account/core/money.ts",
         "sha256": "ec6b4990ca0f965440b90c6769a8fa92614caf0d812a32f0301e3d40e9db8db1"
       },
@@ -29934,10 +34283,6 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "path": "apps/web/src/features/account/session/formatters.ts",
         "sha256": "b3024898784341a954ed634c6629c43a426c811f66750aa3bce865c42ecdd83a"
-      },
-      {
-        "path": "apps/web/src/features/account/session/index.ts",
-        "sha256": "76146e5d8a1fdc19fadb6c769720674a46703b45ca4c7a594f11e2fc43de8a47"
       },
       {
         "path": "apps/web/src/features/account/session/money.ts",
@@ -30026,10 +34371,6 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       {
         "path": "apps/web/src/features/board/session/sync/boardSync.ts",
         "sha256": "2f811092c49a3b2e70785f83b32510822b4921353ac6d2a1779a23de0276541b"
-      },
-      {
-        "path": "apps/web/src/features/board/session/sync/index.ts",
-        "sha256": "836f534642571aa830a6093aa4ed5dd1ef818b64c9775d275da0c53a4cabee89"
       },
       {
         "path": "apps/web/src/features/board/testing/syncFixtures.ts",

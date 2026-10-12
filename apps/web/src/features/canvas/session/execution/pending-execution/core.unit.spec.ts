@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../../board'
 import { CanvasGraphSession } from '../../../core/graph'
+import { BoardGraphSession, type PendingImageResultNodeId } from './boardGraphSession'
 import {
-  BoardGraphSession,
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
   PendingImageMutationContractError,
   type PendingImageExecutionCore,
   type PendingImageExecutionLease,
   type PendingImageExecutionStartResult,
-  type PendingImageResultNodeId,
-} from './index'
+} from './core'
 import type { BoardAttachment } from '../board-attachment'
 import { bindBoardGraphSession, type PendingImageDomainMutationResult } from './boardGraphSession'
 

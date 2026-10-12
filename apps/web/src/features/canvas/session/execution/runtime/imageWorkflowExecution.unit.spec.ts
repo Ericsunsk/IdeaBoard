@@ -11,7 +11,8 @@ import {
 import { CanvasGraphSession } from '../../../core/graph'
 import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter/projection/bindCanvasGraphSessionProjection'
 import { boardSnapshotToFlow } from '../../../session/flow-adapter/projection/flowSnapshotAdapter.ts'
-import { BoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
+import { BoardGraphSession } from '../pending-execution/boardGraphSession'
+import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { useImageWorkflowExecution } from './imageWorkflowExecution'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 

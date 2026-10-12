@@ -17,19 +17,32 @@
 // code also consumes these Board-owned pure document contracts; the explicit
 // list keeps the port narrower than the full Board barrel.
 export {
-  CANVAS_NODE_REGISTRY_LIST,
   FUSION_SLOT_LAYOUT,
-  IMAGE_NODE_EMPTY_SIZE,
-  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
-  InvalidBoardStateError,
-  PROMPT_ASPECT_RATIO_OPTIONS,
   areFusionBlendPointsEqual,
-  assertLatestBoardSnapshot,
-  assertLatestBoardState,
   buildFusionDisplayPercentages,
   computeFusionBlendWeights,
   constrainFusionBlendPoint,
-  createEmptyBoardSnapshot,
+  getDefaultBlendPointForImageCount,
+  getFusionLineAnchors,
+  getFusionSlotAnchor,
+  getFusionSlotAnchors,
+  normalizeFusionBlendPoint,
+  type FusionBlendPoint,
+} from '../core/document/fusionBlend'
+export {
+  IMAGE_NODE_EMPTY_SIZE,
+  resolveImageNodeDisplayRatio,
+  resolveImageNodeFrameSize,
+  resolveImageNodeLatestOutput,
+  resolveImageNodeStageHeight,
+} from '../core/document/imageNodeSizing'
+export {
+  InvalidBoardStateError,
+  assertLatestBoardSnapshot,
+  assertLatestBoardState,
+} from '../core/document/latestBoardState'
+export {
+  CANVAS_NODE_REGISTRY_LIST,
   createTypedCanvasNodeSnapshot,
   getCanvasNodeImageInputLimit,
   getCanvasNodePortInputLimit,
@@ -37,73 +50,59 @@ export {
   getCanvasNodeRequiredInputPorts,
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
-  getDefaultBlendPointForImageCount,
-  getFusionLineAnchors,
-  getFusionSlotAnchor,
-  getFusionSlotAnchors,
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
   isCanvasImageInputSourceNodeType,
-  normalizeFusionBlendPoint,
-  normalizePromptAspectRatio,
-  rebuildBoardMediaRefs,
+  type CanvasConnectionContractNode,
+  type CanvasCreatableNodeKind,
+  type CanvasNodePortContract,
+  type CanvasSnapshotNodeCollectionKey,
+} from '../core/document/nodeRegistry'
+export {
+  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
+  createEmptyBoardSnapshot,
   requireImageNodeOutputCount,
-  resolveImageNodeDisplayRatio,
-  resolveImageNodeFrameSize,
-  resolveImageNodeLatestOutput,
-  resolveImageNodeStageHeight,
-  resolvePromptAspectRatioValue,
   resolveWorkflowNodeOutputStatus,
   type BoardSnapshot,
   type BoardState,
   type CanvasConnection,
-  type CanvasConnectionContractNode,
   type CanvasConnectionEndpoint,
   type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
-  type CanvasCreatableNodeKind,
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeKind,
   type CanvasGroup,
   type CanvasGroupNodeId,
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
-  type CanvasNodePortContract,
   type CanvasPoint,
-  type CanvasSnapshotNodeCollectionKey,
-  type FusionBlendPoint,
   type FusionNodeItem,
   type ImageNodeItem,
   type ImageNodeOutputItem,
   type ImageRetouchRecipe,
   type ImageRetouchRecipeStep,
   type LibraryImportFact,
-  type PromptAspectRatio,
   type PromptNodeInputImage,
   type PromptNodeItem,
   type WorkflowNodeOutputStatus,
-} from '../core'
+} from '../core/document/nodes'
+export {
+  PROMPT_ASPECT_RATIO_OPTIONS,
+  normalizePromptAspectRatio,
+  resolvePromptAspectRatioValue,
+  type PromptAspectRatio,
+} from '../core/document/promptAspectRatio'
+export { rebuildBoardMediaRefs } from '../core/media/references'
 
 // Local persistence and preview adapters.
-export {
-  loadBoardState,
-  serializeBoardState,
-  setBoardPreviewSnapshot,
-  setBoardState,
-} from '../session/persistence'
-export {
-  BOARD_PREVIEW_RENDERER_VERSION,
-  renderBoardPreviewDataUrl,
-} from '../session/preview'
+export { loadBoardState, setBoardPreviewSnapshot, setBoardState } from '../session/persistence/state'
+export { serializeBoardState } from '../session/persistence/boardStateSerialization'
+export { BOARD_PREVIEW_RENDERER_VERSION } from '../session/preview/boardPreviewVersion'
+export { renderBoardPreviewDataUrl } from '../session/preview/boardPreviewSerializer'
 
 // Catalog and revision-gated sync use cases.
-export {
-  getBoardById,
-  normalizeBoardName,
-  touchBoard,
-  useBoardRepository,
-  type BoardRepository,
-} from '../session/catalog'
+export { getBoardById, normalizeBoardName, touchBoard } from '../session/catalog/boards'
+export { useBoardRepository, type BoardRepository } from '../session/catalog/repository'
 export {
   fetchBoardArchivedAt,
   isBoardArchivedError,
@@ -112,4 +111,4 @@ export {
   syncBoardToServer,
   syncRestoreBoardToServer,
   type BoardSyncConflictKind,
-} from '../session/sync'
+} from '../session/sync/boardSync'

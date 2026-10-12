@@ -15,13 +15,54 @@
  * must not import `session/adapters` or any other Board implementation path.
  */
 // Durable Board facts and pure domain rules.
-export * from './core'
+export * from './core/document/nodes'
+export * from './core/document/nodeRegistry'
+export * from './core/document/latestBoardState'
+export * from './core/document/fusionBlend'
+export * from './core/document/imageNodeSizing'
+export * from './core/document/promptAspectRatio'
+export * from './core/schema/stateSchema'
+export * from './core/schema/boardStateEnvelopeContract'
+export * from './core/media/references'
 // Session use cases and repository/sync ports.
-export * from './session/catalog'
-export * from './session/sync'
-export * from './session/share-join'
+export * from './session/catalog/boards'
+export * from './session/catalog/repository'
+export * from './session/catalog/commands'
+export * from './session/catalog/scope'
+export {
+  hydrateBoardsFromServer,
+  syncBoardToServer,
+  syncBoardRenameToServer,
+  clearPendingBoardSyncRollback,
+  syncDeleteBoardToServer,
+  getBoardSyncConflictKind,
+  isBoardSyncConflictError,
+  isBoardArchivedError,
+  fetchBoardArchivedAt,
+  markBoardArchivedLocally,
+  syncRestoreBoardToServer,
+  type HydrateBoardsFromServerResult,
+  type HydrateBoardsFromServerOptions,
+  type BoardSyncConflictKind,
+} from './session/sync/boardSync'
+export * from './session/sync/boardQueryKeys'
+export * from './session/sync/boardQueries'
+export * from './session/sync/boardSseInvalidation'
+export * from './session/share-join/joinSharedBoardWorkflow'
 // Stable adapters for persistence and preview boundaries.
-export * from './session/persistence'
-export * from './session/preview'
+export * from './session/persistence/state'
+export * from './session/persistence/boardStateSerialization'
+export {
+  createBoardPreviewRefreshQueue,
+  type BoardPreviewRefreshQueue,
+} from './session/preview/boardPreviewRefreshQueue'
+export { renderBoardPreviewDataUrl } from './session/preview/boardPreviewSerializer'
+export { blankBoardPreviewSurfaceClass } from './session/preview/boardPreviewStyle'
+export { BOARD_PREVIEW_RENDERER_VERSION } from './session/preview/boardPreviewVersion'
 // Catalog presentation composition (route-level public surface).
-export * from './ui/gallery'
+export type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './ui/gallery/contract'
+export { createCatalog, formatCatalogDate, useCatalog } from './ui/gallery/useCatalog'
+export { createGalleryController } from './ui/gallery/controller'
+export { createCommandHandlers } from './ui/gallery/commandHandlers'
+export { createBoardFeedback, useBoardFeedback, type BoardFeedback } from './ui/gallery/useBoardFeedback'
+export { default as BoardsPage } from './ui/gallery/BoardsPage.vue'

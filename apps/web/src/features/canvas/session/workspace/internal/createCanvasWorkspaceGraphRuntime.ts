@@ -10,7 +10,7 @@ import {
   type CanvasGraphEditingUploadAdapter,
   type CanvasGraphInteractionBrowserAdapter,
 } from '../../graph-editing'
-import type { PendingImageExecutionCore } from '../../execution/pending-execution'
+import type { PendingImageExecutionCore } from '../../execution/pending-execution/core'
 import type { LibraryAssetMaterializer } from '../../../../library'
 
 type CanvasWorkspaceBoardRuntime = ReturnType<typeof useBoardRuntime>

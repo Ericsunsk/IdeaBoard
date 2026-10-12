@@ -124,16 +124,63 @@ describe('RetouchCurvesControl', () => {
     expect(params.value.channels.rgb).toEqual([{ id: 'endpoint:black', input: 0, output: 20 }])
   })
 
-  it('re-translates preset options on locale switch without remount', async () => {
+  it('re-translates preset options across all four locales without remount', async () => {
     renderCurvesControl({ channels: {} })
 
     const presetSelect = screen.getByRole('combobox', { name: 'Curves preset' })
     expect(within(presetSelect).getByRole('option', { name: 'Brighten' })).toBeVisible()
 
-    await setUserLocale('es')
-    await nextTick()
+    const cases = [
+      {
+        locale: 'es',
+        aria: 'Ajuste de curvas',
+        linear: 'Lineal',
+        brighten: 'Aclarar',
+        matte: 'Mate',
+        custom: 'Personalizado',
+      },
+      {
+        locale: 'zh-CN',
+        aria: '曲线预设',
+        linear: '线性',
+        brighten: '提亮',
+        matte: '哑光',
+        custom: '自定义',
+      },
+      {
+        locale: 'ko',
+        aria: '커브 프리셋',
+        linear: '선형',
+        brighten: '밝게',
+        matte: '매트',
+        custom: '사용자 정의',
+      },
+    ] as const
 
-    expect(screen.getByRole('combobox', { name: 'Ajuste de curvas' })).toBeVisible()
-    expect(within(presetSelect).getByRole('option', { name: 'Aclarar' })).toBeVisible()
+    // Static baked labels would collapse every switch to the English copy.
+    const seenBrighten = new Set<string>(['Brighten'])
+    for (const item of cases) {
+      await setUserLocale(item.locale)
+      await nextTick()
+
+      // Same select node, patched in place — no remount.
+      expect(screen.getByRole('combobox', { name: item.aria })).toBe(presetSelect)
+      expect(within(presetSelect).getByRole('option', { name: item.brighten })).toBeVisible()
+      expect(within(presetSelect).getByRole('option', { name: item.linear })).toBeVisible()
+      expect(within(presetSelect).getByRole('option', { name: item.matte })).toBeVisible()
+      expect(within(presetSelect).getByRole('option', { name: item.custom })).toBeVisible()
+      // Custom + six presets in every locale.
+      expect(within(presetSelect).getAllByRole('option')).toHaveLength(7)
+      // CURVE_PRESET absence semantics: presets carry only labelKeys, so no
+      // baked English option survives a non-English locale.
+      expect(within(presetSelect).queryByRole('option', { name: 'Brighten' })).toBeNull()
+      seenBrighten.add(item.brighten)
+    }
+    expect(seenBrighten.size).toBe(4)
+
+    await setUserLocale('en')
+    await nextTick()
+    expect(screen.getByRole('combobox', { name: 'Curves preset' })).toBe(presetSelect)
+    expect(within(presetSelect).getByRole('option', { name: 'Brighten' })).toBeVisible()
   })
 })

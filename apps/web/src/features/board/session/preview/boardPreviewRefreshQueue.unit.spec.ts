@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import type { BoardState } from '../../core'
-import { createEmptyBoardState } from '../../core'
+import type { BoardState } from '../../core/document/nodes'
+import { createEmptyBoardState } from '../../core/document/nodes'
 import {
   createBoardPreviewRefreshQueue,
   type BoardPreviewRefreshQueueDependencies,

@@ -12,7 +12,7 @@ export {
   type ImageTaskAction,
 } from '../../core/execution/imageActionExecution.ts'
 export { createImageExecutionPlanner } from './planning/imageExecutionPlan'
-export { resolvePendingImageResultPosition, type PendingImageResultLookup } from './result-nodes'
+export { resolvePendingImageResultPosition, type PendingImageResultLookup } from './result-nodes/planning'
 export { useImageWorkflowExecution } from './runtime/imageWorkflowExecution'
 export {
   createImageWorkflowCommands,
@@ -27,12 +27,16 @@ export {
 } from './application/canvasExecutionRecoveryCoordinator'
 export {
   BoardGraphSession,
+  type BoardGraphSessionOptions,
+  type PendingImageMutationRejectReason,
+  type PendingImageResolvedResult,
+  type PendingImageResultNodeId,
+} from './pending-execution/boardGraphSession'
+export {
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
   PendingImageMutationContractError,
-  type BoardGraphSessionOptions,
   type PendingImageExecutionCore,
-  type PendingImageExecutionEdgeProjection,
   type PendingImageExecutionCoreOptions,
   type PendingImageExecutionFact,
   type PendingImageExecutionLease,
@@ -45,11 +49,9 @@ export {
   type PendingImageExecutionTransition,
   type PendingImageMaterializationOutcome,
   type PendingImageMaterializationResult,
-  type PendingImageMutationRejectReason,
-  type PendingImageResolvedResult,
-  type PendingImageResultNodeId,
   type PendingImageSupersededExecution,
-} from './pending-execution'
+} from './pending-execution/core'
+export type { PendingImageExecutionEdgeProjection } from './pending-execution/edgeProjection'
 export { buildFusionBillingReadinessRequest } from './billing/canvasBillingReadinessResource'
 export {
   CanvasBillingPreflightError,

@@ -27,7 +27,7 @@ function newIsolatedBoardQueryClient() {
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { BoardWorkspaceUnavailableError } from '../adapters/boardsResource'
 import { requireBoardWorkspaceId } from '../adapters/boardsResource'
-import { getBoardState, replaceBoardStateMap } from '../persistence'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { getBoardById, listBoards, replaceBoards } from '../catalog/boards'
 import { getBoardScope } from '../catalog/scope'
 

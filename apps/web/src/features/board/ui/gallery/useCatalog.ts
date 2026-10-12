@@ -1,6 +1,6 @@
 import { onMounted, onScopeDispose } from 'vue'
 import { useBoardRepository } from '../../session/catalog/repository'
-import { createBoardPreviewRefreshQueue } from '../../session/preview'
+import { createBoardPreviewRefreshQueue } from '../../session/preview/boardPreviewRefreshQueue'
 import { createGalleryController } from './controller'
 import { formatCatalogDate } from './format'
 import type { Catalog, CatalogNavigation } from './contract'

@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { toRef } from 'vue'
-import type { PaymentReturnContext } from '../../core'
+import type { PaymentReturnContext } from '../../core/return'
 import { useRecharge } from '../../session/payments/useRecharge'
 import AccountPane from '../shared/AccountPane.vue'
 import ReturnStatus from './ReturnStatus.vue'

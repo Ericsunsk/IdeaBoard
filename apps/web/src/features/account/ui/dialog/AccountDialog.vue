@@ -48,7 +48,8 @@ import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
 } from '../../../../core/composables/useOverlayInteractionLifecycle'
-import { defaultAccountTab, type AccountTab, type PaymentReturnContext } from '../../core'
+import { defaultAccountTab, type AccountTab } from '../../core/tabs'
+import type { PaymentReturnContext } from '../../core/return'
 import AccountDialogContent from './AccountDialogContent.vue'
 import { accountDialogContentClass } from '../shared/ui'
 

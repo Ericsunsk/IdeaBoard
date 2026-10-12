@@ -12,23 +12,25 @@ import { describe, expect, it } from 'vitest'
  * view-model rail, barrel alias) now live in
  * `scripts/checkRetouchSharedContract.ts` (`lint:retouch-shared-contract`
  * wiring pending), which proves each rule armed with negative fixtures.
- * What stays here: the focus-ring assertions awaiting the browser
- * replacement (`computed-style/3a1e8303`) and the locale assertions frozen
+ * What stays here: the locale assertions frozen
  * under `i18n/retouch-call-time-locale-switch` (tool decision pending).
  *
  * Behavioral coverage (listbox/slider focus, marker keyboard, preset/channel
  * switching) lives in the component specs via true rendering assertions, not
  * here. Color enforcement lives in stylelint + checkStyleGovernance
  * (raw-color/hex budgets), not in negated source-string assertions.
+ *
+ * P5 retirement (computed-style/3a1e8303): the "keeps focus rings on
+ * motion-safe outline tokens without layout shift" source-string assertions
+ * (5) are replaced by the computed-style browser contract
+ * (`ui/retouchFocusRing.browser.spec.ts`), which asserts the rendered
+ * outline paint rides the shared focus tokens live with no layout shift.
  */
 
 const uiRoot = resolve(process.cwd(), 'src/features/canvas/tools/retouch/ui')
 const readComponent = (relativePath: string) => readFileSync(resolve(uiRoot, relativePath), 'utf8')
 
-const histogramPlot = readComponent('shared/styles/retouch-histogram-plot.css')
-const curves = readComponent('shared/styles/retouch-curves.css')
 const effectActions = readComponent('chrome/EffectActions.vue')
-const layersPanel = readComponent('layers/LayersPanel.vue')
 const thresholdControl = readComponent('threshold/ThresholdControl.vue')
 const levelsControl = readComponent('levels/LevelsControl.vue')
 const curvesControl = readComponent('curves/CurvesControl.vue')
@@ -39,16 +41,6 @@ const readProcessing = (relativePath: string) =>
 const levelsProcessing = readProcessing('kinds/levels.ts')
 const thresholdProcessing = readProcessing('kinds/threshold.ts')
 const curvesProcessing = readProcessing('kinds/curves.ts')
-
-describe('retouch readability and keyboard contracts', () => {
-  it('keeps focus rings on motion-safe outline tokens without layout shift', () => {
-    expect(histogramPlot).toContain('--focus-outline-width')
-    expect(histogramPlot).toContain('outline-offset')
-    expect(curves).toContain('--focus-outline-width')
-    expect(curves).toContain('--focus-outline-color')
-    expect(layersPanel).toContain('--focus-outline-offset')
-  })
-})
 
 describe('retouch state view model', () => {
   const viewModel = readFileSync(

@@ -1,9 +1,5 @@
-import {
-  BOARD_STATE_SCHEMA_VERSION,
-  InvalidBoardStateError,
-  type BoardSnapshot,
-  type BoardState,
-} from '../../core'
+import { InvalidBoardStateError } from '../../core/document/latestBoardState'
+import { BOARD_STATE_SCHEMA_VERSION, type BoardSnapshot, type BoardState } from '../../core/document/nodes'
 import { readLocalStorageItem, writeLocalStorageItem } from '../../../../core/utils/storage'
 import { normalizeBoardState, serializeBoardState } from './boardStateSerialization'
 import { scopedBoardStorageKey } from '../catalog/scope'

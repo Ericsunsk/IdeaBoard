@@ -25,7 +25,7 @@ import {
   requireBoardWorkspaceId,
   type WorkspaceBoardMeta,
 } from '../adapters/boardsResource'
-import { deleteBoardState, duplicateBoardState } from '../persistence'
+import { deleteBoardState, duplicateBoardState } from '../persistence/state'
 import { writeBoardListMeta } from '../sync/boardQueries'
 
 export type BoardScopeChangedResult = { ok: false; reason: 'scope-changed' }

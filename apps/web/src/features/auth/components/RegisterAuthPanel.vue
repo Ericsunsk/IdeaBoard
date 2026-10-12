@@ -188,18 +188,18 @@ import IbFormField from '../../../core/components/IbFormField.vue'
 import { PASSWORD_LENGTH_LIMIT } from '../../../core/auth/passwordPolicy'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { useAuthPanelControls } from './panelControls'
+import EmailField from './auth-fields/EmailField.vue'
+import PasswordField from './auth-fields/PasswordField.vue'
+import OtpField from './auth-fields/OtpField.vue'
 import {
   AUTH_DISPLAY_NAME_LIMIT,
-  EmailField,
-  OtpField,
-  PasswordField,
   emailFormatError,
   lengthRangeError,
   otpFieldError,
   passwordLengthFieldError,
   requiredFieldError,
   useAuthForm,
-} from './auth-fields'
+} from './auth-fields/useAuthForm'
 import {
   authCompactModalShellClass,
   authFieldClass,

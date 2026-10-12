@@ -1,6 +1,6 @@
 import { computed, readonly, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { BoardRepository } from '../../session/catalog/repository'
-import type { BoardPreviewRefreshQueue } from '../../session/preview'
+import type { BoardPreviewRefreshQueue } from '../../session/preview/boardPreviewRefreshQueue'
 import type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 import { createCommandHandlers } from './commandHandlers'

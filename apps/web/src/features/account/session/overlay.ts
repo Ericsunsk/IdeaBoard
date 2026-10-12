@@ -3,14 +3,12 @@ import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 import { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../admin/routePaths'
 import { USER_LOGIN_PATH, USER_REGISTER_PATH, USER_BOARDS_PATH } from '../../workspace/routePaths'
 import { stringParam } from '../../../core/router/queryParams'
+import { defaultAccountTab, resolveAccountTabKey, type AccountTab } from '../core/tabs'
 import {
-  defaultAccountTab,
   parsePaymentReturnQuery,
-  resolveAccountTabKey,
   stripPaymentReturnQuery,
-  type AccountTab,
   type PaymentReturnContext,
-} from '../core'
+} from '../core/return'
 
 export type AccountOverlayRoute = {
   fullPath: string

@@ -1,4 +1,4 @@
-import { blankBoardPreviewSurfaceClass } from '../../session/preview'
+import { blankBoardPreviewSurfaceClass } from '../../session/preview/boardPreviewStyle'
 
 export { blankBoardPreviewSurfaceClass }
 

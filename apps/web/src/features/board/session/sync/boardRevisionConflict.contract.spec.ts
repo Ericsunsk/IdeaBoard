@@ -18,7 +18,7 @@ import {
 } from '../../testing/syncFixtures'
 import { clearStoredAuth } from '../../../../core/utils/auth'
 
-import { getBoardState, replaceBoardStateMap } from '../persistence'
+import { getBoardState, replaceBoardStateMap } from '../persistence/state'
 import { listBoards, replaceBoards } from '../catalog/boards'
 import { boardDocumentOptions } from './boardQueries'
 import { boardQueryKeys } from './boardQueryKeys'
