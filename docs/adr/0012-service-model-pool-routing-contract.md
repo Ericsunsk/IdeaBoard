@@ -2,37 +2,20 @@
 
 ## Context
 
-GitHub issue #853 was the shared design gate for the Model Pool feature and
-Generation Pipeline reset (#847–#854). This ADR freezes the routing rules and
-cross-context data contract; the completed issue history and git commits retain
-the implementation order and verification evidence.
-
-Today routing is a single-value `feature -> model` lookup with no resolution
-awareness and no pool: `ConfigRepository.ResolveModel`
-(`apps/api/internal/aigateway/model.go:75`) reads one settings key per
-workflow feature (`modelMappingKeyPrefix`, `model.go:27`), submit freezes one
-model string via `mintResolvedModel` (`apps/api/internal/tasking/workspacetasks/settle.go:210`),
-and the workspace worker previously re-resolved the live mapping per
-execution. The worker now consumes the submit-time routing snapshot.
-Resolution travels on two unjoined tracks: `params.output_resolution`
-(`apps/api/internal/workflow/paramkeys/keys.go:43`,
-`apps/api/internal/workflow/feature_execution_codec.go:30`) for the execution
-plan, and a top-level/independent billing `resolution` on submit/quote
-(`apps/api/internal/runtime/interfaces/http/contract_v1_tasks.go:189,300,557`)
-that previously had an independent settlement fallback
-(`apps/api/internal/tasking/workspacetasks/settle.go:100,147`).
+Service Model Pool routing uses one shared contract across readiness, quote,
+submit, billing, and worker execution. Accepted tasks pin an immutable routing
+snapshot; later pool edits cannot change their selected Model or retry candidate.
 The `service_resolution_unavailable` code is the dedicated 422 outcome for
-an empty eligible pool; pricing and provider errors retain their own codes.
+an empty eligible pool. `billing_pricing_unavailable` (422 for an unpriced
+SKU), `billing_quote_unavailable` (503 for a transient quote failure), and
+`provider_unavailable` retain their own meanings; they do not represent an
+empty eligible pool.
 
 ## Decision
 
-1. **Terminology.** `Service` is the product capability formerly named by
-   workflow feature slugs (`generation`, `inpaint`, `render`, `variations`,
-   `cutout`, `fusion`, `upscale`, `outpaint`;
-   `apps/api/internal/workflow/features.go:15`). `workflow_kind` and the
-   `feature` request/param fields are renamed to `service` with no
-   compatibility alias (#847 owns the mechanical rename; #854 deletes every
-   remainder listed under Consequences).
+1. **Terminology.** `Service` identifies the product capability with canonical
+   slugs `generation`, `inpaint`, `render`, `variations`, `cutout`, `fusion`,
+   `upscale`, and `outpaint`. Routing requests and task facts use `service`.
 2. **Domain shape.**
    - `Service` owns exactly one Model pool: an unordered set of
      `ModelPoolEntry { model, enabled, supported_resolutions }`.
@@ -75,7 +58,7 @@ an empty eligible pool; pricing and provider errors retain their own codes.
    `RoutingResolver` is the sole cross-context routing seam; these owners may
    consume its result but may not perform a second live Model lookup.
 3. **Canonical resolutions.** The contract speaks exactly `1k`, `2k`, and
-   `4k` (today `workflow/output_resolution.go:6`, `billing/domain.go:17`).
+   `4k`.
    There is no `default` request, billing, or pool capability value. A
    fixed-resolution Service still selects one of these three canonical values
    in its Service policy; an omitted request is normalized to that policy
@@ -117,7 +100,7 @@ an empty eligible pool; pricing and provider errors retain their own codes.
    never silently spends another layer's budget.
 8. **Unavailable shape.** An empty eligible set converges to one canonical
    error before task creation, billing hold, or enqueue: HTTP `422`, code
-   `service_resolution_unavailable` (new; does not exist today, see Context),
+   `service_resolution_unavailable`,
    identifying the request as `details.fields.service` and
    `details.fields.resolution` under the existing `details.fields` convention.
    Both values are the normalized request values. Quote, readiness, and submit
@@ -136,33 +119,25 @@ an empty eligible pool; pricing and provider errors retain their own codes.
 10. **Single seam.** `RoutingResolver` is the only authoritative routing
     decision point. Readiness, quote, and submit call it; Worker execution
     consumes only its persisted snapshot. No layer performs an independent
-    live Model lookup. Today's
-    independent readiness, submit, and worker live lookups all collapse into
-    this seam.
+    live Model lookup.
 11. **One-time resolution canonicalization.** `params.output_resolution` is
     the single client resolution source of truth. Ingress normalizes it once
     (against the Service's resolution policy) into the execution plan; the
     billing resolution is derived from that normalized plan, and any
     top-level/independent billing resolution value MUST either be removed or
-    checked for exact agreement — never silently preferred. Today's dual
-    track (`canonical_intake.go:190` plan write-back vs
-    `contract_v1_tasks.go:300` top-level `resolution` vs `settle.go:100`
-    fallback) is the gap this rule closes.
+    checked for exact agreement — never silently preferred.
 12. **Launched resolutions stay visible.** The frontend keeps showing launched
     `1K/2K/4K` options and MUST NOT depend on a dynamic
-    `available_resolutions` list (no such source exists today and none is
-    introduced). An empty runtime pool surfaces as the `422
+    `available_resolutions` list. An empty runtime pool surfaces as the `422
     service_resolution_unavailable` toast; it never hides launched options
     and never creates a task or hold.
-13. **Migration and technology boundary.** The reset uses the existing
-    PostgreSQL/pgx/sqlc, River, gateway, contract/error, OpenAPI, Vue Query,
-    and Valibot primitives. No second ORM, queue, retry framework, transaction
-    coordinator, routing system, or orchestration framework is introduced.
-    One coordinated schema/API migration moves all callers to this contract;
-    the clean break removes `workflow_kind`, single-value Model mappings,
-    independent `ResolveModel` paths, compatibility aliases, dual reads/writes,
-    and fallback shims. Generated sqlc/OpenAPI/frontend artifacts are produced
-    from their source contracts during that migration.
+13. **Technology boundary.** Routing uses PostgreSQL/pgx/sqlc, River,
+    gateway, contract/error, OpenAPI, Vue Query, and Valibot primitives.
+    No second ORM, queue, retry framework, transaction coordinator, routing
+    system, or orchestration framework is permitted. Routing has no
+    compatibility aliases, independent Model lookup, dual reads/writes, or
+    fallback shims. Generated sqlc/OpenAPI/frontend artifacts are produced
+    from their source contracts.
 14. **Vision boundary.** Vision search and its provider path remain outside
     Service Model Pool routing. They keep their existing isolated catalog and
     billing semantics until a separate ADR explicitly brings them into this
@@ -180,68 +155,20 @@ What is excluded: per-Model pricing (price ignores Model), Admin-tuned
 traffic shaping, multi-fallback chains, parallel old/new routing systems, and
 any frontend availability oracle.
 
-#854 removal list (verified live sites; production code only, tests and
-fixtures follow the same rename):
+## Runtime constraints
 
-- `workflow_kind` field/validation: `contract_v1_tasks.go:170,182,196,543,600,613,619`,
-  `workspacetasks/tasks.go:205,301`, `tasking/workspacetasks/settle.go`
-  `CreateInput`/`QuoteParams` kind plumbing, `events/v1_envelope.go:138,322`,
-  `openapi.public.yaml` / `openapi.events.yaml` task schemas, frontend
-  `workspaceTasks.ts:120,135,218,280,284`,
-  `canvasWorkspaceTaskAdapter.ts:191,408,441,449,509,519` (+ generated
-  clients, regenerated not hand-edited).
-- Single-value `feature -> model` mapping: `aigateway/model.go:27,30,75,149`
-  (`modelMappingKeyPrefix`, `modelMappingKey`, `ResolveModel`,
-  `SaveModelMapping`), `ModelResolver`/`ModelStore` seams
-  (`workspacetasks/tasks.go:297`, `settle.go:34`,
-  task application and settlement seams, submit mint, readiness gate, worker
-  live lookup, and `ResolvedModel` single-string durable
-  plan field (`workspacetasks/tasks.go:209`) superseded by `RoutingSnapshot`.
-- Dual resolution tracks: top-level `resolution` on submit/quote
-  (`contract_v1_tasks.go:189,300,557`) vs `params.output_resolution`
-  (`paramkeys/keys.go:43`, `canonical_intake.go:190,261`); settlement
-  defaulting (`settle.go:100,147`) is removed under rule 11.
-- Error-code delta: `service_resolution_unavailable` (422) is new; today's
-  neighbors (`billing_pricing_unavailable` 422 unpriced SKU,
-  `billing_quote_unavailable` 503 transient, `provider_unavailable`
-  submission error, `ErrModelMappingMissing`) keep their meanings and MUST
-  NOT be reused for empty-pool.
+A missing routing resolver fails closed. `resolved_model` is a transient
+worker handoff and a durable execution-attempt fact, not a task event envelope
+field.
 
-The following decisions are frozen for #847–#854 implementation: the
-selection algorithm and 128-bit seed above, monotonic per-Service uint64 pool
-versions, immutable task-row JSONB routing snapshots, 422 fields named
-`service` and `resolution`, and vision search remaining outside the pool.
+Ingress accepts only `1k`, `2k`, and `4k`. Omitted resolutions are normalized
+to the fixed Service policy's canonical value; an explicit value that does
+not match that policy is rejected as 422 `validation_failed`.
 
-## Final state (#854)
-
-#854 closes the migration with no schema change of its own: the single
-schema boundary is the #848 pool migration, and generated sqlc/OpenAPI/
-frontend artifacts are regenerated from source contracts (prose-only
-OpenAPI delta for the 422 resolution-mismatch and policy-normalization
-behaviors; no shape change).
-
-Removed in #854: the unwired legacy drawing execution package, the
-`RoutingGate`/`RejectRoutingUntilPool` fallback and its render site
-(nil resolver fails closed with the canonical sentinel), the durable
-`resolved_model` envelope key (transient worker handoff only; attempt
-facts keep `resolved_model`), and the legacy
-`tasking/application/task.SubmitTask` path with its submission store
-seam. `ResolveModel`, single-value mappings, and `workflow_kind`
-runtime uses were already gone on arrival.
-
-Enforced in #854 (rule 3): only `1k`, `2k`, and `4k` are accepted at
-ingress. Omitted resolutions are normalized to the fixed Service policy's
-canonical value; an explicit value that does not match that policy is
-rejected as 422 `validation_failed`.
-
-Explicitly deferred: the startup reaper / `abandoned` status
-vocabulary (needs a status migration plus backfill, pressure-query,
-Admin, and frontend updates). Stale `running` attempts keep reporting
-`normal_running` pressure until River redelivery converges them.
-Vision search stays outside the pool (rule 14); its admin write seam
-is unchanged.
-
-Rollback is code-only: no #854 data migration exists to undo.
+There is no startup reaper or `abandoned` attempt status. Stale `running`
+attempts keep reporting `normal_running` pressure until River redelivery
+converges them. Adding a reaper requires coordinated status, pressure-query,
+Admin, and frontend changes. Vision search stays outside the pool (rule 14).
 
 ## Status
 

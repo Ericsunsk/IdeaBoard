@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "checkpointSha": "31f00e806f95ab672831d58c02f0689d244e1cee",
+  "checkpointSha": "d1b35b5bd3d9708b1ff08eceec72734f1b5c3bcf",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
-  "inventoryGate": "strict P1 current batch; all cruiser/Board errors remain blocking",
+  "inventoryGate": "inventory advisory; existing cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
   "totals": { "seams": 256, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],

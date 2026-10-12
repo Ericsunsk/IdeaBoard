@@ -1,97 +1,31 @@
-# ADR-0013: Frontend structure: feature-first SaaS layout over tiered DDD
+# ADR-0013: Frontend feature-first SaaS layout
 
 Status: Accepted
 Owner: Frontend Architecture
 Decision date: 2026-10-10
-Affected contexts: `canvas` (tools scope: `retouch`, `inpaint`), prospectively `board`, `search`, `account`, `admin`
-Supersedes: the Tiered DDD four-layer frontend mandate from ADR-0005 and
-`DESIGN.md` Frontend Contract §2/§5/§6 (bounded-context map from ADR-0005 is unchanged)
+Affected contexts: Frontend feature contexts
 
 ## Context
 
-`DESIGN.md` Frontend Contract §2 requires heavy core subdomains (`board`,
-`canvas`, `search`, `account`, `admin`) to land a standard four-layer split
-(`domain/` / `application/` / `infrastructure/` / `presentation` or `ui/`),
-and `apps/web/DESIGN.md` repeats the Tiered DDD rule. Purity is enforced by
-`domain/canvasDomainPurity.unit.spec.ts`, `dependency-cruiser` direction
-rules, `checkNamingGovernance.ts`, and `checkTestGuardrails.ts`.
-
-At tool granularity the ceremony tax is visible. Retouch
-(`features/canvas/tools/retouch/`) carries passthrough wrappers that only
-rebind pure predicates to props — `Chrome.vue` holds `chromeSelection`,
-`stackForCapabilities`, and `canCopy/canMerge/canRemoveSelectedLayer`
-computeds (~15 lines) over the framework-free `processing/layerStack.ts`
-predicates, plus emit-forwarding (`forwardUpdateParam`). Forcing this scope
-into four layers would scatter one control's model, session, and view across
-four directories. Meanwhile inpaint (`features/canvas/tools/inpaint/`) ships
-the same class of feature flat today (`model.ts`, two `useInpaintChrome*`
-composables, `components/`, `fabric/`, `lib/`, `config/`) with no layers at
-all — a mandated four-layer split would diverge the two tools instead of
-converging them.
-
-The durable value is already leaf-local: `retouch/processing/` (`curves`,
-`levels`, `hsl`, `sharpen`, `histogram`, `layerStack`, `engine`) is
-framework-free pure math with colocated unit specs. What needs enforcing is
-that leaf's purity, not the depth of the tree above it. See
-`DESIGN.md` Frontend Contract, `apps/web/DESIGN.md` Directory Structure
-section, and `features/canvas/CONTEXT.md`.
+Frontend 以 feature cohesion、pure core 和 control colocation 保持 ownership 清晰。Bounded-context ownership 由 [ADR-0005](./0005-frontend-ddd-reorganization.md) 定义，目录深度不决定 domain boundary。
 
 ## Decision
 
-Frontend adopts a feature-first SaaS layout. The Tiered DDD four-layer
-requirement no longer applies to frontend code; feature cohesion, a pure
-core, and control-colocated placement replace it. ADR-0005's bounded-context
-map is unchanged — only the layering mandate is lifted.
+Feature/tool scope 按职责使用三个 zones：
 
-Inside a tool/feature scope (reference shape:
-`features/canvas/tools/retouch/`), three zones apply:
+1. `core/`：pure computation 与 types，无 Vue reactivity、Router、Pinia、TanStack Query 或 generated DTO dependencies。
+2. `session/`：stateful orchestration 与 adapters，拥有 lifecycle、reactivity、IO、coordinate/stage adapters、apply pipelines 和 runtime handoffs，可依赖 Vue 与自身 core。
+3. `ui/`：按 control colocate SFC、local helpers 与 specs；例如 `curves/`、`levels/`、`histogram/`。Cross-control contracts 放在 UI root 或 core。
 
-1. **`core/` — pure math and types only.** Framework-free: no `vue`
-   reactivity, no router/Pinia/TanStack Query, no `generated-query` DTOs.
-   This is the only zone where domain purity is enforced (the purity spec
-   scope narrows from `domain/` to each scope's `core/`).
-2. **`session/` — stateful orchestration and adapters.** `useXSession`,
-   `useXMode`, coordinate/histogram/stage adapters, chrome sources, apply
-   pipelines, runtime render/WebGL handoffs. May import `vue` reactivity and
-   `core/`; owns lifecycle, reactivity, and IO boundaries.
-3. **`ui/` — controls colocated by control, not by technical kind.** One
-   directory per control (e.g. `curves/`, `levels/`, `histogram/`); each
-   control colocates its SFC, local helpers, and specs
-   (`.(unit|contract|component|browser).spec.ts`). Cross-control contracts
-   stay at the `ui/` root or in `core/`.
+每个 tool scope 通过 `index.ts` 暴露 named model/session/apply/UI seams。Scope internals 保持 private；cross-scope imports 只使用登记的 public entry 或 port，不 deep import。简单 feature 在额外分区不能改善 ownership 时可以保持 flat，并在 `CONTEXT.md` 说明。
 
-Each tool scope keeps one `index.ts` seam as its only legal cross-scope
-exit (named re-exports of model types, session entry, apply/chrome
-factories, chrome component). Scope internals (today's `processing/*`
-equivalents) stay private behind it; no deep imports across tool scopes.
+Specs 使用 `.(unit|contract|component|browser).spec.ts`，与对应 module 或 control colocate。Pure computation 使用 unit specs；rendered behavior 使用 component 或 browser specs。
 
-Scopes outside `canvas/tools` keep their current layout until migrated
-per-scope. No flag-day rewrite.
+## Enforcement
 
-## Consequences
+- Dependency-cruiser 校验 module direction、pure core 与 cross-tool boundaries。
+- `checkNamingGovernance.ts` 校验 naming 和 control-colocated directories。
+- `checkTestGuardrails.ts` 校验 spec suffix、placement 与行为断言约束。
+- `features/canvas/core/canvasDomainPurity.unit.spec.ts` 校验 Canvas 各 pure core scopes。
 
-What gets easier: a new control lands in one directory; pure math stays
-deterministic and unit-tested without passthrough ceremony; `retouch` and
-`inpaint` converge on one shape instead of two.
-
-What gets harder / is excluded: four-layer directory uniformity is gone;
-reviewers judge `core/` purity and seam discipline, not directory depth.
-`domain/`-wide purity assertions must narrow or they will false-fail
-legitimate `session/` reactivity.
-
-The following toolchain changes enforce this migration:
-
-- `dependency-cruiser`: add `core/` direction rules (`session/`/`ui/` may
-  import `core/`; `core/` imports nothing feature-local; cross-tool deep
-  imports forbidden except via the tool `index.ts`).
-- `checkNamingGovernance.ts`: permit control-colocated directories; review
-  anti-stutter scope for control siblings.
-- `checkTestGuardrails.ts` + spec suffix convention: keep
-  `.(unit|contract|component|browser).spec.ts`; colocated specs live next to
-  their control.
-- Narrow `canvasDomainPurity.unit.spec.ts` from `domain/` to per-scope
-  `core/` directories.
-
-## Status
-
-Accepted
+Frontend 结构总契约见 `DESIGN.md`、`apps/web/DESIGN.md` 和对应 feature `CONTEXT.md`。改变 zone ownership、pure dependencies 或 public seams 时需要同步更新 contract specs 与文档。

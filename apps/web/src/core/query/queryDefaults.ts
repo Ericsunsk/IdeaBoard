@@ -19,7 +19,7 @@
 //   type argument is needed at call sites.
 //
 // Query keys are NOT presets; see `QUERY_KEY_CONVENTIONS` in
-// `shared/CONTEXT.md` (generated orval keys when the op exists, hand-rolled
+// `core/CONTEXT.md` (generated orval keys when the op exists, hand-rolled
 // `*QueryKeys` factories only for composed queries, no inline literals).
 export const STALE_TIME_MS = {
   /** Account/workspace reads: wallet, workspace selection. */

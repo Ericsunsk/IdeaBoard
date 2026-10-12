@@ -1,6 +1,6 @@
 # API Context
 
-> P1b split: transport and generated-query ownership relocated from `src/shared/CONTEXT.md#API Boundary`. This file owns the HTTP exit, transport contracts, and generated client policy. Horizontal contracts live in `src/core/CONTEXT.md`.
+This file owns the HTTP exit, transport contracts, and generated client policy. Horizontal contracts live in `src/core/CONTEXT.md`.
 
 ## Domain Language
 
@@ -9,13 +9,13 @@
 | API Boundary | `Vue UI -> application use case -> resource/adapter -> generated API`; `orvalMutator` is the sole fetcher for all generated files; features call via `api/*` wrappers or their own `*Resource.ts`; generated code is never hand-edited. |
 | Query Client | The single TanStack Query singleton (`stale 5s` / `gc 10m` / `retry 1` / no refocus); identity change clears all via `clearAuthScopedQueryCache`; features never build their own `QueryClient`.                                         |
 
-## P1b Generated-Query Relocation (Complete)
+## Generated Query Policy
 
-P1b relocates the generated subtree opaquely from `src/shared/api/generated-query/**` to `src/api/generated-query/**` (contents byte-identical) with drift verification before/after. Orval output (`public/` + `control/` per `apps/web/orval.config.ts`; 417 files per `generatedMapping` in `docs/architecture/frontend-contract-inventory.md`) is never hand-edited. Backend `apps/api/internal/db/sqlc/*.go` is out of frontend scope.
+Orval output (`public/` + `control/` per `apps/web/orval.config.ts`) lives under `src/api/generated-query/**` and is never hand-edited. Backend `apps/api/internal/db/sqlc/*.go` is out of frontend scope.
 
-- Generator baseline: `apps/api/openapi.public.yaml` + `apps/api/openapi.control.yaml` via `npm run api:generate`; drift gate `npm run api:check-generated` (`apps/web/scripts/checkApiGeneratedDrift.ts`); mutators `orvalMutator.ts` / `publicMutator.ts` / `controlMutator.ts` live in `src/api/`.
-- Rules: (1) no hand edits to generated contents; (2) no relocation outside P1b; P1b updates hard-coded Orval/drift/cruiser/purity/governance paths in the same change (plan §5.5 P1b / §10.4).
-- Consumers: all imports use the new `src/api/*` paths; the shims at `src/shared/api/*.shim.ts` preserved the old specifiers for one phase and are now deleted (P4, all 109 P1 shims). Shared-internal relative wrappers (`api/*`, `core/composables`) and feature resource/adapter absolute imports (`account`, `admin/*`, `board`, `library`, `search`, `workspace` selection snapshot) are canonical; route pages/components must not import generated code directly (via resource/adapter only).
+- Generator inputs: `apps/api/openapi.public.yaml` + `apps/api/openapi.control.yaml` via `npm run api:generate`; drift gate: `npm run api:check-generated` (`apps/web/scripts/checkApiGeneratedDrift.ts`).
+- Mutators `orvalMutator.ts` / `publicMutator.ts` / `controlMutator.ts` live in `src/api/`.
+- Consumers use `src/api/*` wrappers or feature-owned resource/adapter boundaries. Route pages/components must not import generated code directly.
 
 ## Public Seams
 

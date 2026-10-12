@@ -1,6 +1,6 @@
 // Colocated admin messages for the storage page (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the page that owns them instead of locale bundles. Toast literals stay in
 // `useStorageFeedback.ts` next to the feedback factory; table/dialog copy for
 // `components/AdminStorageTable.vue` / `components/AdminStorageEditorDialog.vue`

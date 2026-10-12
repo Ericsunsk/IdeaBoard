@@ -141,19 +141,11 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Credits million dataset          | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/credits/application/commands -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 | Usage million dataset            | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`               |
 
-### P0 工具链冻结（fallback）
+### Frontend 工具与治理规则
 
-迁移计划 P0 要求为 formatter、i18n、visual testing 各定 owner 与 deadline，逾期用 fallback。冻结结论（维持现状、不新增工具依赖）：
+Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 使用四 bundle parity check；交互与样式行为通过 Playwright browser specs 验证。
 
-| 决策 | Owner | Deadline | 冻结结论 / fallback |
-|---|---|---|---|
-| Formatter | 当前修复 integrator `/root` | 2026-10-10 | 沿用 Prettier（`singleQuote`、无分号、`printWidth: 100`）；`npm run format:check` 保持质量门 |
-| Visual | 当前修复 integrator `/root` | 2026-10-10 | 采用自建最低档截图 fallback：relocation PR 跑 `npm run build` 并附关键路由截图（计划 §6.6）；截图缺失不能算已验收 |
-| i18n | 当前修复 integrator `/root` | 2026-10-10 | 工具未选定，启用当前治理 fallback：四 bundle parity + 嵌套≤3/no-god-keys warn-only；相关约束退役冻结，选型完成后按台账分配，不减少 quota |
-
-新增 P0 规则全部 warn-only，不设 error 门；唯一例外是 Canvas 高频交互态禁用 Query（`eslint.config.js`，error）。既有 error 门保持不变。
-
-P0 boolean-prefix 使用 TypeScript type-aware ESLint，现有例外冻结在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线。`no-barrel-import` 仅提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。真实 checker fixtures：`npm run lint:p0-governance`。
+ESLint 直接执行治理规则。Canvas 高频交互态禁用 Query 为 error；其余治理规则的 severity 以 `eslint.config.js` 为准。boolean-prefix 使用 TypeScript type-aware ESLint，现有例外保存在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线。`no-barrel-import` 提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。
 
 ### 显式负载 harness
 
@@ -425,8 +417,7 @@ apps/web/src/
 │   ├── legal/                # legal pages
 │   ├── library/              # asset library
 │   ├── search/               # search features
-│   ├── workspace/            # workspace routes, layout, shell (/user/* URLs)
-└── shared/                   # one-phase compatibility shims; canonical docs in core/api
+│   └── workspace/            # workspace routes, layout, shell (/user/* URLs)
 
 apps/api/
 ├── cmd/                      # service entrypoints

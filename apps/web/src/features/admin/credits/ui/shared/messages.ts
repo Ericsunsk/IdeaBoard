@@ -1,6 +1,6 @@
 // Colocated admin messages for the credits shared dialogs (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the component that owns them instead of locale bundles. Toast literals stay
 // in `feedback.ts` next to the feedback factory; resource error literals stay in
 // `api.ts` / the owning `resource.ts`; validation copy stays in the shared

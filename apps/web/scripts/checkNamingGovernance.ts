@@ -154,18 +154,20 @@ const legacyAllowances: Record<string, string> = {
   // Accepted shared regroup variance (owner ruling 2026-10-11): session keeps
   // per-scope subdirs, ui keeps group dirs, core stays flat. These stems repeat
   // their immediate group dir by design; renaming would churn the accepted tree.
-  'features/admin/shared/session/brand/brandLogoResource.ts': 'admin: brand scope resource repeats brand group dir by design',
-  'features/admin/shared/session/brand/brandLogos.ts': 'admin: brand vocabulary repeats brand group dir by design',
-  'features/admin/shared/ui/chart/chart.ts': 'admin: chart primitive repeats chart group dir by design',
-  'features/admin/users/session/sessionCommands.ts': 'admin: session commands repeat session zone by design',
+  'features/admin/shared/session/brand/brandLogoResource.ts':
+    'admin: brand scope resource repeats brand group dir by design',
+  'features/admin/shared/session/brand/brandLogos.ts':
+    'admin: brand vocabulary repeats brand group dir by design',
+  'features/admin/shared/ui/chart/chart.ts':
+    'admin: chart primitive repeats chart group dir by design',
+  'features/admin/users/session/sessionCommands.ts':
+    'admin: session commands repeat session zone by design',
 }
 
 /** Permanent documented keeps: src-relative dir path -> ownership reason. */
 const keptGenericOwnership: Record<string, string> = {
   // Cross-cutting client helpers (auth identity, errors, date, form, upload).
   'core/utils': 'core: cross-cutting client helpers (see core/CONTEXT.md)',
-  // P1b shim-only directory; delete after P1 with the TTL shims.
-  'shared/utils': 'shared: P1b compatibility shims only (see core/CONTEXT.md)',
   // Official shadcn-vue helper boundary (`components.json` standard utils location)
   'lib/utils.ts': 'shadcn: official standard helper entry (cn, cleanProps)',
   'lib/utils.unit.spec.ts': 'shadcn: test for official standard helper entry',
@@ -232,9 +234,6 @@ function checkTsModule(
   absoluteDir: string,
   fileName: string,
 ): Violation | null {
-  // P1b compatibility shims are the only sanctioned alias kind; they carry
-  // the moved module's stem plus `.shim` and re-export only.
-  if (fileName.endsWith('.shim.ts')) return null
   const stem = fileName.slice(0, -'.ts'.length)
   const specMatch = stem.match(/^(.*)\.(unit|contract|component|browser)\.spec$/)
   const base = specMatch ? (specMatch[1] ?? stem) : stem

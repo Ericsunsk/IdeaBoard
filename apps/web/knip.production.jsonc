@@ -1,13 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // P0 Knip production config (plan v4 §5.4 C, checklist §11-0.3).
+  // Knip production reachability config.
   //
   // Independent from knip.jsonc: its existing dead-code entry roots stay
   // unchanged and must NOT gain `!` markers. Public surface is owned by
   // docs/frontend-seam-inventory.md, not either Knip entry list.
-  // here — production reachability is derived from the Vite runtime roots
-  // below instead. See docs/architecture/knip-issue-ledger.md for the frozen
-  // per-issue dispositions and real CLI fixture evidence.
+  // Production reachability is derived from the Vite runtime roots below.
+  // See docs/architecture/knip-issue-ledger.md for current governance rules.
   //
   // Target commands (from apps/web):
   //   knip --config knip.config.ts
@@ -37,18 +36,10 @@
     "src/**/*.{ts,vue,css}!",
     // Vitest spec entries are excluded; helper paths are deliberately tracked.
     "!src/**/*.spec.ts!",
-    // TTL shims are excluded from the production graph by design (plan v4:
-    // knip must NOT enforce shim expiry; docs/frontend-seam-inventory.md sets
-    // the default TTL to 1 phase with a named deletion owner). Expiry is
-    // enforced by the dedicated `lint:shim-ttl` governance check against
-    // docs/architecture/phase-marker.json instead, so shims stay invisible to
-    // both the unused-files and the unused-exports production reports until
-    // the lint retires them at end of TTL.
-    "!src/**/*.shim.ts!",
   ],
   // Build-time CSS import: src/app/style.css `@import "tailwindcss"` is
   // processed by @tailwindcss/vite at build time, never shipped as a runtime
   // import. tailwindcss correctly stays in devDependencies; the import is
-  // ignored here with the reason frozen in the ledger.
+  // ignored here only when the current production contract requires it.
   "ignoreDependencies": ["tailwindcss"],
 }

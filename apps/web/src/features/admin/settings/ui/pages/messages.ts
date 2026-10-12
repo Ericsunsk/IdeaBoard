@@ -1,6 +1,6 @@
 // Colocated admin messages for the settings pages (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops literals stay beside their owner
+// Copy Policy (`core/CONTEXT.md`): admin/ops literals stay beside their owner
 // instead of locale bundles. Toast literals stay in `useSettingsFeedback.ts`;
 // card copy lives here; lifecycle copy stays in `use*Settings.ts`;
 // search-provider test-state labels stay in `TEST_STATE_STYLE` in

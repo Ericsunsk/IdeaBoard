@@ -31,14 +31,14 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `serializeBoardState` / `parseBoardState` — serialization and version-migration adapters (via `session/persistence/index.ts`) in `session/persistence`.
 - `renderBoardPreviewDataUrl` / `createBoardPreviewRefreshQueue` — preview generation and refresh queue in `session/preview`.
 - `createCatalog` / `useCatalog` / `BoardsPage` — gallery page, controller, and views (via root `board/index.ts`) in `ui/gallery`.
-- Gallery copy keys are canonical under `board.*` in the locale bundles (the h1 included: `board.title`). `workspace.boards.*` remains as a dual-key alias until the end of P4 (deletion owner: P4 board-lane); new callers must use `board.*`.
+- Gallery copy keys are canonical under `board.*` in the locale bundles (including the h1: `board.title`). New callers use `board.*`; existing `workspace.boards.*` aliases have matching locale values.
 - `board/testing` — snapshot/state factories for tests only; never enters the production barrel.
 - `board/index.ts` — public entry for non-Canvas consumers and route composition; Canvas uses the narrow port below.
 - `board/ports/canvas.ts` — narrow BoardCanvas port for Canvas callers (issue #861): snapshot facts, local persistence, revision-gated sync, preview rendering, and media-ref extraction only; Canvas production code must use this subpath, never the full barrel.
 
-## Sync / Query Ownership (production, ADR-0014; formal acceptance pending)
+## Sync / Query Ownership (ADR-0014)
 
-Current production server catalog/document snapshots live in TanStack Query under the canonical keys below; the feature-owned store keeps the draft overlay and merge precedence. The P2.5 private test harness was retired after the scenarios were bound to the production Query boundary (`session/sync/boardQueryKeys.ts`, `boardQueries.ts`, `boardSseInvalidation.ts`). Milestone evidence is canonical in `docs/architecture/frontend-contract-inventory.md` (`behaviors` and `syncDesign`).
+Current production server catalog/document snapshots live in TanStack Query under the canonical keys below; the feature-owned store keeps the draft overlay and merge precedence. The production Query boundary is defined by `session/sync/boardQueryKeys.ts`, `boardQueries.ts`, and `boardSseInvalidation.ts`.
 
 | Concern            | Owner                                              |
 | ------------------ | -------------------------------------------------- |
@@ -55,10 +55,9 @@ Current production server catalog/document snapshots live in TanStack Query unde
 - SSE mapping: `board.document_replaced` invalidates the document (500ms coalesce; frames at or below the local revision are dropped; draft-dirty boards are marked stale without refetch or draft overwrite); `board.member_changed` invalidates the list; `board.share_revoked` invalidates the list and removes the document query; a stream gap invalidates only `['boards', workspaceId]`, leaving other workspace and task caches unchanged. SSE never calls `setQueryData` on document content; optimistic `setQueryData` is limited to create/rename local write-back.
 - Draft detection compares normalized persisted content with a runtime server-content baseline, ignoring timestamps and derived preview caches. Unknown cold-storage content is conservative; accepted hydrate/PUT responses establish the baseline. Live Canvas dirty/saving predicates cover edits before autosave persistence. A PUT response establishes only its submitted server content, so edits made during the request remain dirty. Clean observer projections accept remote content despite local clock skew; dirty projections retain the draft and concurrency base.
 - Ordinary Canvas navigation uses Query freshness (`force: false`); explicit recovery and visible refresh may force HTTP reads. Share-revocation hydration is injected by the production observer, keeping the SSE mapper independent of the sync orchestration module.
-- Revision rules: document saves send the observed revision as `If-Match`; 409 keeps the draft and surfaces the conflict status until an explicit reload converges; archived writes stay on the banner path, never the conflict path; renames are PATCH-only (no document write) and adopt the server-advanced revision. ADR-0006 is deprecated; only its optimistic concurrency invariant remains current. `apps/api/openapi.public.yaml`, `DESIGN.md`, and the Board API adapter own the current `If-Match`/409 wire contract.
+- Revision rules: document saves send the observed revision as `If-Match`; 409 keeps the draft and surfaces the conflict status until an explicit reload converges; archived writes stay on the banner path, never the conflict path; renames are PATCH-only (no document write) and adopt the server-advanced revision. ADR-0006 defines the optimistic concurrency contract. `apps/api/openapi.public.yaml`, `DESIGN.md`, and the Board API adapter own the current `If-Match`/409 wire contract.
 - 404 rules: document PUT 404 never creates/upserts and preserves the draft/base revision; document GET 404 fails the whole hydrate and preserves existing drafts/revisions. Only absence in a successfully completed catalog list removes previously synced boards; never-synced offline creations remain.
 - Draft precedence (3-layer): local-newer drafts win over older remote snapshots; explicit rollback (or `preserveLocalNewer: false`) converges to the remote snapshot; never-synced offline creations are kept while deleted-elsewhere boards are dropped. The overlay is frozen to the captured scope: a workspace switch drops the late response.
-- The frozen race/broadcast/conflict trio is bound to the production Query boundary. Its original implementation-before red evidence is missing, so its formal production status remains pending; the audit-repair red/green evidence does not replace that historical requirement. Design-harness green does not satisfy production migration.
 - Dual-view semantics: canvas renders the draft-overlay view (local draft over the server snapshot); gallery renders the Query snapshot view (catalog list only, never full board states for thumbnails).
 
 ## Invariants
@@ -71,8 +70,8 @@ Current production server catalog/document snapshots live in TanStack Query unde
 - Canvas saves are transactionally consistent snapshots; image refs must first persist to `mediaAssetId`.
 - Sync writes must carry `revision`; conflicts follow domain rollback/reconcile policy, never silent last-write-wins.
 - Schema evolution keeps load-migration functions for historic versions (e.g. `latestBoardState.ts`); never break old board data in place.
-- `retouchStack` has been fully removed with no migration: historical boards containing that field can no longer be opened (explicit user decision).
-- Protected contracts (persisted schema, API semantics, storage keys, route URLs, serialization semantics) live in `docs/architecture/frontend-contract-inventory.md`; no silent changes during restructuring.
+- Board state containing `retouchStack` is unsupported.
+- Protected contracts (persisted schema, API semantics, storage keys, route URLs, serialization semantics) live in code and specs; no silent changes during restructuring.
 - Never store a Vue Flow runtime instance as the document; never send dirty objects with runtime UI state to the backend.
 - Never pass bare JSON across processes without a revision/version envelope.
 - Never persist un-uploaded local Blob/Object URLs or temporary blob URLs as permanent layers.

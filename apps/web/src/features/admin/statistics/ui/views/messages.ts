@@ -1,6 +1,6 @@
 // Colocated admin messages for the statistics page (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the page that owns them instead of locale bundles. Chart-footnote literals
 // owned by `useUsageStatisticsCharts` stay in their chart modules.
 

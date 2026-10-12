@@ -1,6 +1,6 @@
 // Colocated admin messages for the reward-codes page (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the page that owns them instead of locale bundles. Toast literals for list
 // actions stay in `useRewardCodesFeedback.ts` next to the feedback factory;
 // row-action and time copy stays in `useRewardCodeRowActions.ts` / `rewardCodeTime.ts`.

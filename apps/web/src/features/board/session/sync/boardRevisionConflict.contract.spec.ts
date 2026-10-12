@@ -1,4 +1,4 @@
-// P2.5 decision (5) — board revision coexistence.
+// Board sync contract (5) — board revision coexistence.
 // If-Match reads the observed revision; 409 keeps the draft + surfaces the
 // conflict status while explicit reload converges; archived stays on the
 // banner path (never conflict); rename is PATCH-only and advances the

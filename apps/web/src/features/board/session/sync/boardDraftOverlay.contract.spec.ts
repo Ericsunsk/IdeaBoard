@@ -1,4 +1,4 @@
-// P2.5 decision (6) — board draft overlay.
+// Board sync contract (6) — board draft overlay.
 // Local-newer wins; rollback → remote wins; never-synced offline creations
 // are kept while deleted-elsewhere boards are dropped; the overlay is frozen
 // to the captured scope. All halves already exist in the current tree

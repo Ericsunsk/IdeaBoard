@@ -1,6 +1,6 @@
 // Colocated admin messages for Stripe settings (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the feedback factory that owns them instead of locale bundles. This module
 // is the pattern example: one literal per toast, messages kept identical.
 

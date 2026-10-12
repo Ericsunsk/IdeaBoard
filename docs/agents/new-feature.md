@@ -20,35 +20,25 @@ checklist instead of forking it.
 1. **Barrel `index.ts` at the feature root** — the sole public entrypoint other
    features may import. Cross-feature deep imports (`../library/components/…`)
    are forbidden. Horizontal roots (`core`, `api`, `theme`, `lib`, `components`)
-   never import `features/*`; only exact reviewed legacy `shared/*.shim.ts`
-   paths may forward to feature destinations for their one-phase TTL.
-   - Documented exceptions (also encoded in
-     `scripts/checkPublicApiSurface.ts` `INTENTIONAL_FLATS`): `admin` (vertical
-     contexts, no single barrel) and `canvas` (intra-feature seams listed in
-     `knip.jsonc` `entry` instead of a root barrel). Additional public subpaths
-     such as feature-owned `routePaths.ts` and legal links must be declared in
+   never import `features/*`.
+   - The `admin` vertical contexts do not use a single root barrel
+     (`scripts/checkPublicApiSurface.ts` `INTENTIONAL_FLATS`). Additional public
+     subpaths such as route paths and legal links must be declared in
      `docs/frontend-seam-inventory.md`; a barrel is not permission for deep imports.
 2. **`CONTEXT.md`** — domain language table, public seams, invariants,
    non-goals. Update it when domain language changes (DESIGN.md Change Rule 7).
-3. **Layer split for complex features, flat for light ones** —
-   `domain/` (pure: no Vue, router, Query, DTOs) + `application/` (use-case
-   orchestration) + `infrastructure/` (transport/storage adapters, DTO mapping)
-   and `ui/` or `presentation/`; or a documented flat exception (`legal`:
-   `components/`, `useXxx.ts`, `types.ts`, no empty dirs to fake
-   the template). Record the choice (layered vs flat + why) in the feature
-   `CONTEXT.md` or the PR description.
+3. **Feature-first zones** — use `core/` for pure types/computation,
+   `session/` for stateful orchestration and adapters, and control-colocated
+   `ui/` for presentation ([ADR-0013](../adr/0013-frontend-feature-first-saas-layout.md)).
+   Keep simple features flat when additional zones do not clarify ownership;
+   document the layout in the feature `CONTEXT.md`.
 4. **Admin adapter boundary** — route pages and components never import
-   `api/generated-query` directly. Target shape per vertical context:
-   `pages/` → `application/` use case → `infrastructure/` or `*Resource.ts` /
-   `api.ts` adapter → generated code. New verticals must land with this shape;
-   existing flats converge toward it (pilot: `settings`, the widest scatter).
-   Building full `application/` anti-corruption adapters for every legacy area
-   at once is out of scope — do it area by area.
+   `api/generated-query` directly. UI uses session resources and adapters,
+   which own transport mapping and calls to generated code.
 5. **Specs colocate with suffixes** — every module ships its spec next to it:
    `curves.ts` → `curves.unit.spec.ts`, SFC → `*.component.spec.ts`, contract →
    `*.contract.spec.ts`, browser-only → `*.browser.spec.ts` (naming governance
-   rule 10; `checkTestGuardrails` enforces placement). P0 test conventions
-   (plan §3.7):
+   rule 10; `checkTestGuardrails` enforces placement). Test conventions:
    - Four suffixes: `unit` pins focused deterministic pure logic; `contract`
      covers exactly three categories (API shape without a real backend,
      architecture-policy fixtures with valid/invalid samples, observable
@@ -72,8 +62,7 @@ checklist instead of forking it.
      `core/query/queryPlacement.contract.spec.ts`).
 6. **Naming** — kebab-case dirs, `PascalCase.vue` SFCs, `camelCase.ts` modules,
    no parent-prefix stutter (`resource.ts`, not `libraryResource.ts`),
-   `index.ts` is barrel-or-documented-boundary only. P0 subset (warn-only in
-   ESLint; the canvas Query ban is the sole new error rule): default
+   `index.ts` is barrel-or-documented-boundary only. ESLint conventions: default
    camelCase, typeLike PascalCase, `I-` interface ban, placeholder
    `id-denylist`, abbreviated-identifier replacements, PascalCase at Vue
    registration and in templates. New image/avatar URL fields use `*_url`

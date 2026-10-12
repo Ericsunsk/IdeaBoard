@@ -1,6 +1,6 @@
 // Colocated admin messages for the prompt-config page (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the page that owns them instead of locale bundles. Toast literals stay in
 // `usePromptConfigFeedback.ts` next to the feedback factory; filter-option and
 // workspace copy stays in `filtering.ts`/`workspace.ts`.

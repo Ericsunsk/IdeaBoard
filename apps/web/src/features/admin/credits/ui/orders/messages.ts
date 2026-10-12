@@ -1,6 +1,6 @@
 // Colocated admin messages for the payment-orders page (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the page that owns them instead of locale bundles. Toast literals stay in
 // `usePaymentOrdersFeedback.ts` next to the feedback factory; status labels and
 // filter options stay in `paymentOrderPresentation.ts`; refund-status labels stay

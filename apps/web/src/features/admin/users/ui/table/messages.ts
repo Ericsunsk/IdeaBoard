@@ -1,6 +1,6 @@
 // Colocated admin messages for the users page (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// Copy Policy (`core/CONTEXT.md`): admin/ops surfaces keep their literals next
 // to the page that owns them instead of locale bundles. Toast literals stay in
 // `useUsersFeedback.ts` next to the feedback factory; row-view labels stay in
 // `view.ts`; command copy stays in `commands.ts`/`context.ts`. Dialog copy for

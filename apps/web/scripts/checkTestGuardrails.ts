@@ -196,6 +196,12 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/components/ui/tabs/tabs.component.spec.ts': [
+    {
+      reason:
+        'Verifies the min-h-8 class that implements the 32px touch-target floor on tab triggers.',
+    },
+  ],
   'src/features/account/ui/shared/ComingSoonPane.component.spec.ts': [
     {
       reason:
@@ -384,13 +390,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
     },
   ],
-  'src/features/canvas/ui/nodes/primitives/PromptComposerControls.options.component.spec.ts':
-    [
-      {
-        reason:
-          'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
-      },
-    ],
+  'src/features/canvas/ui/nodes/primitives/PromptComposerControls.options.component.spec.ts': [
+    {
+      reason:
+        'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
+    },
+  ],
   'src/features/canvas/tools/retouch/ui/histogram/HistogramPlot.component.spec.ts': [
     {
       reason:

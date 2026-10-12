@@ -1,4 +1,4 @@
-// P2.5 decision (3) — board focus controls.
+// Board sync contract (3) — board focus controls.
 // refetchOnWindowFocus stays false; the only focus path is the existing 5s
 // throttled explicit visible-invalidate plus the hidden-flush save. All three
 // halves already exist in the current tree, so this spec stays active.

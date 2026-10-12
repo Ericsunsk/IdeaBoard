@@ -1,4 +1,0 @@
-{
-  "$comment": "Single machine-readable phase marker for TTL governance (plan v4: knip production config excludes *.shim.ts; expiry is enforced by `cd apps/web && npm run lint:shim-ttl`, not by knip). `currentPhase` must be one of P0, P1a, P1b, P1, P2, P2.5, P3, P4, P5, P6, P7. P1b-era TTL shims carry `TTL: 1 phase — delete after P1` headers and stay green while currentPhase is P1 or earlier; advancing this marker past P1 (P1 acceptance) turns every surviving `delete after P1` shim into a lint failure owned by its header's deletion owner. Do not advance past P1 until the owning lanes have deleted their shims.",
-  "currentPhase": "P1"
-}

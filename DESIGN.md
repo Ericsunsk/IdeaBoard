@@ -113,7 +113,7 @@ workspace task 的执行适配器是 `internal/tasking/interfaces/worker`：它�
 
 ### 5. Feature Prompt 只保存当前模板
 
-`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格与 Service Model Pool 路由都必须在 Hold 前通过校验；Readiness 与 Submit 共用 Prompt、typed params 和 Billing request 规划。#847 完成字段改名后，Readiness、Quote 与 Submit 共用同一个 `RoutingResolver` 判定，缺失或空的 Service Model Pool 路由在任何 Hold 之前就以 `service_resolution_unavailable` fail closed。#848 已落地：Submit 在同一 settlement transaction（Credit Hold + task insert + River enqueue）里固化不可变 `RoutingSnapshot`，worker 只消费该快照，绝不读取实时 Model 映射，也不从 live pool 回落；快照缺失或无法 replay 时同样 fail closed（释放 Hold、不烧重试预算）。价格不受模型影响，见 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
+`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格与 Service Model Pool 路由都必须在 Hold 前通过校验；Readiness 与 Submit 共用 Prompt、typed params 和 Billing request 规划。Readiness、Quote 与 Submit 共用同一个 `RoutingResolver` 判定，缺失或空的 Service Model Pool 路由在任何 Hold 之前就以 `service_resolution_unavailable` fail closed。Submit 在同一 settlement transaction（Credit Hold + task insert + River enqueue）里固化不可变 `RoutingSnapshot`，worker 只消费该快照，绝不读取实时 Model 映射，也不从 live pool 回落；快照缺失或无法 replay 时同样 fail closed（释放 Hold、不烧重试预算）。价格不受模型影响，见 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
 
 稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
 
