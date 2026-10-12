@@ -14765,7 +14765,7 @@
         ]
       }
     },
-    "src/features/canvas/tools/image-tools/bindings.ts": {
+    "src/features/canvas/tools/image-tools/session/bindings.ts": {
       "CanvasImageTools": {
         "kind": "canonical-origin",
         "evidence": ["src/features/canvas/tools/image-tools/index.ts#CanvasImageTools"]
@@ -14857,13 +14857,13 @@
         ]
       }
     },
-    "src/features/canvas/tools/image-tools/session.ts": {
+    "src/features/canvas/tools/image-tools/session/imageToolSession.ts": {
       "UseCanvasImageToolsOptions": {
         "kind": "canonical-origin",
         "evidence": ["src/features/canvas/tools/image-tools/index.ts#UseCanvasImageToolsOptions"]
       }
     },
-    "src/features/canvas/tools/image-tools/useCanvasImageTools.ts": {
+    "src/features/canvas/tools/image-tools/session/useCanvasImageTools.ts": {
       "useCanvasImageTools": {
         "kind": "canonical-origin",
         "evidence": ["src/features/canvas/tools/image-tools/index.ts#useCanvasImageTools"]
@@ -20845,9 +20845,9 @@
         "src/features/canvas/ui/overlays/canvasTransientMotion.component.spec.ts",
         "src/features/canvas/ui/pages/CanvasPage.component.spec.ts",
         "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
-        "src/features/canvas/tools/image-tools/components/ChromeFrame.component.spec.ts",
-        "src/features/canvas/tools/image-tools/components/Presentation.component.spec.ts",
-        "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+        "src/features/canvas/tools/image-tools/ui/ChromeFrame.component.spec.ts",
+        "src/features/canvas/tools/image-tools/ui/Presentation.component.spec.ts",
+        "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
         "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.browser.spec.ts",
         "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.component.spec.ts",
         "src/features/canvas/tools/inpaint/ui/ImageInpaintOverlay.component.spec.ts",

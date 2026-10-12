@@ -1,7 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
-import { IMAGE_TOOL_CHROME_LAYOUT } from '../../image-tools/imageToolChrome.ts'
+import { IMAGE_TOOL_CHROME_LAYOUT } from '../../image-tools/core'
 import { useRafScheduler } from '../../../session/browser/interaction/useRafScheduler.ts'
 import { waitForNextAnimationFrame } from '../../../session/browser/animationFrame.ts'
 import { containImageRect } from '../../../tools/outpaint/core/geometry.ts'

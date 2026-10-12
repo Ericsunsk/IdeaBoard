@@ -237,4 +237,47 @@ describe('ImageNodeStage image tool presentation', () => {
     )
     expect(noTool.container.querySelector('.image-node-stage-actions')).toBeTruthy()
   })
+
+  it('renders source media neutrally until a selected tool owns the stage', () => {
+    const noBinding = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: 'https://provider.example/image.png' },
+        imageToolStageBinding: null,
+        active: false,
+        dragging: false,
+      },
+      global: {
+        stubs: {
+          StagePresentation: { template: '<div><slot /></div>' },
+          NodeStageFrame: {
+            props: ['transparent'],
+            template:
+              '<div data-testid="node-stage-frame" :data-transparent="String(transparent)"><slot /></div>',
+          },
+        },
+      },
+    })
+    const inactive = renderImageStage(false)
+    const active = renderImageStage(true)
+
+    for (const view of [noBinding, inactive, active]) {
+      const media = view.container.querySelector('.image-node-stage-image')
+      expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')
+    }
+    expect(noBinding.container.querySelector('[data-testid="node-stage-frame"]')).toHaveAttribute(
+      'data-transparent',
+      'false',
+    )
+    expect(inactive.container.querySelector('[data-testid="node-stage-frame"]')).toHaveAttribute(
+      'data-transparent',
+      'false',
+    )
+    expect(active.container.querySelector('[data-testid="node-stage-frame"]')).toHaveAttribute(
+      'data-transparent',
+      'true',
+    )
+  })
 })

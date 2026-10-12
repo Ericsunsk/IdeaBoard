@@ -141,7 +141,7 @@ import {
   INPAINT_MIN_BRUSH_SIZE,
   INPAINT_MIN_LAYER_OPACITY,
 } from '../core/constants'
-import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
+import { ImageToolChromeFrame as ChromeFrame } from '../../image-tools/ui/chrome'
 import { NodeToolIconButton, PromptTextComposer } from '../../../ui/nodes/primitives'
 import { SERVICE } from '../../../../../core/contracts/imageServices'
 import { useCanvasBillingQuote } from '../../../session/execution'

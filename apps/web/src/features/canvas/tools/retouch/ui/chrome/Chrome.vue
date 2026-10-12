@@ -44,7 +44,7 @@ import type {
   RetouchLayer,
 } from '../../core/model.ts'
 import RetouchEffectActions from './EffectActions.vue'
-import ChromeFrame from '../../../image-tools/components/ChromeFrame.vue'
+import { ImageToolChromeFrame as ChromeFrame } from '../../../image-tools/ui/chrome'
 import RetouchLayerActions from '../layers/LayerActions.vue'
 import RetouchLayersPanel from '../layers/LayersPanel.vue'
 import RetouchPropertiesPanel from './PropertiesPanel.vue'

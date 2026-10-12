@@ -1,23 +1,20 @@
 import type { ComputedRef, Ref } from 'vue'
 import type {
   ImageRetouchKind,
+  RetouchChromeAnchorRect,
   RetouchEffectLayer,
+  RetouchEffectParamKey,
+  RetouchEffectParamMap,
   RetouchNonHslWholeParams,
   RetouchEditorLayers,
   RetouchMode,
-} from '../retouch'
-import type { RetouchEffectParamKey, RetouchEffectParamMap } from '../retouch/core/model.ts'
-import type { ImageMaskDrawMode } from '../inpaint'
-import type { ImageStrengthAction } from '../../session/execution'
-import type { ImageToolSession } from './session'
-import type { ZeroCopyStageHandle } from '../retouch'
+  ZeroCopyStageHandle,
+} from '../../retouch'
+import type { ImageMaskDrawMode } from '../../inpaint'
+import type { ImageStrengthAction } from '../../../session/execution'
+import type { ImageToolSession } from './imageToolSession'
 
-type ImageToolAnchorRect = {
-  top: number
-  left: number
-  width: number
-  height: number
-}
+type ImageToolAnchorRect = RetouchChromeAnchorRect
 
 export type ImageToolStageBinding = {
   nodeId: string
@@ -31,7 +28,7 @@ export type ImageToolStageBinding = {
   session: ImageToolSession
 }
 
-import type { ImageActionStrengthControlHandlers } from './model.ts'
+import type { ImageActionStrengthControlHandlers } from '../core/model.ts'
 
 export type ImageActionStrengthControl = ImageActionStrengthControlHandlers & {
   visible: boolean

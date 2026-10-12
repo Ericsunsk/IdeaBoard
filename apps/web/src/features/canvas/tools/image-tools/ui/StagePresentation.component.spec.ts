@@ -12,7 +12,7 @@ import {
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/vue'
 import { render } from '../../../../../test/render'
-import type { ImageToolStageBinding } from '../bindings'
+import type { ImageToolStageBinding } from '../session/bindings'
 import StagePresentation from './StagePresentation.vue'
 
 vi.mock('../../retouch/session/stage/runtime/webglEngine.ts', async (importOriginal) => {

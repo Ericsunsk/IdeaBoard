@@ -3,9 +3,9 @@ import type { CanvasImageTools } from './bindings'
 import { createImageToolChromeAdapter } from './chromeAdapter'
 import { createImageToolCommands } from './commands'
 import { createImageToolNodeBindings } from './nodeBindings'
-import { createImageToolSession, type UseCanvasImageToolsOptions } from './session'
+import { createImageToolSession, type UseCanvasImageToolsOptions } from './imageToolSession'
 
-export type { UseCanvasImageToolsOptions } from './session'
+export type { UseCanvasImageToolsOptions } from './imageToolSession'
 
 export function useCanvasImageTools(options: UseCanvasImageToolsOptions): CanvasImageTools {
   const session = createImageToolSession(options)

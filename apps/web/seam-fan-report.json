@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "bfe0a3b2926022b5c2dae39615ca155996d33457",
+  "checkpointSha": "388f8ec52aba5b0fbee5383597d079ab5aafac27",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict P1 current batch; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -4691,7 +4691,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -10628,12 +10628,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -11366,7 +11366,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         }
@@ -28298,7 +28298,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "type-only"
         },
@@ -29487,7 +29487,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -31970,17 +31970,17 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/core/model.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/model.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "runtime"
         },
@@ -33829,7 +33829,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
         },
@@ -35029,7 +35029,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
           "kind": "type-only"
         },
@@ -37372,7 +37372,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
           "kind": "type-only"
         }
@@ -37445,14 +37445,12 @@
         }
       ],
       "fanIn": 10,
-      "fanOut": 24,
+      "fanOut": 21,
       "fanOutTargets": [
-        "fs",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue/index.js",
-        "path",
         "src/api/mediaAssetDelivery.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userLocale.ts",
@@ -37464,7 +37462,6 @@
         "src/features/canvas/session/workspace/useCanvasFeedback.ts",
         "src/features/canvas/tools/inpaint/index.ts",
         "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
-        "src/features/canvas/tools/retouch/core/model.ts",
         "src/features/canvas/tools/retouch/core/recipe.ts",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
@@ -37474,318 +37471,308 @@
       ],
       "outboundEdges": [
         {
-          "from": "src/features/canvas/tools/image-tools/applyScope.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/applyScope.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/core/model.ts",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/core/model.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
-          "to": "src/features/canvas/tools/inpaint/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
-          "to": "src/features/canvas/tools/retouch/core/model.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.unit.spec.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/commands.ts",
-          "to": "src/features/canvas/tools/inpaint/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/commands.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/ChromeFrame.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/ChromeFrame.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.component.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
-          "to": "src/features/canvas/tools/inpaint/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "to": "node_modules/@testing-library/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "to": "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "to": "src/features/canvas/tools/inpaint/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/maskOverlayAdapter.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/maskOverlayAdapter.ts",
+          "from": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/model.ts",
+          "from": "src/features/canvas/tools/image-tools/session/applyScope.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/applyScope.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/model.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/commands.ts",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/commands.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/stagePresentation.contract.spec.ts",
-          "to": "fs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/stagePresentation.contract.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/stagePresentation.contract.spec.ts",
-          "to": "path",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.ts",
+          "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
-          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/tools/retouch/core/recipe.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/ChromeFrame.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/ChromeFrame.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
+          "to": "src/features/canvas/tools/inpaint/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
+          "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         }
       ],
@@ -37800,22 +37787,22 @@
       "undeclaredDeepImports": [
         {
           "from": "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.vue",
-          "to": "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/chrome.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
-          "to": "src/features/canvas/tools/image-tools/imageToolChrome.ts",
+          "to": "src/features/canvas/tools/image-tools/core/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/retouch/ui/chrome/Chrome.vue",
-          "to": "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/chrome.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
-          "to": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/stage.ts",
           "kind": "runtime"
         }
       ],
@@ -37824,9 +37811,9 @@
       "targetFanOut": 24,
       "advisories": {
         "fanInTargetMismatch": true,
-        "fanOutTargetMismatch": false,
+        "fanOutTargetMismatch": true,
         "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "missingFanOutTargets": ["fs", "path", "src/features/canvas/tools/retouch/core/model.ts"]
       },
       "shimCount": 0,
       "scope": "intra-feature",
@@ -37841,27 +37828,27 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/commands.ts",
+          "from": "src/features/canvas/tools/image-tools/session/commands.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
@@ -37890,7 +37877,7 @@
         "src/core/utils/number.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
+        "src/features/canvas/tools/image-tools/ui/chrome.ts",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
@@ -38048,7 +38035,7 @@
         },
         {
           "from": "src/features/canvas/tools/inpaint/ui/ImageInpaintChrome.vue",
-          "to": "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/chrome.ts",
           "kind": "runtime"
         },
         {
@@ -38097,7 +38084,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
           "kind": "runtime"
         }
@@ -38108,8 +38095,8 @@
       "advisories": {
         "fanInTargetMismatch": true,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/features/canvas/tools/image-tools/ui/chrome.ts"],
+        "missingFanOutTargets": ["src/features/canvas/tools/image-tools/ui/ChromeFrame.vue"]
       },
       "shimCount": 0,
       "scope": "intra-feature",
@@ -38236,54 +38223,59 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.unit.spec.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/commands.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/maskOverlayAdapter.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/commands.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/inpaint/session/useImageInpaintOverlay.ts",
@@ -38296,7 +38288,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 16,
       "fanOut": 27,
       "fanOutTargets": [
         "fs",
@@ -38321,8 +38313,8 @@
         "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
         "src/features/canvas/session/media/displayImagePreviewEncoding.ts",
-        "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
-        "src/features/canvas/tools/image-tools/imageToolChrome.ts",
+        "src/features/canvas/tools/image-tools/core/index.ts",
+        "src/features/canvas/tools/image-tools/ui/chrome.ts",
         "src/features/canvas/tools/outpaint/core/geometry.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
@@ -38665,7 +38657,7 @@
         },
         {
           "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
-          "to": "src/features/canvas/tools/image-tools/imageToolChrome.ts",
+          "to": "src/features/canvas/tools/image-tools/core/index.ts",
           "kind": "runtime"
         },
         {
@@ -38745,7 +38737,7 @@
         },
         {
           "from": "src/features/canvas/tools/retouch/ui/chrome/Chrome.vue",
-          "to": "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
+          "to": "src/features/canvas/tools/image-tools/ui/chrome.ts",
           "kind": "runtime"
         },
         {
@@ -39134,28 +39126,39 @@
           "from": "src/features/canvas/index.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
-        }
-      ],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [
+        },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
-          "to": "src/features/canvas/tools/retouch/core/model.ts",
+          "from": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "to": "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
-        },
+        }
+      ],
+      "missingConsumers": [
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "type-only"
+        }
+      ],
+      "undeclaredDeepImports": [
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/tools/retouch/core/recipe.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "to": "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
           "kind": "runtime"
         }
       ],
@@ -39165,8 +39168,14 @@
       "advisories": {
         "fanInTargetMismatch": true,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": [
+          "src/features/canvas/tools/image-tools/core/index.ts",
+          "src/features/canvas/tools/image-tools/ui/chrome.ts"
+        ],
+        "missingFanOutTargets": [
+          "src/features/canvas/tools/image-tools/core/imageToolChrome.ts",
+          "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue"
+        ]
       },
       "shimCount": 0,
       "scope": "intra-feature",
@@ -39738,8 +39747,8 @@
         "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
         "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
         "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
-        "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
         "src/features/canvas/tools/image-tools/index.ts",
+        "src/features/canvas/tools/image-tools/ui/stage.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.vue",
@@ -40766,13 +40775,13 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
-          "to": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "kind": "runtime"
+          "to": "src/features/canvas/tools/image-tools/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
-          "to": "src/features/canvas/tools/image-tools/index.ts",
-          "kind": "type-only"
+          "to": "src/features/canvas/tools/image-tools/ui/stage.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
@@ -40895,8 +40904,8 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/features/canvas/tools/image-tools/ui/stage.ts"],
+        "missingFanOutTargets": ["src/features/canvas/tools/image-tools/ui/StagePresentation.vue"]
       },
       "shimCount": 0,
       "scope": "intra-feature",
@@ -41404,8 +41413,8 @@
         "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
         "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
         "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
-        "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
         "src/features/canvas/tools/image-tools/index.ts",
+        "src/features/canvas/tools/image-tools/ui/stage.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/nodes/home/ImageActionMenu.vue",
@@ -41678,13 +41687,13 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
-          "to": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "kind": "runtime"
+          "to": "src/features/canvas/tools/image-tools/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
-          "to": "src/features/canvas/tools/image-tools/index.ts",
-          "kind": "type-only"
+          "to": "src/features/canvas/tools/image-tools/ui/stage.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
@@ -41822,8 +41831,8 @@
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
+        "newFanOutTargets": ["src/features/canvas/tools/image-tools/ui/stage.ts"],
+        "missingFanOutTargets": ["src/features/canvas/tools/image-tools/ui/StagePresentation.vue"]
       },
       "shimCount": 0,
       "scope": "intra-feature",
@@ -42893,7 +42902,7 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
           "kind": "type-only"
         },

@@ -1,9 +1,9 @@
 import { createApp, computed, defineComponent, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createImageToolChromeAdapter } from './chromeAdapter.ts'
-import { useRetouchSession } from '../retouch'
+import { useRetouchSession } from '../../retouch'
 import type { ImageToolChromeCommands } from './bindings.ts'
-import type { ImageToolSession } from './session.ts'
+import type { ImageToolSession } from './imageToolSession.ts'
 
 class TestImageData {
   data: Uint8ClampedArray

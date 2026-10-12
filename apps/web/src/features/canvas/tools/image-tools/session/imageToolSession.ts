@@ -1,27 +1,26 @@
 import { computed } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { ImageNodeItem } from '../../../board/ports/canvas'
-import type { CanvasInteractionKey } from '../../ui/screens/useFlowCanvasInteractionState.ts'
+import type { CanvasNodeItem, ImageNodeItem } from '../../../../board/ports/canvas'
+import type { CanvasInteractionKey } from '../../../ui/screens/useFlowCanvasInteractionState.ts'
 import type {
   CanvasFlowViewportControls,
   CanvasVueFlowConnectionAdapter,
-} from '../../session/flow-adapter'
-import type { CanvasNodeItem } from '../../../board/ports/canvas'
+} from '../../../session/flow-adapter'
 import {
   cancelImageRetouchFinalRender,
   useRetouchCoordinateAdapter,
   useRetouchMode,
   useRetouchSession,
-} from '../retouch'
-import type { RetouchMode } from '../retouch'
-import { useImageInpaintOverlay } from '../inpaint'
-import { useInpaintChromeState } from '../inpaint'
-import type { ImageNodeDisplayPayload } from '../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
-import type { CanvasFeedback } from '../../session/workspace/useCanvasFeedback.ts'
+  type RetouchMode,
+} from '../../retouch'
+import { useImageInpaintOverlay } from '../../inpaint'
+import { useInpaintChromeState } from '../../inpaint'
+import type { ImageNodeDisplayPayload } from '../../../session/flow-adapter/projection/flowImageNodeSelectors.ts'
+import type { CanvasFeedback } from '../../../session/workspace/useCanvasFeedback.ts'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
 import { createImageToolApplyScopeHost } from './applyScope'
-import type { ImageActionStrengthControlSource } from './model.ts'
+import type { ImageActionStrengthControlSource } from '../core/model.ts'
 
 type ValueRef<T> = {
   readonly value: T

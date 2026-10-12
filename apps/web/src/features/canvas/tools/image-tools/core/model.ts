@@ -1,5 +1,5 @@
 import type { ComponentPublicInstance } from 'vue'
-import type { ImageStrengthAction } from '../../session/execution'
+import type { ImageStrengthAction } from '../../../session/execution'
 
 export type ImageActionStrengthControlHandlers = {
   getValue: (action: ImageStrengthAction) => number

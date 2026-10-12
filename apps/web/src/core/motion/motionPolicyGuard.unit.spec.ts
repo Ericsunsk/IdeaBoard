@@ -67,7 +67,7 @@ describe('Motion Policy style guard', () => {
   it('allows registered Canvas continuous motion with a local semantic and fallback', () => {
     expect(
       findMotionPolicyViolations(
-        'src/features/canvas/ui/nodes/styles/node-shared.css',
+        'src/features/canvas/ui/styles/node-shared.css',
         `
           .workflow-node.running {
             --node-running-border-cycle: 2.4s;

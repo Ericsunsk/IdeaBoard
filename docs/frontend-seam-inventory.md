@@ -20603,7 +20603,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -27114,12 +27114,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -27941,7 +27941,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         }
@@ -38965,7 +38965,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "type-only"
         },
@@ -39637,7 +39637,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -41279,17 +41279,17 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/core/model.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/model.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/features/canvas/session/execution/index.ts",
           "kind": "runtime"
         },
@@ -41873,7 +41873,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
         },
@@ -42389,13 +42389,16 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "ownershipScope": ["src/features/canvas/tools/image-tools/"],
       "publicExports": [
         "CanvasImageTools",
+        "IMAGE_TOOL_CHROME_LAYOUT",
         "ImageActionBinding",
         "ImageActionStrengthControl",
         "ImageToolChromeCommands",
+        "ImageToolChromeFrame",
         "ImageToolChromeModel",
         "ImageToolPresentation",
         "ImageToolPresentationBinding",
         "ImageToolStageBinding",
+        "ImageToolStagePresentation",
         "UseCanvasImageToolsOptions",
         "useCanvasImageTools"
       ],
@@ -42439,27 +42442,27 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/commands.ts",
+          "from": "src/features/canvas/tools/image-tools/session/commands.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
           "to": "src/features/canvas/tools/inpaint/index.ts",
           "kind": "runtime"
         }
@@ -42497,7 +42500,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/core/utils/number.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
+        "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue",
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
@@ -42585,54 +42588,54 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/bindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/bindings.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.ts",
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/chromeAdapter.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/chromeAdapter.unit.spec.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/commands.ts",
+          "from": "src/features/canvas/tools/image-tools/session/commands.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/Presentation.vue",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
-          "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/maskOverlayAdapter.ts",
+          "from": "src/features/canvas/tools/image-tools/session/imageToolSession.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/maskOverlayAdapter.ts",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
+          "to": "src/features/canvas/tools/retouch/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/ui/Presentation.vue",
           "to": "src/features/canvas/tools/retouch/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/session.ts",
+          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
           "to": "src/features/canvas/tools/retouch/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/inpaint/session/useImageInpaintOverlay.ts",
@@ -42672,6 +42675,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "RetouchChromeSourceOptions",
         "RetouchEditorLayers",
         "RetouchEffectLayer",
+        "RetouchEffectParamKey",
+        "RetouchEffectParamMap",
         "RetouchHslParamKey",
         "RetouchImageRect",
         "RetouchLayer",
@@ -42684,6 +42689,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "cancelImageRetouchFinalRender",
         "createRetouchApplyCommands",
         "createRetouchChromeSource",
+        "deserializeImageRetouchPlan",
         "hasRenderableRetouchLayerStack",
         "isWebGLRetouchSupported",
         "renderImageRetouchFile",
@@ -42717,8 +42723,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
         "src/features/canvas/session/media/displayImagePreviewEncoding.ts",
-        "src/features/canvas/tools/image-tools/components/ChromeFrame.vue",
-        "src/features/canvas/tools/image-tools/imageToolChrome.ts",
+        "src/features/canvas/tools/image-tools/core/imageToolChrome.ts",
+        "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue",
         "src/features/canvas/tools/outpaint/core/geometry.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
         "src/test/render.ts"
@@ -42991,8 +42997,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
         "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
         "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
-        "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
         "src/features/canvas/tools/image-tools/index.ts",
+        "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/overlays/CanvasGroupFramesOverlay.vue",
@@ -43151,8 +43157,8 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
         "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
         "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
         "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportContext.ts",
-        "src/features/canvas/tools/image-tools/components/StagePresentation.vue",
         "src/features/canvas/tools/image-tools/index.ts",
+        "src/features/canvas/tools/image-tools/ui/StagePresentation.vue",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/nodes/home/ImageActionMenu.vue",
@@ -49587,7 +49593,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/shared/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -54191,12 +54197,12 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/nodeBindings.ts",
+          "from": "src/features/canvas/tools/image-tools/session/nodeBindings.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
         },
@@ -54856,7 +54862,7 @@ Intentional active-measurement refresh: export a current graph with `npx depcrui
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/tools/image-tools/useCanvasImageTools.unit.spec.ts",
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
           "to": "src/shared/i18n/userLocale.ts",
           "kind": "runtime"
         },

@@ -1,6 +1,9 @@
-export { useCanvasImageTools } from './useCanvasImageTools'
-export { default as ImageToolPresentation } from './components/Presentation.vue'
-export type { UseCanvasImageToolsOptions } from './useCanvasImageTools'
+export { useCanvasImageTools } from './session/useCanvasImageTools'
+export { default as ImageToolPresentation } from './ui/Presentation.vue'
+export { default as ImageToolChromeFrame } from './ui/ChromeFrame.vue'
+export { default as ImageToolStagePresentation } from './ui/StagePresentation.vue'
+export { IMAGE_TOOL_CHROME_LAYOUT } from './core/imageToolChrome'
+export type { UseCanvasImageToolsOptions } from './session/useCanvasImageTools'
 export type {
   ImageActionBinding,
   ImageActionStrengthControl,
@@ -9,4 +12,4 @@ export type {
   ImageToolPresentationBinding,
   ImageToolStageBinding,
   CanvasImageTools,
-} from './bindings'
+} from './session/bindings'

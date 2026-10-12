@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue'
-import type { ImageToolStageBinding } from '../bindings'
+import type { ImageToolStageBinding } from '../session/bindings'
 import { ImageInpaintOverlay } from '../../inpaint'
 import { isWebGLRetouchSupported } from '../../retouch'
 

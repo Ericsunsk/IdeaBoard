@@ -7,6 +7,8 @@
 export type {
   ImageRetouchKind,
   RetouchEffectLayer,
+  RetouchEffectParamKey,
+  RetouchEffectParamMap,
   RetouchHslParamKey,
   RetouchLayer,
   RetouchMode,

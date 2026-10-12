@@ -1,31 +1,31 @@
 import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../../../board'
-import { renderRetouchLayerStackFile } from '../retouch/session/stage/runtime/finalRender'
-import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../session/execution'
-import type { UseCanvasImageToolsOptions } from './session'
-import { useCanvasImageTools, type CanvasImageTools } from './'
-import { i18n } from '../../../../core/i18n'
-import { loadLocaleMessages } from '../../../../core/i18n/userLocale'
-import { deserializeImageRetouchPlan } from '../retouch/core/recipe.ts'
-import * as mediaAssetDelivery from '../../../../api/mediaAssetDelivery'
+import type { ImageNodeItem } from '../../../../board'
+import { renderRetouchLayerStackFile } from '../../retouch'
+import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../../session/execution'
+import type { UseCanvasImageToolsOptions } from './imageToolSession'
+import { useCanvasImageTools, type CanvasImageTools } from '../'
+import { i18n } from '../../../../../core/i18n'
+import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
+import { deserializeImageRetouchPlan } from '../../retouch/core/recipe.ts'
+import * as mediaAssetDelivery from '../../../../../api/mediaAssetDelivery'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
-} from '../../../../api/mediaAssetDelivery'
+} from '../../../../../api/mediaAssetDelivery'
 
-vi.mock('../retouch/session/stage/runtime/finalRender', async (importOriginal) => {
+vi.mock('../../retouch/session/stage/runtime/finalRender', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../retouch/session/stage/runtime/finalRender')>()
+    await importOriginal<typeof import('../../retouch/session/stage/runtime/finalRender')>()
   return {
     ...actual,
     renderRetouchLayerStackFile: vi.fn(),
   }
 })
 
-vi.mock('../inpaint/session/maskPaintingCanvas', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../inpaint/session/maskPaintingCanvas')>()
+vi.mock('../../inpaint/session/maskPaintingCanvas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../inpaint/session/maskPaintingCanvas')>()
   return {
     ...actual,
     buildMaskCommitResult: vi.fn(() => ({
@@ -35,7 +35,7 @@ vi.mock('../inpaint/session/maskPaintingCanvas', async (importOriginal) => {
   }
 })
 
-vi.mock('../inpaint/session/fabric/loader', () => ({
+vi.mock('../../inpaint/session/fabric/loader', () => ({
   loadFabricMaskPainter: () => ({
     paintStroke: vi.fn(),
     eraseStroke: vi.fn(),
@@ -63,10 +63,10 @@ vi.mock('../inpaint/session/fabric/loader', () => ({
 const renderLayerStackFileMock = vi.mocked(renderRetouchLayerStackFile)
 
 const mediaAssetRequestMock = vi.hoisted(() => vi.fn())
-vi.mock('../../../../api/client', () => ({
+vi.mock('../../../../../api/client', () => ({
   api: { request: mediaAssetRequestMock },
 }))
-vi.mock('../../../../api/workspaceEventStream', () => ({
+vi.mock('../../../../../api/workspaceEventStream', () => ({
   subscribeWorkspaceMediaInvalidation: vi.fn(() => vi.fn()),
 }))
 

@@ -52,7 +52,7 @@
 import { computed } from 'vue'
 import { RetouchChrome } from '../../retouch'
 import { ImageInpaintChrome } from '../../inpaint'
-import type { ImageToolPresentationBinding } from '../bindings'
+import type { ImageToolPresentationBinding } from '../session/bindings'
 
 const props = defineProps<{ imageTools: ImageToolPresentationBinding }>()
 

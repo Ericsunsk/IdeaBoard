@@ -17,7 +17,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IMAGE_TOOL_CHROME_LAYOUT } from '../imageToolChrome.ts'
+import { IMAGE_TOOL_CHROME_LAYOUT } from '../core/imageToolChrome.ts'
 
 type ImageToolChromeMode = 'adjust' | 'inpaint'
 

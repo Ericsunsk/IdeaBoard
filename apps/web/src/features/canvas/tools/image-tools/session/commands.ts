@@ -1,7 +1,7 @@
-import { createRetouchApplyCommands } from '../retouch'
-import { useInpaintChromeActions } from '../inpaint'
+import { createRetouchApplyCommands } from '../../retouch'
+import { useInpaintChromeActions } from '../../inpaint'
 import type { ImageToolChromeCommands } from './bindings'
-import type { ImageToolSession } from './session'
+import type { ImageToolSession } from './imageToolSession'
 
 export function createImageToolCommands(session: ImageToolSession) {
   const { execution, ui, feedback } = session.capabilities

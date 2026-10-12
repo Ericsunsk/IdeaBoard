@@ -672,7 +672,7 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "B_p": 5,
       "zeroRetirementReason": null,
       "zeroBehaviorReason": null,
-      "status": "not-started"
+      "status": "verified-local"
     },
     {
       "phase": "P7",
@@ -7669,12 +7669,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p6-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
         "kind": "behavior-existing-partial",
         "id": "image-tools/neutral-stage-and-mode-owned-overlays",
         "requirement": "StagePresentation.component.spec.ts neutral media/no overlay, adjust zero-copy and mask dimensions exist; add ImageNodeStage render-mode neutrality.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 147,
+            "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+            "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+            "fingerprint": "1925692ffd741eb0"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 165,
+            "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+            "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+            "fingerprint": "a2c635b7e7f42979"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 176,
+            "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+            "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+            "fingerprint": "b27e0acd497e84af"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+            "line": 268,
+            "scenario": "renders source media neutrally until a selected tool owns the stage",
+            "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+            "fingerprint": "c61852ccbc22a2c6"
+          }
+        ],
+        "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
       },
       "reviewRequired": false
     },
@@ -7692,12 +7723,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p6-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
         "kind": "behavior-existing-partial",
         "id": "image-tools/neutral-stage-and-mode-owned-overlays",
         "requirement": "StagePresentation.component.spec.ts neutral media/no overlay, adjust zero-copy and mask dimensions exist; add ImageNodeStage render-mode neutrality.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 147,
+            "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+            "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+            "fingerprint": "1925692ffd741eb0"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 165,
+            "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+            "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+            "fingerprint": "a2c635b7e7f42979"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 176,
+            "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+            "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+            "fingerprint": "b27e0acd497e84af"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+            "line": 268,
+            "scenario": "renders source media neutrally until a selected tool owns the stage",
+            "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+            "fingerprint": "c61852ccbc22a2c6"
+          }
+        ],
+        "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
       },
       "reviewRequired": false
     },
@@ -7715,12 +7777,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p6-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
         "kind": "behavior-existing-partial",
         "id": "image-tools/neutral-stage-and-mode-owned-overlays",
         "requirement": "StagePresentation.component.spec.ts neutral media/no overlay, adjust zero-copy and mask dimensions exist; add ImageNodeStage render-mode neutrality.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 147,
+            "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+            "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+            "fingerprint": "1925692ffd741eb0"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 165,
+            "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+            "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+            "fingerprint": "a2c635b7e7f42979"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 176,
+            "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+            "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+            "fingerprint": "b27e0acd497e84af"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+            "line": 268,
+            "scenario": "renders source media neutrally until a selected tool owns the stage",
+            "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+            "fingerprint": "c61852ccbc22a2c6"
+          }
+        ],
+        "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
       },
       "reviewRequired": false
     },
@@ -7738,12 +7831,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p6-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
         "kind": "behavior-existing-partial",
         "id": "image-tools/neutral-stage-and-mode-owned-overlays",
         "requirement": "StagePresentation.component.spec.ts neutral media/no overlay, adjust zero-copy and mask dimensions exist; add ImageNodeStage render-mode neutrality.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 147,
+            "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+            "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+            "fingerprint": "1925692ffd741eb0"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 165,
+            "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+            "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+            "fingerprint": "a2c635b7e7f42979"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 176,
+            "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+            "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+            "fingerprint": "b27e0acd497e84af"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+            "line": 268,
+            "scenario": "renders source media neutrally until a selected tool owns the stage",
+            "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+            "fingerprint": "c61852ccbc22a2c6"
+          }
+        ],
+        "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
       },
       "reviewRequired": false
     },
@@ -7761,12 +7885,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p6-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
         "kind": "behavior-existing-partial",
         "id": "image-tools/neutral-stage-and-mode-owned-overlays",
         "requirement": "StagePresentation.component.spec.ts neutral media/no overlay, adjust zero-copy and mask dimensions exist; add ImageNodeStage render-mode neutrality.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 147,
+            "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+            "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+            "fingerprint": "1925692ffd741eb0"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 165,
+            "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+            "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+            "fingerprint": "a2c635b7e7f42979"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 176,
+            "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+            "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+            "fingerprint": "b27e0acd497e84af"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+            "line": 268,
+            "scenario": "renders source media neutrally until a selected tool owns the stage",
+            "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+            "fingerprint": "c61852ccbc22a2c6"
+          }
+        ],
+        "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
       },
       "reviewRequired": false
     },
@@ -7784,12 +7939,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "proposedPhase": null,
       "owner": "/root/p6-lane",
       "risk": "medium",
-      "retirementStatus": "not-started",
+      "retirementStatus": "retired",
       "replacement": {
         "kind": "behavior-existing-partial",
         "id": "image-tools/neutral-stage-and-mode-owned-overlays",
         "requirement": "StagePresentation.component.spec.ts neutral media/no overlay, adjust zero-copy and mask dimensions exist; add ImageNodeStage render-mode neutrality.",
-        "status": "partial-unverified"
+        "status": "verified",
+        "evidence": [
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 147,
+            "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+            "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+            "fingerprint": "1925692ffd741eb0"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 165,
+            "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+            "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+            "fingerprint": "a2c635b7e7f42979"
+          },
+          {
+            "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+            "line": 176,
+            "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+            "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+            "fingerprint": "b27e0acd497e84af"
+          },
+          {
+            "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+            "line": 268,
+            "scenario": "renders source media neutrally until a selected tool owns the stage",
+            "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+            "fingerprint": "c61852ccbc22a2c6"
+          }
+        ],
+        "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
       },
       "reviewRequired": false
     },
@@ -20102,36 +20288,36 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "line": 146,
-          "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
-          "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
-          "fingerprint": "99ab88134e57896e"
-        },
-        {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 147,
           "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
-          "assertion": "expect(view.container.querySelector('.retouch-raster-overlay')).toBeNull()",
-          "fingerprint": "72bd6831414512c2"
+          "assertion": "expect(view.container.querySelector('[data-stage-image]')).toBeTruthy()",
+          "fingerprint": "1925692ffd741eb0"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 148,
           "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
-          "assertion": "expect(view.container.querySelector('.inpaint-overlay')).toBeNull()",
-          "fingerprint": "ad96733d1859ecfc"
+          "assertion": "expect(view.container.querySelector('.retouch-raster-overlay')).toBeNull()",
+          "fingerprint": "7f9e1f1c01b542c1"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "line": 152,
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "line": 149,
+          "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
+          "assertion": "expect(view.container.querySelector('.inpaint-overlay')).toBeNull()",
+          "fingerprint": "0b516d933948d9f7"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "line": 153,
           "scenario": "keeps the media slot neutral without a selected tool and releases the mask ref on unmount",
           "assertion": "expect(current.setMaskCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)",
-          "fingerprint": "8e65fabb339b6bbe"
+          "fingerprint": "609693d1e35741e1"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
     },
     {
       "id": "image-tools/zero-copy-adjust",
@@ -20141,43 +20327,43 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "line": 161,
-          "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
-          "assertion": "expect(sourceView.container.querySelector('[data-stage-image]')).toBeTruthy()",
-          "fingerprint": "c3c86b7d8cab252f"
-        },
-        {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 162,
           "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
-          "assertion": "expect(sourceView.container.querySelector('.image-tool-stage-zero-copy')).toBeNull()",
-          "fingerprint": "b30f6e344ab4e8a1"
+          "assertion": "expect(sourceView.container.querySelector('[data-stage-image]')).toBeTruthy()",
+          "fingerprint": "c68fc76054d8499d"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 163,
           "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
-          "assertion": "expect(adjustView.container.querySelector('[data-stage-image]')).toBeTruthy()",
-          "fingerprint": "2ef507a510f1ea33"
+          "assertion": "expect(sourceView.container.querySelector('.image-tool-stage-zero-copy')).toBeNull()",
+          "fingerprint": "739c1a62d2f2fa99"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 164,
           "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
-          "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
-          "fingerprint": "29ba1812927cdcc5"
+          "assertion": "expect(adjustView.container.querySelector('[data-stage-image]')).toBeTruthy()",
+          "fingerprint": "fca7be0050f5afc7"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 165,
           "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
+          "assertion": "expect(adjustView.container.querySelector('.image-tool-stage-zero-copy')).toBeTruthy()",
+          "fingerprint": "a2c635b7e7f42979"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "line": 166,
+          "scenario": "mounts zero-copy WebGL canvas in adjust mode and binds the canvas ref",
           "assertion": "expect(adjust.setRetouchCanvasRef).toHaveBeenCalledWith(expect.any(HTMLCanvasElement))",
-          "fingerprint": "1605e1d280e748da"
+          "fingerprint": "8428a132fa047964"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
     },
     {
       "id": "image-tools/mask-pointer-dimensions",
@@ -20187,70 +20373,135 @@ P4 admin proposal amendment, 2026-10-11 (user proposal doc as §10.2 amendment a
       "status": "verified",
       "evidence": [
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "line": 174,
-          "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
-          "assertion": "expect(canvas).toBeInstanceOf(HTMLCanvasElement)",
-          "fingerprint": "de6e4f22ee6c0317"
-        },
-        {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 175,
           "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
-          "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
-          "fingerprint": "c616aa82c4bbf7f8"
+          "assertion": "expect(canvas).toBeInstanceOf(HTMLCanvasElement)",
+          "fingerprint": "afe6e297fc219e80"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 176,
           "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
-          "assertion": "expect(canvas).toHaveAttribute('data-canvas-height', '11')",
-          "fingerprint": "eef6c71281472e1b"
+          "assertion": "expect(canvas).toHaveAttribute('data-canvas-width', '20')",
+          "fingerprint": "b27e0acd497e84af"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 177,
           "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
-          "assertion": "expect(canvas?.style.height).toBe('10.6px')",
-          "fingerprint": "24783c5cc8792fb1"
+          "assertion": "expect(canvas).toHaveAttribute('data-canvas-height', '11')",
+          "fingerprint": "c620b8b35b3b2ed7"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
           "line": 178,
           "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
-          "assertion": "expect(current.setMaskCanvasRef).toHaveBeenCalledWith('node-1', canvas)",
-          "fingerprint": "3fc93a7f2c5b95a7"
+          "assertion": "expect(canvas?.style.height).toBe('10.6px')",
+          "fingerprint": "3fc6a0b3114b165d"
         },
         {
-          "source": "src/features/canvas/tools/image-tools/components/StagePresentation.component.spec.ts",
-          "line": 182,
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "line": 179,
+          "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
+          "assertion": "expect(current.setMaskCanvasRef).toHaveBeenCalledWith('node-1', canvas)",
+          "fingerprint": "73088a00cebb00a8"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
+          "line": 183,
           "scenario": "renders the inpaint canvas at its derived mask dimensions and forwards its pointer event",
           "assertion": "expect(current.onCanvasPointerDown).toHaveBeenCalledExactlyOnceWith(pointerDown)",
-          "fingerprint": "e9894a00be68866c"
+          "fingerprint": "0b133cd97213767d"
         }
       ],
       "plannedAssertion": null,
-      "verifiedRun": "Local npm run test:run; 2026-10-10 15:03:32 CST; 526 files / 3502 tests passed; checkpoint 70e5758eddad32b588eaf641d1a470848283b0d4 plus uncommitted P0 diff; root integrator evidence /tmp/ideaboard-p0-fixes.TX4uxO/full-tests.log. Concurrent build: not a clean performance baseline or CI-green rollback proof."
+      "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
     },
     {
       "id": "image-tools/seam-identity-leaks",
       "phase": "P6",
       "owner": "/root/p6-lane",
       "requirement": "ChromeFrame, RetouchImageRect and bindings cross only approved Seams; rendered sessions retain one identity and no duplicate reactive binding.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "ChromeFrame, RetouchImageRect and bindings cross only approved Seams; rendered sessions retain one identity and no duplicate reactive binding.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
+          "line": 35,
+          "scenario": "declares ChromeFrame through the index",
+          "assertion": "expect(ImageToolChromeFrame).toBe(DirectChromeFrame)",
+          "fingerprint": "8d982780fa455b9e"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
+          "line": 39,
+          "scenario": "exposes the stage presentation and session hook through the index",
+          "assertion": "expect(ImageToolStagePresentation).toBe(DirectStagePresentation)",
+          "fingerprint": "6fba28b008ba30ab"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
+          "line": 40,
+          "scenario": "exposes the stage presentation and session hook through the index",
+          "assertion": "expect(useCanvasImageTools).toBe(directUseCanvasImageTools)",
+          "fingerprint": "83083d1d306f5236"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
+          "line": 44,
+          "scenario": "declares chrome layout through the index",
+          "assertion": "expect(IMAGE_TOOL_CHROME_LAYOUT).toBe(directLayout)",
+          "fingerprint": "221ba80788ac91d4"
+        },
+        {
+          "source": "src/features/canvas/tools/image-tools/imageToolsSeam.contract.spec.ts",
+          "line": 45,
+          "scenario": "declares chrome layout through the index",
+          "assertion": "expect(_anchorSeam).toBeNull()",
+          "fingerprint": "10f6ae34f9c8b3cb"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
     },
     {
       "id": "image-tools/image-node-neutrality",
       "phase": "P6",
       "owner": "/root/p6-lane",
       "requirement": "ImageNodeStage renders source media neutrally until a selected tool owns an overlay; mode change/unmount releases old refs.",
-      "status": "pending",
-      "evidence": [],
-      "plannedAssertion": "ImageNodeStage renders source media neutrally until a selected tool owns an overlay; mode change/unmount releases old refs.",
-      "verifiedRun": null
+      "status": "verified",
+      "evidence": [
+        {
+          "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+          "line": 268,
+          "scenario": "renders source media neutrally until a selected tool owns the stage",
+          "assertion": "expect(media?.getAttribute('src')).toBe('https://provider.example/image.png')",
+          "fingerprint": "c61852ccbc22a2c6"
+        },
+        {
+          "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+          "line": 270,
+          "scenario": "renders source media neutrally until a selected tool owns the stage",
+          "assertion": "expect(noBinding.container.querySelector('[data-testid=\"node-stage-frame\"]')).toHaveAttribute('data-transparent', 'false')",
+          "fingerprint": "4c3774d6240cd881"
+        },
+        {
+          "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+          "line": 274,
+          "scenario": "renders source media neutrally until a selected tool owns the stage",
+          "assertion": "expect(inactive.container.querySelector('[data-testid=\"node-stage-frame\"]')).toHaveAttribute('data-transparent', 'false')",
+          "fingerprint": "6daac58cef3e7390"
+        },
+        {
+          "source": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+          "line": 278,
+          "scenario": "renders source media neutrally until a selected tool owns the stage",
+          "assertion": "expect(active.container.querySelector('[data-testid=\"node-stage-frame\"]')).toHaveAttribute('data-transparent', 'true')",
+          "fingerprint": "1cb215d527e27328"
+        }
+      ],
+      "plannedAssertion": null,
+      "verifiedRun": "Local 2026-10-12 CST integrator: npx vitest run src/features/canvas/tools/image-tools/ (7 files/48 tests green) + src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts green (17/17 in seam+stage+ImageNodeStage run); working tree P6 lane + integrator regen."
     },
     {
       "id": "final/tabs-keyboard",

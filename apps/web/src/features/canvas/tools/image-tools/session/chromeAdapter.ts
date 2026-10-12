@@ -1,7 +1,7 @@
 import { computed } from 'vue'
-import { createRetouchChromeSource, hasRenderableRetouchLayerStack } from '../retouch'
+import { createRetouchChromeSource, hasRenderableRetouchLayerStack } from '../../retouch'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './bindings'
-import type { ImageToolSession } from './session'
+import type { ImageToolSession } from './imageToolSession'
 
 export function createImageToolChromeAdapter(
   session: ImageToolSession,

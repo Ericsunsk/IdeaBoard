@@ -881,6 +881,20 @@ try {
         content: `import { SUPPORTED_LOCALES } from '{target:src/core/i18n/localeCore}'; console.log(SUPPORTED_LOCALES);`,
       },
     },
+    {
+      name: 'allows spec files to deep-import retouch internals for mocks',
+      file: {
+        filePath: 'src/features/canvas/tools/image-tools/session/boundary-cross-tool-deep.spec.ts',
+        content: `import { useRetouchSession } from '{target:src/features/canvas/tools/retouch/session/sessionTarget}'; console.log(useRetouchSession);`,
+      },
+    },
+    {
+      name: 'allows spec files to deep-import inpaint internals for mocks',
+      file: {
+        filePath: 'src/features/canvas/tools/image-tools/session/boundary-inpaint-deep.spec.ts',
+        content: `import { useInpaintChromeState } from '{target:src/features/canvas/tools/inpaint/session/inpaintSessionTarget}'; console.log(useInpaintChromeState);`,
+      },
+    },
   ]
 
   for (const positive of positiveCases) {

@@ -1,7 +1,7 @@
 import type { ImageActionBinding, ImageToolStageBinding } from './bindings'
-import type { ImageToolSession } from './session'
-import type { ZeroCopyStageHandle } from '../retouch'
-import { i18n } from '../../../../core/i18n'
+import type { ImageToolSession } from './imageToolSession'
+import type { ZeroCopyStageHandle } from '../../retouch'
+import { i18n } from '../../../../../core/i18n'
 
 // Stage identity covers the 4 reactive fields; session is a stable closure
 // reference and intentionally excluded from the equality check.
