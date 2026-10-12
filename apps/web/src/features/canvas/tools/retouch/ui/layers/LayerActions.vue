@@ -11,7 +11,7 @@
       </NodeToolIconButton>
       <NodeToolIconButton
         class="retouch-layer-actions__button"
-        :disabled="!canCopyLayer"
+        :is-disabled="!canCopyLayer"
         :aria-label="t('canvas.retouch.duplicateLayer')"
         :tooltip="t('canvas.retouch.duplicateLayer')"
         @click="emit('copy-layer')"
@@ -20,7 +20,7 @@
       </NodeToolIconButton>
       <NodeToolIconButton
         class="retouch-layer-actions__button"
-        :disabled="!canMergeLayer"
+        :is-disabled="!canMergeLayer"
         :aria-label="t('canvas.retouch.mergeLayers')"
         :tooltip="t('canvas.retouch.mergeLayers')"
         @click="emit('merge-layer')"
@@ -29,7 +29,7 @@
       </NodeToolIconButton>
       <NodeToolIconButton
         class="retouch-layer-actions__button"
-        :disabled="!canRemoveLayer"
+        :is-disabled="!canRemoveLayer"
         :aria-label="t('canvas.retouch.deleteLayer')"
         :tooltip="t('canvas.retouch.deleteLayer')"
         @click="emit('remove-layer')"
@@ -38,8 +38,8 @@
       </NodeToolIconButton>
       <NodeToolIconButton
         class="retouch-layer-actions__button"
-        primary
-        :disabled="applyDisabled"
+        is-primary
+        :is-disabled="applyDisabled"
         :aria-label="applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')"
         :tooltip="applying ? t('canvas.retouch.applying') : t('canvas.retouch.applyAsNewNode')"
         @click="emit('apply-retouch')"

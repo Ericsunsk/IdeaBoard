@@ -8,38 +8,38 @@ import {
 
 describe('overlay interaction lifecycle contract', () => {
   it('blocks shared lifecycle dismissal while busy and resets every reopen', () => {
-    const visible = ref(false)
+    const isVisible = ref(false)
     const busy = ref(false)
     const onReset = vi.fn()
     const scope = effectScope()
     const lifecycle = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         busy,
         surface: {
           dismissibleBy: ['escape'],
-          restoreFocus: false,
+          shouldRestoreFocus: false,
         },
         onReset,
         onVisibilityChange: (nextVisible) => {
-          visible.value = nextVisible
+          isVisible.value = nextVisible
         },
       }),
     )!
 
     try {
-      visible.value = true
+      isVisible.value = true
       expect(onReset).toHaveBeenCalledOnce()
 
       busy.value = true
       expect(lifecycle.requestClose('escape')).toBe(false)
-      expect(visible.value).toBe(true)
+      expect(isVisible.value).toBe(true)
 
       busy.value = false
       expect(lifecycle.requestClose('escape')).toBe(true)
-      expect(visible.value).toBe(false)
+      expect(isVisible.value).toBe(false)
 
-      visible.value = true
+      isVisible.value = true
       expect(onReset).toHaveBeenCalledTimes(2)
       expect(lifecycle.requestClose('escape')).toBe(true)
     } finally {
@@ -48,7 +48,7 @@ describe('overlay interaction lifecycle contract', () => {
   })
 
   it('restores trigger focus through the overlay lifecycle after close completes', () => {
-    const visible = ref(false)
+    const isVisible = ref(false)
     const trigger = document.createElement('button')
     document.body.appendChild(trigger)
     trigger.focus()
@@ -56,19 +56,19 @@ describe('overlay interaction lifecycle contract', () => {
     const scope = effectScope()
     const dialog = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         surface: {
           dismissibleBy: ['close-control'],
-          restoreFocus: true,
+          shouldRestoreFocus: true,
         },
         onVisibilityChange: (nextVisible) => {
-          visible.value = nextVisible
+          isVisible.value = nextVisible
         },
       }),
     )!
 
     try {
-      visible.value = true
+      isVisible.value = true
       expect(dialog.requestClose('close-control')).toBe(true)
       expect(dialog.completeClose()).toBe(true)
       expect(focus).toHaveBeenCalledOnce()
@@ -79,36 +79,36 @@ describe('overlay interaction lifecycle contract', () => {
   })
 
   it('routes Canvas outside-click and Escape through its public adapter and tears listeners down', async () => {
-    const visible = ref(false)
+    const isVisible = ref(false)
     const rootElement = document.createElement('div')
     const root = ref<HTMLElement | null>(rootElement)
     const onDismiss = vi.fn(
       (_dismissal: OverlayDismissal, _event: KeyboardEvent | PointerEvent) => {
-        visible.value = false
+        isVisible.value = false
       },
     )
     document.body.appendChild(rootElement)
     const scope = effectScope()
     scope.run(() =>
       useCanvasCustomLayerOverlay({
-        visible,
+        isVisible,
         roots: [root],
         onDismiss,
       }),
     )
 
     try {
-      visible.value = true
+      isVisible.value = true
       await nextTick()
       document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
       expect(onDismiss).toHaveBeenLastCalledWith('outside-pointer', expect.any(PointerEvent))
 
-      visible.value = true
+      isVisible.value = true
       await nextTick()
       document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
       expect(onDismiss).toHaveBeenLastCalledWith('escape', expect.any(KeyboardEvent))
 
-      visible.value = true
+      isVisible.value = true
       await nextTick()
       scope.stop()
       document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))

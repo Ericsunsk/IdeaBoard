@@ -30,11 +30,13 @@ function createHarness(
     ...(harnessOptions.isAttached ? { isAttached: harnessOptions.isAttached } : {}),
     ...(harnessOptions.getBoardId ? { getBoardId: harnessOptions.getBoardId } : {}),
     applyPatch: (patch, direction) =>
-      session.applyCommitPatch(patch, direction, { recordHistory: false, markDirty: true })
-        .didChange,
+      session.applyCommitPatch(patch, direction, {
+        shouldRecordHistory: false,
+        shouldMarkDirty: true,
+      }).didChange,
   })
   session.subscribe((event) => {
-    if (event.sideEffects.recordHistory) history.record(event.patch)
+    if (event.sideEffects.shouldRecordHistory) history.record(event.patch)
   })
   return { session, history }
 }
@@ -51,13 +53,13 @@ describe('useCanvasGraphHistory', () => {
 
     history.undo()
     expect(store.getNode('prompt-1')).toMatchObject({
-      selected: false,
+      isSelected: false,
       snapshot: { x: 40, text: 'before' },
     })
 
     history.redo()
     expect(store.getNode('prompt-1')).toMatchObject({
-      selected: true,
+      isSelected: true,
       snapshot: { x: 240, text: 'after' },
     })
   })
@@ -68,7 +70,7 @@ describe('useCanvasGraphHistory', () => {
     store.beginTransaction('node-update').selectNode('prompt-1', true).commit()
 
     history.undo()
-    expect(store.getNode('prompt-1')?.selected).toBe(true)
+    expect(store.getNode('prompt-1')?.isSelected).toBe(true)
   })
 
   it('clears redo after a new canonical commit', () => {
@@ -88,7 +90,7 @@ describe('useCanvasGraphHistory', () => {
     store.beginTransaction('node-update').updateNode('prompt-1', { text: 'edited' }).commit()
     history.undo()
     store
-      .beginTransaction('result-materialize', { recordHistory: false, markDirty: true })
+      .beginTransaction('result-materialize', { shouldRecordHistory: false, shouldMarkDirty: true })
       .updateNode('prompt-1', { text: 'materialized' })
       .commit()
 
@@ -153,7 +155,7 @@ describe('useCanvasGraphHistory', () => {
   })
 
   it('ignores undo/redo while detached and never applies a cross-board patch', () => {
-    let attached = true
+    let isAttached = true
     let boardId: string | null = 'board-1'
     const applyPatch = vi.fn(() => true)
     const snapshot = createEmptyBoardSnapshot()
@@ -172,12 +174,12 @@ describe('useCanvasGraphHistory', () => {
     ]
     const boardSession = CanvasGraphSession.hydrate('board-1', snapshot)
     const boardHistory = useCanvasGraphHistory({
-      isAttached: () => attached,
+      isAttached: () => isAttached,
       getBoardId: () => boardId,
       applyPatch,
     })
     boardSession.subscribe((event) => {
-      if (event.sideEffects.recordHistory) boardHistory.record(event.patch)
+      if (event.sideEffects.shouldRecordHistory) boardHistory.record(event.patch)
     })
     boardSession.store
       .beginTransaction('node-update')
@@ -187,7 +189,7 @@ describe('useCanvasGraphHistory', () => {
     // Mid-switch: the session is disposed and the board id already moved on.
     // The production readCanvasGraphStore throws here; the guard must bail
     // before the applier is ever reached.
-    attached = false
+    isAttached = false
     boardId = 'board-2'
 
     expect(() => boardHistory.undo()).not.toThrow()

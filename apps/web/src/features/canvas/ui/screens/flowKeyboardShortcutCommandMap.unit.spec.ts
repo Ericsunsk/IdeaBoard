@@ -33,16 +33,16 @@ function runShortcut(
     cancelable: true,
     ...init,
   })
-  let handled = false
+  let isHandled = false
   target.addEventListener(
     'keydown',
     (received) => {
-      handled = dispatchFlowKeyboardShortcutKeydown(received as KeyboardEvent, handlers)
+      isHandled = dispatchFlowKeyboardShortcutKeydown(received as KeyboardEvent, handlers)
     },
     { once: true },
   )
   target.dispatchEvent(event)
-  return { event, handled }
+  return { event, isHandled }
 }
 
 describe('flowKeyboardShortcutCommandMap', () => {
@@ -144,9 +144,9 @@ describe('flowKeyboardShortcutCommandMap', () => {
 
     for (const testCase of cases) {
       const handlers = createHandlers()
-      const { event, handled } = runShortcut(testCase.init, handlers)
+      const { event, isHandled } = runShortcut(testCase.init, handlers)
 
-      expect(handled, testCase.name).toBe(true)
+      expect(isHandled, testCase.name).toBe(true)
       testCase.assert(handlers, event)
     }
   })
@@ -161,10 +161,10 @@ describe('flowKeyboardShortcutCommandMap', () => {
       const save = runShortcut({ key: 's', metaKey: true }, saveHandlers, input)
       const del = runShortcut({ key: 'Delete' }, deleteHandlers, input)
 
-      expect(save.handled).toBe(true)
+      expect(save.isHandled).toBe(true)
       expect(save.event.defaultPrevented).toBe(true)
       expect(saveHandlers.onSave).toHaveBeenCalledOnce()
-      expect(del.handled).toBe(false)
+      expect(del.isHandled).toBe(false)
       expect(del.event.defaultPrevented).toBe(false)
       expect(deleteHandlers.onDeleteInlineSelection).not.toHaveBeenCalled()
     } finally {
@@ -185,13 +185,13 @@ describe('flowKeyboardShortcutCommandMap', () => {
     const alt = runShortcut({ key: 'Alt' }, handlers)
     const save = runShortcut({ key: 's', metaKey: true }, handlers)
 
-    expect(undo.handled).toBe(false)
-    expect(pan.handled).toBe(false)
-    expect(tool.handled).toBe(false)
-    expect(space.handled).toBe(false)
-    expect(del.handled).toBe(false)
-    expect(alt.handled).toBe(false)
-    expect(save.handled).toBe(false)
+    expect(undo.isHandled).toBe(false)
+    expect(pan.isHandled).toBe(false)
+    expect(tool.isHandled).toBe(false)
+    expect(space.isHandled).toBe(false)
+    expect(del.isHandled).toBe(false)
+    expect(alt.isHandled).toBe(false)
+    expect(save.isHandled).toBe(false)
     expect(handlers.onUndo).not.toHaveBeenCalled()
     expect(handlers.onPanViewport).not.toHaveBeenCalled()
     expect(handlers.onToolSelect).not.toHaveBeenCalled()
@@ -206,9 +206,9 @@ describe('flowKeyboardShortcutCommandMap', () => {
       onDeleteInlineSelection: vi.fn(() => false),
     })
 
-    const { event, handled } = runShortcut({ key: 'Backspace' }, handlers)
+    const { event, isHandled } = runShortcut({ key: 'Backspace' }, handlers)
 
-    expect(handled).toBe(true)
+    expect(isHandled).toBe(true)
     expect(event.defaultPrevented).toBe(false)
     expect(handlers.onDeleteInlineSelection).toHaveBeenCalledOnce()
   })

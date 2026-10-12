@@ -4,7 +4,7 @@
     v-bind="controlStateAttrs"
     class="control-state node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none"
     :class="{
-      primary,
+      isPrimary,
       'canvas-tool-tooltip-trigger': !!resolvedTooltip,
     }"
     :style="buttonStyle"
@@ -28,18 +28,18 @@ const props = withDefaults(
   defineProps<{
     size?: number | string | undefined
     iconSize?: number | string | undefined
-    active?: boolean
-    disabled?: boolean
-    primary?: boolean
+    isActive?: boolean
+    isDisabled?: boolean
+    isPrimary?: boolean
     ariaLabel?: string | undefined
     tooltip?: string | undefined
   }>(),
   {
     size: undefined,
     iconSize: undefined,
-    active: false,
-    disabled: false,
-    primary: false,
+    isActive: false,
+    isDisabled: false,
+    isPrimary: false,
     ariaLabel: undefined,
     tooltip: undefined,
   },
@@ -68,8 +68,8 @@ const resolvedTooltip = computed(() => props.tooltip ?? '')
 const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.value) || undefined)
 const controlStateAttrs = computed(() =>
   resolveInteractiveControlState({
-    disabled: props.disabled,
-    selected: props.active,
+    isDisabled: props.isDisabled,
+    isSelected: props.isActive,
   }),
 )
 </script>

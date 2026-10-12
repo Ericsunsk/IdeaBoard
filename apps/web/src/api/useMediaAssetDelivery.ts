@@ -49,11 +49,11 @@ function resolveVariant(metadata: MediaAssetDeliveryMetadata, tier: MediaAssetDe
 export function useMediaAssetDelivery(
   assetId: MaybeRefOrGetter<MediaAssetId | null | undefined>,
   tier: MaybeRefOrGetter<MediaAssetDeliveryTier>,
-  options: { enabled?: MaybeRefOrGetter<boolean> } = {},
+  options: { isEnabled?: MaybeRefOrGetter<boolean> } = {},
 ) {
   const resolvedAssetId = computed(() => normalizeMediaAssetId(toValue(assetId)))
   const resolvedTier = computed(() => normalizeTier(toValue(tier)))
-  const isEnabled = computed(() => toValue(options.enabled) !== false)
+  const isEnabled = computed(() => toValue(options.isEnabled) !== false)
   const metadata = ref<MediaAssetDeliveryMetadata | null>(null)
   const url = ref('')
   const status = ref<MediaAssetDeliveryStatus>('idle')

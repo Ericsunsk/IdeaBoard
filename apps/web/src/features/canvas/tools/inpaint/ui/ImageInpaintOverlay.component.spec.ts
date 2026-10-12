@@ -9,7 +9,7 @@ function renderOverlay() {
       brushSize: 40,
       canvasHeight: 100,
       canvasWidth: 200,
-      imageLayerVisible: true,
+      isImageLayerVisible: true,
       maskLayerOpacity: 72,
       setCanvasRef,
       'onCanvas-pointerdown': vi.fn(),

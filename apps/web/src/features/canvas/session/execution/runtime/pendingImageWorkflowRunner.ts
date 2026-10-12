@@ -211,8 +211,8 @@ export function createPendingImageWorkflowRunner(
     firstFailure: PromiseRejectedResult | undefined,
   ): void {
     if (firstFailure) {
-      const handled = options.onError?.(firstFailure.reason)
-      if (!handled) options.onWarning(taskExecutionWarning(firstFailure.reason))
+      const isHandled = options.onError?.(firstFailure.reason)
+      if (!isHandled) options.onWarning(taskExecutionWarning(firstFailure.reason))
       return
     }
     if (pendingCount > 0) {
@@ -260,8 +260,8 @@ export function createPendingImageWorkflowRunner(
     const releasedNodeIds = releasedResultNodeIds(release)
     if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
     const isCurrent = options.executionCore.isAttachmentCurrent(intent.attachment)
-    const handled = isCurrent && options.onError?.(error)
-    if (!handled && isCurrent) {
+    const isHandled = isCurrent && options.onError?.(error)
+    if (!isHandled && isCurrent) {
       options.onWarning(taskExecutionWarning(error))
     }
   }

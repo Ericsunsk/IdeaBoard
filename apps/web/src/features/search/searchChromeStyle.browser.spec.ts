@@ -76,22 +76,22 @@ vi.mock('./session/screenRuntime', () => ({
       results: {
         items: ref([]),
         hasMore: ref(false),
-        loading: ref(false),
-        loadingMore: ref(false),
+        isLoading: ref(false),
+        isLoadingMore: ref(false),
         hasError: ref(false),
         failedImages: ref(new Set()),
         savedKeys: ref(new Set()),
       },
       library: {
-        open: ref(false),
-        expanded: ref(false),
+        isOpen: ref(false),
+        isExpanded: ref(false),
         folderFacts: ref([]),
         mutationPublisher: {},
-        mounted: ref(false),
+        isMounted: ref(false),
         isDropTarget: ref(false),
       },
       selection: { count: ref(0) },
-      preview: { visible: ref(false), activeResult: ref(null) },
+      preview: { isVisible: ref(false), activeResult: ref(null) },
     },
     commands: {
       search: {
@@ -161,7 +161,7 @@ const PopoverHost = defineComponent({
   setup() {
     const popover = ref<SearchSavePopoverController>()
     function open(event: Event) {
-      popover.value?.toggle(event, { result: searchResult, authenticated: true, saved: false })
+      popover.value?.toggle(event, { result: searchResult, isAuthenticated: true, isSaved: false })
     }
     return { popover, open }
   },

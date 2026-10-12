@@ -14,13 +14,13 @@
       :output-resolution="outputResolution"
       :aspect-ratio="aspectRatio"
       :placeholder="placeholder"
-      :disabled="disabled"
-      :allow-empty="allowEmpty"
-      :submit-disabled="submitDisabled"
-      :show-submit="showSubmit"
-      :show-aspect-ratio="showAspectRatio"
-      :show-output-count="showOutputCount"
-      :show-output-resolution="showOutputResolution"
+      :is-disabled="isDisabled"
+      :should-allow-empty="shouldAllowEmpty"
+      :is-submit-disabled="isSubmitDisabled"
+      :should-show-submit="shouldShowSubmit"
+      :should-show-aspect-ratio="shouldShowAspectRatio"
+      :should-show-output-count="shouldShowOutputCount"
+      :should-show-output-resolution="shouldShowOutputResolution"
       :billing-state="billingState"
       :textarea-class="promptInputClass"
       :actions-class="promptActionsClass"
@@ -49,25 +49,25 @@ const props = withDefaults(
     outputCount: number
     outputResolution?: OutputResolution | undefined
     placeholder: string
-    disabled?: boolean
-    allowEmpty?: boolean
-    submitDisabled?: boolean
-    showSubmit?: boolean
-    showOutputCount?: boolean
-    showOutputResolution?: boolean
+    isDisabled?: boolean
+    shouldAllowEmpty?: boolean
+    isSubmitDisabled?: boolean
+    shouldShowSubmit?: boolean
+    shouldShowOutputCount?: boolean
+    shouldShowOutputResolution?: boolean
     aspectRatio?: PromptAspectRatio | undefined
     offset?: string
     billingState?: CanvasBillingQuoteState | null
   }>(),
   {
-    allowEmpty: false,
+    shouldAllowEmpty: false,
     aspectRatio: undefined,
-    disabled: false,
+    isDisabled: false,
     offset: '8px',
-    showSubmit: true,
-    showOutputCount: true,
-    showOutputResolution: true,
-    submitDisabled: false,
+    shouldShowSubmit: true,
+    shouldShowOutputCount: true,
+    shouldShowOutputResolution: true,
+    isSubmitDisabled: false,
     billingState: null,
     outputResolution: '1k',
   },
@@ -82,7 +82,7 @@ const emit = defineEmits<{
 }>()
 
 const shouldStackOutputCount = ref(false)
-const showAspectRatio = computed(() => props.aspectRatio !== undefined)
+const shouldShowAspectRatio = computed(() => props.aspectRatio !== undefined)
 const hasText = computed(() => props.modelValue.trim().length > 0)
 const promptInputClass = computed(() =>
   [

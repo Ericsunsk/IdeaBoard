@@ -59,7 +59,7 @@ export function cloneNodeRecord(record: CanvasGraphNodeRecord): CanvasGraphNodeR
     id: record.id,
     kind: record.kind,
     snapshot: cloneJsonValue(record.snapshot),
-    selected: record.selected,
+    isSelected: record.isSelected,
   }
 }
 
@@ -67,7 +67,7 @@ export function cloneEdgeRecord(record: CanvasGraphEdgeRecord): CanvasGraphEdgeR
   return {
     id: record.id,
     connection: cloneJsonValue(record.connection),
-    selected: record.selected,
+    isSelected: record.isSelected,
   }
 }
 
@@ -98,7 +98,7 @@ export function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphSto
       id,
       kind,
       snapshot: cloneJsonValue(node),
-      selected: false,
+      isSelected: false,
     })
     nodeOrder.push(id)
   }
@@ -116,7 +116,7 @@ export function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphSto
     edgesById.set(id, {
       id,
       connection: cloneJsonValue(connection),
-      selected: false,
+      isSelected: false,
     })
     edgeOrder.push(id)
   }

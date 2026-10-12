@@ -116,7 +116,7 @@ describe('canvas billing readiness store', () => {
       status: 'ready',
       unitCredits: 4,
       availableCredits: 3,
-      sufficient: false,
+      isSufficient: false,
     })
   })
 
@@ -167,12 +167,12 @@ describe('canvas billing readiness store', () => {
       service: SERVICE.cutout,
     }
 
-    await store.ensureService(SERVICE.cutout, { request, force: true })
-    await store.ensureService(SERVICE.cutout, { request, force: true })
+    await store.ensureService(SERVICE.cutout, { request, shouldForce: true })
+    await store.ensureService(SERVICE.cutout, { request, shouldForce: true })
     expect(fetchReadiness).toHaveBeenCalledOnce()
 
     currentTime += 60_001
-    await store.ensureService(SERVICE.cutout, { request, force: true })
+    await store.ensureService(SERVICE.cutout, { request, shouldForce: true })
     expect(fetchReadiness).toHaveBeenCalledTimes(2)
   })
 })

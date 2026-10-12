@@ -56,13 +56,13 @@ describe('useFlowCanvasNodeHandleRail', () => {
     const harness = mountHandleRail(root)
 
     try {
-      expect(harness.rail.showHandleControls.value).toBe(false)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(false)
 
       root.dispatchEvent(new MouseEvent('mouseenter'))
-      expect(harness.rail.showHandleControls.value).toBe(true)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(true)
 
       root.dispatchEvent(new MouseEvent('mouseleave'))
-      expect(harness.rail.showHandleControls.value).toBe(false)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(false)
     } finally {
       harness.unmount()
     }
@@ -79,10 +79,10 @@ describe('useFlowCanvasNodeHandleRail', () => {
 
       root.dispatchEvent(new FocusEvent('focusin'))
 
-      expect(harness.rail.showHandleControls.value).toBe(true)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(true)
 
       root.dispatchEvent(new FocusEvent('focusout', { relatedTarget: document.body }))
-      expect(harness.rail.showHandleControls.value).toBe(false)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(false)
     } finally {
       harness.unmount()
     }
@@ -100,7 +100,7 @@ describe('useFlowCanvasNodeHandleRail', () => {
       )
 
       root.dispatchEvent(new FocusEvent('focusout', { relatedTarget: nextFocusedElement }))
-      expect(harness.rail.showHandleControls.value).toBe(true)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(true)
     } finally {
       harness.unmount()
     }
@@ -113,15 +113,15 @@ describe('useFlowCanvasNodeHandleRail', () => {
 
     root.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }))
 
-    expect(harness.rail.showHandleControls.value).toBe(true)
+    expect(harness.rail.shouldShowHandleControls.value).toBe(true)
     expect(vi.getTimerCount()).toBe(1)
 
     harness.unmount()
 
-    expect(harness.rail.showHandleControls.value).toBe(false)
+    expect(harness.rail.shouldShowHandleControls.value).toBe(false)
     expect(vi.getTimerCount()).toBe(0)
     vi.runOnlyPendingTimers()
-    expect(harness.rail.showHandleControls.value).toBe(false)
+    expect(harness.rail.shouldShowHandleControls.value).toBe(false)
   })
 
   it('preserves the transient handle hint for pen input', () => {
@@ -131,7 +131,7 @@ describe('useFlowCanvasNodeHandleRail', () => {
 
     root.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'pen' }))
 
-    expect(harness.rail.showHandleControls.value).toBe(true)
+    expect(harness.rail.shouldShowHandleControls.value).toBe(true)
     expect(vi.getTimerCount()).toBe(1)
     harness.unmount()
   })
@@ -149,7 +149,7 @@ describe('useFlowCanvasNodeHandleRail', () => {
       harness.rail.refreshTransientHandleVisibility()
       expect(blur).toHaveBeenCalledTimes(1)
 
-      expect(harness.rail.showHandleControls.value).toBe(true)
+      expect(harness.rail.shouldShowHandleControls.value).toBe(true)
     } finally {
       harness.unmount()
     }

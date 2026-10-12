@@ -2,8 +2,8 @@ import type { SearchResult } from '../../core/models'
 
 export type SearchSavePopoverRequest = {
   result: SearchResult
-  saved: boolean
-  authenticated: boolean
+  isSaved: boolean
+  isAuthenticated: boolean
 }
 
 export type SearchSavePopoverController = {

@@ -188,7 +188,7 @@ describe('useFlowNodeMutations', () => {
       [makeEdge('e-1', 'fusion-1', 'fusion-2')],
     )
 
-    mutations.markFlowExecutionNodeDirty('fusion-1', { includeSelf: false })
+    mutations.markFlowExecutionNodeDirty('fusion-1', { shouldIncludeSelf: false })
 
     expect(getOutputStatus(nodes.value, 'fusion-1')).toBe('ready')
     expect(getOutputStatus(nodes.value, 'fusion-2')).toBe('stale')
@@ -203,7 +203,7 @@ describe('useFlowNodeMutations', () => {
       [makeEdge('e-1', 'fusion-1', 'fusion-2')],
     )
 
-    mutations.markFlowExecutionNodeDirty('fusion-1', { includeSelf: true })
+    mutations.markFlowExecutionNodeDirty('fusion-1', { shouldIncludeSelf: true })
 
     expect(getOutputStatus(nodes.value, 'fusion-1')).toBe('stale')
     expect(getOutputStatus(nodes.value, 'fusion-2')).toBe('stale')

@@ -288,10 +288,11 @@ async function fetchReference(refresh: boolean) {
     const nextSnapshot = await catalogResource.getReference({ ...identity, refresh })
     if (version !== requestVersion) return
     snapshot.value = nextSnapshot
-  } catch (err) {
+  } catch (caughtError) {
     if (version !== requestVersion) return
     snapshot.value = null
-    loadError.value = err instanceof Error ? err.message : MODELS_MESSAGES.referenceLoadFailed
+    loadError.value =
+      caughtError instanceof Error ? caughtError.message : MODELS_MESSAGES.referenceLoadFailed
   } finally {
     if (version === requestVersion) loading.value = false
   }

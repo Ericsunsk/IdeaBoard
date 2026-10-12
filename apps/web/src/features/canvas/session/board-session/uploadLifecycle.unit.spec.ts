@@ -23,9 +23,9 @@ describe('createBoardSessionUploadLifecycle', () => {
       width: 100,
       height: 100,
       ratio: 1,
-      dimensionsKnown: true,
+      isDimensionsKnown: true,
       warnings: [],
-      compressed: false,
+      isCompressed: false,
     }))
     setMediaWorkspaceIdResolver(() => 'ws_test123')
   })

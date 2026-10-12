@@ -107,7 +107,7 @@
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
-          :loading="loading"
+          :is-loading="loading"
           v-bind="submitControlState"
           >{{ loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount') }}</Button
         >
@@ -156,7 +156,7 @@
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
-          :loading="loading"
+          :is-loading="loading"
           v-bind="submitControlState"
           >{{ loading ? t('auth.buttons.verifying') : t('auth.buttons.verifyAndSignIn') }}</Button
         >
@@ -241,7 +241,7 @@ const submitControlState = computed(() =>
   resolveInteractiveControlState({ pending: loading.value }),
 )
 const secondaryControlState = computed(() =>
-  resolveInteractiveControlState({ disabled: loading.value }),
+  resolveInteractiveControlState({ isDisabled: loading.value }),
 )
 
 watch(loading, (busy) => emit('update:busy', busy), { immediate: true })
@@ -249,7 +249,7 @@ onBeforeUnmount(() => emit('update:busy', false))
 
 function resolveFieldControlState(invalid: boolean) {
   return resolveInteractiveControlState({
-    disabled: loading.value,
+    isDisabled: loading.value,
     tone: invalid ? 'danger' : 'default',
   })
 }

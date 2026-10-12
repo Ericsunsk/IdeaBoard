@@ -68,7 +68,7 @@ export const banDurationOptions: Array<{ label: string; value: number }> = [
 ]
 
 const OPERATOR_REASON_SPEC = {
-  required: true,
+  isRequired: true,
   label: '操作原因（内部审计记录）',
   placeholder: '请填写操作原因，例如：用户申诉工单 1234…',
 } as const

@@ -28,9 +28,9 @@ export interface PreparedImageAsset {
   width: number
   height: number
   ratio: number
-  dimensionsKnown: boolean
+  isDimensionsKnown: boolean
   warnings: string[]
-  compressed: boolean
+  isCompressed: boolean
 }
 
 const IMAGE_ASSET_PIPELINE_CONFIG = {
@@ -309,9 +309,9 @@ function buildUncompressedAsset(
     width: dimensions?.width ?? 0,
     height: dimensions?.height ?? 0,
     ratio: ratio > 0 ? ratio : 1,
-    dimensionsKnown: !!dimensions,
+    isDimensionsKnown: !!dimensions,
     warnings,
-    compressed: false,
+    isCompressed: false,
   }
 }
 
@@ -357,9 +357,9 @@ export async function prepareImageAssetForUpload(
       width: compressedDimensions.width,
       height: compressedDimensions.height,
       ratio: ratio > 0 ? ratio : 1,
-      dimensionsKnown: true,
+      isDimensionsKnown: true,
       warnings,
-      compressed: true,
+      isCompressed: true,
     }
   } catch (error) {
     const reason = userFacingErrorCopy(error, options.messages.unknownError)

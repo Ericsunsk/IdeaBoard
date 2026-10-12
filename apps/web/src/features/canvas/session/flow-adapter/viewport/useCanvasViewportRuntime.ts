@@ -81,7 +81,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   let didMiniMapDragMove = false
   let pendingMiniMapDragDelta: CanvasMiniMapDragDelta = { x: 0, y: 0 }
   let pendingMiniMapDragFrameId: number | null = null
-  let pendingMiniMapDragEnd = false
+  let isPendingMiniMapDragEnd = false
   let miniMapDragSessionId = 0
   let miniMapDragTargetViewport: CanvasFlowViewport | null = null
   let isMiniMapViewportUpdateInFlight = false
@@ -172,7 +172,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     miniMapDragSessionId += 1
     clearPendingMiniMapDragFrame()
     pendingMiniMapDragDelta = { x: 0, y: 0 }
-    pendingMiniMapDragEnd = false
+    isPendingMiniMapDragEnd = false
     miniMapDragTargetViewport = options.getViewport()
     lastRequestedMiniMapViewportKey = null
     lastSuccessfulMiniMapViewportKey = null
@@ -198,7 +198,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
 
     flushPendingMiniMapDragDelta()
     isMiniMapDragActive = false
-    pendingMiniMapDragEnd = true
+    isPendingMiniMapDragEnd = true
 
     finishMiniMapDragEndIfIdle()
   }
@@ -294,10 +294,10 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function finishMiniMapDragEndIfIdle() {
-    if (!pendingMiniMapDragEnd || isMiniMapViewportUpdateInFlight) return
+    if (!isPendingMiniMapDragEnd || isMiniMapViewportUpdateInFlight) return
 
     if (!didMiniMapDragMove) {
-      pendingMiniMapDragEnd = false
+      isPendingMiniMapDragEnd = false
       onFlowMoveEnd({ flowTransform: options.getViewport() })
       miniMapDragTargetViewport = null
       return
@@ -309,7 +309,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       return
     }
 
-    pendingMiniMapDragEnd = false
+    isPendingMiniMapDragEnd = false
     if (
       didMiniMapDragMove &&
       latestTarget &&
@@ -416,7 +416,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
 
   function cleanupFrameProbes() {
     clearPendingMiniMapDragFrame()
-    pendingMiniMapDragEnd = false
+    isPendingMiniMapDragEnd = false
     isMiniMapDragActive = false
     isMiniMapViewportUpdateInFlight = false
     viewportPersistence.dispose()

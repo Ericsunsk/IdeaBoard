@@ -17,7 +17,8 @@ import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './
 // keeping a header-only Idempotency-Key. The deleted
 // `/api/admin/payments/stripe-config` route is gone; this module is the
 // single transport.
-type ApiStripeConfigurationSummary = {
+/** @externalContract Control Plane Stripe configuration response. */
+export type ApiStripeConfigurationSummary = {
   configured: boolean
   api_key_configured: boolean
   webhook_secret_configured: boolean
@@ -51,7 +52,7 @@ export function createAdminStripeSettingsResource(): AdminStripeSettingsResource
               ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
               payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
               product_tax_code: input.productTaxCode.trim(),
-              purchases_enabled: input.purchasesEnabled,
+              purchases_enabled: input.isPurchasesEnabled,
               reason,
             } as ControlStripeConfigRequest,
             {
@@ -72,17 +73,17 @@ function normalizeStripeConfiguration(
   configuration: ApiStripeConfigurationSummary,
 ): StripeConfigurationSummary {
   return {
-    configured: configuration.configured,
-    apiKeyConfigured: configuration.api_key_configured,
-    webhookSecretConfigured: configuration.webhook_secret_configured,
+    isConfigured: configuration.configured,
+    isApiKeyConfigured: configuration.api_key_configured,
+    isWebhookSecretConfigured: configuration.webhook_secret_configured,
     accountId: configuration.account_id,
     mode: configuration.mode,
-    chargesEnabled: configuration.charges_enabled,
+    isChargesEnabled: configuration.charges_enabled,
     paymentMethodConfigurationId: configuration.payment_method_configuration_id ?? '',
     productTaxCode: configuration.product_tax_code,
-    productReady: configuration.product_ready,
-    webhookReady: configuration.webhook_ready,
-    purchasesEnabled: configuration.purchases_enabled,
+    isProductReady: configuration.product_ready,
+    isWebhookReady: configuration.webhook_ready,
+    isPurchasesEnabled: configuration.purchases_enabled,
     updatedAt: configuration.updated_at,
   }
 }

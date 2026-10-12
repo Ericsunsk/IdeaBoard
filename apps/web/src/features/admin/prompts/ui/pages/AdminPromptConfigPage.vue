@@ -23,7 +23,7 @@
         <!-- 右侧：刷新操作 -->
         <div class="flex shrink-0 items-center gap-2">
           <AdminRefreshButton
-            :loading="loading"
+            :is-loading="isLoading"
             :aria-label="PROMPTS_MESSAGES.refresh"
             @click="loadPrompts()"
           />
@@ -51,7 +51,7 @@
       <div class="mt-2 text-admin-meta text-muted-foreground">
         {{ PROMPTS_MESSAGES.loadFailedHint }}
       </div>
-      <AdminButton class="mt-4" variant="outline" :disabled="loading" @click="loadPrompts()">
+      <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadPrompts()">
         <Refresh class="size-4" />
         {{ PROMPTS_MESSAGES.reload }}
       </AdminButton>
@@ -98,7 +98,7 @@
         <div :class="adminTableCardClass">
           <AdminTable
             :value="group.items"
-            :loading="loading"
+            :is-loading="isLoading"
             data-key="slug"
             scrollable
             :frame-class="adminTableFrameClass"
@@ -217,7 +217,7 @@
       :item="activeItem"
       :draft="activeItem ? (promptMap[activeItem.slug] ?? '') : ''"
       :validation="activeValidation"
-      :saving="Boolean(activeItem && saving[activeItem.slug])"
+      :is-saving="Boolean(activeItem && isSaving[activeItem.slug])"
       :variables="activeVars"
       :header="editorHeader"
       @update:draft="onDraftInput"
@@ -275,12 +275,12 @@ const {
   insertVariableIntoDraft,
   loadFailed,
   loadPrompts,
-  loading,
+  isLoading,
   promptMap,
   prompts,
   resetDrafts,
   savePrompt,
-  saving,
+  isSaving,
 } = promptConfigWorkspace
 
 const activeItem = ref<FeatureItem | null>(null)
@@ -399,7 +399,7 @@ function onInsertVariable(payload: { key: string; position: number }) {
 }
 
 // 初载：数据到达前不渲染 0 值计数，避免闪动误导。
-const isInitialLoading = computed(() => loading.value && prompts.value.length === 0)
+const isInitialLoading = computed(() => isLoading.value && prompts.value.length === 0)
 
 function getVarsForSlug(slug: FeatureSlug): readonly FeaturePromptVariable[] {
   return getPromptVariables(slug)

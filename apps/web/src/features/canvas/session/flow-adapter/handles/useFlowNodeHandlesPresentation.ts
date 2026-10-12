@@ -28,9 +28,9 @@ type FlowNodeAggregateHandlePresentation = {
   direction: FlowNodeHandleDirection
   handleType: 'source' | 'target'
   position: Position
-  connectable: boolean
-  visible: boolean
-  proximityActive: boolean
+  isConnectable: boolean
+  isVisible: boolean
+  isProximityActive: boolean
   style: CSSProperties
   ariaLabel: string
   title: string
@@ -130,9 +130,9 @@ function useHandleDirectionPresentation(
   const proximity = useCanvasHandleProximity({
     nodeId: options.nodeId,
     direction,
-    enabled: computed(() => portIds.value.length > 0 && !options.disabled()),
+    isEnabled: computed(() => portIds.value.length > 0 && !options.disabled()),
   })
-  const visible = computed(
+  const isVisible = computed(
     () => !options.disabled() && (options.showHandles() || proximity.isActive.value),
   )
   const anchors = computed<FlowNodeAnchorHandlePresentation[]>(() =>
@@ -153,9 +153,9 @@ function useHandleDirectionPresentation(
       direction,
       handleType: policy.handleType,
       position: policy.position,
-      connectable: !options.disabled(),
-      visible: visible.value,
-      proximityActive: proximity.isActive.value,
+      isConnectable: !options.disabled(),
+      isVisible: isVisible.value,
+      isProximityActive: proximity.isActive.value,
       style: proximity.isActive.value
         ? createFollowStyle(policy.centeredStyle, proximity.point.value, localScale())
         : policy.centeredStyle,

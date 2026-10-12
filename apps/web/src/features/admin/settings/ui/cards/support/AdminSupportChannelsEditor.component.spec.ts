@@ -2,6 +2,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../../../../test/render'
 import { mockAppToast } from '../../../../../../test/toast'
+import type { SupportChannelsSetting } from '../../../session/support/resource'
 import AdminSupportChannelsEditor from './AdminSupportChannelsEditor.vue'
 import { SUPPORT_CHANNELS_QUERY_KEY } from '../../../../../../core/composables/useSupportChannels'
 
@@ -18,7 +19,7 @@ describe('AdminSupportChannelsEditor', () => {
       url: 'https://discord.com/support',
       enabled: true,
       sort_order: 0,
-    }
+    } satisfies SupportChannelsSetting['channels'][number]
     const update = vi.fn().mockImplementation(async (draft) => draft)
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
@@ -36,7 +37,7 @@ describe('AdminSupportChannelsEditor', () => {
       url: 'https://discord.com/new',
       enabled: false,
       sort_order: 0,
-    })
+    } satisfies Partial<SupportChannelsSetting['channels'][number]>)
     expect(update.mock.calls[0]?.[1]).toBe('')
     expect(invalidate).toHaveBeenCalledWith({ queryKey: SUPPORT_CHANNELS_QUERY_KEY })
     expect(queryClient.getQueryData(['admin', 'settings', 'support'])).toMatchObject({
@@ -101,7 +102,7 @@ describe('AdminSupportChannelsEditor', () => {
 
   it('routes validation failure to toast error without an inline alert', async () => {
     const toast = mockAppToast()
-    const channels = [
+    const channels: SupportChannelsSetting['channels'] = [
       {
         id: '1',
         name: 'Discord',
@@ -139,14 +140,17 @@ describe('AdminSupportChannelsEditor', () => {
   })
 
   it('moves channels and restores their saved ordering', async () => {
-    const channels = ['First', 'Second'].map((name, index) => ({
-      id: String(index),
-      name,
-      kind: 'custom',
-      url: 'https://example.com',
-      enabled: true,
-      sort_order: index,
-    }))
+    const channels: SupportChannelsSetting['channels'] = ['First', 'Second'].map(
+      (name, index) =>
+        ({
+          id: String(index),
+          name,
+          kind: 'custom',
+          url: 'https://example.com',
+          enabled: true,
+          sort_order: index,
+        }) satisfies SupportChannelsSetting['channels'][number],
+    )
     const { user } = renderWithUser(AdminSupportChannelsEditor, {
       props: { resource: { get: vi.fn().mockResolvedValue({ channels }), update: vi.fn() } },
       global: {

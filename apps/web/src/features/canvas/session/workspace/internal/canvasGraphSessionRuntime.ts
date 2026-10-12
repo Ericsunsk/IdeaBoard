@@ -145,8 +145,8 @@ export function createCanvasGraphSessionRuntime(
     const unsubscribeHistory = session.subscribe((event) => {
       if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value)
         return
-      if (event.sideEffects.recordHistory) options.history.record(event.patch)
-      if (event.sideEffects.markDirty) options.markDirty()
+      if (event.sideEffects.shouldRecordHistory) options.history.record(event.patch)
+      if (event.sideEffects.shouldMarkDirty) options.markDirty()
     })
     const unsubscribeProjection = bindCanvasGraphSessionProjection({
       session,

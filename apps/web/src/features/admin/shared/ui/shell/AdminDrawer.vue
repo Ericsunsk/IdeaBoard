@@ -95,7 +95,7 @@ const emit = defineEmits<{
 const adminDrawerSurfaceIntent = defineDialogSurfaceIntent()
 const { ariaBusy, canDismiss, completeClose, handleVisibilityChange, requestClose } =
   useOverlayInteractionLifecycle({
-    visible: () => props.visible,
+    isVisible: () => props.visible,
     busy: () => props.busy,
     surface: adminDrawerSurfaceIntent,
     onReset: () => emit('reset'),

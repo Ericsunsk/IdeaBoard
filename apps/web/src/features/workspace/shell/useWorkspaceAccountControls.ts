@@ -25,7 +25,7 @@ export type WorkspaceNavigationAdapter = {
 
 type UseWorkspaceAccountControlsOptions = {
   navigation: WorkspaceNavigationAdapter
-  showHome?: boolean
+  shouldShowHome?: boolean
 }
 
 function formatIdeaValue(value: number): string {
@@ -140,7 +140,7 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
         { key: 'login', label: i18n.global.t('auth.signIn'), command: () => openLogin() },
         { key: 'register', label: i18n.global.t('auth.signUpFree'), command: () => openRegister() },
       ]
-      if (options.showHome ?? true) {
+      if (options.shouldShowHome ?? true) {
         guestItems.push({
           key: 'home',
           label: i18n.global.t('auth.menu.home'),
@@ -160,7 +160,7 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
         command: () => void goAdmin(),
       })
     }
-    if (options.showHome ?? true) {
+    if (options.shouldShowHome ?? true) {
       items.push({
         key: 'home',
         label: i18n.global.t('auth.menu.home'),

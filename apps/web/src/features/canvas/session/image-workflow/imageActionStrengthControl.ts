@@ -71,7 +71,7 @@ export function useFlowImageActionStrengthControl(options: {
     stopDragSession()
     const initialStrength = getStrengthFromPointer(action, input, startEvent)
     strengthEdit.beginEdit(action, input, {
-      syncInitial: false,
+      shouldSyncInitial: false,
       initialValue: initialStrength,
     })
 

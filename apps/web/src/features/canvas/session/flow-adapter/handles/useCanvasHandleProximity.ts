@@ -23,7 +23,7 @@ import {
 type UseCanvasHandleProximityOptions = {
   nodeId: MaybeRefOrGetter<string>
   direction: CanvasHandleProximityDirection
-  enabled: MaybeRef<boolean>
+  isEnabled: MaybeRef<boolean>
 }
 
 type CanvasHandleProximitySurface = {
@@ -145,7 +145,7 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
     unregister = coordinator.register({
       nodeId,
       direction: options.direction,
-      isEnabled: () => unref(options.enabled),
+      isEnabled: () => unref(options.isEnabled),
       onStateChange: (state) => {
         isActive.value = state.isActive
         point.value = state.point
@@ -171,7 +171,7 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
   )
 
   watch(
-    () => unref(options.enabled),
+    () => unref(options.isEnabled),
     () => surface.requestRefresh(),
     { flush: 'sync' },
   )

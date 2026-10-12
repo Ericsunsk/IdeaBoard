@@ -47,11 +47,11 @@
 
       <Button
         type="submit"
-        :loading="pwdLoading"
-        :disabled="pwdLoading"
+        :is-loading="isPasswordLoading"
+        :is-disabled="isPasswordLoading"
         :class="accountPrimaryActionButtonClass"
         >{{
-          pwdLoading ? t('account.security.updating') : t('account.security.updatePassword')
+          isPasswordLoading ? t('account.security.updating') : t('account.security.updatePassword')
         }}</Button
       >
     </form>
@@ -89,7 +89,7 @@
         :loading-label="t('account.security.sending')"
         :placeholder="t('account.security.newEmailPlaceholder')"
       />
-      <Button type="submit" :disabled="emailLoading" :class="accountPrimaryActionButtonClass">{{
+      <Button type="submit" :is-disabled="emailLoading" :class="accountPrimaryActionButtonClass">{{
         emailLoading ? t('account.security.sending') : t('account.security.sendCode')
       }}</Button>
     </form>
@@ -110,8 +110,8 @@
       />
       <Button
         type="submit"
-        :loading="emailLoading"
-        :disabled="emailLoading"
+        :is-loading="emailLoading"
+        :is-disabled="emailLoading"
         :class="accountPrimaryActionButtonClass"
         >{{
           emailLoading ? t('account.security.updating') : t('account.security.confirmEmailChange')
@@ -152,7 +152,7 @@ const { t } = useI18n()
 const {
   form: pwdForm,
   errors: pwdErrors,
-  loading: pwdLoading,
+  isLoading: isPasswordLoading,
   validateField: validatePasswordField,
   clearFieldError: clearPasswordFieldError,
   handleNewPasswordInput,
@@ -189,7 +189,7 @@ async function handleRequestEmailChange() {
       return true
     },
     {
-      loading: emailLoading,
+      isLoading: emailLoading,
       feedback: {
         success: () => appToast.success(t('account.security.toast.verificationCodeSent')),
         error: (error) =>
@@ -215,7 +215,7 @@ async function handleConfirmEmailChange() {
   const changed = await runAsyncAction(
     () => userStore.changeEmailWithOTP(emailForm.value.newEmail, emailForm.value.otp),
     {
-      loading: emailLoading,
+      isLoading: emailLoading,
       feedback: {
         success: () => appToast.success(t('account.security.toast.emailUpdated')),
         error: (error) =>

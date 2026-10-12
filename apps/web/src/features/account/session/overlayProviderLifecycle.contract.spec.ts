@@ -72,21 +72,21 @@ describe('Account overlay provider lifecycle', () => {
     expect(seenB).toBe(overlayB)
 
     overlayA!.commands.open('billing')
-    expect(overlayA!.viewModel.visible.value).toBe(true)
+    expect(overlayA!.viewModel.isVisible.value).toBe(true)
     expect(overlayA!.viewModel.initialTab.value).toBe('billing')
-    expect(overlayB!.viewModel.visible.value).toBe(false)
+    expect(overlayB!.viewModel.isVisible.value).toBe(false)
 
     overlayB!.commands.open('recharge')
-    expect(overlayB!.viewModel.visible.value).toBe(true)
+    expect(overlayB!.viewModel.isVisible.value).toBe(true)
     expect(overlayB!.viewModel.initialTab.value).toBe('recharge')
-    expect(overlayA!.viewModel.visible.value).toBe(true)
+    expect(overlayA!.viewModel.isVisible.value).toBe(true)
 
     overlayA!.commands.close()
-    expect(overlayA!.viewModel.visible.value).toBe(false)
-    expect(overlayB!.viewModel.visible.value).toBe(true)
+    expect(overlayA!.viewModel.isVisible.value).toBe(false)
+    expect(overlayB!.viewModel.isVisible.value).toBe(true)
 
     overlayB!.commands.close()
-    expect(overlayB!.viewModel.visible.value).toBe(false)
+    expect(overlayB!.viewModel.isVisible.value).toBe(false)
 
     appA.unmount()
     appB.unmount()
@@ -116,14 +116,14 @@ describe('Account overlay provider lifecycle', () => {
 
     overlayA!.commands.open('usage')
     overlayB!.commands.open('billing')
-    expect(overlayA!.viewModel.visible.value).toBe(true)
-    expect(overlayB!.viewModel.visible.value).toBe(true)
+    expect(overlayA!.viewModel.isVisible.value).toBe(true)
+    expect(overlayB!.viewModel.isVisible.value).toBe(true)
 
     appA.unmount()
 
-    expect(overlayB!.viewModel.visible.value).toBe(true)
+    expect(overlayB!.viewModel.isVisible.value).toBe(true)
     overlayB!.commands.close()
-    expect(overlayB!.viewModel.visible.value).toBe(false)
+    expect(overlayB!.viewModel.isVisible.value).toBe(false)
 
     appB.unmount()
   })

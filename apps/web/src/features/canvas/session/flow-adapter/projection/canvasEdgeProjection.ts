@@ -25,10 +25,10 @@ export function projectCanvasRenderEdges(
   let didChange = false
   const renderEdges = semanticEdges.map((edge) => {
     if (edge.targetHandle !== 'in:image') return edge
-    const animated = isAnimated(edge)
-    if (edge.animated === animated) return edge
+    const shouldAnimate = isAnimated(edge)
+    if (edge.animated === shouldAnimate) return edge
     didChange = true
-    return { ...edge, animated }
+    return { ...edge, animated: shouldAnimate }
   })
   return didChange ? renderEdges : (semanticEdges as Edge[])
 }

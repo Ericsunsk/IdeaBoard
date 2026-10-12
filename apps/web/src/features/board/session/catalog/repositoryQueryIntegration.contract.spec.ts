@@ -107,8 +107,11 @@ describe('production Board repository Query integration', () => {
   it('keeps the gallery list-only and updates its production view after member SSE', async () => {
     const catalog = repository()
     expect(
-      await catalog.commands.hydrate({ preserveLocalNewer: true, includeDocuments: false }),
-    ).toEqual({ ok: true })
+      await catalog.commands.hydrate({
+        shouldPreserveLocalNewer: true,
+        shouldIncludeDocuments: false,
+      }),
+    ).toEqual({ isOk: true })
     expect(mocks.request).toHaveBeenCalledTimes(1)
     expect(catalog.viewModel.boards.value[0]?.name).toBe('Server Board')
     apiState.boardsResponse.data[0]!.name = 'Renamed remotely'
@@ -172,9 +175,9 @@ describe('production Board repository Query integration', () => {
     getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
     expect(oldSignal?.aborted).toBe(true)
     const newHydrate = catalog.commands.hydrate()
-    await expect(newHydrate).resolves.toEqual({ ok: true })
+    await expect(newHydrate).resolves.toEqual({ isOk: true })
     resolveOld({ data: oldDocument })
-    await expect(hydrate).resolves.toMatchObject({ ok: false })
+    await expect(hydrate).resolves.toMatchObject({ isOk: false })
     expect(
       queryClient.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-1')),
     ).toBeUndefined()
@@ -347,7 +350,9 @@ describe('production Board repository Query integration', () => {
     await expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })
     expect(getBoardById('board-1')?.revision).toBe(7)
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local draft')
-    expect(await catalog.commands.hydrate({ preserveLocalNewer: false })).toEqual({ ok: true })
+    expect(await catalog.commands.hydrate({ shouldPreserveLocalNewer: false })).toEqual({
+      isOk: true,
+    })
     expect(getBoardById('board-1')?.revision).toBe(8)
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote winner')
   })
@@ -357,7 +362,7 @@ describe('production Board repository Query integration', () => {
     const catalog = repository()
     await catalog.commands.hydrate()
     remote(8, 'revision eight')
-    await catalog.commands.hydrate({ includeDocuments: false })
+    await catalog.commands.hydrate({ shouldIncludeDocuments: false })
     expect(catalog.viewModel.boards.value[0]?.revision).toBe(8)
     expect(getBoardById('board-1')?.revision).toBe(7)
     const session = createBoardSessionRepository()
@@ -376,9 +381,9 @@ describe('production Board repository Query integration', () => {
       const hydrate = vi.fn(hydrateBoardsFromServer)
       const catalog = createBoardRepository({ hydrate, observeServer: observeBoardServerSnapshots })
       repositories.push(catalog)
-      await catalog.commands.hydrate({ includeDocuments: false })
+      await catalog.commands.hydrate({ shouldIncludeDocuments: false })
       if (failure === 'returned')
-        hydrate.mockResolvedValueOnce({ ok: false, error: new Error('test outage') })
+        hydrate.mockResolvedValueOnce({ isOk: false, error: new Error('test outage') })
       else hydrate.mockRejectedValueOnce(new Error('test outage'))
       await catalog.commands.hydrate().catch(() => {})
       apiState.boardsResponse.data[0]!.name = 'After failed hydrate'
@@ -399,12 +404,12 @@ describe('production Board repository Query integration', () => {
       const observeServer = vi.fn(observeBoardServerSnapshots)
       const catalog = createBoardRepository({ hydrate, observeServer })
       repositories.push(catalog)
-      await catalog.commands.hydrate({ includeDocuments: false })
+      await catalog.commands.hydrate({ shouldIncludeDocuments: false })
       let fail!: () => void
       hydrate.mockImplementationOnce(
         () =>
           new Promise((resolve) => {
-            fail = () => resolve({ ok: false, error: new Error('test outage') })
+            fail = () => resolve({ isOk: false, error: new Error('test outage') })
           }),
       )
       const pending = catalog.commands.hydrate()
@@ -413,7 +418,7 @@ describe('production Board repository Query integration', () => {
       else {
         getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
         remote(9, 'other workspace', OTHER_WORKSPACE_ID)
-        await catalog.commands.hydrate({ includeDocuments: false })
+        await catalog.commands.hydrate({ shouldIncludeDocuments: false })
       }
       const observations = observeServer.mock.calls.length
       fail()

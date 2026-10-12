@@ -9,7 +9,7 @@ type UseFlowNodeInternalsRefreshQueueOptions = {
 
 export function useFlowNodeInternalsRefreshQueue(options: UseFlowNodeInternalsRefreshQueueOptions) {
   const rafScheduler = useRafScheduler()
-  let pendingNodeInternalsRefresh = false
+  let isPendingNodeInternalsRefresh = false
   let queuedNodeInternalsIds: Set<string> | null = null
 
   function readQueuedNodeInternalsRefreshIds(): string[] {
@@ -23,8 +23,8 @@ export function useFlowNodeInternalsRefreshQueue(options: UseFlowNodeInternalsRe
     if (nextIds.length === 0) return
     if (!queuedNodeInternalsIds) queuedNodeInternalsIds = new Set()
     nextIds.forEach((id) => queuedNodeInternalsIds?.add(id))
-    if (pendingNodeInternalsRefresh) return
-    pendingNodeInternalsRefresh = true
+    if (isPendingNodeInternalsRefresh) return
+    isPendingNodeInternalsRefresh = true
     void nextTick(() => {
       rafScheduler.schedule(() => {
         const ids = readQueuedNodeInternalsRefreshIds()
@@ -32,7 +32,7 @@ export function useFlowNodeInternalsRefreshQueue(options: UseFlowNodeInternalsRe
           options.updateNodeInternals(ids)
         }
         const pendingIds = readQueuedNodeInternalsRefreshIds()
-        pendingNodeInternalsRefresh = false
+        isPendingNodeInternalsRefresh = false
         if (pendingIds.length > 0) {
           scheduleFlowNodeInternalsRefresh(pendingIds)
         }

@@ -6,16 +6,16 @@
       `node-stage-frame--${variant}`,
       `node-stage-frame-layout--${layout}`,
       {
-        'is-active': active,
-        'is-drop-target': dropTarget,
-        'is-connection-drop-target': connectionDropTarget,
-        'is-loading': loading,
-        'is-running': running,
-        'is-transparent': transparent,
+        'is-active': isActive,
+        'is-drop-target': isDropTarget,
+        'is-connection-drop-target': isConnectionDropTarget,
+        'is-loading': isLoading,
+        'is-running': isRunning,
+        'is-transparent': isTransparent,
       },
     ]"
     :style="frameStyle"
-    :aria-busy="ariaBusy ? 'true' : undefined"
+    :aria-busy="isAriaBusy ? 'true' : undefined"
     :aria-label="ariaLabel"
   >
     <slot />
@@ -29,27 +29,27 @@ const props = withDefaults(
   defineProps<{
     variant?: 'standard' | 'prompt' | 'square'
     layout?: 'block' | 'center'
-    active?: boolean
-    dropTarget?: boolean
-    connectionDropTarget?: boolean
-    loading?: boolean
-    running?: boolean
-    transparent?: boolean
+    isActive?: boolean
+    isDropTarget?: boolean
+    isConnectionDropTarget?: boolean
+    isLoading?: boolean
+    isRunning?: boolean
+    isTransparent?: boolean
     height?: number | string | undefined
-    ariaBusy?: boolean
+    isAriaBusy?: boolean
     ariaLabel?: string | undefined
   }>(),
   {
     variant: 'standard',
     layout: 'block',
-    active: false,
-    dropTarget: false,
-    connectionDropTarget: false,
-    loading: false,
-    running: false,
-    transparent: false,
+    isActive: false,
+    isDropTarget: false,
+    isConnectionDropTarget: false,
+    isLoading: false,
+    isRunning: false,
+    isTransparent: false,
     height: undefined,
-    ariaBusy: false,
+    isAriaBusy: false,
     ariaLabel: undefined,
   },
 )

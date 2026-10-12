@@ -27,7 +27,7 @@
             :key="provider"
             type="button"
             :class="authSocialIconButtonClass"
-            :disabled="loading"
+            :is-disabled="loading"
             :aria-label="t('auth.socialSignInAria', { provider: getOAuthProviderLabel(provider) })"
             :title="t('auth.socialSignInAria', { provider: getOAuthProviderLabel(provider) })"
             @click="handleSocialLogin(provider)"
@@ -97,7 +97,7 @@
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
-          :loading="loading"
+          :is-loading="loading"
           v-bind="submitControlState"
           >{{ loading ? t('auth.buttons.signingIn') : t('auth.buttons.signIn') }}</Button
         >
@@ -124,7 +124,7 @@
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
-          :loading="loading"
+          :is-loading="loading"
           v-bind="submitControlState"
           >{{ loading ? t('auth.buttons.sending') : t('auth.buttons.sendCode') }}</Button
         >
@@ -167,7 +167,7 @@
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
-          :loading="loading"
+          :is-loading="loading"
           v-bind="submitControlState"
           >{{ loading ? t('auth.buttons.resetting') : t('auth.buttons.resetPassword') }}</Button
         >
@@ -256,7 +256,7 @@ const submitControlState = computed(() =>
   resolveInteractiveControlState({ pending: loading.value }),
 )
 const secondaryControlState = computed(() =>
-  resolveInteractiveControlState({ disabled: loading.value }),
+  resolveInteractiveControlState({ isDisabled: loading.value }),
 )
 const resetMode = ref(false)
 const resetOtpSent = ref(false)

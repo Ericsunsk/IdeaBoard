@@ -154,16 +154,16 @@ function renderAccountDialogContent(initialTab?: AccountTab) {
         UiTag: TagStub,
         transition: TransitionStub,
         BillingPane: {
-          props: ['active'],
+          props: ['isActive'],
           template: '<section aria-label="Transactions">最终收支记录</section>',
         },
         RechargePane: {
-          props: ['active', 'paymentReturn'],
+          props: ['isActive', 'paymentReturn'],
           template:
             '<section aria-label="Top up">选择充值数量<span v-if="paymentReturn">{{ paymentReturn.publicToken }}</span></section>',
         },
         UsagePane: {
-          props: ['active'],
+          props: ['isActive'],
           template: '<section aria-label="Usage">Lifetime 数据</section>',
         },
         RewardsPane: {

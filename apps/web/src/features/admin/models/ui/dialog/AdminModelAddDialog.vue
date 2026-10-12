@@ -385,8 +385,9 @@ async function loadDetectedModels() {
     detectedMeta.value = {
       configured: detection.configured_providers,
     }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : MODELS_MESSAGES.addDetectFailed
+  } catch (caughtError) {
+    error.value =
+      caughtError instanceof Error ? caughtError.message : MODELS_MESSAGES.addDetectFailed
   } finally {
     loading.value = false
   }

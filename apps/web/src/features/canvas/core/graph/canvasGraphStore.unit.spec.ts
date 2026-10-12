@@ -123,10 +123,10 @@ describe('CanvasGraphStore', () => {
   })
 
   it('routes constructor and explicit hydrate measurements through injected telemetry', () => {
-    const measured: string[] = []
+    const isMeasured: string[] = []
     const telemetry: CanvasGraphStoreTelemetry = {
       measureHydrate: (counts, task) => {
-        measured.push(`hydrate:${counts.nodes}:${counts.edges}:${counts.groups}`)
+        isMeasured.push(`hydrate:${counts.nodes}:${counts.edges}:${counts.groups}`)
         return task()
       },
       measureDraft: (_counts, task) => task(),
@@ -136,7 +136,7 @@ describe('CanvasGraphStore', () => {
 
     store.hydrate(createEmptyBoardSnapshot())
 
-    expect(measured).toEqual(['hydrate:3:1:0', 'hydrate:0:0:0'])
+    expect(isMeasured).toEqual(['hydrate:3:1:0', 'hydrate:0:0:0'])
   })
 
   it('hydrates and exports a BoardSnapshot without changing the schema shape', () => {
@@ -265,20 +265,20 @@ describe('CanvasGraphStore', () => {
     const summary = store
       .beginTransaction('group')
       .selectNode(promptId, true)
-      .removeNode(imageId, { removeConnectedEdges: true })
+      .removeNode(imageId, { shouldRemoveConnectedEdges: true })
       .createGroup([promptId, toCanvasGraphNodeId('prompt', 2)], GROUP_GEOMETRY, groupId)
       .commit()
 
     const undo = store.applyCommitPatch(summary.commitPatch, 'backward')
     expect(undo.reason).toBe('history-undo')
     expect(store.getNode(imageId)).toBeDefined()
-    expect(store.getNode(promptId)?.selected).toBe(false)
+    expect(store.getNode(promptId)?.isSelected).toBe(false)
     expect(store.getGroup(groupId)).toBeUndefined()
     expect(store.getNodeIds()).toEqual([imageId, promptId, toCanvasGraphNodeId('prompt', 2)])
 
     store.applyCommitPatch(summary.commitPatch, 'forward')
     expect(store.getNode(imageId)).toBeUndefined()
-    expect(store.getNode(promptId)?.selected).toBe(true)
+    expect(store.getNode(promptId)?.isSelected).toBe(true)
     expect(store.getGroup(groupId)).toBeDefined()
   })
 
@@ -325,7 +325,7 @@ describe('CanvasGraphStore', () => {
 
     const summary = store
       .beginTransaction('batch-delete')
-      .batchDelete({ nodeIds: [imageId, promptId], removeConnectedEdges: true })
+      .batchDelete({ nodeIds: [imageId, promptId], shouldRemoveConnectedEdges: true })
       .commit()
 
     expect(summary.removedNodeIds).toEqual([imageId, promptId])
@@ -421,7 +421,7 @@ describe('CanvasGraphStore', () => {
 
     const summary = commitCanvasGraphDeleteGroupIntent(store, {
       groupId,
-      deleteMembers: true,
+      shouldDeleteMembers: true,
     })
 
     expect(summary).toMatchObject({
@@ -476,7 +476,7 @@ describe('CanvasGraphStore', () => {
 
     const updateSummary = store
       .beginTransaction('delete')
-      .removeNode(imageId, { removeConnectedEdges: true })
+      .removeNode(imageId, { shouldRemoveConnectedEdges: true })
       .commit()
 
     expect(updateSummary.changedGroupIds).toEqual([groupId])
@@ -727,10 +727,14 @@ describe('CanvasGraphStore', () => {
       shouldRecordHistory: false,
       shouldMarkDirty: false,
     })
-    expect(summary.projectionPatch.nodes.selectionChanged).toEqual([{ id: nodeId, selected: true }])
-    expect(summary.projectionPatch.edges.selectionChanged).toEqual([{ id: edgeId, selected: true }])
-    expect(store.getNode(nodeId)?.selected).toBe(true)
-    expect(store.getEdge(edgeId)?.selected).toBe(true)
+    expect(summary.projectionPatch.nodes.selectionChanged).toEqual([
+      { id: nodeId, isSelected: true },
+    ])
+    expect(summary.projectionPatch.edges.selectionChanged).toEqual([
+      { id: edgeId, isSelected: true },
+    ])
+    expect(store.getNode(nodeId)?.isSelected).toBe(true)
+    expect(store.getEdge(edgeId)?.isSelected).toBe(true)
     expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
   })
 
@@ -776,7 +780,7 @@ describe('CanvasGraphStore', () => {
     expect(
       stageCanvasGraphNodeDragIntent(transaction, {
         nodeId: promptId,
-        selected: true,
+        isSelected: true,
       }),
     ).toBe(true)
     expect(
@@ -791,7 +795,7 @@ describe('CanvasGraphStore', () => {
     expect(summary.changedNodeIds).toEqual([promptId])
     expect(summary.selectedNodeIds).toEqual([promptId])
     expect(store.exportSnapshot().promptNodes[0]).toMatchObject({ x: 640, y: 120 })
-    expect(store.getNode(promptId)?.selected).toBe(true)
+    expect(store.getNode(promptId)?.isSelected).toBe(true)
   })
 
   it('commits delete and disconnect intents with canonical transaction reasons', () => {
@@ -801,7 +805,7 @@ describe('CanvasGraphStore', () => {
 
     const deleteSummary = commitCanvasGraphDeleteIntent(store, {
       nodeIds: [imageId],
-      removeConnectedEdges: true,
+      shouldRemoveConnectedEdges: true,
     })
 
     expect(deleteSummary.reason).toBe('delete')

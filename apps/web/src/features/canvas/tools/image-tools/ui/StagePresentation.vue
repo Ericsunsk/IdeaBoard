@@ -15,7 +15,7 @@
     :canvas-width="maskCanvasWidth"
     :canvas-height="maskCanvasHeight"
     :mask-layer-opacity="binding.session.maskChromeState.inpaintLayerOpacity.value"
-    :image-layer-visible="true"
+    :is-image-layer-visible="true"
     :brush-size="binding.session.inpaint.brushSize.value"
     :set-canvas-ref="maskCanvasRefSetter"
     @canvas-pointerdown="binding.session.inpaint.onCanvasPointerDown"

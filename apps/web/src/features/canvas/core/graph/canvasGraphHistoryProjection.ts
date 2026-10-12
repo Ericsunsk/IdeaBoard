@@ -63,8 +63,8 @@ export function createSummary(
     selectedEdgeIds,
     didChangeOrder:
       changes.didChangeNodeOrder || changes.didChangeEdgeOrder || changes.didChangeGroupOrder,
-    shouldRecordHistory: changes.hasDomainChanges && options.recordHistory,
-    shouldMarkDirty: changes.hasDomainChanges && options.markDirty,
+    shouldRecordHistory: changes.hasDomainChanges && options.shouldRecordHistory,
+    shouldMarkDirty: changes.hasDomainChanges && options.shouldMarkDirty,
     commitPatch,
     projectionPatch: {
       nodes: {
@@ -80,7 +80,7 @@ export function createSummary(
         selectionChanged: selectedNodeIds
           .map((id) => state.nodesById.get(id))
           .filter((record): record is CanvasGraphNodeRecord => !!record)
-          .map((record) => ({ id: record.id, selected: record.selected })),
+          .map((record) => ({ id: record.id, isSelected: record.isSelected })),
       },
       edges: {
         added: addedEdgeIds
@@ -91,7 +91,7 @@ export function createSummary(
         selectionChanged: selectedEdgeIds
           .map((id) => state.edgesById.get(id))
           .filter((record): record is CanvasGraphEdgeRecord => !!record)
-          .map((record) => ({ id: record.id, selected: record.selected })),
+          .map((record) => ({ id: record.id, isSelected: record.isSelected })),
       },
       groups: {
         added: addedGroupIds

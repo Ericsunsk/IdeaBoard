@@ -257,8 +257,8 @@ function useCanvasRuntimeHistory(
     maxSteps: 10,
     applyPatch: (patch, direction) => {
       const summary = readCanvasGraphStore().applyCommitPatch(patch, direction, {
-        recordHistory: false,
-        markDirty: true,
+        shouldRecordHistory: false,
+        shouldMarkDirty: true,
       })
       return summary.didChange
     },
@@ -300,7 +300,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   function applyBoardSnapshot(
     snapshot: BoardSnapshot,
     source: 'hydrate-replace' | 'save-reconcile',
-    applyOptions: { clearHistory?: boolean } = {},
+    applyOptions: { shouldClearHistory?: boolean } = {},
   ) {
     const graphRuntime = requireGraphSessionRuntime()
     options.boardBaseSnapshot.value = snapshot
@@ -310,7 +310,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     )
     const flow = boardSnapshotToFlow(snapshot)
     graphRuntime.commitGraph({ nodes: flow.nodes as Node[], edges: flow.edges as Edge[] }, source)
-    if (source === 'hydrate-replace' || applyOptions.clearHistory) {
+    if (source === 'hydrate-replace' || applyOptions.shouldClearHistory) {
       canvasGraphHistory.clearBaseline()
     }
   }
@@ -329,17 +329,17 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
   const saveCurrentBoardSnapshot = async (
     saveOptions: {
-      waitForPreview?: boolean | undefined
-      silent?: boolean | undefined
+      shouldWaitForPreview?: boolean | undefined
+      isSilent?: boolean | undefined
     } = {},
   ) => {
     const result = await boardSync.saveCurrentBoardSnapshot(saveOptions)
     if (result.reconciliation) {
       applyBoardSnapshot(result.reconciliation.snapshot, 'save-reconcile', {
-        clearHistory: !result.reconciliation.hasLocalDraftAdvanced,
+        shouldClearHistory: !result.reconciliation.hasLocalDraftAdvanced,
       })
     }
-    return result.saved
+    return result.isSaved
   }
 
   const { markDirtyAndSchedule, flushAutosave } = useBoardAutosave({
@@ -347,8 +347,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isSaving: options.isSavingBoard,
     resumeSignal: options.autosaveResumeSignal,
     canRun: () => !nodeDragLifecycle.isActive(),
-    save: (autosaveOptions?: { silent?: boolean | undefined }) =>
-      saveCurrentBoardSnapshot({ waitForPreview: false, silent: autosaveOptions?.silent }),
+    save: (autosaveOptions?: { isSilent?: boolean | undefined }) =>
+      saveCurrentBoardSnapshot({
+        shouldWaitForPreview: false,
+        isSilent: autosaveOptions?.isSilent,
+      }),
   })
 
   function markDirty() {
@@ -417,10 +420,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       return
     }
 
-    const onlyVisualChanges = changes.every(
+    const isOnlyVisualChanges = changes.every(
       (change) => change.type === 'position' || change.type === 'select',
     )
-    if (nodeDragLifecycle.isActive() && onlyVisualChanges) {
+    if (nodeDragLifecycle.isActive() && isOnlyVisualChanges) {
       const selectionChanges = changes.filter(
         (change): change is Extract<NodeChange, { type: 'select' }> => change.type === 'select',
       )
@@ -455,8 +458,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
     const store = readCanvasGraphStore()
     const transaction = store.beginTransaction('node-update', {
-      recordHistory: false,
-      markDirty: false,
+      shouldRecordHistory: false,
+      shouldMarkDirty: false,
     })
     stageCanvasRendererSelection(store, transaction, elements)
     transaction.commit()

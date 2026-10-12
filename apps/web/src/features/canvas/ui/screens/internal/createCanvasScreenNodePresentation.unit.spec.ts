@@ -9,7 +9,7 @@ function createPresentation(getFlowNodeUiStateCached: ReturnType<typeof vi.fn>) 
       imageWorkflow: {
         tools: {
           nodeBindings: {
-            actionFor: () => ({ directGenerating: false }),
+            actionFor: () => ({ isDirectGenerating: false }),
             stageFor: () => null,
           },
           active: { nodeId: ref(null), maskNodeId: ref(null) },
@@ -50,7 +50,7 @@ function createPresentation(getFlowNodeUiStateCached: ReturnType<typeof vi.fn>) 
     workspace: workspace as never,
     activePanels: { isActiveNodePanel: () => false } as never,
     imageStages: { setImageStageRef: noop, clearImageStageRef: noop } as never,
-    duplicateModifierPressed: ref(false),
+    isDuplicateModifierPressed: ref(false),
     nodeInteractions: {
       onFlowPromptTextUpdate: noop,
       onFlowNodeParamUpdate: noop,
@@ -72,8 +72,8 @@ describe('createCanvasScreenNodePresentation node slot scope', () => {
     const props = presentation.nodePropsFor({
       id: 'prompt-1',
       data: { kind: 'prompt', snapshotNode: null },
-      selected: false,
-      dragging: false,
+      isSelected: false,
+      isDragging: false,
     } as never)
 
     // The shared ui-state cache covers all nodes/edges: touching it here

@@ -284,12 +284,12 @@ export async function provisionWorkspace(
   if (name.length > WORKSPACE_NAME_MAX_LENGTH) {
     throw new Error('Workspace name is too long')
   }
-  const organization_id = optionalOpaqueId(input.organizationId, 'org', 'organization')
+  const organizationId = optionalOpaqueId(input.organizationId, 'org', 'organization')
   const response = await createWorkspace(
     {
       data: {
         name,
-        ...(organization_id == null ? {} : { organization_id }),
+        ...(organizationId == null ? {} : { organization_id: organizationId }),
       },
     },
     {

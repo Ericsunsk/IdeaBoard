@@ -37,7 +37,7 @@ export async function joinSharedBoardByToken(token: string): Promise<JoinSharedB
   )
 
   const hydrateResult = await boardRepository.commands.hydrate()
-  if (!hydrateResult.ok) {
+  if (!hydrateResult.isOk) {
     throw new Error(i18n.global.t('workspace.joinSharedBoard.hydrateFailed'), {
       cause: hydrateResult.error,
     })

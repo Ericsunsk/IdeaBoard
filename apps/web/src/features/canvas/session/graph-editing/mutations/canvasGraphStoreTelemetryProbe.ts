@@ -15,7 +15,7 @@ export const canvasGraphStoreTelemetryProbe: CanvasGraphStoreTelemetry = {
   measureDraft: (counts, task) => measureCanvasPerf('graph-transaction.draft', () => counts, task),
   recordCommit: (sideEffects) => {
     recordCanvasInteractionCount('graphCommitCount')
-    if (sideEffects.recordHistory) recordCanvasInteractionCount('graphHistoryCommitCount')
-    if (sideEffects.markDirty) recordCanvasInteractionCount('graphDirtyCommitCount')
+    if (sideEffects.shouldRecordHistory) recordCanvasInteractionCount('graphHistoryCommitCount')
+    if (sideEffects.shouldMarkDirty) recordCanvasInteractionCount('graphDirtyCommitCount')
   },
 }

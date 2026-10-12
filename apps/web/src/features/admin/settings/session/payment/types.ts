@@ -1,17 +1,17 @@
 type StripeConfigurationMode = 'test' | 'live'
 
 export type StripeConfigurationSummary = {
-  configured: boolean
-  apiKeyConfigured: boolean
-  webhookSecretConfigured: boolean
+  isConfigured: boolean
+  isApiKeyConfigured: boolean
+  isWebhookSecretConfigured: boolean
   accountId?: string | undefined
   mode?: StripeConfigurationMode | undefined
-  chargesEnabled: boolean
+  isChargesEnabled: boolean
   paymentMethodConfigurationId: string
   productTaxCode: string
-  productReady: boolean
-  webhookReady: boolean
-  purchasesEnabled: boolean
+  isProductReady: boolean
+  isWebhookReady: boolean
+  isPurchasesEnabled: boolean
   updatedAt?: string | undefined
 }
 
@@ -19,7 +19,7 @@ type SaveStripeConfigurationInput = {
   apiKey?: string
   paymentMethodConfigurationId: string
   productTaxCode: string
-  purchasesEnabled: boolean
+  isPurchasesEnabled: boolean
 }
 
 export interface AdminStripeSettingsResource {

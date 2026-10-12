@@ -1677,58 +1677,6 @@
         "evidence": ["docs/frontend-seam-inventory.md: src/components/ui/spinner/index.ts#Spinner"]
       }
     },
-    "src/components/ui/table/index.ts": {
-      "Table": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableBody": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableCaption": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableCell": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableFooter": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableHead": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableHeader": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      },
-      "TableRow": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/table/table.component.spec.ts"]
-      }
-    },
-    "src/components/ui/tabs/index.ts": {
-      "Tabs": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
-      },
-      "TabsContent": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
-      },
-      "TabsList": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
-      },
-      "TabsTrigger": {
-        "kind": "test-contract",
-        "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
-      }
-    },
     "src/core/auth/adminAccess.ts": {
       "AdminAccessUser": {
         "kind": "canonical-public",
@@ -14544,6 +14492,12 @@
           "docs/frontend-seam-inventory.md: src/theme/lightboxScrim.ts#lightboxScrimLinkClass"
         ]
       }
+    },
+    "src/features/admin/settings/session/payment/resource.ts": {
+      "ApiStripeConfigurationSummary": {
+        "kind": "test-contract",
+        "evidence": ["src/features/admin/settings/session/payment/resource.contract.spec.ts"]
+      }
     }
   },
   "generated": {
@@ -17669,37 +17623,33 @@
     },
     "src/components/ui/table/Table.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableBody.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableCaption.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableCell.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableFooter.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableHead.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableHeader.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
+      "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
     "src/components/ui/table/TableRow.vue": {
-      "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/index.ts"]
-    },
-    "src/components/ui/table/index.ts": {
       "kind": "retained-public-or-test-support",
       "evidence": ["src/components/ui/table/table.component.spec.ts"]
     },
@@ -17709,21 +17659,17 @@
     },
     "src/components/ui/tabs/Tabs.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/tabs/index.ts"]
+      "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
     },
     "src/components/ui/tabs/TabsContent.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/tabs/index.ts"]
+      "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
     },
     "src/components/ui/tabs/TabsList.vue": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/tabs/index.ts"]
+      "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
     },
     "src/components/ui/tabs/TabsTrigger.vue": {
-      "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/tabs/index.ts"]
-    },
-    "src/components/ui/tabs/index.ts": {
       "kind": "retained-public-or-test-support",
       "evidence": ["src/components/ui/tabs/tabs.component.spec.ts"]
     },

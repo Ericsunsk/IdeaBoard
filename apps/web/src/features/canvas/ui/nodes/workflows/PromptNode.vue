@@ -4,9 +4,9 @@
     :node-id="node.id"
     :width="node.width"
     :title="node.title || t('canvas.node.prompt')"
-    :active="active"
-    :dragging="dragging"
-    :copy-mode="copyMode"
+    :is-active="isActive"
+    :is-dragging="isDragging"
+    :is-copy-mode="isCopyMode"
     @node-mousedown="emit('node-mousedown', $event)"
     @update:title="emit('update:title', $event)"
     @delete="emit('delete')"
@@ -16,8 +16,8 @@
     </template>
     <NodeStageFrame
       variant="prompt"
-      :active="active"
-      :connection-drop-target="connectionDropTarget"
+      :is-active="isActive"
+      :is-connection-drop-target="isConnectionDropTarget"
     >
       <div class="box-border flex min-h-[280px] flex-col gap-3 p-5">
         <div
@@ -30,7 +30,7 @@
             class="prompt-node-thumb-item aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] flex-none cursor-grab"
             :src="item.url"
             :asset-id="item.mediaRef?.assetId"
-            removable
+            is-removable
             :data-image-id="item.id"
             @mousedown.stop
             @contextmenu.stop.prevent="emit('input-image-preview', item)"
@@ -40,7 +40,7 @@
             v-if="canAcceptMoreImages"
             class="prompt-node-thumb-add node-input-thumbnail-add node-tool-output-count node-tool-button canvas-tool-tooltip-trigger"
             :class="{
-              'is-drag-over': addSlotDragOver,
+              'is-drag-over': isAddSlotDragOver,
             }"
             type="button"
             :aria-label="t('canvas.controls.addImageInput')"
@@ -63,8 +63,8 @@
           :output-count="outputCount"
           :output-resolution="node.outputResolution"
           :aspect-ratio="aspectRatio"
-          :allow-empty="true"
-          :submit-disabled="props.generationAvailable === false"
+          :should-allow-empty="true"
+          :is-submit-disabled="props.isGenerationAvailable === false"
           :billing-state="billingQuote"
           class="flex-auto"
           @update:model-value="emit('update:text', $event)"
@@ -103,11 +103,11 @@ import { buildGenerationTaskRequest } from '../../../session/execution'
 
 const props = defineProps<{
   node: PromptNodeItem
-  active: boolean
-  connectionDropTarget?: boolean
-  dragging: boolean
-  copyMode: boolean
-  generationAvailable?: boolean
+  isActive: boolean
+  isConnectionDropTarget?: boolean
+  isDragging: boolean
+  isCopyMode: boolean
+  isGenerationAvailable?: boolean
   uiState?: PromptNodeUiState | undefined
 }>()
 
@@ -139,7 +139,7 @@ const outputCount = computed(() => requireImageNodeOutputCount(props.node.output
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const billingQuote = useCanvasBillingQuote(
   () => SERVICE.generation,
-  () => props.active,
+  () => props.isActive,
   () =>
     buildGenerationTaskRequest({
       prompt: '',
@@ -149,7 +149,7 @@ const billingQuote = useCanvasBillingQuote(
     }),
 )
 const {
-  addSlotDragOver,
+  isAddSlotDragOver,
   canAcceptMoreImages,
   onAddSlotDragLeave,
   onAddSlotDragOver,

@@ -47,7 +47,7 @@ function setConnectionStartHandle(value: MockConnectingHandle | null) {
   vueFlowMock.connectionStartHandle.value = value
 }
 
-function renderHandles(props: { kind: NodeKind; disabled?: boolean }) {
+function renderHandles(props: { kind: NodeKind; isDisabled?: boolean }) {
   const geometry = {
     prepare: () => undefined,
     resolveAnchor: () => ({ x: 100.5, y: 100.5 }),
@@ -56,8 +56,8 @@ function renderHandles(props: { kind: NodeKind; disabled?: boolean }) {
   const currentProps = reactive({
     nodeId: 'node-1',
     kind: props.kind,
-    disabled: props.disabled ?? false,
-    dragging: false,
+    isDisabled: props.isDisabled ?? false,
+    isDragging: false,
   })
   const interactionRoot = ref<HTMLElement | null>(null)
   const zoomLevel = ref(100)
@@ -82,7 +82,7 @@ function renderHandles(props: { kind: NodeKind; disabled?: boolean }) {
     ...view,
     coordinator,
     interactionRoot: view.getByTestId('interaction-root'),
-    setProximitySuspended: (suspended: boolean) => proximitySurface?.setSuspended(suspended),
+    setProximitySuspended: (isSuspended: boolean) => proximitySurface?.setSuspended(isSuspended),
   }
 }
 
@@ -124,7 +124,7 @@ describe('FlowCanvasNodeHandleRail', () => {
   })
 
   it('keeps disabled handles hidden and non-connectable', async () => {
-    const view = renderHandles({ kind: 'prompt', disabled: true })
+    const view = renderHandles({ kind: 'prompt', isDisabled: true })
 
     view.interactionRoot.dispatchEvent(new MouseEvent('mouseenter'))
     view.coordinator.movePointer({ x: 130, y: 100 })

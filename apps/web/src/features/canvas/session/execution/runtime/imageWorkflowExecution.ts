@@ -36,7 +36,7 @@ export type UseImageWorkflowExecutionOptions = {
   rendererMetrics: CanvasRendererMetricsPort
   boardBaseSnapshot: Ref<BoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
-  flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
+  flushAutosave?: (options?: { isSilent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean

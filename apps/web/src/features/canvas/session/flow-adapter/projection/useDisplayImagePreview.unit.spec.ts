@@ -287,7 +287,7 @@ describe('useDisplayImagePreview', () => {
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
-      useDisplayImagePreview(sourceUrl, { maxSide: null, keepPreviousOnSourceChange: true }),
+      useDisplayImagePreview(sourceUrl, { maxSide: null, shouldKeepPreviousOnSourceChange: true }),
     )
     if (!preview) throw new Error('preview composable was not created')
 

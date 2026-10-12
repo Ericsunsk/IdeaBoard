@@ -37,12 +37,12 @@ export type CanvasChromeAccountState = {
 
 export type CanvasChromeToolState = {
   activeTool: 'select' | 'hand'
-  libraryMounted: boolean
-  libraryOpen: boolean
-  minimapEnabled: boolean
+  isLibraryMounted: boolean
+  isLibraryOpen: boolean
+  isMinimapEnabled: boolean
 }
 
 export type CanvasChromeStatusState = {
-  exportDisabled: boolean
+  isExportDisabled: boolean
   zoomLevel: number
 }

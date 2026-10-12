@@ -24,9 +24,9 @@ function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
     logoutFailed() {
       appToast.error(i18n.global.t('account.toast.signOutFailed'))
     },
-    rewardRedemptionSucceeded(creditedAmount, replayed) {
+    rewardRedemptionSucceeded(creditedAmount, isReplayed) {
       appToast.success(
-        replayed
+        isReplayed
           ? i18n.global.t('account.toast.rewardAlreadyRedeemed')
           : i18n.global.t('account.toast.rewardCredited', {
               amount: formatIdeaAmount(creditedAmount),

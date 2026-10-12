@@ -157,8 +157,8 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     return reason === 'revision-conflict' || reason === 'idempotency-conflict'
   }
 
-  function selectRenameRestoreErrorMessage(reason: string, rollbackSucceeded: boolean): string {
-    if (isSyncConflictReason(reason) && rollbackSucceeded) {
+  function selectRenameRestoreErrorMessage(reason: string, isRollbackSucceeded: boolean): string {
+    if (isSyncConflictReason(reason) && isRollbackSucceeded) {
       return t('canvas.chrome.conflictRestoredRefreshFailedError')
     }
     if (isSyncConflictReason(reason)) {
@@ -168,7 +168,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
   }
 
   function reportBoardRenameFailure(
-    result: Extract<BoardRenameOutcome, { ok: false }>,
+    result: Extract<BoardRenameOutcome, { isOk: false }>,
     boardId: string,
   ): void {
     if (result.reason === 'local-name-conflict') {
@@ -187,17 +187,17 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
       return
     }
     if (!('rollback' in result)) return
-    const hydrateSucceeded = result.hydrate?.ok === true
-    const rollbackSucceeded = result.rollback.ok
-    if (isSyncConflictReason(result.reason) && hydrateSucceeded) {
+    const isHydrateSucceeded = result.hydrate?.isOk === true
+    const isRollbackSucceeded = result.rollback.isOk
+    if (isSyncConflictReason(result.reason) && isHydrateSucceeded) {
       catalogRecovery.value = { status: 'idle' }
       options.message.error?.(t('canvas.chrome.conflictReloadedError'))
-    } else if (rollbackSucceeded && result.reason === 'sync-failed') {
+    } else if (isRollbackSucceeded && result.reason === 'sync-failed') {
       catalogRecovery.value = { status: 'idle' }
       options.message.error?.(t('canvas.chrome.syncFailedRestoredError'))
     } else {
       catalogRecovery.value = { status: 'reload-required', boardId }
-      options.message.error?.(selectRenameRestoreErrorMessage(result.reason, rollbackSucceeded))
+      options.message.error?.(selectRenameRestoreErrorMessage(result.reason, isRollbackSucceeded))
     }
     console.warn('[canvas] failed to sync renamed board', result.error)
   }
@@ -228,7 +228,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
       .finally(() => {
         isRenamePending.value = false
       })
-    if (result.ok) {
+    if (result.isOk) {
       options.message.success(t('canvas.chrome.renameSuccess'))
       return
     }
@@ -240,10 +240,10 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     if (recovery.status !== 'reload-required') return
     catalogRecovery.value = { status: 'reloading', boardId: recovery.boardId }
     const result = await boardRepository.commands.hydrate({
-      preserveLocalNewer: false,
+      shouldPreserveLocalNewer: false,
       rollbackBoardIds: [recovery.boardId],
     })
-    if (result.ok) {
+    if (result.isOk) {
       catalogRecovery.value = { status: 'idle' }
       options.message.success(t('canvas.chrome.catalogReloadedSuccess'))
       return

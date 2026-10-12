@@ -12,7 +12,7 @@ export type AsyncActionFeedback<T = unknown> = {
 }
 
 type AsyncActionOptions<T = unknown> = {
-  loading?: Ref<boolean>
+  isLoading?: Ref<boolean>
   before?: () => void
   after?: () => void
   feedback?: AsyncActionFeedback<T>
@@ -27,7 +27,7 @@ export function useAsyncAction() {
     action: () => T | Promise<T>,
     options: AsyncActionOptions<T> = {},
   ): Promise<T | undefined> {
-    const pending = options.loading ?? defaultPending
+    const pending = options.isLoading ?? defaultPending
     if (pending.value) return undefined
 
     pending.value = true

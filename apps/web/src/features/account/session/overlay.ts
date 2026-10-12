@@ -34,7 +34,7 @@ export type AccountOverlayOptions = {
 }
 
 export function createAccountOverlay(options: AccountOverlayOptions) {
-  const visible = ref(false)
+  const isVisible = ref(false)
   const initialTab = ref<AccountTab>(defaultAccountTab)
   const paymentReturn = ref<PaymentReturnContext | null>(null)
   let previousFullPath: string | undefined
@@ -44,7 +44,7 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
     sequence: number
     sourceFullPath: string
   } | null = null
-  const allowed = computed(
+  const isAllowed = computed(
     () =>
       Boolean(options.currentUser.value) &&
       !isPathUnderRoute(options.route.path, ADMIN_ROOT_PATH) &&
@@ -53,7 +53,7 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
   )
 
   function close() {
-    visible.value = false
+    isVisible.value = false
     paymentReturn.value = null
   }
 
@@ -61,24 +61,24 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
     tab: AccountTab = defaultAccountTab,
     returnContext: PaymentReturnContext | null = null,
   ) {
-    if (!allowed.value) return
+    if (!isAllowed.value) return
     initialTab.value = tab
     paymentReturn.value = returnContext
-    visible.value = true
+    isVisible.value = true
   }
 
-  function setVisible(nextVisible: boolean) {
-    if (!nextVisible) {
+  function setVisible(isNextVisible: boolean) {
+    if (!isNextVisible) {
       close()
       return
     }
-    if (allowed.value) visible.value = true
+    if (isAllowed.value) isVisible.value = true
   }
 
   watch(
-    () => [options.route.fullPath, allowed.value] as const,
-    ([fullPath, isAllowed]) => {
-      const routeChanged = previousFullPath !== undefined && previousFullPath !== fullPath
+    () => [options.route.fullPath, isAllowed.value] as const,
+    ([fullPath, canShowOverlay]) => {
+      const isRouteChanged = previousFullPath !== undefined && previousFullPath !== fullPath
       previousFullPath = fullPath
 
       if (pendingPaymentReturnCleanup) {
@@ -108,7 +108,7 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
           if (
             pendingPaymentReturnCleanup?.sequence !== expectedCleanup.sequence ||
             options.route.fullPath !== expectedCleanup.sourceFullPath ||
-            !allowed.value
+            !isAllowed.value
           ) {
             if (pendingPaymentReturnCleanup?.sequence === expectedCleanup.sequence) {
               pendingPaymentReturnCleanup = null
@@ -132,7 +132,7 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
       }
 
       const requestedTab =
-        isAllowed && options.route.path === USER_BOARDS_PATH
+        isAllowed.value && options.route.path === USER_BOARDS_PATH
           ? stringParam(options.route.query.accountTab)
           : undefined
       if (requestedTab) {
@@ -140,17 +140,17 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
         return
       }
 
-      if (!isAllowed || routeChanged) close()
+      if (!canShowOverlay || isRouteChanged) close()
     },
     { immediate: true },
   )
 
   return {
     viewModel: {
-      allowed,
+      isAllowed,
       initialTab: readonly(initialTab),
       paymentReturn: readonly(paymentReturn),
-      visible: readonly(visible),
+      isVisible: readonly(isVisible),
     },
     commands: { close, open, setVisible },
   }

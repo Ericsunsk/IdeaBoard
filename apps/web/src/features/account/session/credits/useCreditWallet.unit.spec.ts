@@ -25,7 +25,7 @@ vi.mock('./resource', () => ({
 vi.mock('../accountWorkspace', () => ({
   useAccountWorkspace: () => ({
     workspaceId: ref('ws_1'),
-    selectionSettled: ref(true),
+    isSelectionSettled: ref(true),
   }),
 }))
 

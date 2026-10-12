@@ -28,7 +28,7 @@ type ImageNodePositionSource = {
 
 type ResolveImageNodeLayoutAnchorOptions = {
   fallbackWidth?: number
-  requireUrl?: boolean
+  shouldRequireUrl?: boolean
 }
 
 export const DEFAULT_IMAGE_NODE_LAYOUT_WIDTH = 280
@@ -75,7 +75,7 @@ export function resolveImageNodeLayoutAnchor(
   options: ResolveImageNodeLayoutAnchorOptions = {},
 ): ImageNodeLayoutAnchor | null {
   const url = resolveImageNodeDisplayUrl(imageNode)
-  if (options.requireUrl && !url) return null
+  if (options.shouldRequireUrl && !url) return null
   const payload = resolveImageNodeDisplayPayload(imageNode)
 
   return {

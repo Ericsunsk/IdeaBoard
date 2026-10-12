@@ -87,20 +87,20 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
 
   function enterOutpaintMode(nodeId: string): boolean {
     options.modes.cancelInpaint()
-    const entered = options.modes.enterOutpaint(nodeId)
+    const isEntered = options.modes.enterOutpaint(nodeId)
     options.ui.clearPanel()
     options.ui.hideStrengthControl()
-    if (!entered) options.ui.warn(i18n.global.t('canvas.tools.cannotOutpaint'))
-    return entered
+    if (!isEntered) options.ui.warn(i18n.global.t('canvas.tools.cannotOutpaint'))
+    return isEntered
   }
 
   function enterRetouchMode(nodeId: string, actionMode: ImageActionMode): boolean {
     options.modes.cancelOutpaint()
     const editorMode = actionMode === IMAGE_ACTION_MODE.retouch ? 'adjust' : 'inpaint'
-    const entered = options.modes.enterRetouch(nodeId, editorMode)
+    const isEntered = options.modes.enterRetouch(nodeId, editorMode)
     options.ui.clearPanel()
     options.ui.hideStrengthControl()
-    if (!entered) {
+    if (!isEntered) {
       const warningKey =
         actionMode === IMAGE_ACTION_MODE.retouch
           ? 'canvas.tools.imageNotEditable'
@@ -109,7 +109,7 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     } else {
       void options.modes.focusRetouch(nodeId)
     }
-    return entered
+    return isEntered
   }
 
   function onFlowImageDirectAction(

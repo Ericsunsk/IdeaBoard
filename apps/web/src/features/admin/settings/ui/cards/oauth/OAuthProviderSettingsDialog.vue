@@ -109,7 +109,7 @@
             aria-label="Client ID"
             :placeholder="OAUTH_MESSAGES.oauthClientIdPlaceholder"
             :disabled="isBusy"
-            :invalid="invalid"
+            :is-invalid="invalid"
             :aria-describedby="describedbyId"
             @update:model-value="form.clearErrors('clientId')"
           />
@@ -132,7 +132,7 @@
             aria-label="Client Secret"
             :placeholder="secretPlaceholder"
             :disabled="isBusy"
-            :invalid="invalid"
+            :is-invalid="invalid"
             :aria-describedby="describedbyId"
             @update:model-value="form.clearErrors('clientSecret')"
           />

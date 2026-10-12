@@ -70,6 +70,7 @@ export type PaymentLegalDocument = {
   url: string
 }
 
+/** @externalContract Workspace purchase options response. */
 export type PaymentPurchaseOptions = {
   purchases_available: boolean
   unavailable_reason?: string

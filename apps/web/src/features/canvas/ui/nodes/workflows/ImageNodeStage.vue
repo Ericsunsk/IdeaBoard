@@ -5,17 +5,17 @@
     :data-image-node-id="nodeId"
     :data-flow-node-id="flowNodeId || undefined"
     :class="{
-      'is-outpaint-mode': !!outpaintModeActive,
+      'is-outpaint-mode': !!isOutpaintModeActive,
       'is-retouch-active': isImageToolActive,
     }"
     layout="center"
     :height="stageHeight"
-    :active="active && !outpaintModeActive"
-    :connection-drop-target="connectionDropTarget"
-    :loading="!!directGenerating && !stageDisplayImage"
-    :running="!!directGenerating || imageImportPending"
-    :transparent="!!outpaintModeActive || isImageToolActive"
-    :aria-busy="!!directGenerating || imageImportPending"
+    :is-active="isActive && !isOutpaintModeActive"
+    :is-connection-drop-target="isConnectionDropTarget"
+    :is-loading="!!isDirectGenerating && !stageDisplayImage"
+    :is-running="!!isDirectGenerating || isImageImportPending"
+    :is-transparent="!!isOutpaintModeActive || isImageToolActive"
+    :is-aria-busy="!!isDirectGenerating || isImageImportPending"
     :aria-label="t('canvas.controls.stageLabel')"
     @dragover.stop="onStageDragOver"
     @drop.stop="onStageDrop"
@@ -29,7 +29,7 @@
         <img
           :src="renderedStageUrl"
           class="image-node-stage-image image-tool-stage-media"
-          :class="{ 'is-dragging': dragging }"
+          :class="{ 'is-dragging': isDragging }"
           :alt="t('canvas.controls.stagePreviewAlt')"
           draggable="false"
           role="button"
@@ -54,7 +54,7 @@
         @keydown.space.prevent="emit('append-to-canvas')"
       />
       <ImageOutpaintOverlay
-        v-if="stageDisplayUrl && outpaintModeActive && outpaintOverlayStyle"
+        v-if="stageDisplayUrl && isOutpaintModeActive && outpaintOverlayStyle"
         :overlay-style="outpaintOverlayStyle"
         :handle-radius="outpaintHandleRadius ?? 4"
         @submit="submitOutpaint"
@@ -71,7 +71,7 @@
           >{{ t('canvas.node.preview') }}</NodeActionButton
         >
         <NodeActionButton
-          v-if="!inputLocked"
+          v-if="!isInputLocked"
           variant="stage-ghost"
           :aria-label="t('canvas.controls.clearImageInput')"
           @click="emit('reset')"
@@ -96,13 +96,13 @@
       </NodeActionButton>
     </div>
     <div
-      v-else-if="(imageImportPending || mediaAssetPending) && !renderedStageUrl"
+      v-else-if="(isImageImportPending || isMediaAssetPending) && !renderedStageUrl"
       class="image-node-stage-pending"
       aria-busy="true"
       :aria-label="t('canvas.controls.preparingPreview')"
     />
     <button
-      v-else-if="!stageDisplayImage && !emptyStateDisabled"
+      v-else-if="!stageDisplayImage && !isEmptyStateDisabled"
       type="button"
       class="image-node-stage-empty"
       :aria-label="emptyStageAriaLabel"
@@ -114,13 +114,13 @@
     <div
       v-else-if="!stageDisplayImage"
       class="image-node-stage-empty is-readonly"
-      :class="{ 'is-loading': directGenerating }"
+      :class="{ 'is-loading': isDirectGenerating }"
       role="status"
       :aria-label="emptyStageAriaLabel"
     >
-      <ComposingOrb v-if="directGenerating" />
+      <ComposingOrb v-if="isDirectGenerating" />
       <NodeEmptyStateIcon v-else :variant="emptyIconVariantComputed" />
-      <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
+      <span v-if="!isDirectGenerating">{{ emptyStateLabel }}</span>
     </div>
   </NodeStageFrame>
 </template>
@@ -149,16 +149,16 @@ const props = defineProps<{
   displayImage: { url: string; assetId?: string | undefined } | null
   libraryImport?: LibraryImportFact | undefined
   localUpload?: FlowLocalUploadState | undefined
-  inputLocked?: boolean
+  isInputLocked?: boolean
   emptyIconVariant?: 'image' | 'fusion'
-  directGenerating?: boolean
-  outpaintModeActive?: boolean
+  isDirectGenerating?: boolean
+  isOutpaintModeActive?: boolean
   outpaintOverlayStyle?: Record<string, string> | null | undefined
   outpaintHandleRadius?: number | undefined
   imageToolStageBinding?: ImageToolStageBinding | null | undefined
-  active: boolean
-  connectionDropTarget?: boolean
-  dragging: boolean
+  isActive: boolean
+  isConnectionDropTarget?: boolean
+  isDragging: boolean
 }>()
 
 const emit = defineEmits<{
@@ -195,27 +195,27 @@ const imageImportFailureMessage = computed(() => {
   if (props.libraryImport?.state === 'failed') return props.libraryImport.failureMessage
   return props.localUpload?.failureMessage?.trim() ?? ''
 })
-const imageImportPending = computed(
+const isImageImportPending = computed(
   () =>
     props.libraryImport?.state === 'pending' ||
     (!!props.localUpload && !imageImportFailureMessage.value),
 )
-const isImageToolActive = computed(() => !!props.imageToolStageBinding?.active)
-const forceFullPreviewQuality = computed(
-  () => !!props.outpaintModeActive || isImageToolActive.value,
+const isImageToolActive = computed(() => !!props.imageToolStageBinding?.isActive)
+const shouldForceFullPreviewQuality = computed(
+  () => !!props.isOutpaintModeActive || isImageToolActive.value,
 )
 const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
   stageWidth: () => props.stageWidth,
   stageHeight: () => props.stageHeight,
   zoomLevel: canvasViewport.zoomLevel,
-  forceFullQuality: forceFullPreviewQuality,
+  shouldForceFullQuality: shouldForceFullPreviewQuality,
 })
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
   assetId: () => stageDisplayImage.value?.assetId,
   isVisible: isStageVisible,
-  keepPreviousOnSourceChange: true,
+  shouldKeepPreviousOnSourceChange: true,
 })
 // Media assets are authenticated API resources. Do not bind their API URL as
 // an optimistic <img> fallback while the signed delivery URL is loading: the
@@ -226,17 +226,17 @@ const renderedStageUrl = computed(() => {
   if (stageDisplayImage.value?.assetId) return stageDisplayUrl.value
   return stageDisplayUrl.value || sourceDisplayUrl.value
 })
-const mediaAssetPending = computed(
+const isMediaAssetPending = computed(
   () => !!stageDisplayImage.value?.assetId && !stageDisplayUrl.value,
 )
 const { t } = useI18n()
 const emptyStateLabel = computed(() =>
-  props.inputLocked ? t('canvas.controls.waiting') : t('canvas.controls.uploadOrDropImage'),
+  props.isInputLocked ? t('canvas.controls.waiting') : t('canvas.controls.uploadOrDropImage'),
 )
-const emptyStateDisabled = computed(() => !!props.inputLocked || !!props.directGenerating)
+const isEmptyStateDisabled = computed(() => !!props.isInputLocked || !!props.isDirectGenerating)
 const emptyStageAriaLabel = computed(() => {
-  if (props.directGenerating) return t('canvas.controls.generatingUploadBlocked')
-  if (props.inputLocked) return t('canvas.controls.waitingToUpload')
+  if (props.isDirectGenerating) return t('canvas.controls.generatingUploadBlocked')
+  if (props.isInputLocked) return t('canvas.controls.waitingToUpload')
   return t('canvas.controls.uploadImageInput')
 })
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
@@ -252,12 +252,12 @@ function onStageDragOver(event: DragEvent) {
 
 function onStageDrop(event: DragEvent) {
   event.preventDefault()
-  if (props.inputLocked) return
+  if (props.isInputLocked) return
   emit('stage-drop', event)
 }
 
 function onEmptyStateClick() {
-  if (emptyStateDisabled.value) return
+  if (isEmptyStateDisabled.value) return
   emit('open-file')
 }
 

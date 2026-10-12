@@ -319,7 +319,7 @@ export function stageAddNode(
     id,
     kind,
     snapshot: cloneJsonValue(node),
-    selected: false,
+    isSelected: false,
   })
   const order = ensureNodeOrder(draft)
   recordOrderAdded(draft.nodeOrderPatches, id, order)
@@ -348,10 +348,10 @@ export function stageUpdateNode(
 export function stageRemoveNode(
   draft: CanvasGraphTransactionDraft,
   nodeId: CanvasGraphNodeId,
-  options: { removeConnectedEdges?: boolean } = {},
+  options: { shouldRemoveConnectedEdges?: boolean } = {},
 ): void {
   if (!readDraftNodeRecord(draft, nodeId)) return
-  if (options.removeConnectedEdges) {
+  if (options.shouldRemoveConnectedEdges) {
     getDraftConnectedEdgeIds(draft, nodeId).forEach((edgeId) => stageRemoveEdge(draft, edgeId))
   }
   removeNodeFromGroupsWrite(draft, nodeId)
@@ -362,13 +362,13 @@ export function stageRemoveNode(
 export function stageSelectNode(
   draft: CanvasGraphTransactionDraft,
   nodeId: CanvasGraphNodeId,
-  selected: boolean,
+  isSelected: boolean,
 ): void {
   const current = readDraftNodeRecord(draft, nodeId)
-  if (!current || current.selected === selected) return
+  if (!current || current.isSelected === isSelected) return
   draft.nodeWrites.set(nodeId, {
     ...current,
-    selected,
+    isSelected,
   })
 }
 
@@ -491,7 +491,7 @@ export function stageAddEdge(
   draft.edgeWrites.set(id, {
     id,
     connection: cloneJsonValue(connection),
-    selected: false,
+    isSelected: false,
   })
   const order = ensureEdgeOrder(draft)
   recordOrderAdded(draft.edgeOrderPatches, id, order)
@@ -511,13 +511,13 @@ export function stageRemoveEdge(
 export function stageSelectEdge(
   draft: CanvasGraphTransactionDraft,
   edgeId: CanvasGraphEdgeId,
-  selected: boolean,
+  isSelected: boolean,
 ): void {
   const current = readDraftEdgeRecord(draft, edgeId)
-  if (!current || current.selected === selected) return
+  if (!current || current.isSelected === isSelected) return
   draft.edgeWrites.set(edgeId, {
     ...current,
-    selected,
+    isSelected,
   })
 }
 
@@ -526,7 +526,7 @@ export function stageBatchDelete(
   options: {
     nodeIds?: CanvasGraphNodeId[]
     edgeIds?: CanvasGraphEdgeId[]
-    removeConnectedEdges?: boolean
+    shouldRemoveConnectedEdges?: boolean
   },
 ): void {
   options.edgeIds?.forEach((edgeId) => {
@@ -534,7 +534,7 @@ export function stageBatchDelete(
   })
   options.nodeIds?.forEach((nodeId) => {
     stageRemoveNode(draft, nodeId, {
-      removeConnectedEdges: options.removeConnectedEdges ?? true,
+      shouldRemoveConnectedEdges: options.shouldRemoveConnectedEdges ?? true,
     })
   })
 }

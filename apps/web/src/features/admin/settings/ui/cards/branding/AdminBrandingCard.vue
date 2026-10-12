@@ -13,7 +13,7 @@
           <button
             :class="brandingLogoButtonClass"
             type="button"
-            :disabled="brandingLoading || brandingSaving || uploading"
+            :disabled="isBrandingLoading || isBrandingSaving || uploading"
             :aria-label="SETTINGS_MESSAGES.uploadLogo"
             :title="SETTINGS_MESSAGES.logoHint"
             @click="openLogoPicker"
@@ -30,14 +30,14 @@
             v-if="brandingForm.logo_url"
             class="absolute -top-1.5 -right-1.5 z-admin-sticky grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground leading-none shadow-xs transition-colors hover:text-destructive focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
             :class="
-              brandingLoading || brandingSaving || uploading
+              isBrandingLoading || isBrandingSaving || uploading
                 ? 'opacity-40'
                 : 'opacity-0 group-hover/logo:opacity-100 group-focus-within/logo:opacity-100 focus-visible:opacity-100'
             "
             type="button"
             :title="SETTINGS_MESSAGES.clearLogo"
             :aria-label="SETTINGS_MESSAGES.clearLogo"
-            :disabled="brandingLoading || brandingSaving || uploading"
+            :disabled="isBrandingLoading || isBrandingSaving || uploading"
             @mousedown.stop
             @pointerdown.stop
             @click.stop="clearBrandingLogo"
@@ -68,7 +68,7 @@
               autocomplete="off"
               maxlength="40"
               placeholder="IdeaBoard"
-              :disabled="brandingLoading || brandingSaving"
+              :disabled="isBrandingLoading || isBrandingSaving"
               @keyup.enter="saveBranding()"
             />
           </AdminFormField>
@@ -80,7 +80,7 @@
               autocomplete="off"
               maxlength="2048"
               placeholder="/uploads/site/assets/logo.png"
-              :disabled="brandingLoading || brandingSaving || uploading"
+              :disabled="isBrandingLoading || isBrandingSaving || uploading"
               @keyup.enter="saveBranding()"
             />
           </AdminFormField>
@@ -90,9 +90,9 @@
 
     <template #actions>
       <AdminEditorActions
-        :save-disabled="brandingLoading || brandingSaving || uploading"
-        :reset-disabled="brandingLoading || brandingSaving || uploading"
-        :saving="brandingSaving"
+        :save-disabled="isBrandingLoading || isBrandingSaving || uploading"
+        :reset-disabled="isBrandingLoading || isBrandingSaving || uploading"
+        :is-saving="isBrandingSaving"
         @save="saveBranding"
         @reset="resetBranding"
       >
@@ -161,9 +161,9 @@ const pendingLogoFile = ref<File | null>(null)
 
 const {
   form: brandingForm,
-  loading: brandingLoading,
+  isLoading: isBrandingLoading,
   logoPreviewURL: brandingLogoPreviewURL,
-  saving: brandingSaving,
+  isSaving: isBrandingSaving,
   uploading,
   clearLogo: clearBrandingLogo,
   fallbackText: brandingFallbackText,

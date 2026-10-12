@@ -4,15 +4,15 @@
     :node-id="node.id"
     :width="node.width"
     :title="node.title || t('canvas.node.image')"
-    :active="active"
-    :dragging="dragging"
-    :copy-mode="copyMode"
+    :is-active="isActive"
+    :is-dragging="isDragging"
+    :is-copy-mode="isCopyMode"
     :class="{
-      'is-outpaint-mode': !!outpaintModeActive,
+      'is-outpaint-mode': !!isOutpaintModeActive,
       'is-retouch-active': isRetouchActive,
     }"
-    rounded-header
-    :header-hidden="!!outpaintModeActive || isRetouchActive"
+    is-rounded-header
+    :is-header-hidden="!!isOutpaintModeActive || isRetouchActive"
     @node-mousedown="emit('node-mousedown', $event)"
     @update:title="emit('update:title', $event)"
     @delete="emit('delete')"
@@ -23,7 +23,7 @@
     <div
       class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
       :class="
-        outpaintModeActive || isRetouchActive ? 'bg-transparent' : 'bg-[var(--canvas-node-bg)]'
+        isOutpaintModeActive || isRetouchActive ? 'bg-transparent' : 'bg-[var(--canvas-node-bg)]'
       "
       @contextmenu.stop
     >
@@ -36,16 +36,16 @@
         :display-image="displayImage"
         :library-import="libraryImport"
         :local-upload="localUpload"
-        :input-locked="inputLocked"
+        :is-input-locked="isInputLocked"
         :empty-icon-variant="emptyIconVariant"
-        :direct-generating="actionBinding.directGenerating"
-        :outpaint-mode-active="outpaintModeActive"
+        :is-direct-generating="actionBinding.isDirectGenerating"
+        :is-outpaint-mode-active="isOutpaintModeActive"
         :outpaint-overlay-style="outpaintOverlayStyle"
         :outpaint-handle-radius="outpaintHandleRadius"
         :image-tool-stage-binding="imageToolStageBinding"
-        :active="active"
-        :connection-drop-target="connectionDropTarget"
-        :dragging="dragging"
+        :is-active="isActive"
+        :is-connection-drop-target="isConnectionDropTarget"
+        :is-dragging="isDragging"
         @stage-drop="emit('stage-drop', $event)"
         @open-file="emit('open-file')"
         @open-preview="emit('open-preview')"
@@ -60,21 +60,21 @@
         @outpaint-frame-pointerdown="emit('outpaint-frame-pointerdown', $event)"
       />
 
-      <NodeFloatingControls v-if="showImageActionMenu || showPromptComposer">
+      <NodeFloatingControls v-if="shouldShowImageActionMenu || shouldShowPromptComposer">
         <HomeCanvasImageActionMenu
-          v-if="showImageActionMenu"
+          v-if="shouldShowImageActionMenu"
           :output-count="outputCountValue"
           :output-resolution="node.outputResolution"
           :strength-control="actionBinding.strengthControl"
           @action="submitAction"
         />
         <NodePromptComposer
-          v-if="showPromptComposer"
+          v-if="shouldShowPromptComposer"
           v-model="promptDraft"
           offset="52px"
           :placeholder="actionBinding.promptPlaceholder"
-          allow-empty
-          :show-submit="false"
+          should-allow-empty
+          :should-show-submit="false"
           :output-count="outputCountValue"
           :output-resolution="node.outputResolution"
           @update:output-count="selectOutputCount"
@@ -108,18 +108,18 @@ const props = defineProps<{
   flowNodeId?: string | undefined
   setImageStageRef?: (nodeId: string, element: Element | null) => void
   clearImageStageRef?: (nodeId: string, element?: Element | null) => void
-  active: boolean
-  connectionDropTarget?: boolean
-  dragging: boolean
-  copyMode: boolean
+  isActive: boolean
+  isConnectionDropTarget?: boolean
+  isDragging: boolean
+  isCopyMode: boolean
   stageHeight: number
   displayImage: { url: string; assetId?: string | undefined } | null
   libraryImport?: LibraryImportFact | undefined
   localUpload?: FlowLocalUploadState | undefined
   emptyIconVariant?: 'image' | 'fusion'
-  inputLocked?: boolean
+  isInputLocked?: boolean
   actionBinding: ImageActionBinding
-  outpaintModeActive?: boolean
+  isOutpaintModeActive?: boolean
   outpaintOverlayStyle?: Record<string, string> | null
   outpaintHandleRadius?: number
   imageToolStageBinding?: ImageToolStageBinding | null
@@ -160,21 +160,21 @@ const { t } = useI18n()
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 const isRetouchActive = computed(() => props.imageToolStageBinding?.mode != null)
 
-const showImageActionMenu = computed(
+const shouldShowImageActionMenu = computed(
   () =>
     !props.libraryImport &&
     !props.localUpload &&
-    props.actionBinding.actionMenuVisible &&
+    props.actionBinding.isActionMenuVisible &&
     !!props.displayImage &&
     !isRetouchActive.value,
 )
-const showPromptComposer = computed(
+const shouldShowPromptComposer = computed(
   () =>
     !props.libraryImport &&
     !props.localUpload &&
-    props.actionBinding.promptComposerVisible &&
+    props.actionBinding.isPromptComposerVisible &&
     !!props.displayImage &&
-    !props.outpaintModeActive,
+    !props.isOutpaintModeActive,
 )
 type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)

@@ -12,7 +12,7 @@ export type BoardAutosavePolicyDeps = {
   isSaving: () => boolean
   markDirty: () => void
   canRun?: (() => boolean) | undefined
-  save: (options?: { silent?: boolean | undefined }) => Promise<boolean>
+  save: (options?: { isSilent?: boolean | undefined }) => Promise<boolean>
   delay?: number | undefined
   onSchedule?: (() => void) | undefined
   onSave?: (() => void) | undefined
@@ -20,7 +20,7 @@ export type BoardAutosavePolicyDeps = {
 
 export type BoardAutosavePolicy = {
   markDirtyAndSchedule: () => void
-  flushAutosave: (options?: { silent?: boolean | undefined }) => Promise<void>
+  flushAutosave: (options?: { isSilent?: boolean | undefined }) => Promise<void>
   handleHidden: () => void
   handleOnlineChange: (prev: boolean | undefined, next: boolean) => void
   handleResumeSignal: (next: unknown, prev: unknown) => void
@@ -37,14 +37,14 @@ export function createBoardAutosavePolicy(deps: BoardAutosavePolicyDeps): BoardA
   // surface a post-unmount error toast via settleSaveFailure. Board switches
   // and leave guards flush explicitly, so dropping the trailing debounce on
   // dispose loses nothing.
-  let disposed = false
+  let isDisposed = false
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
-  async function runSaveLoop(silent = true) {
-    let nextSilent = silent
+  async function runSaveLoop(isSilent = true) {
+    let isNextSilent = isSilent
     do {
       hasPendingSave = false
-      if (disposed) return
+      if (isDisposed) return
       if (!deps.isDirty()) return
       if (deps.canRun && !deps.canRun()) {
         hasPendingSave = true
@@ -56,9 +56,9 @@ export function createBoardAutosavePolicy(deps: BoardAutosavePolicyDeps): BoardA
       }
       const saveVersion = dirtyVersion
       deps.onSave?.()
-      const saved = await deps.save({ silent: nextSilent })
-      if (disposed) return
-      if (!saved) {
+      const isSaved = await deps.save({ isSilent: isNextSilent })
+      if (isDisposed) return
+      if (!isSaved) {
         hasPendingSave = true
         return
       }
@@ -66,20 +66,20 @@ export function createBoardAutosavePolicy(deps: BoardAutosavePolicyDeps): BoardA
         deps.markDirty()
         hasPendingSave = true
       }
-      nextSilent = true
+      isNextSilent = true
     } while (hasPendingSave)
   }
 
-  async function runSaveNow(silent = true) {
-    if (disposed) return
+  async function runSaveNow(isSilent = true) {
+    if (isDisposed) return
     if (!deps.isDirty() && !hasPendingSave) return
     if (activeSaveTask) {
       hasPendingSave = true
       await activeSaveTask
-      await runSaveNow(silent)
+      await runSaveNow(isSilent)
       return
     }
-    activeSaveTask = runSaveLoop(silent).finally(() => {
+    activeSaveTask = runSaveLoop(isSilent).finally(() => {
       activeSaveTask = null
     })
     await activeSaveTask
@@ -99,16 +99,20 @@ export function createBoardAutosavePolicy(deps: BoardAutosavePolicyDeps): BoardA
     scheduleDebounced()
   }
 
-  async function flushAutosave(options?: { silent?: boolean | undefined }) {
-    await runSaveNow(options?.silent ?? true)
+  async function flushAutosave(options?: { isSilent?: boolean | undefined }) {
+    await runSaveNow(options?.isSilent ?? true)
   }
 
   function handleHidden() {
     void flushAutosave()
   }
 
-  function handleOnlineChange(prev: boolean | undefined, next: boolean) {
-    if (prev === false && next === true && (deps.isDirty() || hasPendingSave)) {
+  function handleOnlineChange(wasPreviouslyEnabled: boolean | undefined, isNextEnabled: boolean) {
+    if (
+      wasPreviouslyEnabled === false &&
+      isNextEnabled === true &&
+      (deps.isDirty() || hasPendingSave)
+    ) {
       void flushAutosave()
     }
   }
@@ -121,7 +125,7 @@ export function createBoardAutosavePolicy(deps: BoardAutosavePolicyDeps): BoardA
   }
 
   function dispose() {
-    disposed = true
+    isDisposed = true
     if (debounceTimer !== undefined) {
       clearTimeout(debounceTimer)
       debounceTimer = undefined

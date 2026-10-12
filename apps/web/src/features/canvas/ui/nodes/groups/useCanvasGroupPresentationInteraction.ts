@@ -76,7 +76,7 @@ export function useCanvasGroupPresentationInteraction(
     dismissTransientCanvasUi: options.pane.dismiss,
   })
   useCanvasCustomLayerOverlay({
-    visible: interactionShell.isSelectionGroupActionVisible,
+    isVisible: interactionShell.isSelectionGroupActionVisible,
     ignore: ['.canvas-selection-group-action-button'],
     ownerDocument: () =>
       options.canvas.host.value?.ownerDocument ??

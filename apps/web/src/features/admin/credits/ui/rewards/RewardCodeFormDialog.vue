@@ -21,7 +21,7 @@
           maxlength="120"
           required
           aria-required="true"
-          :invalid="invalid"
+          :is-invalid="invalid"
           :aria-describedby="describedbyId"
           @input="form.clearErrors('displayName')"
         />
@@ -45,7 +45,7 @@
             autocomplete="off"
             :spellcheck="false"
             class="min-w-0 flex-1 font-mono"
-            :invalid="Boolean(form.errors.value.code)"
+            :is-invalid="Boolean(form.errors.value.code)"
             :aria-describedby="codeDescribedby"
             @input="form.clearErrors('code')"
           />

@@ -17,7 +17,7 @@
           {{ M.supportDescription }}
         </p>
       </div>
-      <ActionButton :disabled="disabled || form.channels.length >= 20" @click="add"
+      <ActionButton :disabled="isDisabled || form.channels.length >= 20" @click="add"
         ><Plus class="size-4" />{{ M.supportAdd }}</ActionButton
       >
     </div>
@@ -26,7 +26,7 @@
     <div :class="adminTableCardClass">
       <AdminTable
         :value="form.channels"
-        :loading="loading"
+        :is-loading="isLoading"
         data-key="id"
         scrollable
         :frame-class="adminTableFrameClass"
@@ -49,7 +49,7 @@
               :id="`support-name-${data.id}`"
               v-model="data.name"
               :aria-label="M.supportName"
-              :disabled="disabled"
+              :disabled="isDisabled"
               :maxlength="80"
               size="small"
               class="w-full"
@@ -70,7 +70,7 @@
               :options="kindOptions"
               :aria-label="M.supportKind"
               size="small"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="w-full"
             />
           </template>
@@ -84,7 +84,7 @@
               v-model="data.url"
               type="url"
               :aria-label="M.supportUrl"
-              :disabled="disabled"
+              :disabled="isDisabled"
               :maxlength="2048"
               size="small"
               class="w-full font-mono"
@@ -100,7 +100,7 @@
                 variant="outline"
                 :aria-label="M.supportMoveUp"
                 :title="M.supportMoveUp"
-                :disabled="disabled || (index ?? 0) === 0"
+                :disabled="isDisabled || (index ?? 0) === 0"
                 @click="move(index ?? 0, -1)"
                 ><NavArrowUp class="size-4"
               /></AdminButton>
@@ -108,7 +108,7 @@
                 variant="outline"
                 :aria-label="M.supportMoveDown"
                 :title="M.supportMoveDown"
-                :disabled="disabled || (index ?? 0) === form.channels.length - 1"
+                :disabled="isDisabled || (index ?? 0) === form.channels.length - 1"
                 @click="move(index ?? 0, 1)"
                 ><NavArrowDown class="size-4"
               /></AdminButton>
@@ -116,7 +116,7 @@
                 variant="destructive"
                 :aria-label="M.supportRemove"
                 :title="M.supportRemove"
-                :disabled="disabled"
+                :disabled="isDisabled"
                 @click="form.channels.splice(index ?? 0, 1)"
                 ><Trash class="size-4"
               /></AdminButton>
@@ -130,7 +130,7 @@
             <AdminSwitch
               v-model="data.enabled"
               :aria-label="M.supportEnable(data.name || String((index ?? 0) + 1))"
-              :disabled="disabled"
+              :disabled="isDisabled"
             />
           </template>
         </AdminColumn>
@@ -138,9 +138,9 @@
     </div>
 
     <AdminEditorActions
-      :save-disabled="disabled || !isDirty"
-      :reset-disabled="disabled || !isDirty"
-      :saving="saving"
+      :save-disabled="isDisabled || !isDirty"
+      :reset-disabled="isDisabled || !isDirty"
+      :is-saving="isSaving"
       @save="save"
       @reset="reset"
     />
@@ -187,14 +187,14 @@ const query = useQuery({ queryKey: supportChannelsQueryKey, queryFn: () => resou
 const mutation = useMutation({
   mutationFn: (draft: SupportChannelsSetting) => resource.update(draft, ''),
 })
-const loading = computed(() => query.isPending.value || query.isFetching.value)
-const saving = computed(() => mutation.isPending.value)
+const isLoading = computed(() => query.isPending.value || query.isFetching.value)
+const isSaving = computed(() => mutation.isPending.value)
 const lifecycle = useSettingsLifecycle<SupportChannelsSetting>({
   defaultValue: { channels: [] },
   source: query.data,
   loadError: query.error,
-  loading,
-  saving,
+  isLoading,
+  isSaving,
   normalize: (setting) => ({
     channels: (setting?.channels ?? []).map((channel, index) => ({
       ...channel,
@@ -232,7 +232,7 @@ const lifecycle = useSettingsLifecycle<SupportChannelsSetting>({
   feedback: useAdminSupportChannelsFeedback(),
 })
 const { form, isDirty, reset } = lifecycle
-const disabled = computed(() => loading.value || saving.value || Boolean(query.error.value))
+const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(query.error.value))
 const kindOptions = supportChannelKinds.map((kind) => ({
   value: kind,
   label: M.supportKinds[kind],

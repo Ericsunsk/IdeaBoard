@@ -4,7 +4,7 @@ import { i18n } from '../../../../core/i18n'
 import { getCanvasNodeKindMenuItems } from '../../core/nodes/canvasNodeRegistry.ts'
 
 type CanvasNodeContextMenuSnapshot = {
-  visible: boolean
+  isVisible: boolean
   x: number
   y: number
   flowX: number
@@ -13,7 +13,7 @@ type CanvasNodeContextMenuSnapshot = {
 
 export function useCanvasNodeContextMenu() {
   const nodeContextMenu = ref<CanvasNodeContextMenuSnapshot>({
-    visible: false,
+    isVisible: false,
     x: 0,
     y: 0,
     flowX: 0,
@@ -25,11 +25,11 @@ export function useCanvasNodeContextMenu() {
   )
 
   function close() {
-    nodeContextMenu.value.visible = false
+    nodeContextMenu.value.isVisible = false
   }
 
-  function open(snapshot: Omit<CanvasNodeContextMenuSnapshot, 'visible'>) {
-    nodeContextMenu.value = { visible: true, ...snapshot }
+  function open(snapshot: Omit<CanvasNodeContextMenuSnapshot, 'isVisible'>) {
+    nodeContextMenu.value = { isVisible: true, ...snapshot }
   }
 
   function createNode(

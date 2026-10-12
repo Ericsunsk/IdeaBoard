@@ -38,7 +38,7 @@ function readImageNodeLayout(
   return {
     x: anchor.x,
     y: anchor.y,
-    width: metrics?.measured ? metrics.dimensions.width : anchor.width,
+    width: metrics?.isMeasured ? metrics.dimensions.width : anchor.width,
     ratio: anchor.ratio,
   }
 }
@@ -55,7 +55,7 @@ export function readOutputAnchorLayout(
     if (node.kind === 'image') return readImageNodeLayout(node, rendererMetrics) ?? fallback
     const snapshot = node.snapshot as { width?: unknown }
     const metrics = rendererMetrics.readNodeMetrics(nodeId)
-    const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
+    const width = metrics?.isMeasured ? metrics.dimensions.width : Number(snapshot.width)
     return {
       ratio: 1,
       x: metrics?.position.x ?? Number(node.snapshot.x ?? 0),
@@ -72,7 +72,7 @@ function readImageLayoutBounds(
   nodeId: string,
 ): { x: number; y: number; width: number; height: number } {
   const metrics = rendererMetrics.readNodeMetrics(nodeId)
-  const height = metrics?.measured
+  const height = metrics?.isMeasured
     ? metrics.dimensions.height
     : estimateImageNodeHeight(imageLayout)
   return { x: imageLayout.x, y: imageLayout.y, width: imageLayout.width, height }
@@ -86,9 +86,9 @@ function readGenericNodeBounds(
   fallbackY: number,
 ): { x: number; y: number; width: number; height: number } | null {
   const metrics = rendererMetrics.readNodeMetrics(nodeId)
-  const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
+  const width = metrics?.isMeasured ? metrics.dimensions.width : Number(snapshot.width)
   if (!Number.isFinite(width) || width <= 0) return null
-  const height = metrics?.measured ? metrics.dimensions.height : Number(snapshot.height)
+  const height = metrics?.isMeasured ? metrics.dimensions.height : Number(snapshot.height)
   return {
     x: metrics?.position.x ?? fallbackX,
     y: metrics?.position.y ?? fallbackY,
@@ -135,9 +135,9 @@ export function resolvePendingImageResultPosition(
   if (isCollisionFree(preferredPosition)) return preferredPosition
   let preferredColumnBottom = preferredPosition.y
   occupiedBounds.forEach((bounds) => {
-    const overlaps =
+    const isOverlaps =
       preferredPosition.x < bounds.x + bounds.width && preferredPosition.x + target.width > bounds.x
-    if (overlaps && bounds.y + bounds.height > preferredPosition.y) {
+    if (isOverlaps && bounds.y + bounds.height > preferredPosition.y) {
       preferredColumnBottom = Math.max(
         preferredColumnBottom,
         bounds.y + bounds.height + IMAGE_RESULT_NODE_Y_GAP,

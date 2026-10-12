@@ -26,8 +26,8 @@
           />
           <Button
             type="submit"
-            :disabled="!canSubmit"
-            :loading="pending"
+            :is-disabled="!canSubmit"
+            :is-loading="pending"
             :class="[accountPrimaryActionButtonClass, 'h-10']"
             >{{ t('account.rewards.redeem') }}</Button
           >
@@ -161,9 +161,13 @@
             }}</Button>
           </div>
           <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
-            <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
-              t('account.rewards.loadMore')
-            }}</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              :is-loading="isFetchingNextPage"
+              @click="loadMore()"
+              >{{ t('account.rewards.loadMore') }}</Button
+            >
           </div>
         </template>
       </DataTableFrame>

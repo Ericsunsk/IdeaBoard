@@ -84,6 +84,7 @@ export interface ImageNodeOutputItem {
   mediaAssetId?: number | undefined
 }
 
+/** @externalContract Persisted Board v4 recipe steps. */
 export type ImageRetouchRecipeStep =
   | { kind: 'hsl'; params: { hueShift: number; saturationScale: number; lightnessOffset: number } }
   | { kind: 'threshold'; threshold: number; invert: boolean }

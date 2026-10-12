@@ -177,7 +177,7 @@ const ImageToolPresentationStub = defineComponent({
 
 const ContextMenuStub = defineComponent({
   props: {
-    visible: { type: Boolean, required: true },
+    isVisible: { type: Boolean, required: true },
     x: { type: Number, required: true },
     y: { type: Number, required: true },
     items: { type: Array as PropType<Array<{ key: string }>>, required: true },
@@ -187,148 +187,161 @@ const ContextMenuStub = defineComponent({
   },
 })
 
-function createRuntime(flowNodes: { id: string; position: { x: number; y: number } }[]) {
+function createRuntimeFlow(flowNodes: { id: string; position: { x: number; y: number } }[]) {
   const nodes = ref(
     flowNodes.map((node) => ({ ...node, style: { width: '120px', height: '60px' } })),
   )
   const renderEdges = ref([{ id: 'edge-a-b', source: 'node-a', target: 'node-b' }])
+  return { nodes, renderEdges }
+}
+
+function createRuntimeViewModel({ nodes, renderEdges }: ReturnType<typeof createRuntimeFlow>) {
+  return {
+    flowPane: { nodes, edges: renderEdges, renderEdges },
+    boardChrome: {
+      currentBoardId: ref('board-a'),
+      isBoardMenuOpen: ref(false),
+      isRenamingBoard: ref(false),
+      boardNameDraft: ref('Board A'),
+      isRenamePending: ref(false),
+      catalogRecovery: ref({ status: 'idle' }),
+      isBoardArchived: ref(false),
+      isRestoringArchivedBoard: ref(false),
+      currentBoardName: ref('Board A'),
+      boardOptions: ref([]),
+    },
+    persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
+    viewportControls: { zoomLevel: ref(100) },
+    graphEditing: {
+      hasSelectedFlowNodes: ref(false),
+      isFlowInteractionActive: ref(false),
+      isFlowViewportPanInteractionActive: ref(false),
+      isFlowInteractionLocked: ref(false),
+      grouping: { groupFrames: ref([]), selectionGroupAction: ref({ kind: 'group' as const }) },
+    },
+    imageWorkflow: {
+      tools: {
+        active: { nodeId: ref(null), maskNodeId: ref(null) },
+        locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
+        nodeBindings: { stageFor: vi.fn(() => null), actionFor: vi.fn() },
+        chrome: ref({ isReady: false }),
+      },
+      outpaint: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
+    },
+  }
+}
+
+function createRuntimeCommands() {
   const flushAutosave = vi.fn()
   const recoverBoardSession = vi.fn(async () => {})
+  return {
+    boardSession: {
+      setBoardNameInputRef: vi.fn(),
+      toggleBoardMenu: vi.fn(),
+      startBoardRename: vi.fn(),
+      cancelBoardRename: vi.fn(),
+      closeBoardHeaderEditing: vi.fn(),
+      onConfirmBoardRename: vi.fn(),
+      reloadCatalog: vi.fn(),
+      restoreArchivedBoard: vi.fn(),
+      onSelectBoard: vi.fn(),
+      onNavigateRequest: vi.fn(),
+      onLogoutRequest: vi.fn(),
+    },
+    flowPane: {
+      onNodesChange: vi.fn(),
+      onEdgesChange: vi.fn(),
+      connectionAdapter: { vueFlowBindings: {}, connectIntent: vi.fn() },
+      nodeDragTransactions: { begin: vi.fn(), commit: vi.fn() },
+    },
+    persistence: { flushAutosave, recoverBoardSession },
+    viewportControls: {
+      onZoomIn: vi.fn(),
+      onZoomOut: vi.fn(),
+      onPanViewport: vi.fn(),
+      onMiniMapCenterRequested: vi.fn(),
+      onMiniMapDragStart: vi.fn(),
+      onMiniMapDragMove: vi.fn(),
+      onMiniMapDragEnd: vi.fn(),
+      onViewportChangeEnd: vi.fn(),
+      onFlowMoveStart: vi.fn(),
+      onFlowMove: vi.fn(),
+      onFlowMoveEnd: vi.fn(),
+      onNodeDragStart: vi.fn(),
+      onNodeDragStop: vi.fn(),
+    },
+    graphEditing: {
+      libraryImport: { add: vi.fn() },
+      imageImport: { retry: vi.fn(async () => false) },
+      grouping: {
+        selectGroupAtPoint: vi.fn(),
+        handlePaneClick: vi.fn(),
+        handleNodeClick: vi.fn(),
+        groupSelectedNodes: vi.fn(),
+        ungroupSelectedGroup: vi.fn(),
+        deleteSelectedGroup: vi.fn(() => false),
+        groupDrag: vi.fn(),
+        groupResize: vi.fn(),
+      },
+      createNodeAtPosition: vi.fn(),
+      onExportSelectedImages: vi.fn(),
+      onFlowMediaInputImageDrop: vi.fn(),
+      onFlowMediaInputImageOpen: vi.fn(),
+      onFlowMediaInputImagePreview: vi.fn(),
+      onFlowMediaInputImageRemove: vi.fn(),
+      onCanvasDrop: vi.fn(),
+      onCanvasDragOver: vi.fn(),
+      onFlowImageOpenPreview: vi.fn(),
+      onFlowImageAppendToCanvas: vi.fn(),
+      beginFlowNodeDragDuplicateTracking: vi.fn(),
+      finishFlowNodeDragDuplicateTracking: vi.fn(),
+      getFlowNodeUiStateCached: vi.fn(),
+      createNodeInteractions: () => ({
+        onFlowDeleteNode: vi.fn(),
+        onFlowPromptTextUpdate: vi.fn(),
+        onFlowNodeParamUpdate: vi.fn(),
+        onFlowImageOpenFile: vi.fn(),
+        onFlowImageReset: vi.fn(),
+        onFlowImageStageDrop: vi.fn(),
+      }),
+    },
+    imageWorkflow: {
+      isGenerationAvailable: vi.fn(() => true),
+      tools: {
+        lifecycle: { enter: vi.fn(), cancel: vi.fn(), discardNodeEdits: vi.fn() },
+        editor: {
+          onCanvasWheel: vi.fn(),
+          focusAndShowChrome: vi.fn(),
+          scheduleChromeAnchorUpdate: vi.fn(),
+        },
+        chrome: {},
+      },
+      interactions: {
+        onFlowImageContextMenu: vi.fn(),
+        onFlowFusionContextMenu: vi.fn(),
+        onFlowImageDirectAction: vi.fn(),
+        onFlowImagePromptGenerate: vi.fn(),
+        onFlowFusionPromptGenerate: vi.fn(),
+        onFlowPromptGenerate: vi.fn(),
+        onFlowImageOutpaintSubmit: vi.fn(),
+        onFlowOutpaintHandlePointerDown: vi.fn(),
+        onFlowOutpaintFramePointerDown: vi.fn(),
+        onFlowOutpaintHandlePointerMove: vi.fn(),
+        onFlowOutpaintHandlePointerUp: vi.fn(),
+      },
+      cancelOutpaint: vi.fn(),
+      hideStrengthControl: vi.fn(),
+    },
+  }
+}
+
+function createRuntime(flowNodes: { id: string; position: { x: number; y: number } }[]) {
+  const flow = createRuntimeFlow(flowNodes)
   mocks.useCanvasWorkspaceRuntime.mockReturnValue({
-    viewModel: {
-      flowPane: { nodes, edges: renderEdges, renderEdges },
-      boardChrome: {
-        currentBoardId: ref('board-a'),
-        isBoardMenuOpen: ref(false),
-        isRenamingBoard: ref(false),
-        boardNameDraft: ref('Board A'),
-        isRenamePending: ref(false),
-        catalogRecovery: ref({ status: 'idle' }),
-        isBoardArchived: ref(false),
-        isRestoringArchivedBoard: ref(false),
-        currentBoardName: ref('Board A'),
-        boardOptions: ref([]),
-      },
-      persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
-      viewportControls: { zoomLevel: ref(100) },
-      graphEditing: {
-        hasSelectedFlowNodes: ref(false),
-        isFlowInteractionActive: ref(false),
-        isFlowViewportPanInteractionActive: ref(false),
-        isFlowInteractionLocked: ref(false),
-        grouping: { groupFrames: ref([]), selectionGroupAction: ref({ kind: 'group' as const }) },
-      },
-      imageWorkflow: {
-        tools: {
-          active: { nodeId: ref(null), maskNodeId: ref(null) },
-          locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
-          nodeBindings: { stageFor: vi.fn(() => null), actionFor: vi.fn() },
-          chrome: ref({ isReady: false }),
-        },
-        outpaint: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
-      },
-    },
-    commands: {
-      boardSession: {
-        setBoardNameInputRef: vi.fn(),
-        toggleBoardMenu: vi.fn(),
-        startBoardRename: vi.fn(),
-        cancelBoardRename: vi.fn(),
-        closeBoardHeaderEditing: vi.fn(),
-        onConfirmBoardRename: vi.fn(),
-        reloadCatalog: vi.fn(),
-        restoreArchivedBoard: vi.fn(),
-        onSelectBoard: vi.fn(),
-        onNavigateRequest: vi.fn(),
-        onLogoutRequest: vi.fn(),
-      },
-      flowPane: {
-        onNodesChange: vi.fn(),
-        onEdgesChange: vi.fn(),
-        connectionAdapter: { vueFlowBindings: {}, connectIntent: vi.fn() },
-        nodeDragTransactions: { begin: vi.fn(), commit: vi.fn() },
-      },
-      persistence: { flushAutosave, recoverBoardSession },
-      viewportControls: {
-        onZoomIn: vi.fn(),
-        onZoomOut: vi.fn(),
-        onPanViewport: vi.fn(),
-        onMiniMapCenterRequested: vi.fn(),
-        onMiniMapDragStart: vi.fn(),
-        onMiniMapDragMove: vi.fn(),
-        onMiniMapDragEnd: vi.fn(),
-        onViewportChangeEnd: vi.fn(),
-        onFlowMoveStart: vi.fn(),
-        onFlowMove: vi.fn(),
-        onFlowMoveEnd: vi.fn(),
-        onNodeDragStart: vi.fn(),
-        onNodeDragStop: vi.fn(),
-      },
-      graphEditing: {
-        libraryImport: { add: vi.fn() },
-        imageImport: { retry: vi.fn(async () => false) },
-        grouping: {
-          selectGroupAtPoint: vi.fn(),
-          handlePaneClick: vi.fn(),
-          handleNodeClick: vi.fn(),
-          groupSelectedNodes: vi.fn(),
-          ungroupSelectedGroup: vi.fn(),
-          deleteSelectedGroup: vi.fn(() => false),
-          groupDrag: vi.fn(),
-          groupResize: vi.fn(),
-        },
-        createNodeAtPosition: vi.fn(),
-        onExportSelectedImages: vi.fn(),
-        onFlowMediaInputImageDrop: vi.fn(),
-        onFlowMediaInputImageOpen: vi.fn(),
-        onFlowMediaInputImagePreview: vi.fn(),
-        onFlowMediaInputImageRemove: vi.fn(),
-        onCanvasDrop: vi.fn(),
-        onCanvasDragOver: vi.fn(),
-        onFlowImageOpenPreview: vi.fn(),
-        onFlowImageAppendToCanvas: vi.fn(),
-        beginFlowNodeDragDuplicateTracking: vi.fn(),
-        finishFlowNodeDragDuplicateTracking: vi.fn(),
-        getFlowNodeUiStateCached: vi.fn(),
-        createNodeInteractions: () => ({
-          onFlowDeleteNode: vi.fn(),
-          onFlowPromptTextUpdate: vi.fn(),
-          onFlowNodeParamUpdate: vi.fn(),
-          onFlowImageOpenFile: vi.fn(),
-          onFlowImageReset: vi.fn(),
-          onFlowImageStageDrop: vi.fn(),
-        }),
-      },
-      imageWorkflow: {
-        isGenerationAvailable: vi.fn(() => true),
-        tools: {
-          lifecycle: { enter: vi.fn(), cancel: vi.fn(), discardNodeEdits: vi.fn() },
-          editor: {
-            onCanvasWheel: vi.fn(),
-            focusAndShowChrome: vi.fn(),
-            scheduleChromeAnchorUpdate: vi.fn(),
-          },
-          chrome: {},
-        },
-        interactions: {
-          onFlowImageContextMenu: vi.fn(),
-          onFlowFusionContextMenu: vi.fn(),
-          onFlowImageDirectAction: vi.fn(),
-          onFlowImagePromptGenerate: vi.fn(),
-          onFlowFusionPromptGenerate: vi.fn(),
-          onFlowPromptGenerate: vi.fn(),
-          onFlowImageOutpaintSubmit: vi.fn(),
-          onFlowOutpaintHandlePointerDown: vi.fn(),
-          onFlowOutpaintFramePointerDown: vi.fn(),
-          onFlowOutpaintHandlePointerMove: vi.fn(),
-          onFlowOutpaintHandlePointerUp: vi.fn(),
-        },
-        cancelOutpaint: vi.fn(),
-        hideStrengthControl: vi.fn(),
-      },
-    },
+    viewModel: createRuntimeViewModel(flow),
+    commands: createRuntimeCommands(),
   })
-  return { nodes, renderEdges }
+  return flow
 }
 
 function renderScreen() {
@@ -523,7 +536,10 @@ describe('Canvas immutable connection endpoints browser contract', () => {
       expect(props['onlyRenderVisibleElements']).toBe(false)
       expect(props['edgesUpdatable']).toBe(false)
       expect(props['connectOnClick']).toBe(false)
-      expect(props['defaultEdgeOptions']).toEqual({ animated: false, updatable: false })
+      expect(props['defaultEdgeOptions']).toEqual({
+        animated: false,
+        updatable: false,
+      } satisfies Partial<import('@vue-flow/core').Edge>)
     } finally {
       view.unmount()
     }

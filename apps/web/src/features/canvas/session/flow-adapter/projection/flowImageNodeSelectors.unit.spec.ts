@@ -102,7 +102,7 @@ describe('flowImageNodeSelectors', () => {
     })
     const node = { position: { x: 40, y: 60 } }
 
-    expect(resolveImageNodeLayoutAnchor(node, imageNode, { requireUrl: true })).toBeNull()
+    expect(resolveImageNodeLayoutAnchor(node, imageNode, { shouldRequireUrl: true })).toBeNull()
     expect(resolveImageNodeLayoutAnchor(node, imageNode)).toEqual({
       url: '',
       ratio: 1,

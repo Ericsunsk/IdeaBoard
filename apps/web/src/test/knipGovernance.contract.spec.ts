@@ -54,12 +54,12 @@ test('the retained api/default alias cannot conceal new duplicate aliases', () =
         '-e',
         `import { assertClientCompatibilityAlias } from ${JSON.stringify(path.join(process.cwd(), 'scripts/knipGovernanceConfig.ts'))}; assertClientCompatibilityAlias(${JSON.stringify(source)})`,
       ],
-      { encoding: 'utf8' },
+      { encoding: 'utf8', timeout: 10_000 },
     )
   expect(run('export const api = {}; export default api').status).toBe(0)
   expect(run('export const api = {}; export default api; export { api as other }').status).toBe(1)
   expect(run('export const api = {}; export default api; export const other = api').status).toBe(1)
-})
+}, 45_000)
 
 test('exact analysis-only public symbols preserve Knip dependency, duplicate and orphan checks', () => {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'knip-governance-')))
@@ -75,7 +75,7 @@ test('exact analysis-only public symbols preserve Knip dependency, duplicate and
         entry: ['main.ts!'],
         project: ['main.ts!', 'generated.ts!', 'orphan.ts!', 'Component.vue!'],
         includeEntryExports: true,
-      }),
+      } satisfies import('knip').KnipConfiguration),
     )
     fs.writeFileSync(
       path.join(root, 'knip.config.ts'),

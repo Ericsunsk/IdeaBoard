@@ -32,7 +32,7 @@
       <template #library>
         <CanvasLibraryFloatingIsland
           presentation="canvas"
-          :open="canvasLibrary.view.open.value"
+          :open="canvasLibrary.view.isOpen.value"
           :workspace-id="canvasWorkspaceId"
           :folder-facts="canvasLibrary.view.folderFacts"
           :mutation-publisher="canvasLibrary.view.mutationPublisher"
@@ -81,7 +81,7 @@
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
             v-bind="nodePropsFor(nodeProps)"
-            :connection-drop-target="connectionDropTargetNodeId === nodeProps.id"
+            :is-connection-drop-target="connectionDropTargetNodeId === nodeProps.id"
             @node-intent="nodePresentationIntentRouter.dispatch"
             @node-mousedown="onFlowNodeMouseDown"
           />
@@ -96,7 +96,7 @@
       </VueFlow>
       <ImageToolPresentation :image-tools="imageTools" />
       <CanvasNodeContextMenu
-        :visible="nodeContextMenu.visible"
+        :is-visible="nodeContextMenu.isVisible"
         :x="nodeContextMenu.x"
         :y="nodeContextMenu.y"
         :items="canvasNodeMenuItems"
@@ -114,7 +114,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../../api/upload.ts'
 import { USER_BOARDS_PATH } from '../../../workspace/routePaths.ts'
-import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
+import { PanOnScrollMode, useVueFlow, VueFlow, type FlowProps } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useCanvasImageLightbox } from './useCanvasImageLightbox'
@@ -182,7 +182,7 @@ const handleProximitySurface = provideCanvasHandleProximityCoordinator(handlePro
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
-const duplicateModifierPressed = ref(false)
+const isDuplicateModifierPressed = ref(false)
 const canvasLibrary = useCanvasLibraryIsland()
 // Workspace id comes from the shared selection store (primed from persisted
 // selection); no workspace query is issued from the Canvas screen.
@@ -275,7 +275,7 @@ const canvasNavigationAdapter: WorkspaceNavigationAdapter = {
 }
 const accountControls = useWorkspaceAccountControls({
   navigation: canvasNavigationAdapter,
-  showHome: false,
+  shouldShowHome: false,
 })
 
 const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
@@ -331,7 +331,7 @@ const surface = useCanvasScreenSurfaceInteractions({
   canvasWrapRef,
   activeTool,
   isCanvasMinimapEnabled,
-  duplicateModifierPressed,
+  isDuplicateModifierPressed,
   activePanels: imageToolUi.activePanels,
 })
 const {
@@ -364,7 +364,7 @@ const nodePresentation = createCanvasScreenNodePresentation({
   workspace,
   activePanels: imageToolUi.activePanels,
   imageStages: imageToolUi.imageStages,
-  duplicateModifierPressed,
+  isDuplicateModifierPressed,
   nodeInteractions: surface.nodeInteractions,
 })
 const {
@@ -373,7 +373,7 @@ const {
   isCanvasShortcutSuppressed: isNodePresentationShortcutSuppressed,
 } = nodePresentation
 const isCanvasShortcutSuppressed = computed(
-  () => canvasLibrary.view.focusWithin.value || isNodePresentationShortcutSuppressed.value,
+  () => canvasLibrary.view.isFocusWithin.value || isNodePresentationShortcutSuppressed.value,
 )
 const onCanvasDrop = commands.graphEditing.onCanvasDrop
 const onExportSelectedImages = commands.graphEditing.onExportSelectedImages
@@ -393,18 +393,18 @@ function handleMiniMapDragMove(payload: { delta: Parameters<typeof onMiniMapDrag
 }
 
 const chromeProps = computed(() => ({
-  inert: isRetouchChromeHidden.value,
+  isInert: isRetouchChromeHidden.value,
   isHidden: isRetouchChromeHidden.value,
   board: canvasChromeBoard.value,
   account: canvasChromeAccount.value,
   tools: {
     activeTool: activeTool.value,
-    libraryMounted: canvasLibrary.view.mounted.value,
-    libraryOpen: canvasLibrary.view.open.value,
-    minimapEnabled: isCanvasMinimapEnabled.value,
+    isLibraryMounted: canvasLibrary.view.isMounted.value,
+    isLibraryOpen: canvasLibrary.view.isOpen.value,
+    isMinimapEnabled: isCanvasMinimapEnabled.value,
   },
   status: {
-    exportDisabled: !viewModel.graphEditing.hasSelectedFlowNodes.value,
+    isExportDisabled: !viewModel.graphEditing.hasSelectedFlowNodes.value,
     zoomLevel: viewModel.viewportControls.zoomLevel.value,
   },
 }))
@@ -440,12 +440,12 @@ const vueFlowProps = computed(() => {
     panOnScrollMode: PanOnScrollMode.Free,
     onlyRenderVisibleElements: false,
     ...connectionAdapter.vueFlowBindings,
-  }
+  } satisfies Partial<FlowProps>
 })
 
 const minimapProps = computed(() => ({
-  enabled: isCanvasMinimapEnabled.value,
-  inert: isRetouchChromeHidden.value,
+  isEnabled: isCanvasMinimapEnabled.value,
+  isInert: isRetouchChromeHidden.value,
   isHidden: isRetouchChromeHidden.value,
 }))
 
@@ -477,7 +477,7 @@ useCanvasScreenLifecycle({
   route,
   persistence: commands.persistence,
   history: viewModel.persistence.history,
-  duplicateModifierPressed,
+  isDuplicateModifierPressed,
   keyboard: {
     onDeleteInlineSelection,
     isShortcutSuppressed: () => isCanvasShortcutSuppressed.value,

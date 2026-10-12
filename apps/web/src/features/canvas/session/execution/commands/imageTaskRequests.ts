@@ -436,12 +436,12 @@ export function buildImageExecutionTaskRequest(
     }
     case 'fusion': {
       const opaqueIds = opaqueAssetIds(plan.inputImages)
-      const fullyCovered =
+      const isFullyCovered =
         plan.inputImages.length > 0 && opaqueIds.length === plan.inputImages.length
       return buildFusionTaskRequest({
         prompt: plan.taskPrompt,
-        imageUrls: fullyCovered ? [] : plan.imageUrls,
-        imageAssetIds: fullyCovered ? undefined : imageAssetIds(plan.inputImages),
+        imageUrls: isFullyCovered ? [] : plan.imageUrls,
+        imageAssetIds: isFullyCovered ? undefined : imageAssetIds(plan.inputImages),
         mediaAssetIds: opaqueIds,
         inputWeights: plan.inputWeights,
         outputCount: plan.outputCount,

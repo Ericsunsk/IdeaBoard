@@ -222,7 +222,7 @@ type ResolvedImageExecutionImage = {
 function resolveImageExecutionImage(
   node: Pick<FlowGraphNode, 'position'>,
   imageNode: ImageNodeItem,
-  options: { requireUrl?: boolean } = {},
+  options: { shouldRequireUrl?: boolean } = {},
 ): ResolvedImageExecutionImage | null {
   const anchor = resolveImageNodeLayoutAnchor(node, imageNode, options)
   if (!anchor) return null
@@ -245,7 +245,7 @@ function requireImageExecutionImage(
     failPlanning(i18n.global.t('canvas.execution.imageNodeMissingUrl'))
   }
   const source = resolveImageExecutionImage(node, snapshot as ImageNodeItem, {
-    requireUrl: true,
+    shouldRequireUrl: true,
   })
   if (!source?.input.url) failPlanning(i18n.global.t('canvas.execution.imageNodeMissingUrl'))
   return source

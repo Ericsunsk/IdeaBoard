@@ -113,8 +113,8 @@ export class CanvasGraphStore {
     options: CanvasGraphTransactionOptions = {},
   ): CanvasGraphTransaction {
     return new CanvasGraphTransaction(this, reason, {
-      recordHistory: options.recordHistory ?? true,
-      markDirty: options.markDirty ?? true,
+      shouldRecordHistory: options.shouldRecordHistory ?? true,
+      shouldMarkDirty: options.shouldMarkDirty ?? true,
     })
   }
 
@@ -133,8 +133,8 @@ export class CanvasGraphStore {
       return createSummary(
         direction === 'forward' ? 'history-redo' : 'history-undo',
         {
-          recordHistory: false,
-          markDirty: options.markDirty ?? true,
+          shouldRecordHistory: false,
+          shouldMarkDirty: options.shouldMarkDirty ?? true,
         },
         this._readState(),
         createChangeSet(),
@@ -153,8 +153,8 @@ export class CanvasGraphStore {
     recordAppliedOrderPatch(this.state.groupOrder, draft.groupOrder, draft.groupOrderPatches)
 
     const resolvedOptions: Required<CanvasGraphTransactionOptions> = {
-      recordHistory: options.recordHistory ?? false,
-      markDirty: options.markDirty ?? true,
+      shouldRecordHistory: options.shouldRecordHistory ?? false,
+      shouldMarkDirty: options.shouldMarkDirty ?? true,
     }
     const changes = normalizeTransactionChanges(draft)
     const didChange = hasVisibleChanges(changes)
@@ -258,13 +258,13 @@ export class CanvasGraphStore {
       summary,
       patch: summary.commitPatch,
       sideEffects: Object.freeze({
-        recordHistory: summary.shouldRecordHistory,
-        markDirty: summary.shouldMarkDirty,
+        shouldRecordHistory: summary.shouldRecordHistory,
+        shouldMarkDirty: summary.shouldMarkDirty,
       }),
     })
     this.telemetry.recordCommit({
-      recordHistory: event.sideEffects.recordHistory,
-      markDirty: event.sideEffects.markDirty,
+      shouldRecordHistory: event.sideEffects.shouldRecordHistory,
+      shouldMarkDirty: event.sideEffects.shouldMarkDirty,
     })
     this.commitListeners.forEach((listener) => {
       try {

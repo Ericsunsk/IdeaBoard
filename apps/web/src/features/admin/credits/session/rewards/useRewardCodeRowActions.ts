@@ -82,7 +82,7 @@ export function useRewardCodeRowActions(options: {
       message: `确定永久删除“${rewardCode.displayName}”吗？没有 Redemption 的兑换码才可删除。`,
       confirmLabel: '确认删除',
       intent: 'danger',
-      reason: { required: true },
+      reason: { isRequired: true },
     })
     if (!confirmed) return
     const operatorReason = requireDestructiveReason(confirm)

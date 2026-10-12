@@ -18,7 +18,7 @@ type StrengthRangeEditSession<TKey> = {
   beginEdit: (
     key: TKey,
     input: HTMLInputElement,
-    options: { syncInitial: boolean; initialValue?: number },
+    options: { shouldSyncInitial: boolean; initialValue?: number },
   ) => void
   finishEdit: (key: TKey) => void
   cancelEdit: (key: TKey) => void
@@ -102,15 +102,15 @@ export function useStrengthRangeEditSession<TKey>(
   function beginEdit(
     key: TKey,
     input: HTMLInputElement,
-    editOptions: { syncInitial: boolean; initialValue?: number },
+    editOptions: { shouldSyncInitial: boolean; initialValue?: number },
   ) {
-    if (!editOptions.syncInitial) {
+    if (!editOptions.shouldSyncInitial) {
       writeValueToRange(key, input, editOptions.initialValue ?? options.readValue(key))
     }
     activeKey.value = key
     editingKey = key
     suppressedClickKey = key
-    if (editOptions.syncInitial) syncValueFromRange(key, input)
+    if (editOptions.shouldSyncInitial) syncValueFromRange(key, input)
     input.focus({ preventScroll: true })
   }
 
@@ -167,7 +167,7 @@ export function useStrengthRangeEditSession<TKey>(
           options.onLongPressStart(key, input, event, api)
           return
         }
-        beginEdit(key, input, { syncInitial: false })
+        beginEdit(key, input, { shouldSyncInitial: false })
       },
       {
         delay: longPressMs,
@@ -221,7 +221,7 @@ export function useStrengthRangeEditSession<TKey>(
     const input = getEventRangeInput(event)
     if (!input) return
     if (activeKey.value === key) {
-      beginEdit(key, input, { syncInitial: true })
+      beginEdit(key, input, { shouldSyncInitial: true })
       return
     }
     suppressedClickKey = null

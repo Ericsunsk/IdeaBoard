@@ -48,7 +48,7 @@ function makeReadiness(
 function renderImageActionMenu(
   input: {
     activeStrengthAction?: ImageStrengthAction | null
-    showStrengthControl?: boolean
+    shouldShowStrengthControl?: boolean
     strengthValue?: number
     billingStore?: CanvasBillingReadinessStore
     outputCount?: number
@@ -59,7 +59,7 @@ function renderImageActionMenu(
     outputCount: input.outputCount ?? 1,
     outputResolution: input.outputResolution ?? '1k',
     strengthControl: {
-      visible: input.showStrengthControl ?? false,
+      isVisible: input.shouldShowStrengthControl ?? false,
       activeAction: input.activeStrengthAction ?? null,
       getValue: () => input.strengthValue ?? 50,
       setRangeRef: vi.fn(),
@@ -121,7 +121,7 @@ describe('HomeCanvasImageActionMenu', () => {
 
   it('shows the active strength range for style variation and upscale actions', () => {
     const variationsRender = renderImageActionMenu({
-      showStrengthControl: true,
+      shouldShowStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.variations,
     })
     const activeStyleRange = variationsRender.getByRole('slider', { name: 'Variations strength' })
@@ -135,7 +135,7 @@ describe('HomeCanvasImageActionMenu', () => {
     variationsRender.unmount()
 
     const hdRender = renderImageActionMenu({
-      showStrengthControl: true,
+      shouldShowStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.upscale,
     })
     const activeHdRange = hdRender.getByRole('slider', { name: 'Upscale strength' })
@@ -177,7 +177,7 @@ describe('HomeCanvasImageActionMenu', () => {
         status: 'ready',
         unitCredits: 0,
         availableCredits: 0,
-        sufficient: true,
+        isSufficient: true,
       }),
     }
 
@@ -228,7 +228,7 @@ describe('HomeCanvasImageActionMenu', () => {
 
   it('submits a strength action once when the committed value changes', () => {
     const view = renderImageActionMenu({
-      showStrengthControl: true,
+      shouldShowStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.variations,
     })
     const range = screen.getByRole('slider', { name: 'Variations strength' })

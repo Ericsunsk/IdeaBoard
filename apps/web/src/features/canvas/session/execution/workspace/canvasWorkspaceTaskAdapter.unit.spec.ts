@@ -133,13 +133,19 @@ describe('toWorkspaceCreateInput', () => {
         prompt: 'redraw the area',
         service: 'inpaint',
         media_asset_ids: ['asset_aaa1'],
-        params: { mask_asset_id: 'asset_mask1', use_mask: true },
+        params: {
+          mask_asset_id: 'asset_mask1',
+          use_mask: true,
+        } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
       }),
     ).toMatchObject({
       service: 'inpaint',
       prompt: 'redraw the area',
       media_asset_ids: ['asset_aaa1'],
-      params: { mask_asset_id: 'asset_mask1', use_mask: true },
+      params: {
+        mask_asset_id: 'asset_mask1',
+        use_mask: true,
+      } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
     })
   })
 
@@ -207,7 +213,10 @@ describe('toWorkspaceCreateInput', () => {
         toWorkspaceCreateInput({
           prompt: '',
           service: 'inpaint',
-          params: { mask_image_url: 'data:image/png;base64,AAA', use_mask: true },
+          params: {
+            mask_image_url: 'data:image/png;base64,AAA',
+            use_mask: true,
+          } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
         }),
       'media-urls',
     )
@@ -215,7 +224,10 @@ describe('toWorkspaceCreateInput', () => {
       toWorkspaceCreateInput({
         prompt: '',
         service: 'inpaint',
-        params: { mask_image_url: 'data:image/png;base64,AAA', use_mask: true },
+        params: {
+          mask_image_url: 'data:image/png;base64,AAA',
+          use_mask: true,
+        } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
       })
       expect.unreachable()
     } catch (error) {
@@ -229,9 +241,15 @@ describe('toWorkspaceCreateInput', () => {
       toWorkspaceCreateInput({
         prompt: 'redraw',
         service: 'inpaint',
-        params: { mask_asset_id: ' asset_mask1 ', use_mask: true },
+        params: {
+          mask_asset_id: ' asset_mask1 ',
+          use_mask: true,
+        } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
       }).params,
-    ).toMatchObject({ mask_asset_id: 'asset_mask1', use_mask: true })
+    ).toMatchObject({
+      mask_asset_id: 'asset_mask1',
+      use_mask: true,
+    } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams)
     // Data-URL masks cannot ride params: upload via the session flow first.
     expectUnmappable(
       () =>
@@ -363,7 +381,7 @@ describe('canonical output resolution ingress (#850)', () => {
         output_resolution: '1K',
         use_mask: true,
         mask_asset_id: 'asset_mask1',
-      },
+      } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
     })
     expect(input.params).toMatchObject({ output_resolution: '1k' })
     expect(input.resolution).toBe('1k')
@@ -445,7 +463,9 @@ describe('quote mapping', () => {
         price_version: 2,
         quantity: 4,
       },
-    })
+    } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
   })
 })
 
@@ -556,7 +576,9 @@ describe('canvas workspace task transport', () => {
     )
     await expect(
       fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
-    ).resolves.toMatchObject({ ready: false, service: 'generation' })
+    ).resolves.toMatchObject({ ready: false, service: 'generation' } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
   })
 
   it('preserves the unavailable resolution code from quote readiness', async () => {
@@ -573,7 +595,9 @@ describe('canvas workspace task transport', () => {
       service: 'generation',
       error_code: 'service_resolution_unavailable',
       message: 'This resolution is unavailable right now.',
-    })
+    } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
   })
 
   it('threads an optional caller signal to the quote transport', async () => {
@@ -621,8 +645,12 @@ describe('canvas workspace task transport', () => {
     ])
 
     expect(items).toHaveLength(2)
-    expect(items[0]).toMatchObject({ ready: true, service: 'generation' })
-    expect(items[1]).toMatchObject({ ready: true, service: 'cutout' })
+    expect(items[0]).toMatchObject({ ready: true, service: 'generation' } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
+    expect(items[1]).toMatchObject({ ready: true, service: 'cutout' } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
     expect(mocks.quoteWorkspaceTask).toHaveBeenCalledTimes(2)
     await expect(fetchCanvasWorkspaceTaskReadinessMatrix([])).resolves.toEqual([])
   })

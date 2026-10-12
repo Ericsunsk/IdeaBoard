@@ -9,7 +9,7 @@ type CanvasCustomLayerRoot = MaybeRefOrGetter<HTMLElement | null | undefined>
 type CanvasCustomLayerDismissEvent = KeyboardEvent | PointerEvent
 
 export type UseCanvasCustomLayerOverlayOptions = {
-  visible: MaybeRefOrGetter<boolean>
+  isVisible: MaybeRefOrGetter<boolean>
   roots?: readonly CanvasCustomLayerRoot[]
   ignore?: readonly string[] | undefined
   ignoreEscape?: readonly string[]
@@ -41,18 +41,18 @@ export function useCanvasCustomLayerOverlay(options: UseCanvasCustomLayerOverlay
   let dismissalContext:
     { dismissal: OverlayDismissal; event: CanvasCustomLayerDismissEvent } | undefined
   const lifecycle = useOverlayInteractionLifecycle({
-    visible: options.visible,
+    isVisible: options.isVisible,
     surface: {
       dismissibleBy: options.dismissibleBy ?? ['outside-pointer', 'escape'],
-      restoreFocus: false,
+      shouldRestoreFocus: false,
     },
-    onVisibilityChange: (visible) => {
-      if (visible || !dismissalContext) return
+    onVisibilityChange: (isVisible) => {
+      if (isVisible || !dismissalContext) return
       options.onDismiss(dismissalContext.dismissal, dismissalContext.event)
     },
   })
   const entry: CanvasCustomLayerEntry = {
-    isVisible: () => Boolean(toValue(options.visible)),
+    isVisible: () => Boolean(toValue(options.isVisible)),
     openSequence: () => openSequence,
     containsPointerEvent: (event) =>
       eventMatchesRoots(event, options.roots) || eventMatchesSelectors(event, options.ignore),
@@ -69,7 +69,7 @@ export function useCanvasCustomLayerOverlay(options: UseCanvasCustomLayerOverlay
   }
 
   watchEffect((onCleanup) => {
-    const isVisible = Boolean(toValue(options.visible))
+    const isVisible = Boolean(toValue(options.isVisible))
     if (!isVisible) {
       wasVisible = false
       return
@@ -113,7 +113,7 @@ function getCanvasCustomLayerStack(ownerDocument: Document) {
 
 function createCanvasCustomLayerStack(ownerDocument: Document): CanvasCustomLayerStack {
   const activeLayers: CanvasCustomLayerEntry[] = []
-  let listening = false
+  let isListening = false
 
   function topmostLayer() {
     let topmost: CanvasCustomLayerEntry | undefined
@@ -142,15 +142,15 @@ function createCanvasCustomLayerStack(ownerDocument: Document): CanvasCustomLaye
   }
 
   function startListening() {
-    if (listening) return
-    listening = true
+    if (isListening) return
+    isListening = true
     ownerDocument.addEventListener('pointerdown', handlePointerDown, true)
     ownerDocument.addEventListener('keydown', handleKeyDown, true)
   }
 
   function stopListening() {
-    if (!listening) return
-    listening = false
+    if (!isListening) return
+    isListening = false
     ownerDocument.removeEventListener('pointerdown', handlePointerDown, true)
     ownerDocument.removeEventListener('keydown', handleKeyDown, true)
   }
@@ -159,11 +159,11 @@ function createCanvasCustomLayerStack(ownerDocument: Document): CanvasCustomLaye
     register(entry) {
       activeLayers.push(entry)
       startListening()
-      let registered = true
+      let isRegistered = true
 
       return () => {
-        if (!registered) return
-        registered = false
+        if (!isRegistered) return
+        isRegistered = false
         const index = activeLayers.lastIndexOf(entry)
         if (index >= 0) activeLayers.splice(index, 1)
         if (activeLayers.length === 0) stopListening()

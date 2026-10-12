@@ -1,16 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { render, screen, userEvent, within } from '../../../test/render'
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './index'
+import Table from './Table.vue'
+import TableBody from './TableBody.vue'
+import TableCaption from './TableCaption.vue'
+import TableCell from './TableCell.vue'
+import TableFooter from './TableFooter.vue'
+import TableHead from './TableHead.vue'
+import TableHeader from './TableHeader.vue'
+import TableRow from './TableRow.vue'
 
 /**
  * Quota: final/table-semantics. The primitive owns native table semantics
@@ -27,7 +25,7 @@ function renderOrdersTable(sortDirection: 'ascending' | 'descending' | 'none' = 
         h(TableHeader, () => [
           h(TableRow, () => [
             h(TableHead, () => 'Order'),
-            h(TableHead, { sortable: true, sortDirection, onSort }, () => 'Total'),
+            h(TableHead, { isSortable: true, sortDirection, onSort }, () => 'Total'),
           ]),
         ]),
         h(TableBody, () => [

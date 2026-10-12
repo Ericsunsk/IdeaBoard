@@ -9,9 +9,9 @@ import { getWorkspaceSelectionStore } from '../../../../workspace'
 
 /** Owns Canvas-local Library visibility and its shared Library coordination facts. */
 export function useCanvasLibraryIsland() {
-  const open = ref(false)
-  const mounted = ref(false)
-  const focusWithin = ref(false)
+  const isOpen = ref(false)
+  const isMounted = ref(false)
+  const isFocusWithin = ref(false)
   const folderFacts = createLibraryFolderFacts(() =>
     listAllWorkspaceLibraryFolders(
       requireWorkspaceId(getWorkspaceSelectionStore().getSelectedId()),
@@ -22,19 +22,19 @@ export function useCanvasLibraryIsland() {
   onScopeDispose(folderFacts.dispose)
 
   return {
-    view: { open, mounted, focusWithin, folderFacts, mutationPublisher },
+    view: { isOpen, isMounted, isFocusWithin, folderFacts, mutationPublisher },
     commands: {
       toggle() {
-        if (!open.value) mounted.value = true
-        open.value = !open.value
-        if (!open.value) focusWithin.value = false
+        if (!isOpen.value) isMounted.value = true
+        isOpen.value = !isOpen.value
+        if (!isOpen.value) isFocusWithin.value = false
       },
       close() {
-        open.value = false
-        focusWithin.value = false
+        isOpen.value = false
+        isFocusWithin.value = false
       },
-      setFocusWithin(focused: boolean) {
-        focusWithin.value = focused
+      setFocusWithin(isFocused: boolean) {
+        isFocusWithin.value = isFocused
       },
     },
   }

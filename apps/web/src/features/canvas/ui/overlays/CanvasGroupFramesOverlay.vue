@@ -4,7 +4,7 @@
       v-for="frame in frames"
       :key="frame.id"
       class="canvas-group-frame-body"
-      :class="{ 'is-selected': frame.selected }"
+      :class="{ 'is-selected': frame.isSelected }"
       :style="frameStyle(frame)"
     />
   </div>
@@ -54,7 +54,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const resizeHandles: CanvasGroupResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-const selectedFrames = computed(() => props.frames.filter((frame) => frame.selected))
+const selectedFrames = computed(() => props.frames.filter((frame) => frame.isSelected))
 
 function resizeHandleKindClass(handle: CanvasGroupResizeHandle) {
   return handle.length === 2 ? 'is-corner-handle' : 'is-edge-handle'

@@ -2,7 +2,7 @@
   <header
     class="canvas-chrome-region canvas-chrome-region--top"
     :class="{ 'is-hidden': isHidden }"
-    :inert="inert"
+    :inert="isInert"
     @wheel.prevent.stop
   >
     <CanvasChromeBoardHeader
@@ -39,10 +39,10 @@
           <ShareAndroid class="canvas-chrome-icon" />
         </button>
         <button
-          :class="[canvasChromeExportControlClass, { 'is-active': !status.exportDisabled }]"
+          :class="[canvasChromeExportControlClass, { 'is-active': !status.isExportDisabled }]"
           type="button"
           :aria-label="t('canvas.chrome.export')"
-          :disabled="status.exportDisabled"
+          :disabled="status.isExportDisabled"
           @mousedown.stop
           @click="emit('export')"
         >
@@ -55,7 +55,7 @@
   <aside
     class="canvas-chrome-region canvas-chrome-region--left"
     :class="{ 'is-hidden': isHidden }"
-    :inert="inert"
+    :inert="isInert"
     @wheel.prevent.stop
   >
     <button
@@ -78,20 +78,20 @@
     </button>
     <button
       type="button"
-      :class="[canvasChromeRoundControlClass, { 'is-active': tools.libraryOpen }]"
+      :class="[canvasChromeRoundControlClass, { 'is-active': tools.isLibraryOpen }]"
       :aria-label="t('common.navigation.library')"
-      :aria-pressed="tools.libraryOpen"
+      :aria-pressed="tools.isLibraryOpen"
       :title="t('common.navigation.library')"
       @click="emit('toggle-library')"
     >
-      <BookmarkSolid v-if="tools.libraryOpen" class="canvas-chrome-icon" />
+      <BookmarkSolid v-if="tools.isLibraryOpen" class="canvas-chrome-icon" />
       <Bookmark v-else class="canvas-chrome-icon" />
     </button>
     <button
       type="button"
-      :class="[canvasChromeRoundControlClass, { 'is-active': tools.minimapEnabled }]"
+      :class="[canvasChromeRoundControlClass, { 'is-active': tools.isMinimapEnabled }]"
       :aria-label="t('canvas.minimap.label')"
-      :aria-pressed="tools.minimapEnabled"
+      :aria-pressed="tools.isMinimapEnabled"
       :title="t('canvas.minimap.label')"
       @click="emit('toggle-minimap')"
     >
@@ -100,10 +100,10 @@
   </aside>
 
   <section
-    v-if="tools.libraryMounted"
+    v-if="tools.isLibraryMounted"
     class="canvas-chrome-region canvas-chrome-region--library"
-    :class="{ 'is-hidden': isHidden, 'is-open': tools.libraryOpen }"
-    :inert="inert"
+    :class="{ 'is-hidden': isHidden, 'is-open': tools.isLibraryOpen }"
+    :inert="isInert"
     @focusin="emit('library-focus-change', true)"
     @focusout="handleLibraryFocusOut"
   >
@@ -113,7 +113,7 @@
   <section
     class="canvas-chrome-region canvas-chrome-region--status"
     :class="{ 'is-hidden': isHidden }"
-    :inert="inert"
+    :inert="isInert"
     @wheel.prevent.stop
   >
     <div class="page-chrome-surface canvas-chrome-status-control">
@@ -170,7 +170,7 @@ import type {
 } from './types'
 
 defineProps<{
-  inert: boolean
+  isInert: boolean
   isHidden: boolean
   board: CanvasChromeBoardState
   account: CanvasChromeAccountState

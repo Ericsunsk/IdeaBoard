@@ -18,7 +18,7 @@ type UseFlowCanvasShellInteractionsOptions = {
 export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellInteractionsOptions) {
   function onPaneContextMenu(event: MouseEvent) {
     event.preventDefault()
-    options.dismissTransientCanvasUi({ closeOutpaint: true, closeBoardHeader: true })
+    options.dismissTransientCanvasUi({ shouldCloseOutpaint: true, shouldCloseBoardHeader: true })
     options.clearFlowSelection()
     const flowPoint = options.screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
     const rect = options.canvasWrapRef.value?.getBoundingClientRect()
@@ -28,7 +28,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
   }
 
   function setActiveTool(tool: FlowTool) {
-    options.dismissTransientCanvasUi({ closeOutpaint: true, closeBoardHeader: true })
+    options.dismissTransientCanvasUi({ shouldCloseOutpaint: true, shouldCloseBoardHeader: true })
     options.clearFlowSelection()
     options.activeTool.value = tool
   }
@@ -36,21 +36,21 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
   function onEscapeShortcut() {
     if (options.isFlowOutpaintActive()) {
       options.dismissTransientCanvasUi({
-        closeOutpaint: true,
-        clearNodePanel: false,
-        hideStrength: false,
+        shouldCloseOutpaint: true,
+        shouldClearNodePanel: false,
+        shouldHideStrength: false,
       })
       return true
     }
     if (options.isBoardHeaderEditingActive()) {
       options.dismissTransientCanvasUi({
-        closeBoardHeader: true,
-        clearNodePanel: false,
-        hideStrength: false,
+        shouldCloseBoardHeader: true,
+        shouldClearNodePanel: false,
+        shouldHideStrength: false,
       })
       return true
     }
-    options.dismissTransientCanvasUi({ closeContextMenu: true })
+    options.dismissTransientCanvasUi({ shouldCloseContextMenu: true })
     return options.clearFlowSelection()
   }
 

@@ -65,12 +65,12 @@ function isAbortError(error: unknown): boolean {
 
 export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorkspaceOptions) {
   const resource = options.resource ?? createAdminPromptConfigResource()
-  const loading = ref(false)
+  const isLoading = ref(false)
   const loadFailed = ref(false)
   const promptMap = reactive<Record<string, string>>({})
   const savedPromptMap = reactive<Record<string, string>>({})
   const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
-  const saving = reactive<Record<string, boolean>>({})
+  const isSaving = reactive<Record<string, boolean>>({})
   const promptList = ref<FeaturePrompt[]>([])
 
   const validations = computed<Record<string, PromptDraftValidation>>(() => {
@@ -93,7 +93,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
           ...(input.signal == null ? {} : { signal: input.signal }),
         }),
       {
-        loading,
+        isLoading,
         feedback: {
           error: (error) => {
             // Page-leave cancellation is silent: never toast or latch
@@ -197,7 +197,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
         return savedConfig
       },
       {
-        loading: toRef(saving, slug),
+        isLoading: toRef(isSaving, slug),
         feedback: {
           success: () => options.feedback.promptSaved(getFeatureTitle(slug)),
           error: options.feedback.savePromptFailed,
@@ -248,13 +248,13 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     insertVariableIntoDraft,
     loadFailed,
     loadPrompts,
-    loading,
+    isLoading,
     promptMap,
     prompts: computed(() => promptList.value),
     refreshPrompts,
     resetDrafts,
     savePrompt,
-    saving,
+    isSaving,
     updatePromptDraft,
     validationMap: validations,
   }

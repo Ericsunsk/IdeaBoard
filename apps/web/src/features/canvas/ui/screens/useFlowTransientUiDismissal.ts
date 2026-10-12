@@ -15,14 +15,14 @@ type UseFlowTransientUiDismissalOptions = {
 
 export function useFlowTransientUiDismissal(options: UseFlowTransientUiDismissalOptions) {
   function dismissTransientCanvasUi(request: DismissTransientCanvasUiOptions = {}) {
-    const clearNodePanel = request.clearNodePanel ?? true
-    const hideStrength = request.hideStrength ?? true
+    const shouldClearNodePanel = request.shouldClearNodePanel ?? true
+    const shouldHideStrength = request.shouldHideStrength ?? true
 
-    if (request.closeOutpaint) options.cancelFlowOutpaintMode()
-    if (request.closeBoardHeader) options.closeBoardHeaderEditing()
-    if (request.closeContextMenu) options.closeNodeContextMenu()
-    if (clearNodePanel !== false) options.clearActiveNodePanel()
-    if (hideStrength) options.hideStrengthControl()
+    if (request.shouldCloseOutpaint) options.cancelFlowOutpaintMode()
+    if (request.shouldCloseBoardHeader) options.closeBoardHeaderEditing()
+    if (request.shouldCloseContextMenu) options.closeNodeContextMenu()
+    if (shouldClearNodePanel !== false) options.clearActiveNodePanel()
+    if (shouldHideStrength) options.hideStrengthControl()
   }
 
   return {

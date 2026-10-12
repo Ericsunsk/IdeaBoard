@@ -68,7 +68,7 @@ function readSingleNodeTextEdit(patch: CanvasGraphCommitPatch): SingleNodeTextEd
   if (!isSingleNodeRecordsOnly(patch)) return null
   const record = patch.nodes.records[0]
   if (!record?.before || !record?.after) return null
-  if (record.before.selected !== record.after.selected) return null
+  if (record.before.isSelected !== record.after.isSelected) return null
   if (!isTextOnlySnapshotChange(record.before.snapshot, record.after.snapshot)) return null
   return { id: record.id, before: record.before, after: record.after }
 }

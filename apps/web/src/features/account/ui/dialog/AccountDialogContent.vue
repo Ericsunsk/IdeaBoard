@@ -4,7 +4,7 @@
       type="button"
       variant="ghost"
       autofocus
-      :disabled="logoutLoading"
+      :is-disabled="logoutLoading"
       :class="accountCloseButtonClass"
       :aria-label="t('account.dialog.close')"
       @click="emit('close')"
@@ -67,7 +67,7 @@
         <Button
           type="button"
           variant="ghost"
-          :disabled="logoutLoading"
+          :is-disabled="logoutLoading"
           :class="accountLogoutButtonClass"
           :aria-label="logoutLoading ? t('account.signingOut') : t('account.signOut')"
           @click="handleLogout"

@@ -10,8 +10,8 @@ function createCanvasElement() {
 
 function createHarness(
   options: {
-    outpaintActive?: boolean
-    boardHeaderActive?: boolean
+    isOutpaintActive?: boolean
+    isBoardHeaderActive?: boolean
     screenToFlowCoordinate?: (point: { x: number; y: number }) => { x: number; y: number }
   } = {},
 ) {
@@ -31,8 +31,8 @@ function createHarness(
     dismissTransientCanvasUi,
     clearFlowSelection,
     onCanvasDropDragOver,
-    isFlowOutpaintActive: () => options.outpaintActive ?? false,
-    isBoardHeaderEditingActive: () => options.boardHeaderActive ?? false,
+    isFlowOutpaintActive: () => options.isOutpaintActive ?? false,
+    isBoardHeaderEditingActive: () => options.isBoardHeaderActive ?? false,
   })
 
   return {
@@ -54,8 +54,8 @@ describe('useFlowCanvasShellInteractions', () => {
 
     expect(event.defaultPrevented).toBe(true)
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeOutpaint: true,
-      closeBoardHeader: true,
+      shouldCloseOutpaint: true,
+      shouldCloseBoardHeader: true,
     })
     expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
     expect(harness.openNodeContextMenu).toHaveBeenCalledWith({
@@ -83,21 +83,21 @@ describe('useFlowCanvasShellInteractions', () => {
   })
 
   it('keeps Escape priority for outpaint and board header before general dismissal', () => {
-    const outpaintHarness = createHarness({ outpaintActive: true })
+    const outpaintHarness = createHarness({ isOutpaintActive: true })
     expect(outpaintHarness.shell.onEscapeShortcut()).toBe(true)
     expect(outpaintHarness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeOutpaint: true,
-      clearNodePanel: false,
-      hideStrength: false,
+      shouldCloseOutpaint: true,
+      shouldClearNodePanel: false,
+      shouldHideStrength: false,
     })
     expect(outpaintHarness.clearFlowSelection).not.toHaveBeenCalled()
 
-    const headerHarness = createHarness({ boardHeaderActive: true })
+    const headerHarness = createHarness({ isBoardHeaderActive: true })
     expect(headerHarness.shell.onEscapeShortcut()).toBe(true)
     expect(headerHarness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeBoardHeader: true,
-      clearNodePanel: false,
-      hideStrength: false,
+      shouldCloseBoardHeader: true,
+      shouldClearNodePanel: false,
+      shouldHideStrength: false,
     })
     expect(headerHarness.clearFlowSelection).not.toHaveBeenCalled()
   })
@@ -108,7 +108,7 @@ describe('useFlowCanvasShellInteractions', () => {
 
     expect(harness.shell.onEscapeShortcut()).toBe(true)
 
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeContextMenu: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ shouldCloseContextMenu: true })
     expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
   })
 

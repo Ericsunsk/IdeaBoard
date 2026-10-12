@@ -21,7 +21,9 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('uses the request output count for presentation quote refreshes', async () => {
-    const readiness = { ready: true, service: 'generation' } as const
+    const readiness = { ready: true, service: 'generation' } as const satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >
     mocks.fetchReadiness.mockResolvedValue(readiness)
 
     await expect(
@@ -58,7 +60,9 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('quotes Fusion at the selected output count', async () => {
-    const readiness = { ready: true, service: 'fusion' } as const
+    const readiness = { ready: true, service: 'fusion' } as const satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >
     mocks.fetchReadiness.mockResolvedValue(readiness)
     const request = buildFusionBillingReadinessRequest({
       imageUrls: ['/uploads/a.png', '/uploads/b.png'],
@@ -88,8 +92,12 @@ describe('canvas billing readiness request contracts', () => {
 
   it('delegates matrix readiness to one quote per request', async () => {
     const items = [
-      { ready: true, service: 'generation' },
-      { ready: true, service: 'cutout' },
+      { ready: true, service: 'generation' } satisfies Partial<
+        import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+      >,
+      { ready: true, service: 'cutout' } satisfies Partial<
+        import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+      >,
     ] as const
     mocks.fetchMatrix.mockResolvedValue(items)
     const requests = [

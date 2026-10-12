@@ -38,7 +38,7 @@ const Host = defineComponent({
   setup() {
     const popover = ref<SearchSavePopoverController>()
     function open(event: Event) {
-      popover.value?.toggle(event, { result, authenticated: true, saved: false })
+      popover.value?.toggle(event, { result, isAuthenticated: true, isSaved: false })
     }
     return { popover, open }
   },

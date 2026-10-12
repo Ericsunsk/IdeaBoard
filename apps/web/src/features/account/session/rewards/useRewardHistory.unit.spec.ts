@@ -17,7 +17,7 @@ vi.mock('../accountWorkspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../accountWorkspace')>()),
   useAccountWorkspace: () => ({
     workspaceId: ref('ws_1'),
-    selectionSettled: ref(true),
+    isSelectionSettled: ref(true),
   }),
 }))
 

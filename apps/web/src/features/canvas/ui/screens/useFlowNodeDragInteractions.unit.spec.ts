@@ -3,19 +3,19 @@ import { ref } from 'vue'
 import { useFlowNodeDragInteractions } from './useFlowNodeDragInteractions'
 
 function createHarness(
-  options: { duplicateModifierPressed?: boolean; nodeDragLocked?: boolean } = {},
+  options: { isDuplicateModifierPressed?: boolean; isNodeDragLocked?: boolean } = {},
 ) {
   const beginNodeDragTransaction = vi.fn()
   const commitNodeDragTransaction = vi.fn()
   const beginFlowNodeDragDuplicateTracking = vi.fn()
   const finishFlowNodeDragDuplicateTracking = vi.fn()
   const dismissTransientCanvasUi = vi.fn()
-  const isNodeDragLocked = vi.fn(() => options.nodeDragLocked ?? false)
+  const isNodeDragLocked = vi.fn(() => options.isNodeDragLocked ?? false)
 
   const interactions = useFlowNodeDragInteractions({
     beginNodeDragTransaction,
     commitNodeDragTransaction,
-    duplicateModifierPressed: ref(options.duplicateModifierPressed ?? false),
+    isDuplicateModifierPressed: ref(options.isDuplicateModifierPressed ?? false),
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
@@ -35,11 +35,11 @@ function createHarness(
 
 describe('useFlowNodeDragInteractions', () => {
   it('dismisses transient UI before starting a node drag transaction', () => {
-    const harness = createHarness({ duplicateModifierPressed: true })
+    const harness = createHarness({ isDuplicateModifierPressed: true })
 
     harness.interactions.onNodeDragStart(['node-a'])
 
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeOutpaint: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ shouldCloseOutpaint: true })
     expect(harness.beginNodeDragTransaction).toHaveBeenCalledTimes(1)
     expect(harness.beginNodeDragTransaction).toHaveBeenCalledWith(['node-a'])
     expect(harness.beginFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(true)
@@ -54,9 +54,9 @@ describe('useFlowNodeDragInteractions', () => {
     harness.interactions.onNodeDragStop()
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeOutpaint: true,
-      clearNodePanel: false,
-      hideStrength: false,
+      shouldCloseOutpaint: true,
+      shouldClearNodePanel: false,
+      shouldHideStrength: false,
     })
     expect(harness.finishFlowNodeDragDuplicateTracking).not.toHaveBeenCalled()
     expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
@@ -83,7 +83,7 @@ describe('useFlowNodeDragInteractions', () => {
   })
 
   it('ignores node drag callbacks while node drag is locked', async () => {
-    const harness = createHarness({ nodeDragLocked: true })
+    const harness = createHarness({ isNodeDragLocked: true })
 
     harness.interactions.onNodeDragStart(['node-a'])
     harness.interactions.onNodeDragStop()

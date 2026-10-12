@@ -253,8 +253,8 @@ function createImageSourceCacheKey(sourceUrl: string, options: LoadImageSourceOp
     options.maxPixels ?? 'unbounded',
     options.maxSide ?? 'full-side',
     options.fitWithinMaxPixels ?? false,
-    options.resolveOptions?.allowSameOriginUploads ?? 'default-uploads',
-    options.resolveOptions?.blockExternal ?? 'default-external',
+    options.resolveOptions?.shouldAllowSameOriginUploads ?? 'default-uploads',
+    options.resolveOptions?.shouldBlockExternal ?? 'default-external',
     sourceUrl,
   ].join('::')
 }

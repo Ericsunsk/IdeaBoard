@@ -116,9 +116,13 @@
           }}</Button>
         </div>
         <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
-          <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
-            t('account.billingRecords.loadMore')
-          }}</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            :is-loading="isFetchingNextPage"
+            @click="loadMore()"
+            >{{ t('account.billingRecords.loadMore') }}</Button
+          >
         </div>
       </template>
     </DataTableFrame>

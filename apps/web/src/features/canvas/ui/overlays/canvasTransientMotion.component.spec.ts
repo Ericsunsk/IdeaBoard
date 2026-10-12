@@ -29,12 +29,12 @@ describe('Canvas transient overlay motion', () => {
   it('keeps context-menu pointer semantics while disabling CSS motion when reduced', () => {
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({ matches: true })),
+      vi.fn(() => ({ matches: true }) satisfies Partial<MediaQueryList>),
     )
     const onCreate = vi.fn()
     render(CanvasNodeContextMenu, {
       props: {
-        visible: true,
+        isVisible: true,
         x: 24,
         y: 36,
         items: [{ key: 'prompt', label: '提示词' }],
@@ -61,11 +61,11 @@ describe('Canvas transient overlay motion', () => {
   it('keeps the context menu inside the viewport when opened near an edge', async () => {
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({ matches: false })),
+      vi.fn(() => ({ matches: false }) satisfies Partial<MediaQueryList>),
     )
     render(CanvasNodeContextMenu, {
       props: {
-        visible: true,
+        isVisible: true,
         x: 1000,
         y: 760,
         items: [{ key: 'prompt', label: '提示词' }],
@@ -87,7 +87,7 @@ describe('Canvas transient overlay motion', () => {
     const onCreate = vi.fn()
     const { rerender } = render(CanvasNodeContextMenu, {
       props: {
-        visible: true,
+        isVisible: true,
         x: 24,
         y: 36,
         items: [
@@ -109,7 +109,7 @@ describe('Canvas transient overlay motion', () => {
     fireEvent.keyDown(screen.getByRole('menuitem', { name: '图像' }), { key: 'Enter' })
     expect(onCreate).toHaveBeenCalledWith('image')
 
-    await rerender({ visible: false })
+    await rerender({ isVisible: false })
     expect(trigger).toHaveFocus()
     trigger.remove()
   })
@@ -117,10 +117,10 @@ describe('Canvas transient overlay motion', () => {
   it('keeps Node tool Popover layout, attrs, and show/hide behavior', async () => {
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({ matches: false })),
+      vi.fn(() => ({ matches: false }) satisfies Partial<MediaQueryList>),
     )
     const { container, rerender } = render(NodeToolPopover, {
-      props: { visible: true, layout: 'row' },
+      props: { isVisible: true, layout: 'row' },
       attrs: { role: 'dialog', 'aria-label': '节点工具' },
       slots: { default: '<button type="button">操作</button>' },
       global: { stubs: { transition: TransitionStub } },
@@ -137,7 +137,7 @@ describe('Canvas transient overlay motion', () => {
     expect(screen.getByRole('dialog', { name: '节点工具' })).toBeVisible()
     expect(screen.getByRole('button', { name: '操作' })).toBeVisible()
 
-    await rerender({ visible: false, layout: 'row' })
+    await rerender({ isVisible: false, layout: 'row' })
     expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 })

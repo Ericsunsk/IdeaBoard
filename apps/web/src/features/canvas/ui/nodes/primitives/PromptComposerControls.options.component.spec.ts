@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { renderWithUser, screen } from '../../../../../test/render'
 import PromptComposerControls from './PromptComposerControls.vue'
 
-function renderControls(disabled = false) {
+function renderControls(isDisabled = false) {
   return renderWithUser(PromptComposerControls, {
     props: {
       modelValue: '生成一张海报',
@@ -12,9 +12,9 @@ function renderControls(disabled = false) {
       textareaClass: 'prompt-input',
       actionsClass: 'prompt-actions',
       sendButtonClass: 'prompt-send',
-      disabled,
-      showAspectRatio: false,
-      showSubmit: false,
+      isDisabled,
+      shouldShowAspectRatio: false,
+      shouldShowSubmit: false,
     },
   })
 }

@@ -10,8 +10,8 @@
         type="number"
         :min="MEDIA_UPLOAD_MIN_CONCURRENT"
         :max="MEDIA_UPLOAD_MAX_CONCURRENT"
-        :disabled="mediaUploadLoading || mediaUploadSaving"
-        :invalid="!!mediaUploadValidationError"
+        :disabled="isMediaUploadLoading || isMediaUploadSaving"
+        :is-invalid="!!mediaUploadValidationError"
         :aria-labelledby="LABEL_ID"
         class="w-20 font-mono text-center text-admin-body"
       />
@@ -22,7 +22,7 @@
     <div class="flex shrink-0 items-center gap-2">
       <ActionButton
         size="small"
-        :disabled="mediaUploadLoading || mediaUploadSaving || !mediaUploadIsDirty"
+        :disabled="isMediaUploadLoading || isMediaUploadSaving || !mediaUploadIsDirty"
         @click="resetMediaUpload"
       >
         {{ SETTINGS_MESSAGES.reset }}
@@ -30,12 +30,12 @@
       <ActionButton
         size="small"
         :disabled="
-          mediaUploadLoading ||
-          mediaUploadSaving ||
+          isMediaUploadLoading ||
+          isMediaUploadSaving ||
           !mediaUploadIsDirty ||
           !!mediaUploadValidationError
         "
-        :loading="mediaUploadSaving"
+        :is-loading="isMediaUploadSaving"
         @click="saveMediaUpload"
       >
         {{ SETTINGS_MESSAGES.save }}
@@ -64,8 +64,8 @@ const mediaUpload = useMediaUploadSettings({
 const {
   form: mediaUploadForm,
   isDirty: mediaUploadIsDirty,
-  loading: mediaUploadLoading,
-  saving: mediaUploadSaving,
+  isLoading: isMediaUploadLoading,
+  isSaving: isMediaUploadSaving,
   validationError: mediaUploadValidationError,
   reset: resetMediaUpload,
   save: saveMediaUpload,

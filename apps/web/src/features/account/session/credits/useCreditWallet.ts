@@ -13,11 +13,11 @@ export type CreditWalletState =
 
 export function useCreditWallet(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
-  const { workspaceId, selectionSettled } = useAccountWorkspace({ enabled })
+  const { workspaceId, isSelectionSettled } = useAccountWorkspace({ enabled })
   const query = useQuery({
     queryKey: computed(() => creditsQueryKeys.wallet(workspaceId.value ?? '')),
     queryFn: ({ signal }) => fetchCreditWallet(workspaceId.value ?? '', signal),
-    enabled: () => toValue(enabled) && selectionSettled.value,
+    enabled: () => toValue(enabled) && isSelectionSettled.value,
     ...accountScoped(),
   })
   const state = computed<CreditWalletState>(() => {

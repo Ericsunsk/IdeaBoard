@@ -61,7 +61,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const { canDismiss, handleVisibilityChange } = useOverlayInteractionLifecycle({
-  visible: () => true,
+  isVisible: () => true,
   busy: () => props.busy,
   surface: defineDialogSurfaceIntent(),
   onVisibilityChange: (visible) => {

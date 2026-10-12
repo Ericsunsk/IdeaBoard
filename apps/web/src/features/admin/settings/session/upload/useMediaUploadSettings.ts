@@ -38,17 +38,17 @@ export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSett
     queryFn: ({ signal }) => fetchMediaUploadSetting(signal),
   })
   const setting = computed(() => query.data.value)
-  const loading = computed(() => query.isLoading.value || query.isFetching.value)
+  const isLoading = computed(() => query.isLoading.value || query.isFetching.value)
   const saveMutation = useMutation({
     mutationFn: (draft: MediaUploadSetting) => saveMediaUploadSetting(draft),
   })
-  const saving = computed(() => saveMutation.isPending.value)
+  const isSaving = computed(() => saveMutation.isPending.value)
   const lifecycle = useSettingsLifecycle({
     defaultValue: DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING,
     source: setting,
     loadError: query.error,
-    loading,
-    saving,
+    isLoading,
+    isSaving,
     normalize: normalizeMediaUploadSetting,
     isSame: isSameMediaUploadSetting,
     validate: validateMediaUploadSetting,
@@ -69,10 +69,10 @@ export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSett
   return {
     form: lifecycle.form,
     isDirty: lifecycle.isDirty,
-    loading: lifecycle.loading,
+    isLoading: lifecycle.isLoading,
     reset: lifecycle.reset,
     save: saveSetting,
-    saving: lifecycle.saving,
+    isSaving: lifecycle.isSaving,
     validationError: lifecycle.validationError,
   }
 }

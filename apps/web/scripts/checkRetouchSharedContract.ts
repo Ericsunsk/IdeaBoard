@@ -235,7 +235,7 @@ export const RETOUCH_SHARED_POLICIES: readonly RetouchSharedPolicy[] = [
     scenario: 'keeps apply as the single primary commit control without local overrides',
     checks: [
       contains(LAYER_ACTIONS, 'primary'),
-      contains(LAYER_ACTIONS, ':disabled="applyDisabled"'),
+      contains(LAYER_ACTIONS, ':is-disabled="applyDisabled"'),
       contains(LAYER_ACTIONS, "emit('apply-retouch')"),
     ],
   },

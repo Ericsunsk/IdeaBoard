@@ -340,9 +340,9 @@ async function runTest(provider: SearchProviderId) {
     if (keyTestStates.value.has(provider)) keyTestStates.value.set(provider, result.test_state)
     emit('change')
     feedback.testPassed(SEARCH_PROVIDER_LABELS[provider])
-  } catch (err) {
+  } catch (caughtError) {
     emit('change')
-    feedback.testFailed(err)
+    feedback.testFailed(caughtError)
   } finally {
     testingState.value[provider] = false
   }
@@ -368,8 +368,8 @@ async function saveKey(provider: SearchProviderId) {
     keyTestStates.value.set(provider, 'never')
     emit('change')
     feedback.keySaved(providerLabel, wasEnabled)
-  } catch (err) {
-    feedback.saveFailed(err)
+  } catch (caughtError) {
+    feedback.saveFailed(caughtError)
   } finally {
     savingState.value[provider] = false
   }
@@ -394,9 +394,9 @@ async function toggleEnabled(provider: SearchProviderId, enabled: boolean) {
         emit('change')
         feedback.toggled(providerLabel, next)
       },
-      onFailure: (_, next, err) => {
+      onFailure: (_, next, caughtError) => {
         if (previousOverride !== undefined) toggle.optimistic.value.set(provider, previousOverride)
-        feedback.toggleFailed(err, next)
+        feedback.toggleFailed(caughtError, next)
       },
     },
   )

@@ -59,7 +59,7 @@ describe('confirmSettingsSave risk tiers', () => {
 
     expect(reason).toBe('typed reason')
     expect(confirm.confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: expect.objectContaining({ required: false }) }),
+      expect.objectContaining({ reason: expect.objectContaining({ isRequired: false }) }),
     )
   })
 
@@ -116,7 +116,7 @@ describe('confirmSettingsSave risk tiers', () => {
     expect(confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         intent: 'danger',
-        reason: expect.objectContaining({ required: true }),
+        reason: expect.objectContaining({ isRequired: true }),
       }),
     )
     expect(toastError).not.toHaveBeenCalled()

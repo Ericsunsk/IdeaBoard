@@ -196,7 +196,7 @@ export function materializeFlowSnapshotConnections({
   const claimIndex = createFlowConnectionClaimIndex({
     candidates,
     baseConnections,
-    allocateGeneratedIds: true,
+    shouldAllocateGeneratedIds: true,
   })
   const allowsMultipleInputs = createInputLimitResolver()
   return resolveClaimedConnections(candidates, claimIndex, allowsMultipleInputs)

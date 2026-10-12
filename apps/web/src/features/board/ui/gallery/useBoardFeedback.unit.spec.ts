@@ -11,57 +11,62 @@ describe('createBoardFeedback', () => {
     const feedback = createBoardFeedback(appToast)
 
     feedback.createFailed({
-      ok: false,
+      isOk: false,
       reason: 'revision-conflict',
       board: boardMeta(),
       error: null,
     })
     feedback.createFailed({
-      ok: false,
+      isOk: false,
       reason: 'idempotency-conflict',
       board: boardMeta(),
       error: null,
     })
-    feedback.createFailed({ ok: false, reason: 'sync-failed', board: boardMeta(), error: null })
-    feedback.renameValidationFailed({ ok: false, reason: 'local-name-conflict' })
-    feedback.renameValidationFailed({ ok: false, reason: 'invalid-name' })
+    feedback.createFailed({ isOk: false, reason: 'sync-failed', board: boardMeta(), error: null })
+    feedback.renameValidationFailed({ isOk: false, reason: 'local-name-conflict' })
+    feedback.renameValidationFailed({ isOk: false, reason: 'invalid-name' })
     feedback.renameSyncFailed({
-      ok: false,
+      isOk: false,
       reason: 'revision-conflict',
       boardId: 'b1',
       previousBoard: boardMeta(),
-      rollback: { ok: true, board: boardMeta() },
-      hydrate: { ok: true },
+      rollback: { isOk: true, board: boardMeta() },
+      hydrate: { isOk: true },
       error: null,
     })
     feedback.renameSyncFailed({
-      ok: false,
+      isOk: false,
       reason: 'idempotency-conflict',
       boardId: 'b1',
       previousBoard: boardMeta(),
-      rollback: { ok: true, board: boardMeta() },
-      hydrate: { ok: false, error: new Error('hydrate failed') },
+      rollback: { isOk: true, board: boardMeta() },
+      hydrate: { isOk: false, error: new Error('hydrate failed') },
       error: null,
     })
     feedback.renameSyncFailed({
-      ok: false,
+      isOk: false,
       reason: 'sync-failed',
       boardId: 'b1',
       previousBoard: boardMeta(),
-      rollback: { ok: true, board: boardMeta() },
+      rollback: { isOk: true, board: boardMeta() },
       error: null,
     })
-    feedback.copyFailed({ ok: false, reason: 'source-missing' })
-    feedback.copyFailed({ ok: false, reason: 'revision-conflict', board: boardMeta(), error: null })
+    feedback.copyFailed({ isOk: false, reason: 'source-missing' })
     feedback.copyFailed({
-      ok: false,
+      isOk: false,
+      reason: 'revision-conflict',
+      board: boardMeta(),
+      error: null,
+    })
+    feedback.copyFailed({
+      isOk: false,
       reason: 'idempotency-conflict',
       board: boardMeta(),
       error: null,
     })
-    feedback.copyFailed({ ok: false, reason: 'sync-failed', board: boardMeta(), error: null })
-    feedback.deleteFailed({ ok: false, reason: 'sync-failed', error: null })
-    feedback.deleteFailed({ ok: false, reason: 'local-missing' })
+    feedback.copyFailed({ isOk: false, reason: 'sync-failed', board: boardMeta(), error: null })
+    feedback.deleteFailed({ isOk: false, reason: 'sync-failed', error: null })
+    feedback.deleteFailed({ isOk: false, reason: 'local-missing' })
     feedback.catalogSyncFailed()
     feedback.catalogReloaded()
 

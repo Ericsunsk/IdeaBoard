@@ -69,7 +69,7 @@ function collectNodeWriteChanges(
     if (!isSameJsonValue(baseRecord.snapshot, nextRecord.snapshot)) {
       changes.updatedNodeIds.add(nodeId)
     }
-    if (baseRecord.selected !== nextRecord.selected) changes.selectedNodeIds.add(nodeId)
+    if (baseRecord.isSelected !== nextRecord.isSelected) changes.selectedNodeIds.add(nodeId)
   }
 }
 
@@ -92,7 +92,7 @@ function collectEdgeWriteChanges(
       changes.removedEdgeIds.add(edgeId)
       changes.addedEdgeIds.add(edgeId)
     }
-    if (baseRecord.selected !== nextRecord.selected) changes.selectedEdgeIds.add(edgeId)
+    if (baseRecord.isSelected !== nextRecord.isSelected) changes.selectedEdgeIds.add(edgeId)
   }
 }
 

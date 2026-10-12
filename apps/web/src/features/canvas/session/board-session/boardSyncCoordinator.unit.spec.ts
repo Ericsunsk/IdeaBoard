@@ -48,7 +48,7 @@ function createHarness() {
     load: vi.fn(async () => makeSnapshot('loaded')),
     save: vi.fn(async (snapshot: BoardSnapshot) => ({
       snapshot,
-      remoteSync: { ok: true as const },
+      remoteSync: { isOk: true as const },
     })),
     refreshPreview: vi.fn(),
   }
@@ -138,9 +138,9 @@ describe('Board Sync Coordinator', () => {
 
   it('returns a save reconciliation for the graph runtime to apply', async () => {
     const harness = createHarness()
-    const result = await harness.coordinator.saveCurrentBoardSnapshot({ silent: false })
+    const result = await harness.coordinator.saveCurrentBoardSnapshot({ isSilent: false })
 
-    expect(result.saved).toBe(true)
+    expect(result.isSaved).toBe(true)
     expect(result.reconciliation).toEqual({
       snapshot: expect.any(Object),
       hasLocalDraftAdvanced: false,
@@ -152,12 +152,12 @@ describe('Board Sync Coordinator', () => {
     const harness = createHarness()
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: makeSnapshot('saved-locally'),
-      remoteSync: { ok: false, reason: 'sync-failed', error: new Error('offline') },
+      remoteSync: { isOk: false, reason: 'sync-failed', error: new Error('offline') },
     })
 
     const result = await harness.coordinator.saveCurrentBoardSnapshot()
 
-    expect(result.saved).toBe(false)
+    expect(result.isSaved).toBe(false)
     expect(result.reconciliation?.snapshot.promptNodes[0]?.text).toBe('saved-locally')
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('retry')
@@ -171,7 +171,7 @@ describe('Board Sync Coordinator', () => {
     const failure = Object.assign(new Error('boom'), { status: 500 })
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: makeSnapshot('saved-locally'),
-      remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+      remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
     })
 
     await harness.coordinator.saveCurrentBoardSnapshot()
@@ -186,7 +186,7 @@ describe('Board Sync Coordinator', () => {
     const failure = Object.assign(new Error('bad'), { status: 400 })
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: makeSnapshot('saved-locally'),
-      remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+      remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
     })
 
     await harness.coordinator.saveCurrentBoardSnapshot()
@@ -201,7 +201,7 @@ describe('Board Sync Coordinator', () => {
     const failure = Object.assign(new Error('denied'), { status: 403 })
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: makeSnapshot('saved-locally'),
-      remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+      remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
     })
 
     await harness.coordinator.saveCurrentBoardSnapshot()
@@ -220,7 +220,7 @@ describe('Board Sync Coordinator', () => {
       })
       vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
         snapshot: makeSnapshot('saved-locally'),
-        remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+        remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
       })
 
       await harness.coordinator.saveCurrentBoardSnapshot()
@@ -244,7 +244,7 @@ describe('Board Sync Coordinator', () => {
       })
       vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
         snapshot: makeSnapshot('saved-locally'),
-        remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+        remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
       })
 
       await harness.coordinator.saveCurrentBoardSnapshot()
@@ -271,7 +271,7 @@ describe('Board Sync Coordinator', () => {
       const failure = new Error('BOARD_REMOTE_SYNC_FAILED', { cause: workspaceCause })
       vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
         snapshot: makeSnapshot('saved-locally'),
-        remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+        remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
       })
 
       await harness.coordinator.saveCurrentBoardSnapshot()
@@ -291,7 +291,7 @@ describe('Board Sync Coordinator', () => {
     try {
       vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
         snapshot: makeSnapshot('saved-locally'),
-        remoteSync: { ok: false, reason: 'sync-failed', error: new Error('fetch timeout') },
+        remoteSync: { isOk: false, reason: 'sync-failed', error: new Error('fetch timeout') },
       })
 
       await harness.coordinator.saveCurrentBoardSnapshot()
@@ -319,10 +319,10 @@ describe('Board Sync Coordinator', () => {
     const save = harness.coordinator.saveCurrentBoardSnapshot()
     await Promise.resolve()
     harness.routeBoardId.value = 'board-b'
-    resolveSave({ snapshot: makeSnapshot('stale'), remoteSync: { ok: true } })
+    resolveSave({ snapshot: makeSnapshot('stale'), remoteSync: { isOk: true } })
 
     const result = await save
-    expect(result.saved).toBe(true)
+    expect(result.isSaved).toBe(true)
     expect(result.reconciliation).toBeUndefined()
   })
 
@@ -360,7 +360,7 @@ describe('Board Sync Coordinator', () => {
     const stabilized = structuredClone(captured)
     stabilized.imageNodes[0]!.sourceImageUrl = '/uploads/stable.png'
     stabilized.imageNodes[0]!.sourceMediaAssetId = 42
-    resolveSave({ snapshot: stabilized, remoteSync: { ok: true } })
+    resolveSave({ snapshot: stabilized, remoteSync: { isOk: true } })
 
     const result = await save
     expect(result.reconciliation?.hasLocalDraftAdvanced).toBe(true)
@@ -377,7 +377,7 @@ describe('Board Sync Coordinator', () => {
       new InvalidBoardStateError({
         code: 'INVALID_BOARD_STATE',
         boundary: 'local-state-read',
-        recoverable: true,
+        isRecoverable: true,
         issues: [{ path: 'promptNodes.0.text', message: 'Invalid text' }],
       }),
     )
@@ -397,12 +397,12 @@ describe('Board Sync Coordinator', () => {
     })
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: makeSnapshot('saved-locally'),
-      remoteSync: { ok: false, reason: 'archived', error: archivedError },
+      remoteSync: { isOk: false, reason: 'archived', error: archivedError },
     })
 
     const result = await harness.coordinator.saveCurrentBoardSnapshot()
 
-    expect(result.saved).toBe(false)
+    expect(result.isSaved).toBe(false)
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('archived')
     // Banner signal, never the generic "Saved locally..." toast.
@@ -419,11 +419,11 @@ describe('Board Sync Coordinator', () => {
     })
     vi.mocked(harness.boardSession.save).mockResolvedValue({
       snapshot: makeSnapshot('saved-locally'),
-      remoteSync: { ok: false, reason: 'archived', error: archivedError },
+      remoteSync: { isOk: false, reason: 'archived', error: archivedError },
     })
 
-    await harness.coordinator.saveCurrentBoardSnapshot({ silent: true })
-    await harness.coordinator.saveCurrentBoardSnapshot({ silent: true })
+    await harness.coordinator.saveCurrentBoardSnapshot({ isSilent: true })
+    await harness.coordinator.saveCurrentBoardSnapshot({ isSilent: true })
 
     expect(harness.onArchived).toHaveBeenCalledTimes(1)
   })
@@ -447,7 +447,7 @@ describe('Board Sync Coordinator', () => {
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: makeSnapshot('saved-locally'),
       remoteSync: {
-        ok: false,
+        isOk: false,
         reason: 'archived',
         error: Object.assign(new Error('board is archived'), {
           status: 409,

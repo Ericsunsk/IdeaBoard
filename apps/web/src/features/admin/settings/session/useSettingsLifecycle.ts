@@ -12,8 +12,8 @@ type AdminSettingsLifecycleOptions<T> = {
   defaultValue: T
   source: Readonly<Ref<Partial<T> | null | undefined>>
   loadError: Readonly<Ref<unknown>>
-  loading: Readonly<Ref<boolean>>
-  saving: Readonly<Ref<boolean>>
+  isLoading: Readonly<Ref<boolean>>
+  isSaving: Readonly<Ref<boolean>>
   normalize: (setting: Partial<T> | null | undefined) => T
   isSame: (current: T, synced: T) => boolean
   validate: (draft: T) => string
@@ -69,7 +69,7 @@ export function useSettingsLifecycle<T>(options: AdminSettingsLifecycleOptions<T
   watch(
     options.source,
     (setting) => {
-      if (!setting || options.saving.value || isDirty.value) return
+      if (!setting || options.isSaving.value || isDirty.value) return
       hydrate(setting)
     },
     { immediate: true },
@@ -78,10 +78,10 @@ export function useSettingsLifecycle<T>(options: AdminSettingsLifecycleOptions<T
   return {
     form,
     isDirty,
-    loading: computed(() => options.loading.value),
+    isLoading: computed(() => options.isLoading.value),
     reset,
     save,
-    saving: computed(() => options.saving.value),
+    isSaving: computed(() => options.isSaving.value),
     validationError,
   }
 }

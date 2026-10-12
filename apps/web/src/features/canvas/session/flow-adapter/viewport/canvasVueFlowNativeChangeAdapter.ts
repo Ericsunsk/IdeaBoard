@@ -112,7 +112,9 @@ export function createCanvasVueFlowNativeChangeAdapter(
       let nextNode = node
       nodeChanges.forEach((change) => {
         if (change.type === 'select') {
-          nextNode = { ...nextNode, selected: change.selected } as Node
+          nextNode = { ...nextNode, selected: change.selected } satisfies Partial<
+            import('@vue-flow/core').GraphNode
+          > as Node
           return
         }
         nextNode = {

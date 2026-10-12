@@ -427,7 +427,7 @@ describe('createBoardSessionRepository', () => {
       await expect(repository.load(board.id)).rejects.toMatchObject({
         code: 'INVALID_BOARD_STATE',
         boundary: 'local-state-read',
-        recoverable: true,
+        isRecoverable: true,
       })
       expect(warnSpy).toHaveBeenCalledWith(
         '[canvas] invalid board state rejected',
@@ -435,7 +435,7 @@ describe('createBoardSessionRepository', () => {
         expect.objectContaining({
           code: 'INVALID_BOARD_STATE',
           boundary: 'local-state-read',
-          recoverable: true,
+          isRecoverable: true,
         }),
       )
     } finally {
@@ -473,7 +473,7 @@ describe('createBoardSessionRepository', () => {
       await expect(repository.load(board.id)).rejects.toMatchObject({
         code: 'INVALID_BOARD_STATE',
         boundary: 'local-state-read',
-        recoverable: true,
+        isRecoverable: true,
         issues: [
           expect.objectContaining({
             path: 'imageNodes.0.sourceImageRatio',
@@ -526,7 +526,7 @@ describe('createBoardSessionRepository', () => {
       await expect(repository.load(board.id)).rejects.toMatchObject({
         code: 'INVALID_BOARD_STATE',
         boundary: 'server-hydration',
-        recoverable: true,
+        isRecoverable: true,
         issues: [
           expect.objectContaining({
             path: 'imageNodes.0.sourceImageRatio',
@@ -561,7 +561,7 @@ describe('createBoardSessionRepository', () => {
     await expect(repository.save(board.id, invalidSnapshot)).rejects.toMatchObject({
       code: 'INVALID_BOARD_STATE',
       boundary: 'board-save',
-      recoverable: true,
+      isRecoverable: true,
     })
   })
 })

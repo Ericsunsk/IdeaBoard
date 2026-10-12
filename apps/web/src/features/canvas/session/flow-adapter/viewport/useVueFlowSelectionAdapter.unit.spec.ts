@@ -3,29 +3,36 @@ import { ref } from 'vue'
 import type { EdgeChange } from '@vue-flow/core'
 import { useVueFlowSelectionAdapter } from './useVueFlowSelectionAdapter'
 
-type TestFlowItem = {
+type TestFlowItem = Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>> & {
   id: string
-  selected?: boolean
   source?: string
   target?: string
 }
 
-const vueFlowMocks = vi.hoisted(() => ({
-  selectedElements: [] as Array<{ id: string }>,
-  nodesSelectionActive: { value: false },
-  removeSelectedElements: vi.fn(),
-  addSelectedNodes: vi.fn(),
-  findNode: vi.fn(),
-}))
+const vueFlowMocks = await vi.hoisted(async () => {
+  const { ref } = await import('vue')
+  return {
+    selectedElements: [] as Array<{ id: string }>,
+    isNodesSelectionActive: ref(false),
+    removeSelectedElements: vi.fn(),
+    addSelectedNodes: vi.fn(),
+    findNode: vi.fn(),
+  }
+})
 
 vi.mock('@vue-flow/core', () => ({
-  useVueFlow: () => ({
-    getSelectedElements: { value: vueFlowMocks.selectedElements },
-    nodesSelectionActive: vueFlowMocks.nodesSelectionActive,
-    removeSelectedElements: vueFlowMocks.removeSelectedElements,
-    addSelectedNodes: vueFlowMocks.addSelectedNodes,
-    findNode: vueFlowMocks.findNode,
-  }),
+  useVueFlow: () =>
+    ({
+      getSelectedElements: { value: vueFlowMocks.selectedElements },
+      nodesSelectionActive: vueFlowMocks.isNodesSelectionActive,
+      removeSelectedElements: vueFlowMocks.removeSelectedElements,
+      addSelectedNodes: vueFlowMocks.addSelectedNodes,
+      findNode: vueFlowMocks.findNode,
+    }) satisfies Pick<
+      ReturnType<typeof import('@vue-flow/core').useVueFlow>,
+      'nodesSelectionActive'
+    > &
+      Record<string, unknown>,
 }))
 
 function createHarness(activeTool = ref<string>('select')) {
@@ -65,7 +72,7 @@ function createPanePointerEvent(options: MouseEventInit = {}) {
 describe('useVueFlowSelectionAdapter', () => {
   beforeEach(() => {
     vueFlowMocks.selectedElements = []
-    vueFlowMocks.nodesSelectionActive.value = false
+    vueFlowMocks.isNodesSelectionActive.value = false
     vueFlowMocks.removeSelectedElements.mockReset()
     vueFlowMocks.addSelectedNodes.mockReset()
     vueFlowMocks.findNode.mockReset()
@@ -77,9 +84,9 @@ describe('useVueFlowSelectionAdapter', () => {
     harness.adapter.commands.onPaneClick()
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeOutpaint: true,
-      closeBoardHeader: true,
-      closeContextMenu: true,
+      shouldCloseOutpaint: true,
+      shouldCloseBoardHeader: true,
+      shouldCloseContextMenu: true,
     })
   })
 
@@ -104,7 +111,7 @@ describe('useVueFlowSelectionAdapter', () => {
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeOutpaint: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ shouldCloseOutpaint: true })
   })
 
   it('does not select a node while the hand tool is active but still dismisses transient UI', () => {
@@ -118,7 +125,7 @@ describe('useVueFlowSelectionAdapter', () => {
 
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeOutpaint: true })
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ shouldCloseOutpaint: true })
   })
 
   it('removes edge selection after marquee selection', () => {
@@ -139,13 +146,13 @@ describe('useVueFlowSelectionAdapter', () => {
     const harness = createHarness()
     const selectedNode: TestFlowItem = { id: 'node-a' }
     setSelectedElements(selectedNode)
-    vueFlowMocks.nodesSelectionActive.value = true
+    vueFlowMocks.isNodesSelectionActive.value = true
 
     harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
       new MouseEvent('mouseup', { clientX: 30, clientY: 30 }),
     )
 
-    expect(vueFlowMocks.nodesSelectionActive.value).toBe(false)
+    expect(vueFlowMocks.isNodesSelectionActive.value).toBe(false)
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
   })
@@ -158,7 +165,7 @@ describe('useVueFlowSelectionAdapter', () => {
       new MouseEvent('mouseup', { clientX: 30, clientY: 30 }),
     )
 
-    expect(vueFlowMocks.nodesSelectionActive.value).toBe(true)
+    expect(vueFlowMocks.isNodesSelectionActive.value).toBe(true)
   })
 
   it('restores previous nodes outside a Shift marquee', () => {

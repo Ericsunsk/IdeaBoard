@@ -1,4 +1,4 @@
-import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
+import type { Edge, EdgeChange, GraphNode, Node, NodeChange } from '@vue-flow/core'
 import type { ComputedRef, Ref } from 'vue'
 import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../../board/ports/canvas'
 import type { CanvasGroupRuntimeCommands, CanvasGroupRuntimeView } from '../graph-editing'
@@ -12,9 +12,7 @@ import type {
 import type { NodeUiState, PromptNodeUiState } from '../../core/nodes/canvasNodeUi.ts'
 import type { CanvasLibraryImportDescriptor } from '../../../library'
 
-export type CanvasRendererSelectableElement = (Node | Edge) & {
-  selected?: boolean
-}
+export type CanvasRendererSelectableElement = (Node | Edge) & Partial<Pick<GraphNode, 'selected'>>
 
 type CanvasWorkspaceCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
@@ -102,7 +100,7 @@ type CanvasWorkspaceRuntimeCommands = {
     }
   }
   persistence: {
-    flushAutosave: (options?: { silent?: boolean }) => Promise<void>
+    flushAutosave: (options?: { isSilent?: boolean }) => Promise<void>
     recoverBoardSession: () => Promise<void>
   }
   viewportControls: {

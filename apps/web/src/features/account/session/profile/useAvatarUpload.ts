@@ -32,7 +32,7 @@ export function useAvatarUpload(deps: AvatarUploadDependencies = {}) {
   const profileFeedback = deps.profileFeedback ?? useProfileFeedback()
   const runAsyncAction = deps.runAsyncAction ?? useAsyncAction().runAsyncAction
 
-  const uploading = ref(false)
+  const isUploading = ref(false)
 
   async function selectFile(file?: File | null) {
     if (!file) return
@@ -47,7 +47,7 @@ export function useAvatarUpload(deps: AvatarUploadDependencies = {}) {
         userStore.setAvatarLocal(avatarUrl)
       },
       {
-        loading: uploading,
+        isLoading: isUploading,
         feedback: profileFeedback.avatarUpload,
       },
     )
@@ -61,7 +61,7 @@ export function useAvatarUpload(deps: AvatarUploadDependencies = {}) {
   }
 
   return {
-    uploading,
+    isUploading,
     selectFile,
     handleFileChange,
   }

@@ -5,29 +5,27 @@ import { renderWithUser, screen, within } from '../../../../test/render'
 import { setUserLocale } from '../../../../core/i18n'
 import UsagePane from './UsagePane.vue'
 
-const usageState = vi.hoisted(() => ({
-  usage: {
-    value: undefined as
-      | {
-          timezone: 'Asia/Shanghai'
-          lifetime: {
-            total_credits: number
-            peak_daily_credits: number
-            average_daily_credits: number
-            task_count: number
-            active_days: number
-          }
-          trend: { date: string; credits: number }[]
-        }
-      | undefined,
-    __v_isRef: true,
-  },
-  displayRange: { value: '30d' as '7d' | '30d' | '1y' | undefined, __v_isRef: true },
-  isInitialPending: { value: false, __v_isRef: true },
-  isSwitching: { value: false, __v_isRef: true },
-  error: { value: null as unknown, __v_isRef: true },
-  retry: vi.fn(),
-}))
+const usageState = await vi.hoisted(async () => {
+  const { ref } = await import('vue')
+  return {
+    usage: ref<{
+      timezone: 'Asia/Shanghai'
+      lifetime: {
+        total_credits: number
+        peak_daily_credits: number
+        average_daily_credits: number
+        task_count: number
+        active_days: number
+      }
+      trend: { date: string; credits: number }[]
+    }>(),
+    displayRange: ref<'7d' | '30d' | '1y'>('30d'),
+    isInitialPending: ref(false),
+    isSwitching: ref(false),
+    error: ref<unknown>(null),
+    retry: vi.fn(),
+  }
+})
 
 let selectedRangeRef: Ref<'7d' | '30d' | '1y'> | undefined
 
@@ -45,7 +43,7 @@ const ButtonStub = defineComponent({
   template: '<button type="button"><slot /></button>',
 })
 
-const chartStub = {
+const chartStub = defineComponent({
   props: {
     data: { type: Object, required: true },
     options: { type: Object, required: true },
@@ -53,7 +51,7 @@ const chartStub = {
   },
   template:
     '<div data-testid="usage-trend-chart" :data-points="String(data.datasets[0].data.length)" :data-datasets="String(data.datasets.length)"><canvas v-bind="canvasProps" /></div>',
-}
+})
 
 function renderUsagePane() {
   return renderWithUser(UsagePane, {

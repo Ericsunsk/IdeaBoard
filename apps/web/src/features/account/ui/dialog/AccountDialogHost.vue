@@ -1,7 +1,7 @@
 <template>
   <AccountDialog
     v-if="isHostAllowed"
-    :visible="visible"
+    :visible="isVisible"
     :initial-tab="initialTab"
     :payment-return="paymentReturn"
     @update:visible="setVisible"
@@ -13,6 +13,6 @@ import AccountDialog from './AccountDialog.vue'
 import { useAccountOverlay } from '../../session/overlay'
 
 const overlay = useAccountOverlay()
-const { allowed: isHostAllowed, initialTab, paymentReturn, visible } = overlay.viewModel
+const { isAllowed: isHostAllowed, initialTab, paymentReturn, isVisible } = overlay.viewModel
 const { setVisible } = overlay.commands
 </script>

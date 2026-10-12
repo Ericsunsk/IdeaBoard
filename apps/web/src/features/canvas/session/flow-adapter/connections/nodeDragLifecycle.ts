@@ -179,7 +179,7 @@ export function createCanvasNodeDragLifecycle(
     const drag = activeDrag
     if (!drag) return
     let didCommitTransaction = false
-    let rebased = false
+    let isRebased = false
     try {
       while (true) {
         try {
@@ -195,8 +195,8 @@ export function createCanvasNodeDragLifecycle(
           finalizeMembership?.()
           break
         } catch (error) {
-          if (!isStaleTransactionError(error) || rebased) throw error
-          rebased = true
+          if (!isStaleTransactionError(error) || isRebased) throw error
+          isRebased = true
           rebaseDragTransaction(drag, latestPositionChanges)
         }
       }

@@ -60,7 +60,7 @@ describe('Admin base control adapters', () => {
 
     it('handles invalid status and small size', () => {
       const wrapper = mount(AdminInput, {
-        props: { invalid: true, size: 'small' },
+        props: { isInvalid: true, size: 'small' },
       })
       const input = wrapper.find('input')
       expect(input.classes()).toContain('!border-destructive')

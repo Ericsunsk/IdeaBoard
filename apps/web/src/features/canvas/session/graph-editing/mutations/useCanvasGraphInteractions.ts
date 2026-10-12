@@ -204,7 +204,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
         position: { x: node.position.x, y: node.position.y },
         dimensions: { width: Number(node.width ?? 0), height: Number(node.height ?? 0) },
         computedPosition: { x: node.position.x, y: node.position.y },
-        measured: Number(node.width ?? 0) > 0 && Number(node.height ?? 0) > 0,
+        isMeasured: Number(node.width ?? 0) > 0 && Number(node.height ?? 0) > 0,
       }
     },
   }

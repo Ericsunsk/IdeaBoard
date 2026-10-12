@@ -8,7 +8,7 @@ const webRoot = fileURLToPath(new URL('../../../', import.meta.url))
 const eslint = new ESLint({
   cwd: webRoot,
   overrideConfig: {
-    languageOptions: { parserOptions: { project: false } },
+    languageOptions: { parserOptions: { project: [] } },
     rules: { 'governance/boolean-prefix': 'off' },
   },
 })
@@ -25,6 +25,9 @@ const allowedFixtures: PlacementFixture[] = [
     ['account resource', 'src/features/account/session/credits/resource.ts'],
     ['admin resource', 'src/features/admin/statistics/session/resource.ts'],
     ['workspace selection', 'src/features/workspace/session/selection.ts'],
+    ['Board server snapshots', 'src/features/board/session/sync/boardQueries.ts'],
+    ['Board SSE invalidation', 'src/features/board/session/sync/boardSseInvalidation.ts'],
+    ['Board sync', 'src/features/board/session/sync/boardSync.ts'],
     ['shared singleton', 'src/shared/query/queryClient.ts'],
     ['P1 core singleton', 'src/core/query/queryClient.ts'],
     ['app plugin registration', 'src/app/main.ts'],
@@ -83,7 +86,7 @@ const advisoryFixtures: PlacementFixture[] = [
   ),
   buildImportFixture(
     'Board shared Query client',
-    'src/features/board/session/sync/boardSync.ts',
+    'src/features/board/session/sync/unownedQuery.ts',
     '../../../../shared/query/queryClient',
   ),
   {

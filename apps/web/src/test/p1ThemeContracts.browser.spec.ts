@@ -250,14 +250,14 @@ describe('P1 theme, control state and focus browser contracts', () => {
   it('keeps real Button disabled and loading semantics stable', async () => {
     const action = vi.fn()
     const { rerender, unmount } = renderWithUser(Button, {
-      props: { loading: true },
+      props: { isLoading: true },
       attrs: { onClick: action },
       slots: { default: 'Action' },
     })
     const loadingAction = screen.getByRole('button', { name: 'Action' })
     loadingAction.click()
     expect(action).not.toHaveBeenCalled()
-    await rerender({ loading: false })
+    await rerender({ isLoading: false })
     loadingAction.click()
     expect(action).toHaveBeenCalledOnce()
     action.mockClear()
@@ -265,8 +265,12 @@ describe('P1 theme, control state and focus browser contracts', () => {
       defineComponent({
         setup: () => () =>
           h('div', [
-            h(Button, { disabled: true, 'aria-label': 'Disabled' }, () => 'Disabled'),
-            h(Button, { loading: true, 'aria-label': 'Loading', onClick: action }, () => 'Loading'),
+            h(Button, { isDisabled: true, 'aria-label': 'Disabled' }, () => 'Disabled'),
+            h(
+              Button,
+              { isLoading: true, 'aria-label': 'Loading', onClick: action },
+              () => 'Loading',
+            ),
           ]),
       }),
     )
@@ -337,10 +341,10 @@ describe('P1 theme, control state and focus browser contracts', () => {
       const confirmAction = vi.fn()
       const { rerender, emitted } = renderWithUser(UserConfirmDialog, {
         props: {
-          visible: true,
+          isVisible: true,
           title: 'Delete item',
           message: 'Cannot undo',
-          loading: false,
+          isLoading: false,
           onConfirm: confirmAction,
         },
       })
@@ -354,7 +358,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
       expect(styleOf(dialog).backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
       // These dialogs use primitive chrome rather than the dialog-motion adapter.
       expect(styleOf(dialog).animationName).toBe('none')
-      await rerender({ loading: true })
+      await rerender({ isLoading: true })
       expect(dialog).toHaveAttribute('aria-busy', 'true')
       expect(cancel).toBeDisabled()
       expect(confirm).toBeDisabled()
@@ -389,7 +393,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
         message: 'Audit action',
         confirmLabel: 'Delete',
         intent: 'danger',
-        reason: { required: true },
+        reason: { isRequired: true },
         onConfirm: action,
       })
       renderWithUser(AdminConfirmDialog)

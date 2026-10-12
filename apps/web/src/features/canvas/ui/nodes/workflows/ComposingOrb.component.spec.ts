@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from '../../../../../test/render'
 import ComposingOrb from './ComposingOrb.vue'
 
-function installBrowserMocks(prefersReducedMotion: boolean) {
+function installBrowserMocks(isReducedMotionPreferred: boolean) {
   const context = {
     fillStyle: '',
     setTransform: vi.fn(),
@@ -21,16 +21,20 @@ function installBrowserMocks(prefersReducedMotion: boolean) {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context)
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
   vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
-  vi.stubGlobal('matchMedia', () => ({
-    matches: prefersReducedMotion,
-    media: '(prefers-reduced-motion: reduce)',
-    onchange: null,
-    addEventListener: addMotionListener,
-    removeEventListener: removeMotionListener,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  }))
+  vi.stubGlobal(
+    'matchMedia',
+    () =>
+      ({
+        matches: isReducedMotionPreferred,
+        media: '(prefers-reduced-motion: reduce)',
+        onchange: null,
+        addEventListener: addMotionListener,
+        removeEventListener: removeMotionListener,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }) satisfies Partial<MediaQueryList>,
+  )
   vi.stubGlobal(
     'IntersectionObserver',
     class {

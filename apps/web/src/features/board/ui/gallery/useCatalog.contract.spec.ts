@@ -16,33 +16,33 @@ describe('Boards Catalog public interface', () => {
   it('owns the complete gallery workflow behind one page-facing contract', async () => {
     const boards = ref([makeBoard('board-1', 'Original', 10)])
     const scope = ref<string | null>('user-1')
-    const hydrate = vi.fn().mockResolvedValue({ ok: true as const })
+    const hydrate = vi.fn().mockResolvedValue({ isOk: true as const })
     const create = vi.fn().mockResolvedValue({
-      ok: true as const,
+      isOk: true as const,
       board: makeBoard('created-board', 'Created', 20),
     })
     const duplicate = vi.fn().mockResolvedValue({
-      ok: true as const,
+      isOk: true as const,
       board: makeBoard('copied-board', 'Original Copy', 30),
     })
     const rename = vi
       .fn()
       .mockResolvedValueOnce({
-        ok: true as const,
+        isOk: true as const,
         board: makeBoard('board-1', 'Renamed', 40),
       })
       .mockResolvedValueOnce({
-        ok: false as const,
+        isOk: false as const,
         reason: 'revision-conflict' as const,
         boardId: 'board-1',
         previousBoard: makeBoard('board-1', 'Renamed', 40),
         error: { status: 409, code: 'board_revision_conflict' },
-        rollback: { ok: true as const, board: makeBoard('board-1', 'Renamed', 40) },
-        hydrate: { ok: false as const, error: new Error('recovery failed') },
+        rollback: { isOk: true as const, board: makeBoard('board-1', 'Renamed', 40) },
+        hydrate: { isOk: false as const, error: new Error('recovery failed') },
       })
     const deleteBoard = vi.fn().mockResolvedValue({
-      ok: true as const,
-      remoteWasMissing: false,
+      isOk: true as const,
+      isRemoteWasMissing: false,
     })
     const preview = {
       previewMap: ref<Record<string, string>>({}),

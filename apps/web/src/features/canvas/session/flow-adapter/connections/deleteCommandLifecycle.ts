@@ -105,16 +105,16 @@ export function createCanvasDeleteCommandLifecycle(
     nodeIds: CanvasGraphNodeId[]
     edgeIds?: CanvasGraphEdgeId[]
     flowNodeIds: string[]
-    acceptNoop?: boolean
+    shouldAcceptNoop?: boolean
   }): boolean {
     const pendingResultNodeIds = collectPendingResultNodeIds(command.flowNodeIds)
     const nodeIds = [...new Set([...command.nodeIds, ...pendingResultNodeIds])]
     const summary = commitCanvasGraphDeleteIntent(command.store, {
       nodeIds,
       edgeIds: command.edgeIds,
-      removeConnectedEdges: true,
+      shouldRemoveConnectedEdges: true,
     })
-    if (!summary.didChange) return command.acceptNoop ?? false
+    if (!summary.didChange) return command.shouldAcceptNoop ?? false
 
     releaseCanvasGraphDeleteExecutions({
       summary,
@@ -176,7 +176,7 @@ export function createCanvasDeleteCommandLifecycle(
       nodeIds: removedNodes.graphNodeIds,
       edgeIds,
       flowNodeIds: removedNodes.flowNodeIds,
-      acceptNoop: true,
+      shouldAcceptNoop: true,
     })
   }
 

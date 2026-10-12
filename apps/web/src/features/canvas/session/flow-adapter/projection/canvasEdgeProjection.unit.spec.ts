@@ -43,7 +43,7 @@ describe('canvas edge projection', () => {
       renderEdges,
     )
     expect(projectCanvasRenderEdges([imageEdge], () => false)).toEqual([
-      { ...imageEdge, animated: false },
+      { ...imageEdge, animated: false } satisfies Partial<import('@vue-flow/core').Edge>,
     ])
   })
 })

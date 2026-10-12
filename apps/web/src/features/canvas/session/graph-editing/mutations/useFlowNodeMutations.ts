@@ -34,8 +34,8 @@ type UseFlowNodeMutationsOptions = {
 }
 
 type UpdateSnapshotNodeOptions = {
-  history?: boolean
-  dirty?: boolean
+  shouldRecordHistory?: boolean
+  shouldMarkDirty?: boolean
 }
 
 type InitialSnapshotPatch<T extends CanvasCreatableNodeKind> = Partial<CanvasNodeItemByKind[T]>
@@ -79,7 +79,7 @@ function isReadyExecutionOutputNode(data: FlowNodeData | undefined): boolean {
 
 function collectReadyExecutionOutputNodeIds(params: {
   nodeId: string
-  includeSelf: boolean
+  shouldIncludeSelf: boolean
   outgoingEdgesBySource: Map<string, Edge[]>
   nodeDataById: Map<string, FlowNodeData>
 }): Set<string> {
@@ -101,7 +101,7 @@ function collectReadyExecutionOutputNodeIds(params: {
     }
   }
 
-  if (params.includeSelf) collectIfReady(params.nodeId)
+  if (params.shouldIncludeSelf) collectIfReady(params.nodeId)
 
   visited.add(params.nodeId)
   enqueueOutgoingTargets(params.nodeId)
@@ -216,8 +216,8 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const nextSnapshotNode = patcher(snapshotNode)
     if (nextSnapshotNode === snapshotNode) return
     const transaction = store.beginTransaction('node-update', {
-      recordHistory: mutationOptions.history ?? true,
-      markDirty: mutationOptions.dirty ?? true,
+      shouldRecordHistory: mutationOptions.shouldRecordHistory ?? true,
+      shouldMarkDirty: mutationOptions.shouldMarkDirty ?? true,
     })
     try {
       transaction.updateNode(graphNodeId, () => nextSnapshotNode).commit()
@@ -243,11 +243,11 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function markFlowExecutionNodeDirty(
     nodeId: string,
-    { includeSelf = false }: { includeSelf?: boolean } = {},
+    { shouldIncludeSelf = false }: { shouldIncludeSelf?: boolean } = {},
   ) {
     const staleNodeIds = collectReadyExecutionOutputNodeIds({
       nodeId,
-      includeSelf,
+      shouldIncludeSelf,
       outgoingEdgesBySource: buildOutgoingEdgesBySource(options.edges.value as unknown as Edge[]),
       nodeDataById: buildNodeDataById(options.nodes.value as FlowNodeDataSource[]),
     })
@@ -256,8 +256,8 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
     const store = options.readCanvasGraphStore()
     const transaction = store.beginTransaction('node-update', {
-      recordHistory: false,
-      markDirty: false,
+      shouldRecordHistory: false,
+      shouldMarkDirty: false,
     })
     try {
       staleNodeIds.forEach((nodeId) => {

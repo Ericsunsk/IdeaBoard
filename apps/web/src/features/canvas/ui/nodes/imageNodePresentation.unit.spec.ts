@@ -4,7 +4,7 @@ import { createImageNodePresentationResolver } from './imageNodePresentation'
 
 describe('Image Node presentation seam', () => {
   it('reuses a node binding until its action or stage binding changes', () => {
-    let actionBinding = { actionMenuVisible: true } as ImageActionBinding
+    let actionBinding = { isActionMenuVisible: true } as ImageActionBinding
     let stageBinding = { mode: 'adjust' } as ImageToolStageBinding
     const resolver = createImageNodePresentationResolver({
       actionBindingFor: () => actionBinding,
@@ -15,7 +15,7 @@ describe('Image Node presentation seam', () => {
     expect(resolver.forNode('image-1')).toBe(initial)
     expect(Object.keys(initial)).toEqual(['actionBinding', 'stageBinding'])
 
-    actionBinding = { actionMenuVisible: false } as ImageActionBinding
+    actionBinding = { isActionMenuVisible: false } as ImageActionBinding
     const afterActionChange = resolver.forNode('image-1')
     expect(afterActionChange).not.toBe(initial)
     expect(afterActionChange.stageBinding).toBe(stageBinding)

@@ -33,11 +33,11 @@ function createHarness() {
       byId: computed(() => new Map(boards.value.map((board) => [board.id, board]))),
     },
     commands: {
-      hydrate: vi.fn(async () => ({ ok: true as const })),
-      create: vi.fn(async () => ({ ok: true as const, board: makeBoard('created') })),
-      rename: vi.fn(async () => ({ ok: true as const, board: makeBoard('board-1') })),
-      duplicate: vi.fn(async () => ({ ok: true as const, board: makeBoard('copy') })),
-      delete: vi.fn(async () => ({ ok: true as const, remoteWasMissing: false })),
+      hydrate: vi.fn(async () => ({ isOk: true as const })),
+      create: vi.fn(async () => ({ isOk: true as const, board: makeBoard('created') })),
+      rename: vi.fn(async () => ({ isOk: true as const, board: makeBoard('board-1') })),
+      duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('copy') })),
+      delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
     },
     dispose: vi.fn(),
   }
@@ -113,19 +113,19 @@ describe('board focus controls', () => {
   })
 
   it('flushes the pending save when the document hides', async () => {
-    let dirty = true
+    let isDirty = true
     const save = vi.fn(async () => true)
     const policy = createBoardAutosavePolicy({
-      isDirty: () => dirty,
+      isDirty: () => isDirty,
       isSaving: () => false,
       markDirty: () => {
-        dirty = true
+        isDirty = true
       },
       save,
     })
     try {
       policy.handleHidden()
-      await vi.waitFor(() => expect(save).toHaveBeenCalledExactlyOnceWith({ silent: true }))
+      await vi.waitFor(() => expect(save).toHaveBeenCalledExactlyOnceWith({ isSilent: true }))
     } finally {
       policy.dispose()
     }
@@ -141,7 +141,7 @@ describe('board focus controls', () => {
       expect(save).not.toHaveBeenCalled()
       Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
       document.dispatchEvent(new Event('visibilitychange'))
-      await vi.waitFor(() => expect(save).toHaveBeenCalledExactlyOnceWith({ silent: true }))
+      await vi.waitFor(() => expect(save).toHaveBeenCalledExactlyOnceWith({ isSilent: true }))
     } finally {
       scope.stop()
       if (original) Object.defineProperty(document, 'visibilityState', original)

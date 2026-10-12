@@ -44,11 +44,11 @@ type UseFlowMediaInputImagesOptions = {
   updateSnapshotNodeBase: (
     nodeId: string,
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
-    options?: { history?: boolean; dirty?: boolean },
+    options?: { shouldRecordHistory?: boolean; shouldMarkDirty?: boolean },
   ) => void
   readCanvasGraphStore: () => CanvasGraphReadPort
   writeCanvasGraphStore?: () => CanvasGraphStore
-  markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
+  markFlowExecutionNodeDirty: (nodeId: string, options?: { shouldIncludeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   openImageUrlPreview: (src: string, ratio?: number, assetId?: string) => Promise<void>
   onWarning: (message: string) => void
@@ -215,7 +215,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
             ? snapshotNode
             : { ...snapshotNode, inputImages: nextImages }
         },
-        { history: false, dirty: true },
+        { shouldRecordHistory: false, shouldMarkDirty: true },
       )
     })
   }
@@ -326,7 +326,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
           inputImages: [...current, externalImage].slice(0, snapshotInputLimit),
         }
       })
-      options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
+      options.markFlowExecutionNodeDirty(nodeId, { shouldIncludeSelf: true })
     } catch (error) {
       const msg = userFacingErrorCopy(error, i18n.global.t('canvas.session.uploadFailed'))
       options.onWarning(msg)
@@ -403,7 +403,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
         removedEdgeIds: edgeIds,
       })
     }
-    options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
+    options.markFlowExecutionNodeDirty(nodeId, { shouldIncludeSelf: true })
   }
 
   function isFlowProjectionInSync(

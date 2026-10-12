@@ -85,7 +85,7 @@ function notifyAuthStateReset(): void {
 /**
  * Forgets the remembered device scope used for transient recovery.
  * Explicit logout calls this so the next device user cannot read the
- * previous user's locally cached boards through the recoverable scope;
+ * previous user's locally cached boards through the isRecoverable scope;
  * silent expiry and 401 paths keep the remembered scope so local drafts
  * stay readable and the next login for the same user recovers them.
  */

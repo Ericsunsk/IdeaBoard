@@ -3,22 +3,22 @@
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
     :data-flow-node-id="props.nodeId"
-    :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': nodeRunning }]"
+    :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': isNodeRunning }]"
     :style="nodeStyle"
   >
     <div
-      v-if="showDefaultDragZone"
+      v-if="shouldShowDefaultDragZone"
       class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--default"
     />
     <template v-if="isPromptNode && promptSnapshot">
       <PromptNode
         :node="promptSnapshot"
-        :active="selected"
-        :connection-drop-target="props.connectionDropTarget"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
+        :is-active="selected"
+        :is-connection-drop-target="props.isConnectionDropTarget"
+        :is-dragging="props.dragging"
+        :is-copy-mode="props.isCopyMode"
         :ui-state="promptUiState"
-        :generation-available="props.generationAvailable"
+        :is-generation-available="props.isGenerationAvailable"
         @update:text="onPromptTextEdited"
         @update:output-count="onPromptParameterChanged('outputCount', $event)"
         @update:output-resolution="onPromptParameterChanged('outputResolution', $event)"
@@ -38,7 +38,7 @@
     <template v-else-if="isImageNode && imageSnapshot">
       <div
         class="flow-canvas-node__drag-surface relative overflow-visible"
-        :class="{ 'is-running': nodeRunning }"
+        :class="{ 'is-running': isNodeRunning }"
         @mousedown="onNodeMouseDown"
         @contextmenu.stop
       >
@@ -47,18 +47,18 @@
           :flow-node-id="props.nodeId"
           :set-image-stage-ref="props.setImageStageRef"
           :clear-image-stage-ref="props.clearImageStageRef"
-          :active="selected"
-          :connection-drop-target="props.connectionDropTarget"
-          :dragging="props.dragging"
-          :copy-mode="props.copyMode"
+          :is-active="selected"
+          :is-connection-drop-target="props.isConnectionDropTarget"
+          :is-dragging="props.dragging"
+          :is-copy-mode="props.isCopyMode"
           :stage-height="stageHeight"
           :display-image="displayImage"
           :library-import="libraryImport"
           :local-upload="localUpload"
           :empty-icon-variant="imageEmptyIconVariant"
-          :input-locked="imageInputLocked"
+          :is-input-locked="isImageInputLocked"
           :action-binding="props.imagePresentation.actionBinding"
-          :outpaint-mode-active="!!props.outpaintModeActive"
+          :is-outpaint-mode-active="!!props.isOutpaintModeActive"
           :outpaint-overlay-style="props.outpaintOverlayStyle ?? null"
           :outpaint-handle-radius="props.outpaintHandleRadius ?? 4"
           :image-tool-stage-binding="props.imagePresentation.stageBinding"
@@ -86,18 +86,18 @@
     <template v-else-if="isFusionNode && fusionSnapshot">
       <div
         class="flow-canvas-node__drag-surface relative overflow-visible"
-        :class="{ 'is-running': nodeRunning }"
+        :class="{ 'is-running': isNodeRunning }"
         @mousedown="onNodeMouseDown"
         @contextmenu.stop
       >
         <FusionNode
           :node="fusionSnapshot"
-          :active="selected"
-          :connection-drop-target="props.connectionDropTarget"
-          :dragging="props.dragging"
-          :copy-mode="props.copyMode"
-          :prompt-composer-visible="props.fusionPresentation?.promptComposerVisible ?? false"
-          :generation-available="props.generationAvailable"
+          :is-active="selected"
+          :is-connection-drop-target="props.isConnectionDropTarget"
+          :is-dragging="props.dragging"
+          :is-copy-mode="props.isCopyMode"
+          :is-prompt-composer-visible="props.fusionPresentation?.isPromptComposerVisible ?? false"
+          :is-generation-available="props.isGenerationAvailable"
           :ui-state="resolvedUiState"
           @node-mousedown="noopMouse"
           @update:title="onFusionParameterChanged('title', $event)"
@@ -122,13 +122,14 @@
       :node-id="props.nodeId"
       :kind="data.kind"
       :interaction-root="flowCanvasNodeRef"
-      :dragging="props.dragging"
-      :disabled="disableHandleRailInteraction"
+      :is-dragging="props.dragging"
+      :is-disabled="shouldDisableHandleRailInteraction"
     />
   </div>
 </template>
 
 <script setup lang="ts">
+import type { NodeProps } from '@vue-flow/core'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { NodeUiState, PromptNodeUiState } from '../../core/nodes/canvasNodeUi.ts'
@@ -144,34 +145,34 @@ import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 import { FusionNode, ImageNode, PromptNode } from './workflows'
 
 const props = withDefaults(
-  defineProps<{
-    nodeId: string
-    data: FlowNodeData
-    selected?: boolean
-    connectionDropTarget?: boolean
-    dragging?: boolean
-    copyMode?: boolean
-    uiState?: NodeUiState | PromptNodeUiState | undefined
-    fusionPresentation?: FusionNodePresentationBinding | undefined
-    generationAvailable?: boolean
-    imagePresentation: ImageNodePresentationBinding
-    setImageStageRef?: ((nodeId: string, element: Element | null) => void) | undefined
-    clearImageStageRef?: ((nodeId: string, element?: Element | null) => void) | undefined
-    outpaintModeActive?: boolean
-    outpaintOverlayStyle?: Record<string, string> | null
-    outpaintHandleRadius?: number
-  }>(),
+  defineProps<
+    Partial<Pick<NodeProps, 'selected' | 'dragging'>> & {
+      nodeId: string
+      data: FlowNodeData
+      isConnectionDropTarget?: boolean
+      isCopyMode?: boolean
+      uiState?: NodeUiState | PromptNodeUiState | undefined
+      fusionPresentation?: FusionNodePresentationBinding | undefined
+      isGenerationAvailable?: boolean
+      imagePresentation: ImageNodePresentationBinding
+      setImageStageRef?: ((nodeId: string, element: Element | null) => void) | undefined
+      clearImageStageRef?: ((nodeId: string, element?: Element | null) => void) | undefined
+      isOutpaintModeActive?: boolean
+      outpaintOverlayStyle?: Record<string, string> | null
+      outpaintHandleRadius?: number
+    }
+  >(),
   {
     selected: false,
-    connectionDropTarget: false,
+    isConnectionDropTarget: false,
     dragging: false,
-    copyMode: false,
+    isCopyMode: false,
     uiState: undefined,
     fusionPresentation: undefined,
-    generationAvailable: true,
+    isGenerationAvailable: true,
     setImageStageRef: () => undefined,
     clearImageStageRef: () => undefined,
-    outpaintModeActive: false,
+    isOutpaintModeActive: false,
     outpaintOverlayStyle: null,
     outpaintHandleRadius: 4,
   },
@@ -184,7 +185,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const showDefaultDragZone = false
+const shouldShowDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
 const isRetouchActive = computed(() => props.imagePresentation.stageBinding?.mode != null)
 const { zoomLevel } = useCanvasViewportContext()
@@ -202,26 +203,26 @@ const resolvedUiState = computed(
 )
 
 const {
-  disableHandleRailInteraction,
+  shouldDisableHandleRailInteraction,
   displayImage,
   fusionSnapshot,
   imageEmptyIconVariant,
-  imageInputLocked,
+  isImageInputLocked,
   libraryImport,
   localUpload,
   imageSnapshot,
   isFusionNode,
   isImageNode,
   isPromptNode,
-  nodeRunning,
+  isNodeRunning,
   promptSnapshot,
   promptUiState,
   stageHeight,
 } = useFlowCanvasNodeAdapter({
   data: () => props.data,
   uiState: () => resolvedUiState.value,
-  imageDirectGenerating: () => props.imagePresentation.actionBinding.directGenerating,
-  outpaintModeActive: () => !!props.outpaintModeActive,
+  imageDirectGenerating: () => props.imagePresentation.actionBinding.isDirectGenerating,
+  outpaintModeActive: () => !!props.isOutpaintModeActive,
   isRetouchActive: () => isRetouchActive.value,
 })
 const hasRenderedNode = computed(

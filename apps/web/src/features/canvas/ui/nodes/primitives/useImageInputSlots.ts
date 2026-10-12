@@ -26,7 +26,7 @@ export function useImageInputSlots<T extends ImageInputSlotItem>({
   onDrop,
   onRemove,
 }: UseImageInputSlotsOptions<T>) {
-  const addSlotDragOver = ref(false)
+  const isAddSlotDragOver = ref(false)
   const visibleInputImages = computed(() => toValue(inputImages).slice(0, maxImages))
   const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxImages)
   const { sortableItems: sortableInputImages } = useSortableMediaInputs({
@@ -45,22 +45,22 @@ export function useImageInputSlots<T extends ImageInputSlotItem>({
 
   function onAddSlotDragOver(event: DragEvent) {
     if (!canAcceptMoreImages.value) return
-    addSlotDragOver.value = true
+    isAddSlotDragOver.value = true
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
   }
 
   function onAddSlotDragLeave() {
-    addSlotDragOver.value = false
+    isAddSlotDragOver.value = false
   }
 
   function onAddSlotDrop(event: DragEvent) {
-    addSlotDragOver.value = false
+    isAddSlotDragOver.value = false
     if (!canAcceptMoreImages.value) return
     onDrop(event)
   }
 
   return {
-    addSlotDragOver,
+    isAddSlotDragOver,
     canAcceptMoreImages,
     onAddSlotDragLeave,
     onAddSlotDragOver,

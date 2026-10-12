@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
 import { render, screen, userEvent } from '../../../test/render'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './index'
+import Tabs from './Tabs.vue'
+import TabsContent from './TabsContent.vue'
+import TabsList from './TabsList.vue'
+import TabsTrigger from './TabsTrigger.vue'
 
 /**
  * Quota: final/tabs-keyboard. The roving tabindex, arrow/Home/End navigation

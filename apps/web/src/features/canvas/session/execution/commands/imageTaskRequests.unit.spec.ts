@@ -305,7 +305,7 @@ describe('imageTaskRequests', () => {
       original_image_width: 1200,
       original_image_height: 800,
       use_mask: true,
-    })
+    } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams)
     expect(request.params).not.toHaveProperty('reference_image_urls')
   })
 
@@ -325,7 +325,7 @@ describe('imageTaskRequests', () => {
       output_count: 1,
       mask_asset_id: 'asset_mask1',
       use_mask: true,
-    })
+    } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams)
     expect(request.params).not.toHaveProperty('mask_image_url')
   })
 
@@ -576,7 +576,7 @@ describe('imageTaskRequests', () => {
         original_image_width: 900,
         original_image_height: 600,
         use_mask: true,
-      },
+      } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
     })
     expect(
       buildPreparedImageInpaintTaskRequest({

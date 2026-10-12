@@ -26,9 +26,9 @@ export function useRecharge(
 ) {
   const queryClient = useQueryClient()
   const { resource, navigateToCheckout } = usePaymentsContext()
-  const { workspaceId, selectionSettled } = useAccountWorkspace()
+  const { workspaceId, isSelectionSettled } = useAccountWorkspace()
   const activeWorkspaceId = computed(() => workspaceId.value ?? '')
-  const transportReady = computed(() => toValue(active) && selectionSettled.value)
+  const transportReady = computed(() => toValue(active) && isSelectionSettled.value)
 
   const returnToken = computed(() => toValue(paymentReturn)?.publicToken ?? '')
   const { optionsQuery, pendingOrdersQuery, historyQuery, returnQuery } = useRechargeQueries(
@@ -53,7 +53,7 @@ export function useRecharge(
     queryClient,
     resource,
     active,
-    selectionSettled,
+    isSelectionSettled,
     activeWorkspaceId,
     updateCachedPendingOrder: pendingOrders.updateCachedPendingOrder,
     removeCachedPendingOrder: pendingOrders.removeCachedPendingOrder,
@@ -299,14 +299,14 @@ function usePaymentEventSubscription(options: {
   queryClient: PendingOrderActionContext['queryClient']
   resource: PendingOrderActionContext['resource']
   active: MaybeRefOrGetter<boolean>
-  selectionSettled: { value: boolean }
+  isSelectionSettled: { value: boolean }
   activeWorkspaceId: PendingOrderActionContext['workspaceId']
   updateCachedPendingOrder: PendingOrderCache['updateCachedPendingOrder']
   removeCachedPendingOrder: PendingOrderCache['removeCachedPendingOrder']
 }) {
-  const { queryClient, resource, active, selectionSettled, activeWorkspaceId } = options
+  const { queryClient, resource, active, isSelectionSettled, activeWorkspaceId } = options
   watch(
-    () => [toValue(active), selectionSettled.value, toValue(activeWorkspaceId) ?? ''] as const,
+    () => [toValue(active), isSelectionSettled.value, toValue(activeWorkspaceId) ?? ''] as const,
     ([enabled, settled, settledWorkspaceId], _previous, onCleanup) => {
       if (!enabled || !settled || !settledWorkspaceId) return
       const unsubscribe = resource.subscribe(settledWorkspaceId, (event) =>

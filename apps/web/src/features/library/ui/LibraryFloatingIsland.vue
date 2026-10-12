@@ -147,7 +147,7 @@
       <LibraryAssetGallery
         ref="galleryRef"
         :assets="workspace.assets.value"
-        :loading="workspace.loading.value"
+        :is-loading="workspace.loading.value"
         :error-message="workspace.errorMessage.value"
         :has-more="workspace.hasMore.value"
         :is-expanded="isExpanded"
@@ -194,13 +194,13 @@
 
   <!-- 二次确认对话框 -->
   <UserConfirmDialog
-    :visible="confirmDialog.visible.value"
+    :is-visible="confirmDialog.visible.value"
     :title="confirmDialog.title.value"
     :message="confirmDialog.message.value"
     :confirm-label="confirmDialog.confirmLabel.value"
     :intent="confirmDialog.intent.value"
-    :loading="confirmDialog.loading.value"
-    @update:visible="confirmDialog.close"
+    :is-loading="confirmDialog.loading.value"
+    @update:is-visible="confirmDialog.close"
     @confirm="confirmDialog.confirm"
   />
 </template>

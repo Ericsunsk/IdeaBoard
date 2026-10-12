@@ -4,7 +4,7 @@ import { useCanvasCustomLayerOverlay } from './useCanvasCustomLayerOverlay'
 import type { OverlayDismissal } from '../../../../core/composables/useOverlayInteractionLifecycle'
 
 type LayerHarness = {
-  visible: Ref<boolean>
+  isVisible: Ref<boolean>
   root: Ref<HTMLElement | null>
   onDismiss: Mock<(dismissal: OverlayDismissal, event: KeyboardEvent | PointerEvent) => void>
 }
@@ -13,14 +13,14 @@ function mountLayers(
   count: number,
   options: {
     ignore?: readonly string[]
-    renderRoots?: boolean
+    shouldRenderRoots?: boolean
     shouldDismiss?: (dismissal: OverlayDismissal, event: KeyboardEvent | PointerEvent) => boolean
   } = {},
 ) {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const layers: LayerHarness[] = Array.from({ length: count }, () => ({
-    visible: ref(false),
+    isVisible: ref(false),
     root: ref<HTMLElement | null>(null),
     onDismiss: vi.fn(),
   }))
@@ -30,20 +30,20 @@ function mountLayers(
       setup() {
         for (const layer of layers) {
           useCanvasCustomLayerOverlay({
-            visible: layer.visible,
+            isVisible: layer.isVisible,
             roots: [layer.root],
             ignore: options.ignore,
             shouldDismiss: options.shouldDismiss,
             onDismiss: (dismissal, event) => {
               layer.onDismiss(dismissal, event)
-              layer.visible.value = false
+              layer.isVisible.value = false
             },
           })
         }
         return () =>
           h(
             'div',
-            options.renderRoots === false
+            options.shouldRenderRoots === false
               ? []
               : layers.map((layer, index) =>
                   h('div', { ref: layer.root, 'data-layer-root': String(index) }),
@@ -82,7 +82,7 @@ describe('useCanvasCustomLayerOverlay', () => {
     const layer = harness.layers[0]!
 
     try {
-      layer.visible.value = true
+      layer.isVisible.value = true
       await nextTick()
 
       dispatchPointerDown(layer.root.value ?? undefined)
@@ -93,7 +93,7 @@ describe('useCanvasCustomLayerOverlay', () => {
       expect(layer.onDismiss).toHaveBeenCalledOnce()
       expect(layer.onDismiss.mock.calls[0]?.[0]).toBe('outside-pointer')
 
-      layer.visible.value = true
+      layer.isVisible.value = true
       await nextTick()
       dispatchEscape()
       expect(layer.onDismiss).toHaveBeenCalledTimes(2)
@@ -110,9 +110,9 @@ describe('useCanvasCustomLayerOverlay', () => {
     const upper = harness.layers[1]!
 
     try {
-      lower.visible.value = true
+      lower.isVisible.value = true
       await nextTick()
-      upper.visible.value = true
+      upper.isVisible.value = true
       await nextTick()
 
       dispatchPointerDown()
@@ -127,14 +127,14 @@ describe('useCanvasCustomLayerOverlay', () => {
   })
 
   it('preserves open order when an earlier layer attaches its root later', async () => {
-    const harness = mountLayers(2, { renderRoots: false })
+    const harness = mountLayers(2, { shouldRenderRoots: false })
     const lower = harness.layers[0]!
     const upper = harness.layers[1]!
 
     try {
-      lower.visible.value = true
+      lower.isVisible.value = true
       await nextTick()
-      upper.visible.value = true
+      upper.isVisible.value = true
       await nextTick()
 
       lower.root.value = document.createElement('div')
@@ -152,7 +152,7 @@ describe('useCanvasCustomLayerOverlay', () => {
   it('removes document listeners when its scope is disposed', async () => {
     const harness = mountLayers(1)
     const layer = harness.layers[0]!
-    layer.visible.value = true
+    layer.isVisible.value = true
     await nextTick()
     await harness.unmount()
 
@@ -170,13 +170,13 @@ describe('useCanvasCustomLayerOverlay', () => {
     const layer = harness.layers[0]!
 
     try {
-      layer.visible.value = true
+      layer.isVisible.value = true
       await nextTick()
 
       document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 2 }))
 
       expect(layer.onDismiss).not.toHaveBeenCalled()
-      expect(layer.visible.value).toBe(true)
+      expect(layer.isVisible.value).toBe(true)
     } finally {
       await harness.unmount()
     }

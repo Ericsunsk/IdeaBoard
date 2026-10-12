@@ -105,8 +105,8 @@
       <div>
         <Button
           type="submit"
-          :disabled="!canCheckout"
-          :loading="checkoutPending"
+          :is-disabled="!canCheckout"
+          :is-loading="checkoutPending"
           :class="accountPrimaryActionButtonClass"
           >{{ t('account.topUp.payNow') }}</Button
         >
@@ -195,8 +195,8 @@ const canCheckout = computed(() => checkoutQuantity.value != null && !props.chec
 
 function packageControlState(quantity: number) {
   return resolveInteractiveControlState({
-    selected: selectionMode.value === 'package' && selectedQuantity.value === quantity,
-    disabled: props.checkoutPending,
+    isSelected: selectionMode.value === 'package' && selectedQuantity.value === quantity,
+    isDisabled: props.checkoutPending,
   })
 }
 

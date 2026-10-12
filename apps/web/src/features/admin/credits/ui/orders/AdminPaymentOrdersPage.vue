@@ -295,7 +295,7 @@ async function requestRefund(ideaQuantity: number) {
     ),
     confirmLabel: PAYMENT_ORDERS_MESSAGES.refundConfirm,
     intent: 'danger',
-    reason: { required: true },
+    reason: { isRequired: true },
   })
   if (!confirmed) return
   const operatorReason = requireDestructiveReason(adminConfirm)

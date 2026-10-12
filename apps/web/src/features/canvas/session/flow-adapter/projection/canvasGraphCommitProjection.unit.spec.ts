@@ -15,7 +15,7 @@ function imageRecord(id: number, sourceImageUrl: string): CanvasGraphNodeRecord 
   return {
     id: `image-${id}`,
     kind: 'image',
-    selected: false,
+    isSelected: false,
     snapshot: {
       id,
       type: 'image-node',
@@ -35,7 +35,7 @@ function imageRecord(id: number, sourceImageUrl: string): CanvasGraphNodeRecord 
 function connectionRecord(id: number): CanvasGraphEdgeRecord {
   return {
     id: `connection-${id}`,
-    selected: false,
+    isSelected: false,
     connection: {
       id,
       fromNodeType: 'image',
@@ -110,7 +110,7 @@ describe('projectCanvasGraphCommit', () => {
       selected: true,
       computedPosition: { x: 100, y: 40, z: 0 },
       handleBounds: { source: [], target: [] },
-    } as Node
+    } satisfies Partial<import('@vue-flow/core').GraphNode> as Node
     const result = projectCanvasGraphCommit({
       current: { nodes: [currentNode], edges: [] },
       patch: patch({
@@ -118,8 +118,8 @@ describe('projectCanvasGraphCommit', () => {
           records: [
             {
               id: 'image-1',
-              before: { ...imageRecord(1, 'old'), selected: true },
-              after: { ...imageRecord(1, 'new'), selected: false },
+              before: { ...imageRecord(1, 'old'), isSelected: true },
+              after: { ...imageRecord(1, 'new'), isSelected: false },
             },
           ],
           order: [],
@@ -131,11 +131,13 @@ describe('projectCanvasGraphCommit', () => {
       selected: false,
       computedPosition: { x: 100, y: 40, z: 0 },
       handleBounds: { source: [], target: [] },
-    })
+    } satisfies Partial<import('@vue-flow/core').GraphNode>)
   })
 
   it('keeps the renderer selection across a domain-only node update', () => {
-    const currentNode = { ...flowNode('image-1', 'old'), selected: true } as Node
+    const currentNode = { ...flowNode('image-1', 'old'), selected: true } satisfies Partial<
+      import('@vue-flow/core').GraphNode
+    > as Node
     const result = projectCanvasGraphCommit({
       current: { nodes: [currentNode], edges: [] },
       patch: patch({
@@ -146,7 +148,9 @@ describe('projectCanvasGraphCommit', () => {
       }),
     })
 
-    expect(result.graph.nodes[0]).toMatchObject({ selected: true })
+    expect(result.graph.nodes[0]).toMatchObject({ selected: true } satisfies Partial<
+      import('@vue-flow/core').GraphNode
+    >)
   })
 
   it('commits a dragged node snapshot even when Vue Flow already rendered its new position', () => {

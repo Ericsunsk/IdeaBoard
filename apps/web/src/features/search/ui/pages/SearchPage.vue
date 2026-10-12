@@ -10,10 +10,12 @@
     <main
       class="relative z-[var(--z-content)] mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
       :class="[
-        libraryIslandOpen && !libraryIslandExpanded
+        isLibraryIslandOpen && !isLibraryIslandExpanded
           ? 'ml-0 md:ml-[350px] mr-auto max-w-[1600px] pl-0 md:pl-6 lg:pl-8'
           : 'mx-auto max-w-[1600px] pl-0',
-        libraryIslandOpen && libraryIslandExpanded ? 'translate-x-[100vw] pointer-events-none' : '',
+        isLibraryIslandOpen && isLibraryIslandExpanded
+          ? 'translate-x-[100vw] pointer-events-none'
+          : '',
       ]"
     >
       <!-- 🌟 核心吸顶搜索控制中心 (保持原始呼吸间距，向下滚动时悬浮吸顶) -->
@@ -120,8 +122,8 @@
                 </button>
                 <Button
                   type="submit"
-                  :loading="visionState === 'extracting'"
-                  :disabled="visionState === 'extracting'"
+                  :is-loading="visionState === 'extracting'"
+                  :is-disabled="visionState === 'extracting'"
                   :title="searchButtonTitle"
                   class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-primary !px-4 !text-xs !font-bold !text-primary-foreground !shadow-none hover:!bg-primary/90 cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
                 >
@@ -137,7 +139,7 @@
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-primary' : '']"
             :aria-label="t('search.tooltips.toggleLibrary')"
             :title="t('search.tooltips.toggleLibrary')"
-            :aria-expanded="libraryIslandOpen"
+            :aria-expanded="isLibraryIslandOpen"
             @pointerenter="preloadLibraryIsland"
             @focus="preloadLibraryIsland"
             @click="toggleLibraryIslandForUser"
@@ -146,7 +148,7 @@
             @drop.prevent="handleLibraryTriggerDrop"
           >
             <BookmarkSolid
-              v-if="libraryIslandOpen"
+              v-if="isLibraryIslandOpen"
               class="size-4 text-primary rotate-6 scale-110 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               aria-hidden="true"
             />
@@ -195,10 +197,10 @@
       </div>
 
       <div
-        v-if="loading && results.length === 0"
+        v-if="isLoading && results.length === 0"
         class="mt-4 transition-[column-gap] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)]"
         :class="[
-          libraryIslandOpen && !libraryIslandExpanded
+          isLibraryIslandOpen && !isLibraryIslandExpanded
             ? 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-4 gap-3.5'
             : 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4',
         ]"
@@ -207,7 +209,7 @@
           v-for="h in [260, 340, 200, 380, 280, 320, 240, 360, 300, 220]"
           :key="h"
           class="break-inside-avoid overflow-hidden rounded-2xl bg-muted/30 animate-pulse"
-          :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
+          :class="isLibraryIslandOpen && !isLibraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
           :style="{ height: `${h}px` }"
         ></div>
       </div>
@@ -229,8 +231,8 @@
         v-else
         :items="results"
         :has-more="hasMore"
-        :loading="loading || loadingMore"
-        :compact="libraryIslandOpen && !libraryIslandExpanded"
+        :loading="isLoading || isLoadingMore"
+        :compact="isLibraryIslandOpen && !isLibraryIslandExpanded"
         :scroll-root="pageScrollRef"
         :active-anchor="savePopoverAnchor"
         class="mt-4"
@@ -262,7 +264,7 @@
         </template>
       </SearchResultViewport>
 
-      <div v-if="loadingMore" class="flex justify-center py-5">
+      <div v-if="isLoadingMore" class="flex justify-center py-5">
         <Spinner class="!h-7 !w-7 text-primary" :label="t('search.loadingMore')" />
       </div>
       <p
@@ -275,10 +277,10 @@
 
     <!-- 🌟 左侧悬浮圆角素材岛组件 -->
     <LibraryFloatingIsland
-      v-if="libraryIslandMounted"
-      v-model:expanded="libraryIslandExpanded"
+      v-if="isLibraryIslandMounted"
+      v-model:expanded="isLibraryIslandExpanded"
       presentation="search"
-      :open="libraryIslandOpen"
+      :open="isLibraryIslandOpen"
       :workspace-id="libraryWorkspaceId"
       :folder-facts="libraryFolderFacts"
       :mutation-publisher="libraryMutationPublisher"
@@ -295,7 +297,7 @@
 
     <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 -->
     <SearchLightboxModal
-      :visible="lightboxVisible"
+      :visible="isLightboxVisible"
       :active-result="activeResult"
       @close="closeLightbox"
     />
@@ -382,22 +384,22 @@ const hasActiveSearch = computed(() => {
 const {
   items: results,
   hasMore,
-  loading,
-  loadingMore,
+  isLoading,
+  isLoadingMore,
   hasError,
   failedImages,
   savedKeys,
 } = searchResults
 const {
-  open: libraryIslandOpen,
-  expanded: libraryIslandExpanded,
+  isOpen: isLibraryIslandOpen,
+  isExpanded: isLibraryIslandExpanded,
   folderFacts: libraryFolderFacts,
   mutationPublisher: libraryMutationPublisher,
-  mounted: libraryIslandMounted,
+  isMounted: isLibraryIslandMounted,
   isDropTarget: isTriggerHoveredDuringDrag,
 } = library
 const { count: selectedBatchCount } = selection
-const { visible: lightboxVisible, activeResult } = preview
+const { isVisible: isLightboxVisible, activeResult } = preview
 const { savePopoverAnchor } = searchScreen
 const { workspaceId: libraryWorkspaceId } = searchScreen
 const {

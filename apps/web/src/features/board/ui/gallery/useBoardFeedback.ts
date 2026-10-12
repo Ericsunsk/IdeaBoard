@@ -9,8 +9,8 @@ import type { BoardRepositoryRenameResult } from '../../session/catalog/reposito
 
 type BoardToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' | 'error'>
 
-type FailedCreateResult = Extract<BoardCreateResult, { ok: false }>
-type FailedRenameResult = Extract<BoardRepositoryRenameResult, { ok: false }>
+type FailedCreateResult = Extract<BoardCreateResult, { isOk: false }>
+type FailedRenameResult = Extract<BoardRepositoryRenameResult, { isOk: false }>
 type RenameValidationFailure = Extract<
   FailedRenameResult,
   { reason: 'local-name-conflict' | 'invalid-name' }
@@ -19,8 +19,8 @@ type RenameSyncFailure = Extract<
   FailedRenameResult,
   { reason: 'revision-conflict' | 'idempotency-conflict' | 'sync-failed' }
 >
-type FailedDuplicateResult = Extract<BoardDuplicateResult, { ok: false }>
-type FailedDeleteResult = Extract<BoardDeleteResult, { ok: false }>
+type FailedDuplicateResult = Extract<BoardDuplicateResult, { isOk: false }>
+type FailedDeleteResult = Extract<BoardDeleteResult, { isOk: false }>
 
 export type BoardFeedback = {
   createFailed: (result: FailedCreateResult) => void
@@ -55,11 +55,11 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
     renameSyncFailed(result) {
       const isConflict =
         result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
-      if (isConflict && result.hydrate?.ok) {
+      if (isConflict && result.hydrate?.isOk) {
         appToast.error(t('workspace.feedback.renameSyncConflictReloaded'))
         return
       }
-      if (result.reason === 'sync-failed' && result.rollback.ok) {
+      if (result.reason === 'sync-failed' && result.rollback.isOk) {
         appToast.error(t('workspace.feedback.renameSyncFailedRolledBack'))
         return
       }

@@ -5,7 +5,7 @@ import type {
 
 type NodePrimaryActionState = {
   label: string
-  disabled: boolean
+  isDisabled: boolean
 }
 
 type NodeConnectionMap<TPort extends string = string> = Partial<Record<TPort, boolean | undefined>>

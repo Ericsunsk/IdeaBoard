@@ -2,8 +2,8 @@
   <Button
     :variant="uiVariant"
     :size="uiSize"
-    :disabled="props.disabled"
-    :loading="props.loading"
+    :is-disabled="props.disabled"
+    :is-loading="props.loading"
     :type="props.type"
     :title="props.title"
     :aria-label="props.ariaLabel"

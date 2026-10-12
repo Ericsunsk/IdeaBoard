@@ -16,7 +16,7 @@ vi.mock('../../session/accountWorkspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session/accountWorkspace')>()),
   useAccountWorkspace: () => ({
     workspaceId: ref('ws_1'),
-    selectionSettled: ref(true),
+    isSelectionSettled: ref(true),
   }),
 }))
 
@@ -71,7 +71,7 @@ function renderPane(
     context,
     queryClient,
     ...renderWithUser(RechargePane, {
-      props: { active: true, paymentReturn: options.paymentReturn ?? null },
+      props: { isActive: true, paymentReturn: options.paymentReturn ?? null },
       global: {
         plugins: [[VueQueryPlugin, { queryClient }]],
         provide: { [paymentsContextKey as symbol]: context },

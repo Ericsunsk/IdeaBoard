@@ -37,7 +37,7 @@ describe('useAvatarUpload', () => {
     expect(deps.uploadAvatar).toHaveBeenCalledWith(file)
     expect(deps.userStore.setAvatarLocal).toHaveBeenCalledWith('https://cdn.example/avatar.png')
     expect(deps.profileFeedback.avatarUpload.success).toHaveBeenCalled()
-    expect(workflow.uploading.value).toBe(false)
+    expect(workflow.isUploading.value).toBe(false)
   })
 })
 

@@ -18,7 +18,7 @@ type SortableReorderEvent = {
   element: HTMLElement
   startX: number
   startY: number
-  active: boolean
+  isActive: boolean
   hoverElement: HTMLElement | null
   hoverItemId: string | null
 }
@@ -112,8 +112,8 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
   }
 
   function activateReorder(event: SortableReorderEvent) {
-    if (event.active) return
-    event.active = true
+    if (event.isActive) return
+    event.isActive = true
     isReordering.value = true
     event.element.classList.add('is-sortable-chosen', 'is-sortable-drag')
   }
@@ -194,7 +194,7 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
 
   const pointerDragSession = usePointerDragSession<SortableReorderEvent>({
     onMove({ event, payload }) {
-      if (!payload.active) {
+      if (!payload.isActive) {
         const deltaX = event.clientX - payload.startX
         const deltaY = event.clientY - payload.startY
         if (Math.hypot(deltaX, deltaY) < SORTABLE_DRAG_TOLERANCE_PX) return
@@ -203,7 +203,7 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
       updateHoverTarget(event, payload)
     },
     onEnd({ event, payload }) {
-      if (payload.active) {
+      if (payload.isActive) {
         updateHoverTargetIfPointerIsOverDraggable(event, payload)
         commitSortableUpdate(payload)
       }
@@ -248,7 +248,7 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
         element: draggableElement,
         startX: event.clientX,
         startY: event.clientY,
-        active: false,
+        isActive: false,
         hoverElement: null,
         hoverItemId: null,
       },

@@ -199,11 +199,11 @@ async function handleUnsave(request: SearchSavePopoverRequest) {
 
 function toggle(event: Event, request: SearchSavePopoverRequest) {
   if (saving.value) return
-  if (!request.authenticated) {
+  if (!request.isAuthenticated) {
     emit('auth-required', request.result)
     return
   }
-  if (request.saved) {
+  if (request.isSaved) {
     void handleUnsave(request)
     return
   }

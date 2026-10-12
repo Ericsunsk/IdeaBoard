@@ -151,10 +151,10 @@ function apiOrigin(): string {
 function resolveRemoteImageUrl(
   url: URL,
   trimmed: string,
-  options?: { allowSameOriginUploads?: boolean; blockExternal?: boolean },
+  options?: { shouldAllowSameOriginUploads?: boolean; shouldBlockExternal?: boolean },
 ): string {
   if (url.protocol === 'http:' || url.protocol === 'https:') {
-    if (options?.blockExternal) return ''
+    if (options?.shouldBlockExternal) return ''
     return trimmed
   }
   return trimmed
@@ -162,7 +162,7 @@ function resolveRemoteImageUrl(
 
 export function resolveFetchUrl(
   raw: string,
-  options?: { allowSameOriginUploads?: boolean; blockExternal?: boolean },
+  options?: { shouldAllowSameOriginUploads?: boolean; shouldBlockExternal?: boolean },
 ): string {
   const trimmed = resolveAssetUrl(canonicalizeRuntimeUploadRef(raw.trim()).trim())
   if (!trimmed) return ''
@@ -174,7 +174,7 @@ export function resolveFetchUrl(
   const isApiOrigin = url.origin === origin
   if (
     (isSameOrigin || isApiOrigin) &&
-    (options?.allowSameOriginUploads ?? true) &&
+    (options?.shouldAllowSameOriginUploads ?? true) &&
     url.pathname.startsWith('/uploads')
   ) {
     return url.toString()

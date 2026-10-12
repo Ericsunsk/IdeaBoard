@@ -18,7 +18,7 @@ describe('resolveInteractiveControlState', () => {
   })
 
   it('exposes stable selected and destructive semantics without choosing surface colors', () => {
-    expect(resolveInteractiveControlState({ selected: true, tone: 'danger' })).toEqual({
+    expect(resolveInteractiveControlState({ isSelected: true, tone: 'danger' })).toEqual({
       disabled: false,
       'aria-pressed': 'true',
       'data-control-state': 'selected',
@@ -27,7 +27,7 @@ describe('resolveInteractiveControlState', () => {
   })
 
   it('keeps explicit disabled state distinct from loading', () => {
-    expect(resolveInteractiveControlState({ disabled: true, selected: false })).toEqual({
+    expect(resolveInteractiveControlState({ isDisabled: true, isSelected: false })).toEqual({
       disabled: true,
       'aria-pressed': 'false',
       'data-control-state': 'disabled',
@@ -36,7 +36,7 @@ describe('resolveInteractiveControlState', () => {
 
   it('gives pending precedence over disabled and selected state', () => {
     expect(
-      resolveInteractiveControlState({ pending: true, disabled: true, selected: true }),
+      resolveInteractiveControlState({ pending: true, isDisabled: true, isSelected: true }),
     ).toEqual({
       disabled: true,
       'aria-busy': 'true',
@@ -46,7 +46,7 @@ describe('resolveInteractiveControlState', () => {
   })
 
   it('gives disabled precedence over selected state', () => {
-    expect(resolveInteractiveControlState({ disabled: true, selected: true })).toEqual({
+    expect(resolveInteractiveControlState({ isDisabled: true, isSelected: true })).toEqual({
       disabled: true,
       'aria-pressed': 'true',
       'data-control-state': 'disabled',

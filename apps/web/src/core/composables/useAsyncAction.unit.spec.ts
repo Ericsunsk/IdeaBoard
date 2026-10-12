@@ -25,17 +25,17 @@ describe('useAsyncAction', () => {
   it('runs feedback lifecycle around successful actions', async () => {
     const loadingHandle = { destroy: vi.fn() }
     const events: string[] = []
-    const loading = ref(false)
+    const isLoading = ref(false)
     const { runAsyncAction } = useAsyncAction()
 
     const result = await runAsyncAction(
       async () => {
-        expect(loading.value).toBe(true)
+        expect(isLoading.value).toBe(true)
         events.push('action')
         return 'saved'
       },
       {
-        loading,
+        isLoading,
         feedback: {
           loading: () => {
             events.push('loading')
@@ -52,7 +52,7 @@ describe('useAsyncAction', () => {
     )
 
     expect(result).toBe('saved')
-    expect(loading.value).toBe(false)
+    expect(isLoading.value).toBe(false)
     expect(loadingHandle.destroy).toHaveBeenCalledOnce()
     expect(events).toEqual(['loading', 'action', 'success:saved', 'finally'])
   })
@@ -105,7 +105,7 @@ describe('useAsyncAction', () => {
 
   it('settles every cleanup step once even when one cleanup step fails', async () => {
     const cleanupError = new Error('loading cleanup failed')
-    const loading = ref(false)
+    const isLoading = ref(false)
     const loadingHandle = {
       destroy: vi.fn(() => {
         throw cleanupError
@@ -117,7 +117,7 @@ describe('useAsyncAction', () => {
 
     await expect(
       runAsyncAction(async () => 'saved', {
-        loading,
+        isLoading,
         after,
         feedback: {
           loading: () => loadingHandle,
@@ -129,7 +129,7 @@ describe('useAsyncAction', () => {
     expect(loadingHandle.destroy).toHaveBeenCalledOnce()
     expect(after).toHaveBeenCalledOnce()
     expect(feedbackFinally).toHaveBeenCalledOnce()
-    expect(loading.value).toBe(false)
+    expect(isLoading.value).toBe(false)
     expect(isPending.value).toBe(false)
   })
 
@@ -153,12 +153,12 @@ describe('useAsyncAction', () => {
   })
 
   it('settles aggregate and scoped pending state atomically for synchronous observers', async () => {
-    const loading = ref(false)
+    const isLoading = ref(false)
     const action = vi.fn(async () => 'saved')
     const { isPending, runAsyncAction } = useAsyncAction()
     let aggregatePendingWhenScopeSettled: boolean | undefined
     const stopWatching = watch(
-      loading,
+      isLoading,
       (pending) => {
         if (!pending) {
           aggregatePendingWhenScopeSettled = isPending.value
@@ -167,7 +167,7 @@ describe('useAsyncAction', () => {
       { flush: 'sync' },
     )
 
-    await expect(runAsyncAction(action, { loading })).resolves.toBe('saved')
+    await expect(runAsyncAction(action, { isLoading })).resolves.toBe('saved')
     expect(aggregatePendingWhenScopeSettled).toBe(false)
     expect(action).toHaveBeenCalledOnce()
 
@@ -177,13 +177,13 @@ describe('useAsyncAction', () => {
   it('cleans up a lifecycle that fails before the action starts', async () => {
     const setupError = new Error('before failed')
     const action = vi.fn()
-    const loading = ref(false)
+    const isLoading = ref(false)
     const feedbackFinally = vi.fn()
     const { isPending, runAsyncAction } = useAsyncAction()
 
     await expect(
       runAsyncAction(action, {
-        loading,
+        isLoading,
         before: () => {
           throw setupError
         },
@@ -195,7 +195,7 @@ describe('useAsyncAction', () => {
 
     expect(action).not.toHaveBeenCalled()
     expect(feedbackFinally).toHaveBeenCalledOnce()
-    expect(loading.value).toBe(false)
+    expect(isLoading.value).toBe(false)
     expect(isPending.value).toBe(false)
   })
 

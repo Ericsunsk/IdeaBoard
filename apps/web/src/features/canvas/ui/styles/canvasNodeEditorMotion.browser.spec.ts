@@ -192,7 +192,7 @@ describe('Canvas Node and editor motion browser contract', () => {
 
     const fusion = mountApp(() =>
       h(FusionStage, {
-        active: true,
+        isActive: true,
         blendPoint: { x: 0.5, y: 0.5 },
         inputImages: [
           { id: 'image-1', url: 'https://example.com/a.png' },
@@ -220,7 +220,7 @@ describe('Canvas Node and editor motion browser contract', () => {
         canvasWidth: 320,
         canvasHeight: 240,
         maskLayerOpacity: 60,
-        imageLayerVisible: true,
+        isImageLayerVisible: true,
         brushSize: 24,
         setCanvasRef: () => {},
       }),

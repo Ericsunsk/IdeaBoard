@@ -166,7 +166,7 @@ const VueFlowStub = defineComponent({
         ),
         h('button', { type: 'button', onClick: () => emit('node-drag-stop') }, '结束拖动节点'),
         slots['zoom-pane']?.(),
-        slots['node-canvas']?.({ id: 'node-a', data: {}, selected: false, dragging: false }),
+        slots['node-canvas']?.({ id: 'node-a', data: {}, isSelected: false, isDragging: false }),
         slots.default?.(),
       ])
   },
@@ -226,7 +226,7 @@ const ImageToolPresentationStub = defineComponent({
 
 const ContextMenuStub = defineComponent({
   props: {
-    visible: { type: Boolean, required: true },
+    isVisible: { type: Boolean, required: true },
     x: { type: Number, required: true },
     y: { type: Number, required: true },
     items: { type: Array as PropType<Array<{ key: string }>>, required: true },
@@ -234,7 +234,7 @@ const ContextMenuStub = defineComponent({
   emits: ['create'],
   setup(props, { emit }) {
     return () =>
-      props.visible
+      props.isVisible
         ? h(
             'button',
             {
@@ -401,10 +401,10 @@ function createRuntime() {
           finishFlowNodeDragDuplicateTracking: vi.fn(),
           getFlowNodeUiStateCached: vi.fn(),
           createNodeInteractions: (interactionOptions: {
-            dismissTransientCanvasUi: (options: { closeContextMenu?: boolean }) => void
+            dismissTransientCanvasUi: (options: { shouldCloseContextMenu?: boolean }) => void
           }) => ({
             onFlowDeleteNode: (nodeId: string) => {
-              interactionOptions.dismissTransientCanvasUi({ closeContextMenu: true })
+              interactionOptions.dismissTransientCanvasUi({ shouldCloseContextMenu: true })
               onFlowDeleteNode(nodeId)
             },
             onFlowPromptTextUpdate: vi.fn(),
@@ -567,7 +567,7 @@ describe('CanvasScreen', () => {
     mocks.keyboardOptions!.onSave()
     await mocks.leaveGuardOptions!.onLeave()
 
-    expect(harness.flushAutosave).toHaveBeenNthCalledWith(1, { silent: false })
+    expect(harness.flushAutosave).toHaveBeenNthCalledWith(1, { isSilent: false })
     expect(harness.flushAutosave).toHaveBeenNthCalledWith(2)
   })
 })

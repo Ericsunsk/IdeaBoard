@@ -51,7 +51,7 @@
               </Button>
               <Button
                 type="submit"
-                :disabled="createSaving || !createDraft.trim()"
+                :is-disabled="createSaving || !createDraft.trim()"
                 class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
               >
                 {{ t('library.dialogs.create') }}
@@ -115,7 +115,7 @@
               </Button>
               <Button
                 type="submit"
-                :disabled="renameSaving || !renameDraft.trim()"
+                :is-disabled="renameSaving || !renameDraft.trim()"
                 class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
               >
                 {{ t('library.dialogs.save') }}

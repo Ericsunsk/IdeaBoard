@@ -11,7 +11,7 @@ type SelectionControllerOptions = {
 
 type MarqueeState = {
   selectedNodeIds: Set<string>
-  toggle: boolean
+  shouldToggle: boolean
   startX: number
   startY: number
 }
@@ -42,7 +42,7 @@ export function createCanvasSelectionController(options: SelectionControllerOpti
     phase = 'marquee'
     marquee = {
       selectedNodeIds: new Set(readNodes().map((node) => node.id)),
-      toggle: event.shiftKey,
+      shouldToggle: event.shiftKey,
       startX: event.clientX,
       startY: event.clientY,
     }
@@ -58,12 +58,12 @@ export function createCanvasSelectionController(options: SelectionControllerOpti
     const selectedNodes = selectedElements.filter(isNode)
     const selectedEdges = selectedElements.filter((element) => !isNode(element))
     if (selectedEdges.length > 0) options.clearElements(selectedEdges)
-    if (!snapshot || !snapshot.toggle) return
+    if (!snapshot || !snapshot.shouldToggle) return
 
-    const moved =
+    const isMoved =
       Math.abs(event.clientX - snapshot.startX) > CLICK_TOLERANCE_PX ||
       Math.abs(event.clientY - snapshot.startY) > CLICK_TOLERANCE_PX
-    if (!moved && selectedNodes.length === 0) return
+    if (!isMoved && selectedNodes.length === 0) return
 
     const selectedIds = new Set(selectedNodes.map((node) => node.id))
     const nodesToUnselect = selectedNodes.filter((node) => snapshot.selectedNodeIds.has(node.id))

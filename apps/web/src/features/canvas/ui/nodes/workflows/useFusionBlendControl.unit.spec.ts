@@ -34,7 +34,7 @@ function mountBlendControl() {
   const control = scope.run(() =>
     useFusionBlendControl({
       stageRef: ref(stage),
-      enabled: ref(true),
+      isEnabled: ref(true),
       imageCount: ref(2),
       blendPoint: ref({ x: 0.5, y: 0.5 }),
       nodeWidth: computed(() => 286),
@@ -76,13 +76,13 @@ describe('useFusionBlendControl', () => {
     window.dispatchEvent(
       createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }),
     )
-    expect(control.blendDragging.value).toBe(true)
+    expect(control.isBlendDragging.value).toBe(true)
 
     window.dispatchEvent(
       createPointerEvent('pointerup', { pointerId: 7, clientX: 150, clientY: 75 }),
     )
     expect(onCommit).toHaveBeenCalledTimes(1)
-    expect(control.blendDragging.value).toBe(false)
+    expect(control.isBlendDragging.value).toBe(false)
   })
 
   it('reverts the draft blend point on pointercancel without committing', () => {
@@ -93,13 +93,13 @@ describe('useFusionBlendControl', () => {
     window.dispatchEvent(
       createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }),
     )
-    expect(control.blendDragging.value).toBe(true)
+    expect(control.isBlendDragging.value).toBe(true)
 
     window.dispatchEvent(
       createPointerEvent('pointercancel', { pointerId: 7, clientX: 150, clientY: 75 }),
     )
     expect(onCommit).not.toHaveBeenCalled()
-    expect(control.blendDragging.value).toBe(false)
+    expect(control.isBlendDragging.value).toBe(false)
     expect(control.activeBlendPoint.value).toEqual({ x: 0.5, y: 0.5 })
   })
 
@@ -113,6 +113,6 @@ describe('useFusionBlendControl', () => {
       createPointerEvent('pointerup', { pointerId: 7, clientX: 150, clientY: 75 }),
     )
     expect(onCommit).not.toHaveBeenCalled()
-    expect(control.blendDragging.value).toBe(false)
+    expect(control.isBlendDragging.value).toBe(false)
   })
 })

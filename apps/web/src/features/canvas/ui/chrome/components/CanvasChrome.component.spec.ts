@@ -11,7 +11,7 @@ describe('CanvasChrome', () => {
   it('keeps only accessible viewport zoom controls without autosave feedback controls', () => {
     render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -36,11 +36,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -58,7 +58,7 @@ describe('CanvasChrome', () => {
   it('places the credits balance immediately before the share control', () => {
     render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -83,11 +83,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -105,7 +105,7 @@ describe('CanvasChrome', () => {
   it('exposes an executable catalog reload recovery action', async () => {
     const { emitted } = render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -130,11 +130,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -146,7 +146,7 @@ describe('CanvasChrome', () => {
   it('starts Board rename from the keyboard before confirming the draft', async () => {
     const { emitted, user } = renderWithUser(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -171,11 +171,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -191,7 +191,7 @@ describe('CanvasChrome', () => {
     const setNameInputRef = vi.fn()
     const { emitted, user, rerender } = renderWithUser(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -216,11 +216,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -263,7 +263,7 @@ describe('CanvasChrome', () => {
   it('keeps Board catalog selection and recovery retry keyboard-accessible', async () => {
     const { emitted, user } = renderWithUser(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -291,11 +291,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -311,7 +311,7 @@ describe('CanvasChrome', () => {
   it('places an active Library control immediately above the minimap control', async () => {
     const { emitted, user } = renderWithUser(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -336,11 +336,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: true,
-          libraryOpen: true,
-          minimapEnabled: false,
+          isLibraryMounted: true,
+          isLibraryOpen: true,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -356,7 +356,7 @@ describe('CanvasChrome', () => {
   it('publishes a scoped focus state for contained Library inputs', () => {
     const { emitted } = render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -381,11 +381,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: true,
-          libraryOpen: true,
-          minimapEnabled: false,
+          isLibraryMounted: true,
+          isLibraryOpen: true,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
       slots: {
         library: () => h('input', { 'aria-label': 'Library folder name' }),
@@ -402,7 +402,7 @@ describe('CanvasChrome', () => {
   it('keeps the full Canvas Chrome inaccessible while hidden and inert', () => {
     const { container } = render(CanvasChrome, {
       props: {
-        inert: true,
+        isInert: true,
         isHidden: true,
         board: {
           currentName: 'Untitled',
@@ -427,11 +427,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -446,7 +446,7 @@ describe('CanvasChrome', () => {
   it('hides the archived banner for live boards', () => {
     render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -471,11 +471,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -485,7 +485,7 @@ describe('CanvasChrome', () => {
   it('shows a non-dismissible archived banner with a restore action', async () => {
     const { emitted } = render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -510,11 +510,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 
@@ -531,7 +531,7 @@ describe('CanvasChrome', () => {
   it('disables the restore action while a restore is in flight', () => {
     render(CanvasChrome, {
       props: {
-        inert: false,
+        isInert: false,
         isHidden: false,
         board: {
           currentName: 'Untitled',
@@ -556,11 +556,11 @@ describe('CanvasChrome', () => {
         },
         tools: {
           activeTool: 'select',
-          libraryMounted: false,
-          libraryOpen: false,
-          minimapEnabled: false,
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
         },
-        status: { exportDisabled: false, zoomLevel: 100 },
+        status: { isExportDisabled: false, zoomLevel: 100 },
       },
     })
 

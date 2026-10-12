@@ -4,10 +4,10 @@
     :node-id="node.id"
     :width="node.width"
     :title="node.title || t('canvas.node.fusion')"
-    :active="active"
-    :dragging="dragging"
-    :copy-mode="copyMode"
-    rounded-header
+    :is-active="isActive"
+    :is-dragging="isDragging"
+    :is-copy-mode="isCopyMode"
+    is-rounded-header
     @node-mousedown="emit('node-mousedown', $event)"
     @update:title="emit('update:title', $event)"
     @delete="emit('delete')"
@@ -20,8 +20,8 @@
       @contextmenu.stop
     >
       <FusionStage
-        :active="active"
-        :connection-drop-target="connectionDropTarget"
+        :is-active="isActive"
+        :is-connection-drop-target="isConnectionDropTarget"
         :blend-point="node.blendPoint"
         :input-images="node.inputImages"
         :width="node.width"
@@ -31,16 +31,16 @@
         @input-image-remove="emit('input-image-remove', $event)"
         @contextmenu="emit('contextmenu', $event)"
       />
-      <NodeFloatingControls v-if="showPromptComposer">
+      <NodeFloatingControls v-if="shouldShowPromptComposer">
         <NodePromptComposer
           v-model="promptDraft"
-          allow-empty
+          should-allow-empty
           offset="8px"
           :placeholder="t('canvas.controls.fusionPlaceholder')"
           :aspect-ratio="aspectRatio"
           :output-resolution="node.outputResolution"
           :output-count="outputCountValue"
-          :submit-disabled="!canGenerate || props.generationAvailable === false"
+          :is-submit-disabled="!canGenerate || props.isGenerationAvailable === false"
           :billing-state="billingQuote"
           @update:aspect-ratio="emit('update:aspect-ratio', $event)"
           @update:output-resolution="emit('update:output-resolution', $event)"
@@ -75,12 +75,12 @@ import {
 
 const props = defineProps<{
   node: FusionNodeItem
-  active: boolean
-  connectionDropTarget?: boolean
-  dragging: boolean
-  copyMode: boolean
-  promptComposerVisible?: boolean
-  generationAvailable?: boolean
+  isActive: boolean
+  isConnectionDropTarget?: boolean
+  isDragging: boolean
+  isCopyMode: boolean
+  isPromptComposerVisible?: boolean
+  isGenerationAvailable?: boolean
   uiState?: NodeUiState | undefined
 }>()
 
@@ -104,12 +104,12 @@ const { t } = useI18n()
 const promptDraft = ref('')
 const visibleInputImages = computed(() => props.node.inputImages)
 const canGenerate = computed(() => visibleInputImages.value.length >= 2)
-const showPromptComposer = computed(() => !!props.promptComposerVisible)
+const shouldShowPromptComposer = computed(() => !!props.isPromptComposerVisible)
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const billingQuote = useCanvasBillingQuote(
   () => SERVICE.fusion,
-  () => showPromptComposer.value && canGenerate.value,
+  () => shouldShowPromptComposer.value && canGenerate.value,
   () =>
     buildFusionBillingReadinessRequest({
       imageUrls: visibleInputImages.value.map((image) => image.url),
@@ -128,7 +128,7 @@ watch(
 )
 
 function submitPrompt(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
-  if (!canGenerate.value || props.generationAvailable === false) return
+  if (!canGenerate.value || props.isGenerationAvailable === false) return
   emit('prompt-generate', prompt, outputCount, aspectRatio)
   promptDraft.value = ''
 }

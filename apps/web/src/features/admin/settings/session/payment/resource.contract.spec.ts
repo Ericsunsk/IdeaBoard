@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { HttpResponse, http, useMswHandlers } from '../../../../../test/msw'
-import { createAdminStripeSettingsResource } from './resource'
+import { createAdminStripeSettingsResource, type ApiStripeConfigurationSummary } from './resource'
 
-const responseData = {
+const responseData: ApiStripeConfigurationSummary = {
   configured: true,
   api_key_configured: true,
   webhook_secret_configured: true,
@@ -26,17 +26,17 @@ describe('stripeSettingsResource', () => {
     )
 
     await expect(createAdminStripeSettingsResource().get()).resolves.toEqual({
-      configured: true,
-      apiKeyConfigured: true,
-      webhookSecretConfigured: true,
+      isConfigured: true,
+      isApiKeyConfigured: true,
+      isWebhookSecretConfigured: true,
       accountId: 'acct_123',
       mode: 'live',
-      chargesEnabled: true,
+      isChargesEnabled: true,
       paymentMethodConfigurationId: 'pmc_ideaboard',
       productTaxCode: 'txcd_10105001',
-      productReady: true,
-      webhookReady: true,
-      purchasesEnabled: false,
+      isProductReady: true,
+      isWebhookReady: true,
+      isPurchasesEnabled: false,
       updatedAt: '2026-08-01T00:00:00Z',
     })
   })
@@ -50,7 +50,8 @@ describe('stripeSettingsResource', () => {
           product_tax_code: 'txcd_10105001',
           purchases_enabled: true,
           reason: '',
-        })
+        } satisfies Pick<ApiStripeConfigurationSummary, 'purchases_enabled'> &
+          Record<string, unknown>)
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
           operatorReason: request.headers.get('X-Operator-Reason'),
@@ -65,13 +66,13 @@ describe('stripeSettingsResource', () => {
           apiKey: '   ',
           paymentMethodConfigurationId: ' pmc_ideaboard ',
           productTaxCode: ' txcd_10105001 ',
-          purchasesEnabled: true,
+          isPurchasesEnabled: true,
         },
         { operatorReason: '   ' },
       ),
     ).resolves.toMatchObject({
-      apiKeyConfigured: true,
-      webhookSecretConfigured: true,
+      isApiKeyConfigured: true,
+      isWebhookSecretConfigured: true,
       accountId: 'acct_123',
     })
     expect(seenHeaders.idempotencyKey).toMatch(/.+/)

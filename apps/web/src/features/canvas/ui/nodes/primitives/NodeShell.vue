@@ -4,9 +4,9 @@
     :class="[
       `${kind}-node`,
       {
-        active,
-        dragging,
-        'copy-mode': copyMode,
+        isActive,
+        isDragging,
+        'copy-mode': isCopyMode,
       },
     ]"
     :data-node-kind="kind"
@@ -14,11 +14,11 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      :class="{ 'invisible pointer-events-none': headerHidden }"
+      :class="{ 'invisible pointer-events-none': isHeaderHidden }"
       :title="title"
-      :active="active"
-      :copy-mode="copyMode"
-      :rounded="roundedHeader"
+      :is-active="isActive"
+      :is-copy-mode="isCopyMode"
+      :is-rounded="isRoundedHeader"
       @node-mousedown="emit('node-mousedown', $event)"
       @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
@@ -40,11 +40,11 @@ const props = defineProps<{
   nodeId: string | number
   width: number
   title: string
-  active: boolean
-  dragging: boolean
-  copyMode: boolean
-  roundedHeader?: boolean
-  headerHidden?: boolean
+  isActive: boolean
+  isDragging: boolean
+  isCopyMode: boolean
+  isRoundedHeader?: boolean
+  isHeaderHidden?: boolean
 }>()
 
 const emit = defineEmits<{

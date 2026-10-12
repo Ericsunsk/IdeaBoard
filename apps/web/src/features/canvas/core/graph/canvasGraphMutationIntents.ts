@@ -20,7 +20,7 @@ export type CanvasGraphConnectionTargetPolicy = {
 export type CanvasGraphNodeDragIntent = {
   nodeId: string
   position?: CanvasPoint | null
-  selected?: boolean
+  isSelected?: boolean
 }
 
 export function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
@@ -87,8 +87,8 @@ export function stageCanvasGraphNodeDragIntent(
       y: intent.position.y,
     })
   }
-  if (intent.selected !== undefined) {
-    transaction.selectNode(intent.nodeId, intent.selected)
+  if (intent.isSelected !== undefined) {
+    transaction.selectNode(intent.nodeId, intent.isSelected)
   }
   return true
 }
@@ -140,7 +140,7 @@ export function commitCanvasGraphDeleteIntent(
   intent: {
     nodeIds?: readonly CanvasGraphNodeId[] | undefined
     edgeIds?: readonly CanvasGraphEdgeId[] | undefined
-    removeConnectedEdges?: boolean | undefined
+    shouldRemoveConnectedEdges?: boolean | undefined
   },
 ): CanvasGraphTransactionSummary {
   const nodeIds = [...(intent.nodeIds ?? [])]
@@ -150,7 +150,7 @@ export function commitCanvasGraphDeleteIntent(
     transaction.batchDelete({
       nodeIds,
       edgeIds,
-      removeConnectedEdges: intent.removeConnectedEdges ?? true,
+      shouldRemoveConnectedEdges: intent.shouldRemoveConnectedEdges ?? true,
     })
     return transaction.commit()
   } catch (error) {
@@ -163,19 +163,19 @@ export function commitCanvasGraphDeleteGroupIntent(
   store: CanvasGraphStore,
   intent: {
     groupId: CanvasGraphGroupId
-    deleteMembers?: boolean
-    removeConnectedEdges?: boolean
+    shouldDeleteMembers?: boolean
+    shouldRemoveConnectedEdges?: boolean
   },
 ): CanvasGraphTransactionSummary {
   const group = store.getGroup(intent.groupId)
-  const nodeIds = intent.deleteMembers ? [...(group?.nodeIds ?? [])] : []
+  const nodeIds = intent.shouldDeleteMembers ? [...(group?.nodeIds ?? [])] : []
   const transaction = store.beginTransaction('group-delete')
   try {
     transaction.ungroup(intent.groupId)
     if (nodeIds.length > 0) {
       transaction.batchDelete({
         nodeIds,
-        removeConnectedEdges: intent.removeConnectedEdges ?? true,
+        shouldRemoveConnectedEdges: intent.shouldRemoveConnectedEdges ?? true,
       })
     }
     return transaction.commit()

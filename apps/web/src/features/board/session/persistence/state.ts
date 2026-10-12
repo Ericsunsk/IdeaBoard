@@ -26,7 +26,7 @@ function toValidBoardState(
   options: { throwOnInvalid?: boolean; boardId?: string } = {},
 ): BoardState | null {
   const result = normalizeBoardState(item, { mode: 'result', boundary })
-  if (result.ok) return result.value
+  if (result.isOk) return result.value
   console.warn('[canvas] invalid board state rejected', options.boardId, result.error)
   if (options.throwOnInvalid) {
     throw new InvalidBoardStateError(result.error)

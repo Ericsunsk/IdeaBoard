@@ -139,7 +139,7 @@ export function useForm<TValues extends Record<string, unknown>>(
   })
 
   const isValid = computed(() => {
-    return Object.values(errors.value).every((err) => !err)
+    return Object.values(errors.value).every((caughtError) => !caughtError)
   })
 
   function setFieldValue<K extends keyof TValues>(field: K, value: TValues[K]) {

@@ -73,8 +73,8 @@ describe('boardStateSchema', () => {
       boundary: 'board-save',
     })
 
-    expect(result.ok).toBe(true)
-    if (result.ok) {
+    expect(result.isOk).toBe(true)
+    if (result.isOk) {
       expect(result.value.imageNodes[0]?.outputResolution).toBe('1k')
       expect(result.value.promptNodes[0]?.outputResolution).toBe('1k')
       expect(result.value.fusionNodes[0]?.outputResolution).toBe('1k')

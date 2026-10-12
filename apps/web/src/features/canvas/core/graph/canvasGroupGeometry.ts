@@ -53,7 +53,7 @@ export type CanvasGroupFrame = {
   id: CanvasGraphGroupId
   nodeIds: CanvasGraphNodeId[]
   bounds: CanvasRect
-  selected: boolean
+  isSelected: boolean
   order: number
 }
 
@@ -232,7 +232,7 @@ export function resolveCanvasSelectionGroupActionBounds(options: {
   action: CanvasSelectionGroupGeometryAction | null
   nodes: readonly CanvasFlowNodeLike[]
   frames: readonly CanvasGroupFrame[]
-  requireSelectedGroupFrame?: boolean
+  shouldRequireSelectedGroupFrame?: boolean
 }): CanvasRect | null {
   const { action } = options
   if (!action) return null
@@ -240,7 +240,8 @@ export function resolveCanvasSelectionGroupActionBounds(options: {
   if (action.kind === 'ungroup') {
     const frame = options.frames.find(
       (item) =>
-        item.id === action.groupId && (options.requireSelectedGroupFrame !== true || item.selected),
+        item.id === action.groupId &&
+        (options.shouldRequireSelectedGroupFrame !== true || item.isSelected),
     )
     if (frame) return frame.bounds
   }
@@ -336,7 +337,7 @@ export function resolveCanvasGroupFrames(options: {
         id: group.id as CanvasGraphGroupId,
         nodeIds,
         bounds: canvasGroupToRect(group),
-        selected: group.id === options.selectedGroupId,
+        isSelected: group.id === options.selectedGroupId,
         order,
       },
     ]

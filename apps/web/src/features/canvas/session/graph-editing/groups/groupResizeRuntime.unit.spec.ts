@@ -25,7 +25,7 @@ describe('groupResizeRuntime', () => {
         id: 'group-1',
         nodeIds: [],
         bounds: { left: 10, top: 10, right: 110, bottom: 110, width: 100, height: 100 },
-        selected: true,
+        isSelected: true,
         order: 0,
       },
     ])
@@ -54,8 +54,8 @@ describe('groupResizeRuntime', () => {
     const { runtime } = createHarness()
     expect(runtime.isActive()).toBe(false)
 
-    const began = runtime.begin('group-1', 'se', { x: 110, y: 110 })
-    expect(began).toBe(true)
+    const isBegan = runtime.begin('group-1', 'se', { x: 110, y: 110 })
+    expect(isBegan).toBe(true)
     expect(runtime.isActive()).toBe(true)
   })
 
@@ -79,8 +79,8 @@ describe('groupResizeRuntime', () => {
     runtime.begin('group-1', 'se', { x: 110, y: 110 })
     runtime.move({ x: 160, y: 160 })
 
-    const committed = runtime.commit()
-    expect(committed).toBe(true)
+    const isCommitted = runtime.commit()
+    expect(isCommitted).toBe(true)
     expect(runtime.isActive()).toBe(false)
 
     const group = session.store.getGroup('group-1')

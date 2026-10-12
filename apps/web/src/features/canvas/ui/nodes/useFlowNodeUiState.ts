@@ -109,7 +109,7 @@ function arePrimaryActionsEqual(
   right: NodeUiState['primaryAction'],
 ) {
   if (!left || !right) return left === right
-  return left.label === right.label && left.disabled === right.disabled
+  return left.label === right.label && left.isDisabled === right.isDisabled
 }
 
 function areConnectionStatesEqual(
@@ -177,9 +177,9 @@ function getNodeConnectionStatus(
 
   getCanvasNodeVisibleInputPorts(nodeType).forEach((portContract) => {
     const matchedEdges = incomingEdges.filter((edge) => edge.targetPort === portContract.port)
-    const connected = matchedEdges.length > 0
-    incoming[portContract.port] = connected
-    if (!connected) {
+    const isConnected = matchedEdges.length > 0
+    incoming[portContract.port] = isConnected
+    if (!isConnected) {
       pendingIncoming[portContract.port] = false
       return
     }
@@ -220,7 +220,7 @@ function buildPrimaryAction(
   if (isRunning) {
     return {
       label: actionLabels.running,
-      disabled: true,
+      isDisabled: true,
     }
   }
 
@@ -241,7 +241,7 @@ function buildPrimaryAction(
           : i18n.global.t('canvas.edges.connectRequiredInputsLabel', {
               count: disconnectedPorts.length,
             }),
-      disabled: true,
+      isDisabled: true,
     }
   }
 
@@ -257,13 +257,13 @@ function buildPrimaryAction(
         pendingPorts.length === 1
           ? i18n.global.t('canvas.edges.waitForInputLabel', { label: pendingLabels[0] })
           : i18n.global.t('canvas.edges.waitForInputsLabel', { count: pendingPorts.length }),
-      disabled: true,
+      isDisabled: true,
     }
   }
 
   return {
     label: actionLabels.ready,
-    disabled: false,
+    isDisabled: false,
   }
 }
 
@@ -321,7 +321,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         hasAnyConnection: status.hasAnyConnection,
         connected: {
           ...status.incoming,
-          output: !!status.outgoing[getCanvasNodePrimaryOutputPort(nodeType)],
+          isOutput: !!status.outgoing[getCanvasNodePrimaryOutputPort(nodeType)],
         },
         pending: {
           ...status.pendingIncoming,

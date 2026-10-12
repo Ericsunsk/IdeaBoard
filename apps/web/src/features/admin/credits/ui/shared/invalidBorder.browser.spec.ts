@@ -33,7 +33,7 @@ describe('Admin invalid border browser contract', () => {
 
   it('keeps the Admin invalid border above hover and focus', async () => {
     const rendered = renderWithUser(AdminInput, {
-      props: { invalid: true, ariaLabel: 'Admin invalid input' },
+      props: { isInvalid: true, ariaLabel: 'Admin invalid input' },
     })
     try {
       const input = rendered.container.querySelector('input') as HTMLElement

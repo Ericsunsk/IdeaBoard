@@ -71,7 +71,7 @@ describe('board draft overlay', () => {
       state: makePromptBoardState(1_000, 'remote-winner'),
     })
 
-    await hydrateBoardsFromServer({ preserveLocalNewer: false })
+    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
 
     expect(listBoards()[0]?.name).toBe('Remote Winner')
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')
@@ -146,7 +146,7 @@ describe('board draft overlay', () => {
     getWorkspaceSelectionStore().select(WORKSPACE_B)
     resolveRequest(apiState.boardsResponse)
 
-    await expect(hydrateTask).resolves.toMatchObject({ ok: false })
+    await expect(hydrateTask).resolves.toMatchObject({ isOk: false })
     expect(listBoards()).toEqual([])
     expect(getBoardState('board-a')).toBeNull()
   })

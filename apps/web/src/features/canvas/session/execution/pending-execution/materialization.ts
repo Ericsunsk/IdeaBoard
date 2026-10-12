@@ -102,10 +102,10 @@ export function assertPendingImageMutationContract(
   if (changedIds.size !== result.changedNodeIds.length) {
     throw new PendingImageMutationContractError('Mutation returned duplicate changed node ids')
   }
-  const changedIdsMatch =
+  const isChangedIdsMatch =
     changedIds.size === materializedIds.size &&
     [...changedIds].every((resultNodeId) => materializedIds.has(resultNodeId))
-  if (!changedIdsMatch) {
+  if (!isChangedIdsMatch) {
     throw new PendingImageMutationContractError(
       'Mutation changed node ids must match materialized outcomes',
     )

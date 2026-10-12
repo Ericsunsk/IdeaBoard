@@ -22,7 +22,7 @@ type CanvasScreenSurfaceInteractionOptions = {
   canvasWrapRef: Ref<HTMLElement | null>
   activeTool: Ref<'select' | 'hand'>
   isCanvasMinimapEnabled: Ref<boolean>
-  duplicateModifierPressed: Ref<boolean>
+  isDuplicateModifierPressed: Ref<boolean>
   activePanels: ActivePanels
 }
 
@@ -34,7 +34,7 @@ function useScreenTransientUi(
   const { hideStrengthControl, cancelOutpaint } = commands.imageWorkflow
   const hasCanvasDismissableLayer = computed(
     () =>
-      contextMenu.nodeContextMenu.value.visible ||
+      contextMenu.nodeContextMenu.value.isVisible ||
       options.activePanels.activeNodePanel.value !== null,
   )
   const { dismissTransientCanvasUi } = useFlowTransientUiDismissal({
@@ -46,12 +46,12 @@ function useScreenTransientUi(
   })
 
   useCanvasCustomLayerOverlay({
-    visible: hasCanvasDismissableLayer,
+    isVisible: hasCanvasDismissableLayer,
     ignore: ['.node-tool-surface', '.canvas-node-context-menu', '[data-inpaint]', '[data-retouch]'],
     ownerDocument: () =>
       options.canvasWrapRef.value?.ownerDocument ??
       (typeof document === 'undefined' ? null : document),
-    onDismiss: () => dismissTransientCanvasUi({ closeContextMenu: true }),
+    onDismiss: () => dismissTransientCanvasUi({ shouldCloseContextMenu: true }),
   })
 
   return dismissTransientCanvasUi
@@ -108,7 +108,7 @@ function useScreenNodeDragInteractions(
   const dragInteractions = useFlowNodeDragInteractions({
     beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
     commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
-    duplicateModifierPressed: options.duplicateModifierPressed,
+    isDuplicateModifierPressed: options.isDuplicateModifierPressed,
     beginFlowNodeDragDuplicateTracking: commands.graphEditing.beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
@@ -188,7 +188,7 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
     if (!isCanvasGroupInteractionEnabled.value) return false
     const didDelete = commands.graphEditing.grouping.deleteSelectedGroup()
     if (didDelete) {
-      dismissTransientCanvasUi({ closeOutpaint: true, closeContextMenu: true })
+      dismissTransientCanvasUi({ shouldCloseOutpaint: true, shouldCloseContextMenu: true })
     }
     return didDelete
   }
@@ -245,14 +245,14 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
 
   function onNodesChange(changes: NodeChange[]) {
     if (changes.some((change) => change.type === 'remove')) {
-      dismissTransientCanvasUi({ closeOutpaint: true, closeContextMenu: true })
+      dismissTransientCanvasUi({ shouldCloseOutpaint: true, shouldCloseContextMenu: true })
     }
     commands.flowPane.onNodesChange(changes)
   }
 
   function handleNodeContextMenuCreate(kind: CanvasCreatableNodeKind) {
     contextMenu.createNode(kind, commands.graphEditing.createNodeAtPosition)
-    dismissTransientCanvasUi({ closeOutpaint: true })
+    dismissTransientCanvasUi({ shouldCloseOutpaint: true })
   }
 
   return {

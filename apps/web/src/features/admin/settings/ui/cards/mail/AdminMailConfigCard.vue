@@ -302,9 +302,9 @@ async function load() {
   try {
     const data = await resource.value.get()
     populate(data)
-  } catch (err) {
-    error.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.mailLoadFailed)
-    feedback.loadFailed(err)
+  } catch (caughtError) {
+    error.value = formatAdminDisplayError(caughtError, SETTINGS_MESSAGES.mailLoadFailed)
+    feedback.loadFailed(caughtError)
   } finally {
     loading.value = false
   }
@@ -350,8 +350,8 @@ const save = form.handleSubmit(async (values) => {
     })
     populate(updated)
     feedback.saved()
-  } catch (err) {
-    feedback.saveFailed(err)
+  } catch (caughtError) {
+    feedback.saveFailed(caughtError)
   } finally {
     saving.value = false
   }
@@ -383,8 +383,8 @@ async function toggleEnabled(next: boolean) {
       onSuccess: () => {
         feedback.saved()
       },
-      onFailure: (_, __, err) => {
-        feedback.saveFailed(err)
+      onFailure: (_, _previous, caughtError) => {
+        feedback.saveFailed(caughtError)
       },
     },
   )
@@ -403,8 +403,8 @@ async function clear() {
     await resource.value.clear({ operatorReason })
     await load()
     feedback.cleared()
-  } catch (err) {
-    feedback.clearFailed(err)
+  } catch (caughtError) {
+    feedback.clearFailed(caughtError)
   } finally {
     saving.value = false
   }
@@ -423,8 +423,8 @@ async function sendTest() {
     await resource.value.test(target, { operatorReason: '' })
     await load()
     feedback.testSent()
-  } catch (err) {
-    feedback.testFailed(err)
+  } catch (caughtError) {
+    feedback.testFailed(caughtError)
   } finally {
     testing.value = false
   }

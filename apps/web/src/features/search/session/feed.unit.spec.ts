@@ -43,8 +43,8 @@ function dependencies(overrides: Partial<SearchFeedDependencies> = {}): SearchFe
   }
 }
 
-function page(results: SearchResult[], next_cursor = '', has_more = false): SearchPage {
-  return { query: 'cafe', results, next_cursor, has_more }
+function page(results: SearchResult[], nextCursor = '', hasMore = false): SearchPage {
+  return { query: 'cafe', results, next_cursor: nextCursor, has_more: hasMore }
 }
 
 function createFeed(deps: SearchFeedDependencies, query = 'cafe') {

@@ -20,11 +20,11 @@ function createPromptNode(id: string, x: number, y: number, width = 280): Node {
   } as Node
 }
 
-function createFrame(id: CanvasGraphGroupId, selected = true): CanvasGroupFrame {
+function createFrame(id: CanvasGraphGroupId, isSelected = true): CanvasGroupFrame {
   return {
     id,
     nodeIds: ['prompt-1', 'prompt-2'],
-    selected,
+    isSelected,
     order: 0,
     bounds: {
       left: 100,
@@ -56,7 +56,7 @@ function createPointerEvent(
 
 function createHarness(
   options: {
-    enabled?: boolean
+    isEnabled?: boolean
     action?: CanvasSelectionGroupAction | null
     viewport?: CanvasFlowViewportTransform
   } = {},
@@ -71,7 +71,7 @@ function createHarness(
   const action = ref<CanvasSelectionGroupAction | null>(
     options.action ?? { kind: 'group', label: '组合', nodeIds: ['prompt-1', 'prompt-2'] },
   )
-  const isEnabled = ref(options.enabled ?? true)
+  const isEnabled = ref(options.isEnabled ?? true)
   const paneSelectionPointerDownCapture = vi.fn()
   const selectGroupAtPoint = vi.fn(() => true)
   const groupDrag = {
@@ -162,7 +162,7 @@ describe('useCanvasGroupPresentationInteraction', () => {
     const addListener = vi.spyOn(window, 'addEventListener')
     const pane = document.createElement('div')
     pane.className = 'vue-flow__pane'
-    const harness = createHarness({ enabled: false })
+    const harness = createHarness({ isEnabled: false })
     const event = createPointerEvent(pane)
 
     harness.runtime.onCanvasPointerDownCapture(event)

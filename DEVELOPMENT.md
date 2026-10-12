@@ -145,7 +145,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 使用四 bundle parity check；交互与样式行为通过 Playwright browser specs 验证。
 
-ESLint 直接执行治理规则。Canvas 高频交互态禁用 Query 为 error；其余治理规则的 severity 以 `eslint.config.js` 为准。boolean-prefix 使用 TypeScript type-aware ESLint，现有例外保存在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线。`no-barrel-import` 提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。
+ESLint 直接执行治理规则。Canvas 高频交互态禁用 Query 为 error；其余治理规则的 severity 以 `eslint.config.js` 为准。boolean-prefix 使用 TypeScript type-aware ESLint，现有例外保存在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线，`npm run lint` 以 `--max-warnings=0` 拒绝任何 warning。自有 boolean fields 与仓内消费者直接使用 predicate names，不保留旧名 alias。DOM、第三方 SDK 与 generated DTO 字段按真实类型契约检查；自有 wire/persisted DTO 用 `@externalContract` 标明外部契约，仅豁免该契约的字段。显式 dictionary 的 keys 是 identities，显式声明的自有 fields 仍受命名检查。`no-barrel-import` 提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。
 
 ### 显式负载 harness
 

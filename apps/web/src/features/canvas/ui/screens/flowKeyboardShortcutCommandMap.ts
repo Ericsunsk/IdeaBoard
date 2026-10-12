@@ -18,13 +18,13 @@ export type FlowKeyboardShortcutHandlers = {
 }
 
 type ShortcutCommandResult = {
-  handled: boolean
-  preventDefault?: boolean
+  isHandled: boolean
+  shouldPreventDefault?: boolean
 }
 
 type FlowKeyboardShortcutCommand = {
   id: string
-  allowEditableTarget?: boolean
+  shouldAllowEditableTarget?: boolean
   match: (event: KeyboardEvent, key: string) => boolean
   run: (
     event: KeyboardEvent,
@@ -68,19 +68,19 @@ function isCanvasShortcutSuppressed(
 const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   {
     id: 'save',
-    allowEditableTarget: true,
+    shouldAllowEditableTarget: true,
     match: (event, key) => hasCommandModifier(event) && key === 's',
     run: (_event, handlers) => {
       void handlers.onSave()
-      return { handled: true, preventDefault: true }
+      return { isHandled: true, shouldPreventDefault: true }
     },
   },
   {
     id: 'escape',
     match: (_event, key) => key === 'escape',
     run: (_event, handlers) => ({
-      handled: true,
-      preventDefault: handlers.onEscape?.() === true,
+      isHandled: true,
+      shouldPreventDefault: handlers.onEscape?.() === true,
     }),
   },
   {
@@ -88,18 +88,18 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
     match: (event, key) => hasCommandModifier(event) && key === 'z',
     run: (event, handlers) => {
       const handler = event.shiftKey ? handlers.onRedo : handlers.onUndo
-      if (!handler) return { handled: true }
+      if (!handler) return { isHandled: true }
       handler()
-      return { handled: true, preventDefault: true }
+      return { isHandled: true, shouldPreventDefault: true }
     },
   },
   {
     id: 'redo-y',
     match: (event, key) => !event.metaKey && event.ctrlKey && key === 'y',
     run: (_event, handlers) => {
-      if (!handlers.onRedo) return { handled: true }
+      if (!handlers.onRedo) return { isHandled: true }
       handlers.onRedo()
-      return { handled: true, preventDefault: true }
+      return { isHandled: true, shouldPreventDefault: true }
     },
   },
   {
@@ -111,9 +111,9 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
         key,
         event.shiftKey ? KEYBOARD_PAN_FAST_STEP : KEYBOARD_PAN_STEP,
       )
-      if (!delta) return { handled: false }
+      if (!delta) return { isHandled: false }
       handlers.onPanViewport?.(delta)
-      return { handled: true, preventDefault: true }
+      return { isHandled: true, shouldPreventDefault: true }
     },
   },
   {
@@ -122,7 +122,7 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
       !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && key === 'v',
     run: (_event, handlers) => {
       handlers.onToolSelect?.()
-      return { handled: true }
+      return { isHandled: true }
     },
   },
   {
@@ -131,7 +131,7 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
       !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && key === 'h',
     run: (_event, handlers) => {
       handlers.onToolHand?.()
-      return { handled: true }
+      return { isHandled: true }
     },
   },
   {
@@ -139,7 +139,7 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
     match: (event) => event.code === 'Space',
     run: (_event, handlers) => {
       handlers.onSpacePressedChange?.(true)
-      return { handled: true }
+      return { isHandled: true }
     },
   },
   {
@@ -147,18 +147,18 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
     match: (event) => event.key === 'Alt',
     run: (_event, handlers) => {
       handlers.onDuplicateModifierChange?.(true)
-      return { handled: true }
+      return { isHandled: true }
     },
   },
   {
     id: 'inline-delete',
     match: (_event, key) => key === 'delete' || key === 'backspace',
     run: (event, handlers) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return { handled: false }
-      if (!handlers.onDeleteInlineSelection) return { handled: false }
+      if (event.metaKey || event.ctrlKey || event.altKey) return { isHandled: false }
+      if (!handlers.onDeleteInlineSelection) return { isHandled: false }
       return {
-        handled: true,
-        preventDefault: handlers.onDeleteInlineSelection(),
+        isHandled: true,
+        shouldPreventDefault: handlers.onDeleteInlineSelection(),
       }
     },
   },
@@ -173,10 +173,10 @@ export function dispatchFlowKeyboardShortcutKeydown(
   const isEditableTarget = isEditableEventTarget(event.target)
   for (const command of flowKeyboardShortcutCommands) {
     if (!command.match(event, key)) continue
-    if (!command.allowEditableTarget && isEditableTarget) return false
+    if (!command.shouldAllowEditableTarget && isEditableTarget) return false
     const result = command.run(event, handlers, key)
-    if (result.preventDefault) event.preventDefault()
-    return result.handled
+    if (result.shouldPreventDefault) event.preventDefault()
+    return result.isHandled
   }
   return false
 }

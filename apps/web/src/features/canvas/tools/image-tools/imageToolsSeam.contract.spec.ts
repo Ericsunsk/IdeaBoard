@@ -25,7 +25,7 @@ const _anchorSeam: RetouchChromeAnchorRect | null =
  * Cycle note: retouch/inpaint chrome and the coordinate adapter consume the
  * zone leaf entries (ui/ChromeFrame.vue, core/imageToolChrome.ts)
  * rather than this barrel — routing those four edges through the barrel
- * creates mutual-barrel no-circular violations (measured 27, lint exit 1).
+ * creates mutual-barrel no-circular violations (isMeasured 27, lint exit 1).
  * The barrel entries below stay as the declared seam for future
  * consolidation (e.g. a shared chrome seam) without changing call sites.
  */

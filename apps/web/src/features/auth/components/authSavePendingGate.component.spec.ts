@@ -48,7 +48,10 @@ function renderLoginPanel() {
       HttpResponse.json({
         code: 0,
         msg: 'ok',
-        data: { social: { google: false, discord: false }, providers: [] },
+        data: {
+          social: { google: false, discord: false } satisfies Record<string, boolean>,
+          providers: [],
+        },
       }),
     ),
   )

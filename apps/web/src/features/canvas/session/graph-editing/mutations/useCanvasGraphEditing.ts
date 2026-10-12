@@ -45,7 +45,7 @@ export type CanvasGraphEditingUploadAdapter = {
 }
 
 export type CanvasGraphEditingNodeInteractionsOptions = {
-  dismissTransientCanvasUi: (options?: { closeContextMenu?: boolean }) => void
+  dismissTransientCanvasUi: (options?: { shouldCloseContextMenu?: boolean }) => void
   discardNodeEdits: (nodeId: string) => void
 }
 
@@ -96,7 +96,7 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
   function updateSnapshotNode(
     nodeId: string,
     mutate: SnapshotNodeMutator,
-    updateOptions?: { history?: boolean },
+    updateOptions?: { shouldRecordHistory?: boolean },
   ) {
     nodeMutations.updateSnapshotNode(nodeId, mutate, updateOptions)
     scheduleFlowNodeInternalsRefresh([nodeId])
@@ -258,7 +258,7 @@ function useGraphEditingLibraryImport(
       nodeMutations.updateSnapshotNode(
         nodeId,
         (snapshot) => (snapshot.type === 'image-node' ? mutate(snapshot) : snapshot),
-        { history: false },
+        { shouldRecordHistory: false },
       ),
     createImageNodeAtPosition: (x, y, initialSnapshotPatch) =>
       nodeMutations.createNodeAtPosition('image', x, y, initialSnapshotPatch),
@@ -285,7 +285,7 @@ function useGraphEditingImageUploads(
           ...(state ? { localUpload: state } : { localUpload: undefined }),
         },
       },
-      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+      createFlowGraphCommandOptions({ shouldRecordHistory: false, shouldMarkDirty: false }),
     )
   }
 

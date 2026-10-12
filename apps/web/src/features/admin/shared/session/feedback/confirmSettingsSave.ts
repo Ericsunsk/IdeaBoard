@@ -44,7 +44,7 @@ export async function confirmSettingsSave(
       message: options.message,
       confirmLabel: options.confirmLabel ?? '确认',
       intent: 'danger',
-      reason: options.reason ?? { required: true },
+      reason: options.reason ?? { isRequired: true },
     })
     if (!confirmed) return null
     return requireDestructiveReason(confirm)
@@ -54,7 +54,7 @@ export async function confirmSettingsSave(
     message: options.message,
     confirmLabel: options.confirmLabel ?? '保存',
     intent: 'warn',
-    reason: options.reason ?? { required: false, placeholder: '可留空，将记录为常规操作…' },
+    reason: options.reason ?? { isRequired: false, placeholder: '可留空，将记录为常规操作…' },
   })
   if (!confirmed) return null
   return readReversibleReason(confirm)

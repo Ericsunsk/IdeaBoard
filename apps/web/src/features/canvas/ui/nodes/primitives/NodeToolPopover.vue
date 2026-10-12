@@ -1,7 +1,7 @@
 <template>
   <Transition v-bind="transientOverlayMotion">
     <div
-      v-if="visible"
+      v-if="isVisible"
       v-bind="$attrs"
       class="node-tool-output-count-popover node-tool-glass-surface"
       :class="layoutClass"
@@ -16,7 +16,7 @@ import { createPopoverMotionTransition } from '../../../../../core/motion/popove
 
 const props = withDefaults(
   defineProps<{
-    visible: boolean
+    isVisible: boolean
     layout?: 'grid' | 'row'
   }>(),
   {

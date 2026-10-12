@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ControlCreatedRewardCode } from '../../../../../api/generated-query/control/model/controlCreatedRewardCode'
 import { createAdminRewardCodeResource } from './resource'
 
 const transport = vi.hoisted(() => ({
@@ -52,7 +53,11 @@ describe('credits/server boundary idempotency/expiry/403', () => {
 
   it('rejects blank idempotency keys before any network call', async () => {
     transport.request.mockResolvedValue(
-      contractOk({ reward_code: codeFixture(), plaintext: 'IDEA2026', replayed: false }),
+      contractOk({
+        reward_code: codeFixture(),
+        plaintext: 'IDEA2026',
+        replayed: false,
+      } satisfies Pick<ControlCreatedRewardCode, 'replayed'> & Record<string, unknown>),
     )
     const resource = createAdminRewardCodeResource()
 
@@ -74,7 +79,11 @@ describe('credits/server boundary idempotency/expiry/403', () => {
 
   it('rejects expired inputs before any network call', async () => {
     transport.request.mockResolvedValue(
-      contractOk({ reward_code: codeFixture(), plaintext: 'IDEA2026', replayed: false }),
+      contractOk({
+        reward_code: codeFixture(),
+        plaintext: 'IDEA2026',
+        replayed: false,
+      } satisfies Pick<ControlCreatedRewardCode, 'replayed'> & Record<string, unknown>),
     )
     const resource = createAdminRewardCodeResource()
 
@@ -126,7 +135,11 @@ describe('credits/server boundary idempotency/expiry/403', () => {
 
   it('keeps header-only identities unchanged for valid intents', async () => {
     transport.request.mockResolvedValue(
-      contractOk({ reward_code: codeFixture(), plaintext: 'IDEA2026', replayed: false }),
+      contractOk({
+        reward_code: codeFixture(),
+        plaintext: 'IDEA2026',
+        replayed: false,
+      } satisfies Pick<ControlCreatedRewardCode, 'replayed'> & Record<string, unknown>),
     )
     const resource = createAdminRewardCodeResource()
 

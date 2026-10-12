@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Node } from '@vue-flow/core'
 import { createCanvasSelectionController } from './canvasSelectionController'
 
-function node(id: string, selected = false): Node {
-  return { id, position: { x: 0, y: 0 }, selected } as Node
+function node(id: string, isSelected = false): Node {
+  return { id, position: { x: 0, y: 0 }, selected: isSelected } as Node &
+    Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>
 }
 
 describe('canvas selection controller', () => {

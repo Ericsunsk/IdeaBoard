@@ -3,9 +3,9 @@ import type { CanvasVueFlowGraphCommandOptions } from '../projection/useCanvasVu
 const FLOW_GRAPH_COMMAND_SIDE_EFFECTS_METADATA_KEY = 'flowGraphCommandSideEffects'
 
 export type FlowGraphCommandSideEffectOptions = {
-  recordHistory?: boolean
+  shouldRecordHistory?: boolean
   historyBefore?: unknown
-  markDirty?: boolean
+  shouldMarkDirty?: boolean
 }
 
 export function createFlowGraphCommandOptions(

@@ -406,7 +406,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
       expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
       expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(true)
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(true)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').isDirectGenerating).toBe(
         true,
       )
       expect(harness.createPendingRetouchNode).toHaveBeenCalledWith(
@@ -433,7 +433,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
       expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(false)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-3').isDirectGenerating).toBe(
         false,
       )
       expect(harness.feedback.warning).not.toHaveBeenCalled()
@@ -662,7 +662,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
 
         expect(renderLayerStackFileMock).toHaveBeenCalledOnce()
         expect(harness.runtime.viewModel.retouch.isApplying.value).toBe(true)
-        expect(harness.runtime.viewModel.nodeBindings.actionFor('image-4').directGenerating).toBe(
+        expect(harness.runtime.viewModel.nodeBindings.actionFor('image-4').isDirectGenerating).toBe(
           true,
         )
         expect(harness.applyImageFileToImageNode).not.toHaveBeenCalled()
@@ -872,7 +872,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
       const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
       const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
-      expect(stageBinding.active).toBe(true)
+      expect(stageBinding.isActive).toBe(true)
       expect(stageBinding.mode).toBe('inpaint')
       expect(stageBinding.nodeId).toBe('image-1')
       expect(stageBinding.session.inpaint.inpaintOverlayStyle.value).toEqual({
@@ -881,7 +881,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
         width: '240px',
         height: '240px',
       })
-      expect(actionBinding.actionMenuVisible).toBe(true)
+      expect(actionBinding.isActionMenuVisible).toBe(true)
       expect(actionBinding.promptPlaceholder).toBe('Optional instructions')
     } finally {
       harness.unmount()
@@ -902,7 +902,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageBinding)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1')).toBe(actionBinding)
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-2')).toBe(inactiveStageBinding)
-      expect(inactiveStageBinding.active).toBe(false)
+      expect(inactiveStageBinding.isActive).toBe(false)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2')).toBe(
         inactiveActionBinding,
       )
@@ -931,7 +931,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
 
       expect(actionAfter).not.toBe(actionBefore)
       expect(actionAfter.strengthControl.activeAction).toBe(IMAGE_STRENGTH_ACTIONS[0])
-      expect(actionAfter.strengthControl.visible).toBe(true)
+      expect(actionAfter.strengthControl.isVisible).toBe(true)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1')).toBe(actionAfter)
     } finally {
       harness.unmount()
@@ -944,7 +944,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
     try {
       expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').isDirectGenerating).toBe(
         false,
       )
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
@@ -954,25 +954,25 @@ describe('useCanvasImageTools image retouch final apply', () => {
       const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
       expect(actionAfter).toBe(actionBefore)
-      expect(actionAfter.directGenerating).toBe(false)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating).toBe(
-        false,
-      )
+      expect(actionAfter.isDirectGenerating).toBe(false)
+      expect(
+        harness.runtime.viewModel.nodeBindings.actionFor('empty-image').isDirectGenerating,
+      ).toBe(false)
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
 
       harness.directActionRunningNodeIds.value = new Set(['image-1'])
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').isDirectGenerating).toBe(
         true,
       )
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating).toBe(
-        false,
-      )
+      expect(
+        harness.runtime.viewModel.nodeBindings.actionFor('empty-image').isDirectGenerating,
+      ).toBe(false)
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(true)
 
       harness.directActionRunningNodeIds.value = new Set()
 
       harness.generationAvailable.value = true
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').isDirectGenerating).toBe(
         false,
       )
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
@@ -1052,7 +1052,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
       expect(chromeModel.mask.brushSize).toBe(36)
       expect(chromeModel.mask.layerOpacity).toBe(40)
       expect(stageBinding.session.inpaint.brushSize.value).toBe(36)
-      expect(actionBinding.promptComposerVisible).toBe(true)
+      expect(actionBinding.isPromptComposerVisible).toBe(true)
       expect('getCommittedMaskData' in harness.runtime).toBe(false)
       expect('clearCommittedMaskData' in harness.runtime).toBe(false)
     } finally {

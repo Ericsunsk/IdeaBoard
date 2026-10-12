@@ -3,7 +3,7 @@
     <template #tools>
       <NodeToolIconButton
         class="inpaint-tool-btn node-tool-icon-button--accent-hover"
-        :active="drawMode === 'paint'"
+        :is-active="drawMode === 'paint'"
         :aria-label="t('canvas.inpaint.brushTool')"
         :tooltip="t('canvas.inpaint.brushTool')"
         @click="emit('set-draw-mode', 'paint')"
@@ -12,7 +12,7 @@
       </NodeToolIconButton>
       <NodeToolIconButton
         class="inpaint-tool-btn node-tool-icon-button--accent-hover"
-        :active="drawMode === 'erase'"
+        :is-active="drawMode === 'erase'"
         :aria-label="t('canvas.inpaint.eraserTool')"
         :tooltip="t('canvas.inpaint.eraserTool')"
         @click="emit('set-draw-mode', 'erase')"
@@ -94,7 +94,7 @@
         </NodeToolIconButton>
         <NodeToolIconButton
           class="inpaint-tool-btn"
-          :disabled="!canUndo"
+          :is-disabled="!canUndo"
           :aria-label="t('canvas.inpaint.undo')"
           :tooltip="t('canvas.inpaint.undo')"
           @click="emit('undo-mask')"
@@ -103,7 +103,7 @@
         </NodeToolIconButton>
         <NodeToolIconButton
           class="inpaint-tool-btn"
-          :disabled="!canRedo"
+          :is-disabled="!canRedo"
           :aria-label="t('canvas.inpaint.redo')"
           :tooltip="t('canvas.inpaint.redo')"
           @click="emit('redo-mask')"
@@ -116,11 +116,11 @@
         class="inpaint-composer"
         variant="floating"
         :placeholder="t('canvas.tools.maskPromptPlaceholder')"
-        :disabled="directGenerating"
+        :is-disabled="isDirectGenerating"
         :output-count="1"
-        :show-aspect-ratio="false"
-        :show-output-count="false"
-        :show-output-resolution="false"
+        :should-show-aspect-ratio="false"
+        :should-show-output-count="false"
+        :should-show-output-resolution="false"
         :billing-state="billingQuote"
         @submit="onSubmit"
       />
@@ -150,7 +150,7 @@ defineProps<{
   drawMode: ImageMaskDrawMode
   brushSize: number
   maskLayerOpacity: number
-  directGenerating?: boolean
+  isDirectGenerating?: boolean
   canUndo?: boolean
   canRedo?: boolean
   anchorRect: {

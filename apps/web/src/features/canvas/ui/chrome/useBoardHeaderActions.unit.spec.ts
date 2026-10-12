@@ -23,10 +23,10 @@ vi.mock('../../../board/ports/canvas', async (importOriginal) => {
 
 function createCatalog(
   rename: BoardRepository['commands']['rename'] = vi.fn(async () => ({
-    ok: true as const,
+    isOk: true as const,
     board: board('board-a', 'New Board'),
   })),
-  hydrate: BoardRepository['commands']['hydrate'] = vi.fn(async () => ({ ok: true as const })),
+  hydrate: BoardRepository['commands']['hydrate'] = vi.fn(async () => ({ isOk: true as const })),
 ) {
   const boards = ref([board('board-a', 'Old Board'), board('board-b', 'Taken')])
   return {
@@ -87,12 +87,12 @@ describe('useBoardHeaderActions', () => {
   it('delegates rename to the shared catalog and reports its typed failure after rollback', async () => {
     const error = new Error('offline')
     const rename = vi.fn(async () => ({
-      ok: false as const,
+      isOk: false as const,
       reason: 'sync-failed' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
       rolledBackBoard: board('board-a', 'Old Board'),
-      rollback: { ok: true as const, board: board('board-a', 'Old Board') },
+      rollback: { isOk: true as const, board: board('board-a', 'Old Board') },
       error,
     }))
     const { header, message } = createHeader(createCatalog(rename))
@@ -105,16 +105,16 @@ describe('useBoardHeaderActions', () => {
   })
 
   it('offers reload recovery when rename rollback fails', async () => {
-    const rollback = { ok: false as const, reason: 'invalid-name' as const }
+    const rollback = { isOk: false as const, reason: 'invalid-name' as const }
     const rename = vi.fn(async () => ({
-      ok: false as const,
+      isOk: false as const,
       reason: 'sync-failed' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
       rollback,
       error: new Error('offline'),
     }))
-    const hydrate = vi.fn(async () => ({ ok: true as const }))
+    const hydrate = vi.fn(async () => ({ isOk: true as const }))
     const { header, message } = createHeader(createCatalog(rename, hydrate))
 
     header.boardNameDraft.value = 'New Board'
@@ -131,7 +131,7 @@ describe('useBoardHeaderActions', () => {
     await header.reloadCatalog()
 
     expect(hydrate).toHaveBeenCalledWith({
-      preserveLocalNewer: false,
+      shouldPreserveLocalNewer: false,
       rollbackBoardIds: ['board-a'],
     })
     expect(header.catalogRecovery.value).toEqual({ status: 'idle' })
@@ -140,12 +140,12 @@ describe('useBoardHeaderActions', () => {
 
   it('reports sync-conflict hydrate success without claiming the old name was restored', async () => {
     const rename = vi.fn(async () => ({
-      ok: false as const,
+      isOk: false as const,
       reason: 'revision-conflict' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
-      rollback: { ok: true as const, board: board('board-a', 'Old Board') },
-      hydrate: { ok: true as const },
+      rollback: { isOk: true as const, board: board('board-a', 'Old Board') },
+      hydrate: { isOk: true as const },
       error: { status: 409, code: 'board_revision_conflict' },
     }))
     const { header, message } = createHeader(createCatalog(rename))
@@ -175,19 +175,19 @@ describe('useBoardHeaderActions', () => {
     expect(message.warning).toHaveBeenCalledWith(
       'Canvas name is syncing. Try renaming again shortly.',
     )
-    resolveRename({ ok: true, board: board('board-a', 'New Board') })
+    resolveRename({ isOk: true, board: board('board-a', 'New Board') })
     await task
     expect(header.isRenamePending.value).toBe(false)
   })
 
   it('keeps reload recovery available when sync-conflict hydration fails', async () => {
     const rename = vi.fn(async () => ({
-      ok: false as const,
+      isOk: false as const,
       reason: 'idempotency-conflict' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
-      rollback: { ok: true as const, board: board('board-a', 'Old Board') },
-      hydrate: { ok: false as const, error: new Error('hydrate failed') },
+      rollback: { isOk: true as const, board: board('board-a', 'Old Board') },
+      hydrate: { isOk: false as const, error: new Error('hydrate failed') },
       error: { status: 409, code: 'board_idempotency_conflict' },
     }))
     const { header, message } = createHeader(createCatalog(rename))
@@ -258,9 +258,9 @@ describe('useBoardHeaderActions', () => {
     const { header, message } = createHeader(createCatalog())
     await vi.waitFor(() => expect(header.isBoardArchived.value).toBe(true))
 
-    const restored = await header.restoreArchivedBoard()
+    const isRestored = await header.restoreArchivedBoard()
 
-    expect(restored).toBe(true)
+    expect(isRestored).toBe(true)
     expect(syncRestoreBoardToServer).toHaveBeenCalledWith('board-a')
     expect(header.isBoardArchived.value).toBe(false)
     expect(message.success).toHaveBeenCalledWith('Board restored.')
@@ -272,9 +272,9 @@ describe('useBoardHeaderActions', () => {
     const { header, message } = createHeader(createCatalog())
     await vi.waitFor(() => expect(header.isBoardArchived.value).toBe(true))
 
-    const restored = await header.restoreArchivedBoard()
+    const isRestored = await header.restoreArchivedBoard()
 
-    expect(restored).toBe(false)
+    expect(isRestored).toBe(false)
     expect(header.isBoardArchived.value).toBe(true)
     expect(message.error).toHaveBeenCalledWith(
       'Failed to restore the board. Please try again later.',
@@ -298,12 +298,12 @@ describe('useBoardHeaderActions', () => {
 
   it('banners the board on archived rename conflicts instead of the reload flow', async () => {
     const rename = vi.fn(async () => ({
-      ok: false as const,
+      isOk: false as const,
       reason: 'sync-failed' as const,
       boardId: 'board-a',
       previousBoard: board('board-a', 'Old Board'),
       rolledBackBoard: board('board-a', 'Old Board'),
-      rollback: { ok: true as const, board: board('board-a', 'Old Board') },
+      rollback: { isOk: true as const, board: board('board-a', 'Old Board') },
       error: Object.assign(new Error('board is archived'), {
         status: 409,
         code: 'board_archived',

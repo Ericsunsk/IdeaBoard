@@ -138,7 +138,10 @@ describe('board revision conflict', () => {
       revision: 8,
       state: makePromptBoardState(1_000, 'remote-winner'),
     })
-    await hydrateBoardsFromServer({ preserveLocalNewer: false, rollbackBoardIds: ['board-1'] })
+    await hydrateBoardsFromServer({
+      shouldPreserveLocalNewer: false,
+      rollbackBoardIds: ['board-1'],
+    })
 
     expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')
@@ -214,7 +217,7 @@ describe('board revision conflict', () => {
     delete apiState.documentById['board-1']
 
     await expect(hydrateBoardsFromServer()).resolves.toMatchObject({
-      ok: false,
+      isOk: false,
       error: { status: 404, code: 'board_not_found' },
     })
     expect(mocks.request).toHaveBeenCalledWith(
@@ -226,7 +229,7 @@ describe('board revision conflict', () => {
     expect(listBoards().find((board) => board.id === 'board-1')?.revision).toBe(7)
 
     apiState.boardsResponse.data = []
-    await expect(hydrateBoardsFromServer()).resolves.toMatchObject({ ok: true })
+    await expect(hydrateBoardsFromServer()).resolves.toMatchObject({ isOk: true })
 
     expect(listBoards().map((board) => board.id)).toEqual(['offline-new'])
     expect(getBoardState('offline-new')?.promptNodes[0]?.text).toBe('offline-draft')
@@ -302,7 +305,10 @@ describe('board revision conflict', () => {
         revision: 8,
         document: { payload: { promptNodes: [{ text: 'remote-winner' }] } },
       })
-      await hydrateBoardsFromServer({ preserveLocalNewer: false, rollbackBoardIds: ['board-1'] })
+      await hydrateBoardsFromServer({
+        shouldPreserveLocalNewer: false,
+        rollbackBoardIds: ['board-1'],
+      })
 
       expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Winner' })
       expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')

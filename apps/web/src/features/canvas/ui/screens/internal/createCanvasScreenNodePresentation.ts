@@ -17,7 +17,7 @@ export function createCanvasScreenNodePresentation(options: {
   workspace: CanvasWorkspaceRuntime
   activePanels: ActivePanels
   imageStages: ImageStages
-  duplicateModifierPressed: Ref<boolean>
+  isDuplicateModifierPressed: Ref<boolean>
   nodeInteractions: ReturnType<
     CanvasWorkspaceRuntime['commands']['graphEditing']['createNodeInteractions']
   >
@@ -94,15 +94,15 @@ export function createCanvasScreenNodePresentation(options: {
     return {
       nodeId: node.id,
       data: node.data,
-      selected: node.selected,
-      dragging: node.dragging,
-      copyMode: options.duplicateModifierPressed.value,
+      isSelected: node.selected,
+      isDragging: node.dragging,
+      isCopyMode: options.isDuplicateModifierPressed.value,
       imagePresentation: imagePresentationFor(node.id),
       fusionPresentation: fusionPresentationFor(node.id),
-      generationAvailable: isGenerationAvailable.value,
+      isGenerationAvailable: isGenerationAvailable.value,
       setImageStageRef: options.imageStages.setImageStageRef,
       clearImageStageRef: options.imageStages.clearImageStageRef,
-      outpaintModeActive: isOutpaintModeActive,
+      isOutpaintModeActive: isOutpaintModeActive,
       outpaintOverlayStyle: isOutpaintModeActive ? outpaint.overlayStyle.value : null,
       outpaintHandleRadius: outpaint.handleRadius,
     }

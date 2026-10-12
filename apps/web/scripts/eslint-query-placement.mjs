@@ -1,6 +1,12 @@
 import path from 'node:path'
 
 const QUERY_PACKAGES = ['@tanstack/vue-query', '@tanstack/query-core']
+// ADR-0014 assigns server Board snapshots and invalidation to these owners.
+const BOARD_QUERY_OWNERS = new Set([
+  'src/features/board/session/sync/boardQueries.ts',
+  'src/features/board/session/sync/boardSseInvalidation.ts',
+  'src/features/board/session/sync/boardSync.ts',
+])
 const ALLOWED_ROOTS = [
   'src/features/account/',
   'src/features/admin/',
@@ -58,7 +64,7 @@ export const queryPlacementRule = {
     schema: [],
     messages: {
       misplaced:
-        'Query cache belongs in account/admin/workspace or the shared/core runtime seam; justify new server-state usage in the feature CONTEXT.md before migration.',
+        'Query cache belongs in account/admin/workspace, core runtime, or the ADR-0014 Board snapshot owners; keep other feature state local.',
     },
   },
   create(context) {
@@ -66,6 +72,7 @@ export const queryPlacementRule = {
     if (
       isHarness(importer) ||
       importer === 'src/app/main.ts' ||
+      BOARD_QUERY_OWNERS.has(importer) ||
       ALLOWED_ROOTS.some((root) => importer.startsWith(root))
     )
       return {}

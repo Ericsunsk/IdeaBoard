@@ -109,18 +109,18 @@ function applyOrderPatches<T extends { id: string }>(
 function mergeProjectedNode(
   current: Node | undefined,
   record: CanvasGraphNodeRecord,
-  selectionChanged = false,
+  isSelectionChanged = false,
 ): Node {
-  const projected = canvasNodeToFlowNode(record.kind, record.snapshot, record.selected)
+  const projected = canvasNodeToFlowNode(record.kind, record.snapshot, record.isSelected)
   if (!current) return projected as Node
-  const currentTransient = current as Node & {
-    dimensions?: { width?: number; height?: number }
-    selected?: boolean
-  }
-  const projectedTransient = projected as FlowAdapterNode & {
-    dimensions?: { width?: number; height?: number }
-    selected?: boolean
-  }
+  const currentTransient = current as Node &
+    Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>> & {
+      dimensions?: { width?: number; height?: number }
+    }
+  const projectedTransient = projected as FlowAdapterNode &
+    Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>> & {
+      dimensions?: { width?: number; height?: number }
+    }
 
   // Every patched node receives its committed canonical fields. Vue Flow may
   // already show the final drag position while its data snapshot is stale;
@@ -135,19 +135,24 @@ function mergeProjectedNode(
     data: projected.data,
     position: projected.position,
     dimensions: projected.dimensions,
-    selected: selectionChanged
+    selected: isSelectionChanged
       ? (projectedTransient.selected ?? false)
       : (currentTransient.selected ?? false),
-  } as Node
+  } as Node & Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>
 }
 
 function mergeProjectedEdge(
   current: Edge | undefined,
   record: CanvasGraphEdgeRecord,
-  selectionChanged = false,
+  isSelectionChanged = false,
 ): Edge {
   const projected = canvasConnectionToFlowEdge(record.connection) as Edge
-  if (!current) return (record.selected ? { ...projected, selected: true } : projected) as Edge
+  if (!current)
+    return (
+      record.isSelected
+        ? ({ ...projected, selected: true } satisfies Partial<import('@vue-flow/core').GraphEdge>)
+        : projected
+    ) as Edge
 
   // `animated` is execution runtime state and is deliberately not copied from
   // canonical graph records. The execution projection adds it after this step.
@@ -156,10 +161,11 @@ function mergeProjectedEdge(
     ...semanticCurrent,
     ...projected,
     data: projected.data,
-    selected: selectionChanged
-      ? record.selected
-      : ((current as Edge & { selected?: boolean }).selected ?? false),
-  } as unknown as Edge
+    selected: isSelectionChanged
+      ? record.isSelected
+      : ((current as Edge & Partial<Pick<import('@vue-flow/core').GraphEdge, 'selected'>>)
+          .selected ?? false),
+  } satisfies Partial<import('@vue-flow/core').GraphEdge> as unknown as Edge
 }
 
 function projectCollection<Record extends { id: string }, FlowItem extends { id: string }>(input: {
@@ -259,12 +265,12 @@ export function projectCanvasGraphCommit(input: {
       recordCanvasInteractionCount('incrementalGraphProjectionCount')
       const selectionChangedNodeIds = new Set(
         input.patch.nodes.records
-          .filter(({ before, after }) => before && after && before.selected !== after.selected)
+          .filter(({ before, after }) => before && after && before.isSelected !== after.isSelected)
           .map(({ id }) => id),
       )
       const selectionChangedEdgeIds = new Set(
         input.patch.edges.records
-          .filter(({ before, after }) => before && after && before.selected !== after.selected)
+          .filter(({ before, after }) => before && after && before.isSelected !== after.isSelected)
           .map(({ id }) => id),
       )
       const nodes = projectCollection({
@@ -345,16 +351,16 @@ export function createCanvasGraphCommitProjectionController(options: {
   onFailure?: ((failure: CanvasGraphCommitProjectionFailure) => void) | undefined
   scheduleMicrotask?: ((task: () => void) => void) | undefined
 }): CanvasGraphCommitProjectionController {
-  let recoveryRequired = false
-  let recoveryScheduled = false
+  let isRecoveryRequired = false
+  let isRecoveryScheduled = false
   const scheduleMicrotask = options.scheduleMicrotask ?? queueMicrotask
 
   function scheduleRecovery() {
-    if (recoveryScheduled) return
-    recoveryScheduled = true
+    if (isRecoveryScheduled) return
+    isRecoveryScheduled = true
     scheduleMicrotask(() => {
-      recoveryScheduled = false
-      if (!recoveryRequired) return
+      isRecoveryScheduled = false
+      if (!isRecoveryRequired) return
       try {
         recover(true)
       } catch {
@@ -364,20 +370,20 @@ export function createCanvasGraphCommitProjectionController(options: {
     })
   }
 
-  function render(projection: CanvasGraphCommitProjection, scheduleOnFailure = true) {
+  function render(projection: CanvasGraphCommitProjection, shouldScheduleOnFailure = true) {
     try {
       options.render(projection)
-      recoveryRequired = false
+      isRecoveryRequired = false
     } catch (cause) {
-      recoveryRequired = true
+      isRecoveryRequired = true
       options.onFailure?.({ cause, projection })
-      if (scheduleOnFailure) scheduleRecovery()
+      if (shouldScheduleOnFailure) scheduleRecovery()
       throw cause
     }
   }
 
-  function recover(suppressRetrySchedule = false): CanvasGraphCommitProjection | null {
-    if (!recoveryRequired) return null
+  function recover(shouldSuppressRetrySchedule = false): CanvasGraphCommitProjection | null {
+    if (!isRecoveryRequired) return null
     const graph = measureCanvasPerf('graph-projection.full-recovery', undefined, () => {
       recordCanvasInteractionCount('fullGraphProjectionCount')
       return options.projectFull()
@@ -391,19 +397,19 @@ export function createCanvasGraphCommitProjectionController(options: {
       nodeMutations: { added: graph.nodes, updated: [], removedIds: [] },
       edgeMutations: { added: graph.edges, updated: [], removedIds: [] },
     }
-    render(projection, !suppressRetrySchedule)
+    render(projection, !shouldSuppressRetrySchedule)
     return projection
   }
 
   return {
     apply(input) {
-      if (recoveryRequired) {
+      if (isRecoveryRequired) {
         const recovered = recover()
         if (recovered) return recovered
       }
       const projection = projectCanvasGraphCommit(input)
       if (projection.needsRecovery) {
-        recoveryRequired = true
+        isRecoveryRequired = true
         const recovered = recover()
         if (recovered) return recovered
       }
@@ -411,6 +417,6 @@ export function createCanvasGraphCommitProjectionController(options: {
       return projection
     },
     recover,
-    needsRecovery: () => recoveryRequired,
+    needsRecovery: () => isRecoveryRequired,
   }
 }

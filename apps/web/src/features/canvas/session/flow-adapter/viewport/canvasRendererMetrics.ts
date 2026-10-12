@@ -15,7 +15,7 @@ export type CanvasRendererNodeMetrics = {
   position: CanvasRendererPoint
   dimensions: CanvasRendererDimensions
   computedPosition: CanvasRendererPoint | null
-  measured: boolean
+  isMeasured: boolean
 }
 
 export type CanvasRendererMetricsPort = {
@@ -47,8 +47,8 @@ function readDimensions(value: unknown): CanvasRendererDimensions {
 
 /**
  * Adapts Vue Flow's renderer-owned node state to a small, explicit metrics
- * port. The returned `measured` flag is intentionally strict: a node with
- * missing or zero dimensions is not treated as measured by layout consumers.
+ * port. The returned `isMeasured` flag is intentionally strict: a node with
+ * missing or zero dimensions is not treated as isMeasured by layout consumers.
  */
 export function createCanvasVueFlowRendererMetricsPort(
   findNode: NodeFinder,
@@ -68,7 +68,7 @@ export function createCanvasVueFlowRendererMetricsPort(
         position,
         dimensions,
         computedPosition,
-        measured: computedPosition !== null && dimensions.width > 0 && dimensions.height > 0,
+        isMeasured: computedPosition !== null && dimensions.width > 0 && dimensions.height > 0,
       }
     },
   }

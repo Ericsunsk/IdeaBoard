@@ -15,17 +15,17 @@ vi.mock('../../../../shared/session/feedback/toast', async (importOriginal) => (
 }))
 
 const configuredSummary: StripeConfigurationSummary = {
-  configured: true,
-  apiKeyConfigured: true,
-  webhookSecretConfigured: true,
+  isConfigured: true,
+  isApiKeyConfigured: true,
+  isWebhookSecretConfigured: true,
   accountId: 'acct_123',
   mode: 'test',
-  chargesEnabled: true,
+  isChargesEnabled: true,
   paymentMethodConfigurationId: 'pmc_ideaboard',
   productTaxCode: 'txcd_10105001',
-  productReady: true,
-  webhookReady: true,
-  purchasesEnabled: true,
+  isProductReady: true,
+  isWebhookReady: true,
+  isPurchasesEnabled: true,
   updatedAt: '2026-08-01T00:00:00Z',
 }
 
@@ -75,13 +75,13 @@ describe('StripeSettingsDialog', () => {
   it('requires an API Key only before a configuration exists', async () => {
     vi.mocked(resource.get).mockResolvedValueOnce({
       ...configuredSummary,
-      configured: false,
-      apiKeyConfigured: false,
-      webhookSecretConfigured: false,
+      isConfigured: false,
+      isApiKeyConfigured: false,
+      isWebhookSecretConfigured: false,
       accountId: undefined,
       mode: undefined,
-      productReady: false,
-      webhookReady: false,
+      isProductReady: false,
+      isWebhookReady: false,
     })
     const { user } = renderDialog()
 
@@ -107,7 +107,7 @@ describe('StripeSettingsDialog', () => {
           apiKey: 'sk_test_secret',
           paymentMethodConfigurationId: 'pmc_ideaboard',
           productTaxCode: 'txcd_10105001',
-          purchasesEnabled: true,
+          isPurchasesEnabled: true,
         },
         { operatorReason: '' },
       ),

@@ -7,19 +7,19 @@ import {
 
 describe('useOverlayInteractionLifecycle', () => {
   it('resets on every open and restores focus once after close completes', async () => {
-    const visible = ref(false)
+    const isVisible = ref(false)
     const onReset = vi.fn()
     const onVisibilityChange = vi.fn((nextVisible: boolean) => {
-      visible.value = nextVisible
+      isVisible.value = nextVisible
     })
     const scope = effectScope()
     const lifecycle = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         busy: false,
         surface: {
           dismissibleBy: ['close-control', 'escape'],
-          restoreFocus: true,
+          shouldRestoreFocus: true,
         },
         onReset,
         onVisibilityChange,
@@ -32,7 +32,7 @@ describe('useOverlayInteractionLifecycle', () => {
     try {
       firstTrigger.focus()
       const firstFocus = vi.spyOn(firstTrigger, 'focus')
-      visible.value = true
+      isVisible.value = true
       await nextTick()
 
       expect(onReset).toHaveBeenCalledTimes(1)
@@ -43,7 +43,7 @@ describe('useOverlayInteractionLifecycle', () => {
 
       secondTrigger.focus()
       const secondFocus = vi.spyOn(secondTrigger, 'focus')
-      visible.value = true
+      isVisible.value = true
       await nextTick()
 
       expect(onReset).toHaveBeenCalledTimes(2)
@@ -61,24 +61,24 @@ describe('useOverlayInteractionLifecycle', () => {
     const intent = defineDialogSurfaceIntent()
 
     expect(intent.dismissibleBy).toEqual(['close-control', 'escape', 'mask'])
-    expect(intent.restoreFocus).toBe(true)
-    expect(defineDialogSurfaceIntent({ restoreFocus: false })).toMatchObject({
+    expect(intent.shouldRestoreFocus).toBe(true)
+    expect(defineDialogSurfaceIntent({ shouldRestoreFocus: false })).toMatchObject({
       dismissibleBy: ['close-control', 'escape', 'mask'],
-      restoreFocus: false,
+      shouldRestoreFocus: false,
     })
   })
 
   it('aborts a cancellable operation instead of blocking dismissal while busy', () => {
-    const visible = ref(true)
+    const isVisible = ref(true)
     const busy = ref(true)
     const onAbort = vi.fn()
     const onVisibilityChange = vi.fn((nextVisible: boolean) => {
-      visible.value = nextVisible
+      isVisible.value = nextVisible
     })
     const scope = effectScope()
     const lifecycle = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         busy,
         busyMode: 'abort',
         onAbort,
@@ -92,24 +92,24 @@ describe('useOverlayInteractionLifecycle', () => {
       expect(lifecycle.canDismiss('escape')).toBe(true)
       expect(lifecycle.requestClose('mask')).toBe(true)
       expect(onAbort).toHaveBeenCalledTimes(1)
-      expect(visible.value).toBe(false)
+      expect(isVisible.value).toBe(false)
     } finally {
       scope.stop()
     }
   })
 
   it('blocks every dismissal path while an irreversible commit is busy', () => {
-    const visible = ref(true)
+    const isVisible = ref(true)
     const busy = ref(false)
     const onVisibilityChange = vi.fn()
     const scope = effectScope()
     const lifecycle = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         busy,
         surface: {
           dismissibleBy: ['close-control', 'escape'],
-          restoreFocus: true,
+          shouldRestoreFocus: true,
         },
         onVisibilityChange,
       }),
@@ -133,17 +133,17 @@ describe('useOverlayInteractionLifecycle', () => {
   })
 
   it('does not restore focus to a trigger removed before the overlay closes', () => {
-    const visible = ref(false)
+    const isVisible = ref(false)
     const scope = effectScope()
     const lifecycle = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         surface: {
           dismissibleBy: ['close-control'],
-          restoreFocus: true,
+          shouldRestoreFocus: true,
         },
         onVisibilityChange: (nextVisible) => {
-          visible.value = nextVisible
+          isVisible.value = nextVisible
         },
       }),
     )!
@@ -153,7 +153,7 @@ describe('useOverlayInteractionLifecycle', () => {
     try {
       trigger.focus()
       const focus = vi.spyOn(trigger, 'focus')
-      visible.value = true
+      isVisible.value = true
       trigger.remove()
       lifecycle.requestClose('close-control')
       lifecycle.completeClose()
@@ -166,17 +166,17 @@ describe('useOverlayInteractionLifecycle', () => {
   })
 
   it('ignores a stale close completion after the overlay has reopened', () => {
-    const visible = ref(false)
+    const isVisible = ref(false)
     const scope = effectScope()
     const lifecycle = scope.run(() =>
       useOverlayInteractionLifecycle({
-        visible,
+        isVisible,
         surface: {
           dismissibleBy: ['close-control'],
-          restoreFocus: true,
+          shouldRestoreFocus: true,
         },
         onVisibilityChange: (nextVisible) => {
-          visible.value = nextVisible
+          isVisible.value = nextVisible
         },
       }),
     )!
@@ -186,17 +186,17 @@ describe('useOverlayInteractionLifecycle', () => {
 
     try {
       firstTrigger.focus()
-      visible.value = true
-      visible.value = false
+      isVisible.value = true
+      isVisible.value = false
 
       secondTrigger.focus()
       const secondFocus = vi.spyOn(secondTrigger, 'focus')
-      visible.value = true
+      isVisible.value = true
 
       expect(lifecycle.completeClose()).toBe(false)
       expect(secondFocus).not.toHaveBeenCalled()
 
-      visible.value = false
+      isVisible.value = false
       expect(lifecycle.completeClose()).toBe(true)
       expect(secondFocus).toHaveBeenCalledTimes(1)
     } finally {

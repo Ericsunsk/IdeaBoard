@@ -45,7 +45,7 @@ describe('PromptComposerControls billing contract', () => {
           status: 'ready',
           unitCredits: 3,
           availableCredits: 20,
-          sufficient: true,
+          isSufficient: true,
         },
       },
     })
@@ -65,7 +65,7 @@ describe('PromptComposerControls billing contract', () => {
         status: 'ready',
         unitCredits: 0,
         availableCredits: 0,
-        sufficient: true,
+        isSufficient: true,
       },
     })
 
@@ -79,7 +79,7 @@ describe('PromptComposerControls billing contract', () => {
       status: 'ready',
       unitCredits: 8,
       availableCredits: 3,
-      sufficient: false,
+      isSufficient: false,
       reason: 'Idea不足（需要 8 Ideas，当前 3 Ideas）',
     })
 
@@ -102,7 +102,7 @@ describe('PromptComposerControls billing contract', () => {
         textareaClass: 'prompt-input',
         actionsClass: 'prompt-actions',
         sendButtonClass: 'prompt-send',
-        showSubmit: false,
+        shouldShowSubmit: false,
       },
     })
 
@@ -124,7 +124,7 @@ describe('PromptComposerControls billing contract', () => {
         textareaClass: 'prompt-input',
         actionsClass: 'prompt-actions',
         sendButtonClass: 'prompt-send',
-        showOutputResolution: false,
+        shouldShowOutputResolution: false,
       },
     })
 

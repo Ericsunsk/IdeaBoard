@@ -33,15 +33,15 @@
       </div>
       <div class="flex items-center gap-1.5">
         <AdminStatusPill
-          :label="PAYMENTS_MESSAGES.productReadyState(summary.productReady)"
-          :variant="summary.productReady ? 'success' : 'neutral'"
+          :label="PAYMENTS_MESSAGES.productReadyState(summary.isProductReady)"
+          :variant="summary.isProductReady ? 'success' : 'neutral'"
           size="small"
         />
       </div>
       <div class="flex items-center gap-1.5">
         <AdminStatusPill
-          :label="PAYMENTS_MESSAGES.webhookReadyState(summary.webhookReady)"
-          :variant="summary.webhookReady ? 'success' : 'neutral'"
+          :label="PAYMENTS_MESSAGES.webhookReadyState(summary.isWebhookReady)"
+          :variant="summary.isWebhookReady ? 'success' : 'neutral'"
           size="small"
         />
       </div>
@@ -77,7 +77,7 @@
         for="admin-stripe-api-key"
         :error="form.errors.value.apiKey"
         :hint="PAYMENTS_MESSAGES.apiKeyHint"
-        :required="!summary?.apiKeyConfigured"
+        :required="!summary?.isApiKeyConfigured"
       >
         <AdminInput
           id="admin-stripe-api-key"
@@ -193,7 +193,7 @@ const form = useForm({
   },
   schema: () =>
     v.object({
-      apiKey: secretField(!summary.value?.apiKeyConfigured, PAYMENTS_MESSAGES.apiKeyRequired),
+      apiKey: secretField(!summary.value?.isApiKeyConfigured, PAYMENTS_MESSAGES.apiKeyRequired),
       paymentMethodConfigurationId: v.pipe(
         v.string(),
         v.trim(),
@@ -212,7 +212,7 @@ const form = useForm({
 })
 const isBusy = computed(() => isLoading.value || isSaving.value)
 const apiKeyPlaceholder = computed(() =>
-  PAYMENTS_MESSAGES.apiKeyPlaceholder(Boolean(summary.value?.apiKeyConfigured)),
+  PAYMENTS_MESSAGES.apiKeyPlaceholder(Boolean(summary.value?.isApiKeyConfigured)),
 )
 const paymentMethodConfigurationIdPattern = /^pmc_[A-Za-z0-9]+$/
 const modeLabel = computed(() =>
@@ -240,7 +240,7 @@ async function load() {
       apiKey: '',
       paymentMethodConfigurationId: nextSummary.paymentMethodConfigurationId,
       productTaxCode: nextSummary.productTaxCode,
-      purchasesEnabled: nextSummary.purchasesEnabled,
+      purchasesEnabled: nextSummary.isPurchasesEnabled,
     })
   } catch (error) {
     // 加载失败一律走 toast；loadError 保留为 frame 状态真相源（可重试 + 禁用保存）。
@@ -267,7 +267,7 @@ const submit = form.handleSubmit(async (values) => {
         ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
         paymentMethodConfigurationId: values.paymentMethodConfigurationId.trim(),
         productTaxCode: values.productTaxCode.trim(),
-        purchasesEnabled: values.purchasesEnabled,
+        isPurchasesEnabled: values.purchasesEnabled,
       },
       { operatorReason },
     )
@@ -276,7 +276,7 @@ const submit = form.handleSubmit(async (values) => {
       apiKey: '',
       paymentMethodConfigurationId: nextSummary.paymentMethodConfigurationId,
       productTaxCode: nextSummary.productTaxCode,
-      purchasesEnabled: nextSummary.purchasesEnabled,
+      purchasesEnabled: nextSummary.isPurchasesEnabled,
     })
     clearSensitiveState()
     feedback.saved()

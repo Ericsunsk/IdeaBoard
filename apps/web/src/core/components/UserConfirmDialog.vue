@@ -1,12 +1,12 @@
 <template>
-  <DialogRoot :open="props.visible" @update:open="handleOpenUpdate">
+  <DialogRoot :open="props.isVisible" @update:open="handleOpenUpdate">
     <DialogPortal>
       <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
       <DialogContent
         :class="dialogContentBaseClass"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
         :aria-label="props.title"
-        :aria-busy="props.loading || undefined"
+        :aria-busy="props.isLoading || undefined"
         @escape-key-down="handleEscape"
         @pointer-down-outside="blockOutsideDismiss"
       >
@@ -25,15 +25,15 @@
               <Button
                 type="button"
                 variant="ghost"
-                :disabled="props.loading"
+                :is-disabled="props.isLoading"
                 class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
-                @click="emit('update:visible', false)"
+                @click="emit('update:isVisible', false)"
               >
                 {{ t('common.actions.cancel') }}
               </Button>
               <Button
                 type="button"
-                :disabled="props.loading"
+                :is-disabled="props.isLoading"
                 :class="[
                   'rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50',
                   props.intent === 'danger'
@@ -72,22 +72,22 @@ import {
 
 const props = withDefaults(
   defineProps<{
-    visible: boolean
+    isVisible: boolean
     title: string
     message: string
     confirmLabel?: string
     intent?: 'primary' | 'danger'
-    loading?: boolean
+    isLoading?: boolean
   }>(),
   {
     confirmLabel: '',
     intent: 'primary',
-    loading: false,
+    isLoading: false,
   },
 )
 
 const emit = defineEmits<{
-  'update:visible': [visible: boolean]
+  'update:isVisible': [visible: boolean]
   confirm: []
 }>()
 
@@ -97,11 +97,11 @@ const { t } = useI18n()
 // irreversible confirm commit (loading) locks every path. Promise settlement
 // on parent unmount stays in useUserConfirmDialog.dispose.
 const { canDismiss, requestClose } = useOverlayInteractionLifecycle({
-  visible: () => props.visible,
-  busy: () => props.loading,
+  isVisible: () => props.isVisible,
+  busy: () => props.isLoading,
   surface: defineDialogSurfaceIntent(),
   onVisibilityChange: (visible) => {
-    if (!visible) emit('update:visible', false)
+    if (!visible) emit('update:isVisible', false)
   },
 })
 

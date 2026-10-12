@@ -95,8 +95,8 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
       const target = graphSession.store.getNode(nodeId as `prompt-${number}` | `fusion-${number}`)
       if (target) {
         const transaction = graphSession.store.beginTransaction('node-update', {
-          recordHistory: false,
-          markDirty: false,
+          shouldRecordHistory: false,
+          shouldMarkDirty: false,
         })
         transaction.updateNode(target.id, mutate)
         transaction.commit()
@@ -223,7 +223,7 @@ describe('useFlowMediaInputImages', () => {
     const harness = createHarness(nodes, edges)
 
     harness.graphSession.store
-      .beginTransaction('connect', { recordHistory: false, markDirty: false })
+      .beginTransaction('connect', { shouldRecordHistory: false, shouldMarkDirty: false })
       .addEdge({
         id: 1,
         fromNodeType: 'image',
@@ -318,7 +318,7 @@ describe('useFlowMediaInputImages', () => {
 
     expect(graphSession.store.exportSnapshot().promptNodes[0]?.inputImages).toEqual([])
     expect(graphSession.store.exportSnapshot().connections).toEqual([])
-    expect(markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', { includeSelf: true })
+    expect(markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', { shouldIncludeSelf: true })
   })
 
   it('removes from canonical Graph state when the Flow projection is stale', async () => {

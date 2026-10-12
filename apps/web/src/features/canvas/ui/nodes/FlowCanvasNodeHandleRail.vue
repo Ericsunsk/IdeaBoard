@@ -19,21 +19,21 @@
       :key="`canvas-${aggregate.direction}-aggregate:${aggregate.id}`"
       :type="aggregate.handleType"
       :position="aggregate.position"
-      :connectable="aggregate.connectable"
-      :connectable-start="aggregate.direction === 'output' && aggregate.connectable"
+      :connectable="aggregate.isConnectable"
+      :connectable-start="aggregate.direction === 'output' && aggregate.isConnectable"
       :connectable-end="false"
       :class="[
         'flow-canvas-node__handle-aggregate',
         `flow-canvas-node__handle-aggregate--${aggregate.direction}`,
         {
-          'is-visible': aggregate.visible,
-          'is-proximity-active': aggregate.proximityActive,
+          'is-visible': aggregate.isVisible,
+          'is-proximity-active': aggregate.isProximityActive,
         },
       ]"
       :style="aggregate.style"
-      :aria-hidden="aggregate.visible && !isConnectionDragging ? undefined : 'true'"
+      :aria-hidden="aggregate.isVisible && !isConnectionDragging ? undefined : 'true'"
       :aria-label="aggregate.ariaLabel"
-      :tabindex="aggregate.visible && !isConnectionDragging ? 0 : -1"
+      :tabindex="aggregate.isVisible && !isConnectionDragging ? 0 : -1"
       :title="aggregate.title"
     >
       <span class="flow-canvas-node__handle-plus" aria-hidden="true">
@@ -55,26 +55,26 @@ const props = defineProps<{
   nodeId: string
   kind: FlowNodeData['kind']
   interactionRoot: HTMLElement | null
-  dragging?: boolean
-  disabled?: boolean
+  isDragging?: boolean
+  isDisabled?: boolean
 }>()
 
 const interactionRoot = computed(() => props.interactionRoot)
-const { showHandleControls, refreshTransientHandleVisibility } =
+const { shouldShowHandleControls, refreshTransientHandleVisibility } =
   useFlowCanvasNodeHandleRail(interactionRoot)
 const { connectionStartHandle } = useVueFlow()
 const isConnectionDragging = computed(() => connectionStartHandle.value !== null)
 const presentation = useFlowNodeHandlesPresentation({
   nodeId: () => props.nodeId,
   kind: () => props.kind,
-  showHandles: () => showHandleControls.value,
-  disabled: () => props.disabled === true,
+  showHandles: () => shouldShowHandleControls.value,
+  disabled: () => props.isDisabled === true,
 })
 
 watch(
-  () => props.dragging === true,
-  (dragging, wasDragging) => {
-    if (wasDragging && !dragging) refreshTransientHandleVisibility()
+  () => props.isDragging === true,
+  (isDragging, wasDragging) => {
+    if (wasDragging && !isDragging) refreshTransientHandleVisibility()
   },
   { flush: 'post' },
 )

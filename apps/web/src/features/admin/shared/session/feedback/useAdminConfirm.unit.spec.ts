@@ -91,7 +91,7 @@ describe('useAdminConfirm', () => {
       message: '确定启用吗？',
       confirmLabel: '启用',
       intent: 'warn',
-      reason: { required: false },
+      reason: { isRequired: false },
     })
 
     expect(activeAdminConfirm.value?.reasonEnabled).toBe(true)
@@ -111,7 +111,7 @@ describe('useAdminConfirm', () => {
         message: '确定删除吗？',
         confirmLabel: '删除',
         intent: 'danger',
-        reason: { required: true },
+        reason: { isRequired: true },
       })
       .then((value) => {
         resolved = true

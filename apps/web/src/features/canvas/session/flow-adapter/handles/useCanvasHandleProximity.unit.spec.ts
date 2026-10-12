@@ -18,7 +18,7 @@ function createGeometry(): CanvasHandleProximityGeometry {
 
 function mountProximity(
   direction: 'input' | 'output' = 'output',
-  enabled = ref(true),
+  isEnabled = ref(true),
   geometry = createGeometry(),
 ) {
   let proximity!: ReturnType<typeof useCanvasHandleProximity>
@@ -28,7 +28,7 @@ function mountProximity(
   document.body.append(host)
   const Consumer = defineComponent({
     setup() {
-      proximity = useCanvasHandleProximity({ nodeId: 'node-1', direction, enabled })
+      proximity = useCanvasHandleProximity({ nodeId: 'node-1', direction, isEnabled })
       return () => null
     },
   })
@@ -42,7 +42,7 @@ function mountProximity(
   app.mount(host)
 
   return {
-    enabled,
+    isEnabled,
     proximity,
     surface,
     unmount: () => {
@@ -145,7 +145,7 @@ describe('useCanvasHandleProximity', () => {
     const harness = mountProximity()
 
     movePointer(130, 100)
-    harness.enabled.value = false
+    harness.isEnabled.value = false
     flushFrame()
 
     expect(harness.proximity.isActive.value).toBe(false)
@@ -190,7 +190,7 @@ describe('useCanvasHandleProximity', () => {
     document.body.append(host)
     const Consumer = defineComponent({
       setup() {
-        useCanvasHandleProximity({ nodeId, direction: 'output', enabled: ref(true) })
+        useCanvasHandleProximity({ nodeId, direction: 'output', isEnabled: ref(true) })
         return () => null
       },
     })

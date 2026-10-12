@@ -5,8 +5,8 @@
     <button
       class="node-aspect-ratio-trigger canvas-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-[var(--canvas-glass-bg)] p-0 text-xs leading-none font-bold text-[var(--canvas-text-control)] outline-none backdrop-blur-[var(--canvas-glass-blur)] disabled:cursor-wait disabled:opacity-[0.55]"
       type="button"
-      :class="{ active: visible }"
-      :disabled="disabled"
+      :class="{ active: isVisible }"
+      :disabled="isDisabled"
       :aria-label="resolvedAriaLabel"
       @click.stop="emit('toggle')"
     >
@@ -21,14 +21,14 @@
       </span>
       <span class="canvas-tool-tooltip" aria-hidden="true">{{ resolvedTooltip }}</span>
     </button>
-    <NodeToolPopover :visible="visible" layout="row" class="node-aspect-ratio-popover">
+    <NodeToolPopover :is-visible="isVisible" layout="row" class="node-aspect-ratio-popover">
       <button
         v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
         :key="option"
         type="button"
         class="node-aspect-ratio-option canvas-tool-tooltip-trigger relative h-[var(--node-tool-popover-option-height)] w-[var(--node-tool-button-size)] cursor-pointer rounded-none border-0 bg-transparent p-0 text-[var(--canvas-text-option)]"
         :class="{ active: option === ratio }"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :aria-label="option"
         @click.stop="emit('select', option)"
       >
@@ -60,13 +60,13 @@ import NodeToolPopover from './NodeToolPopover.vue'
 const props = withDefaults(
   defineProps<{
     modelValue: PromptAspectRatio
-    visible: boolean
-    disabled?: boolean
+    isVisible: boolean
+    isDisabled?: boolean
     ariaLabel?: string | undefined
     tooltip?: string | undefined
   }>(),
   {
-    disabled: false,
+    isDisabled: false,
     ariaLabel: undefined,
     tooltip: undefined,
   },

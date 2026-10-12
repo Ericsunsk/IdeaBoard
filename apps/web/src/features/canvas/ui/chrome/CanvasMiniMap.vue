@@ -94,7 +94,7 @@ type MiniMapOverlayDragPayload = {
   lastClientY: number
   deltaScaleX: number
   deltaScaleY: number
-  started: boolean
+  isStarted: boolean
 }
 
 const { t } = useI18n()
@@ -102,7 +102,7 @@ const { dimensions, getNodesInitialized, viewport } = useVueFlow()
 const viewportOverlaySvg = ref<SVGSVGElement | null>(null)
 const dragViewBoxOverride = ref<MiniMapRect | null>(null)
 let activeOverlayDragPayload: MiniMapOverlayDragPayload | null = null
-let suppressNextOverlayClick = false
+let shouldSuppressNextOverlayClick = false
 // This component only runs in the browser, where timer handles are numeric.
 let resetClickSuppressionId: number | null = null
 
@@ -141,11 +141,11 @@ const viewportOverlayDrag = usePointerDragSession<MiniMapOverlayDragPayload>({
       event.clientX - payload.startClientX,
       event.clientY - payload.startClientY,
     )
-    if (!payload.started && dragDistance < CANVAS_MINIMAP_DRAG_START_DISTANCE) return
+    if (!payload.isStarted && dragDistance < CANVAS_MINIMAP_DRAG_START_DISTANCE) return
 
     event.preventDefault()
-    if (!payload.started) {
-      payload.started = true
+    if (!payload.isStarted) {
+      payload.isStarted = true
       emit('drag-start')
     }
 
@@ -171,7 +171,7 @@ const isViewportOverlayDragging = viewportOverlayDrag.isDragging
 onBeforeUnmount(() => {
   const activePayload = activeOverlayDragPayload
   viewportOverlayDrag.cancelDrag()
-  if (activePayload) finishViewportOverlayDrag(activePayload, { releaseViewBox: false })
+  if (activePayload) finishViewportOverlayDrag(activePayload, { shouldReleaseViewBox: false })
   if (resetClickSuppressionId !== null) window.clearTimeout(resetClickSuppressionId)
 })
 
@@ -219,7 +219,7 @@ function onViewportOverlayPointerDown(event: PointerEvent) {
     lastClientY: event.clientY,
     deltaScaleX: deltaScale.x,
     deltaScaleY: deltaScale.y,
-    started: false,
+    isStarted: false,
   }
   activeOverlayDragPayload = payload
   viewportOverlayDrag.beginDrag(event, payload, { target: event.currentTarget })
@@ -227,8 +227,8 @@ function onViewportOverlayPointerDown(event: PointerEvent) {
 
 function onViewportOverlayClick(event: MouseEvent) {
   if (event.defaultPrevented) return
-  if (suppressNextOverlayClick) {
-    suppressNextOverlayClick = false
+  if (shouldSuppressNextOverlayClick) {
+    shouldSuppressNextOverlayClick = false
     return
   }
 
@@ -239,24 +239,24 @@ function onViewportOverlayClick(event: MouseEvent) {
 
 function finishViewportOverlayDrag(
   payload: MiniMapOverlayDragPayload,
-  options: { releaseViewBox?: boolean } = {},
+  options: { shouldReleaseViewBox?: boolean } = {},
 ) {
   if (activeOverlayDragPayload === payload) activeOverlayDragPayload = null
-  if (!payload.started) {
+  if (!payload.isStarted) {
     dragViewBoxOverride.value = null
     return
   }
 
   suppressOverlayClick()
   emit('drag-end')
-  if (options.releaseViewBox !== false) releaseDragViewBoxOverride()
+  if (options.shouldReleaseViewBox !== false) releaseDragViewBoxOverride()
 }
 
 function suppressOverlayClick() {
-  suppressNextOverlayClick = true
+  shouldSuppressNextOverlayClick = true
   if (resetClickSuppressionId !== null) window.clearTimeout(resetClickSuppressionId)
   resetClickSuppressionId = window.setTimeout(() => {
-    suppressNextOverlayClick = false
+    shouldSuppressNextOverlayClick = false
     resetClickSuppressionId = null
   })
 }

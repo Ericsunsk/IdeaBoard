@@ -123,7 +123,7 @@
           <Button
             variant="outline"
             size="sm"
-            :loading="fetchingNextPage"
+            :is-loading="fetchingNextPage"
             @click="emit('load-more')"
             >{{ t('account.topUp.loadMore') }}</Button
           >

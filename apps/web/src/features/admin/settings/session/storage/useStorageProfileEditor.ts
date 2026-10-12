@@ -124,7 +124,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
         closeEditor()
       },
       {
-        loading: saving,
+        isLoading: saving,
         feedback: {
           error: storageFeedback.saveDraftFailed,
         },
@@ -149,7 +149,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
         }
       },
       {
-        loading: fetching,
+        isLoading: fetching,
         feedback: {
           error: storageFeedback.fetchBucketDomainsFailed,
         },

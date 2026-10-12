@@ -43,8 +43,8 @@ describe('canvasSelectionCoordinator', () => {
         getEdgeIds: () => ['connection-3'],
       },
       {
-        selectNode: (id, selected) => calls.push(`node:${id}:${selected}`),
-        selectEdge: (id, selected) => calls.push(`edge:${id}:${selected}`),
+        selectNode: (id, isSelected) => calls.push(`node:${id}:${isSelected}`),
+        selectEdge: (id, isSelected) => calls.push(`edge:${id}:${isSelected}`),
       },
       [element({ id: 'image-1', selected: true })],
     )

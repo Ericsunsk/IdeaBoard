@@ -3,11 +3,11 @@
     ref="stageFrameRef"
     class="fusion-node-stage node-tool-surface node-input-thumbnail-contract variant-standard"
     variant="square"
-    :active="active"
-    :connection-drop-target="connectionDropTarget"
-    :drop-target="addSlotDragOver"
+    :is-active="isActive"
+    :is-connection-drop-target="isConnectionDropTarget"
+    :is-drop-target="isAddSlotDragOver"
     :class="{
-      'is-blend-dragging': blendDragging,
+      'is-blend-dragging': isBlendDragging,
     }"
     @dragenter.stop.prevent="onAddSlotDragOver"
     @dragover.stop.prevent="onAddSlotDragOver"
@@ -24,7 +24,11 @@
     >
       <span v-for="ray in fusionRays" :key="ray.key" class="fusion-node-ray" :style="ray.style" />
     </TransitionGroup>
-    <NodeEmptyStateIcon v-if="showEmptyFusionMark" class="fusion-empty-mark" variant="fusion" />
+    <NodeEmptyStateIcon
+      v-if="shouldShowEmptyFusionMark"
+      class="fusion-empty-mark"
+      variant="fusion"
+    />
     <div ref="thumbsRef" class="fusion-node-slots">
       <TransitionGroup name="fusion-node-slot">
         <template v-for="(slot, index) in fusionSlotItems">
@@ -34,7 +38,7 @@
             class="fusion-node-slot fusion-node-slot-item"
             :src="slot.image.url"
             :asset-id="slot.image.mediaRef?.assetId"
-            removable
+            is-removable
             :style="getSlotStyle(index)"
             :data-image-id="slot.image.id"
             @mousedown.stop
@@ -51,14 +55,14 @@
       </TransitionGroup>
     </div>
     <div
-      v-if="showBlendPad"
+      v-if="shouldShowBlendPad"
       class="fusion-blend-layer"
       :aria-label="t('canvas.controls.blendControl')"
     >
       <Transition name="fusion-blend-handle" appear>
         <button
           class="fusion-blend-handle"
-          :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
+          :class="{ 'is-hover': isBlendHandleHover, 'is-dragging': isBlendDragging }"
           type="button"
           :style="blendHandleStyle"
           :aria-label="t('canvas.controls.blendHandleHint')"
@@ -71,7 +75,7 @@
         </button>
       </Transition>
       <TransitionGroup
-        v-if="showBlendWeightBadges"
+        v-if="shouldShowBlendWeightBadges"
         name="fusion-blend-weight-badge"
         tag="div"
         class="fusion-blend-weight-layer"
@@ -111,8 +115,8 @@ import {
 } from '../primitives'
 
 const props = defineProps<{
-  active: boolean
-  connectionDropTarget?: boolean
+  isActive: boolean
+  isConnectionDropTarget?: boolean
   blendPoint: FusionBlendPoint
   inputImages: FusionNodeItem['inputImages']
   width: number
@@ -135,7 +139,7 @@ const stageRef = ref<HTMLElement | null>(null)
 const maxInputImages = FUSION_SLOT_LAYOUT.maxSlots
 
 const {
-  addSlotDragOver,
+  isAddSlotDragOver,
   onAddSlotDragLeave,
   onAddSlotDragOver,
   onAddSlotDrop,
@@ -158,14 +162,14 @@ watchPostEffect(() => {
 })
 
 const imageCount = computed(() => Math.min(visibleInputImages.value.length || 0, maxInputImages))
-const showBlendPad = computed(() => imageCount.value >= 2)
-const showEmptyFusionMark = computed(() => imageCount.value === 0)
+const shouldShowBlendPad = computed(() => imageCount.value >= 2)
+const shouldShowEmptyFusionMark = computed(() => imageCount.value === 0)
 const nodeWidth = computed(() => props.width)
 const sourceBlendPoint = computed(() => props.blendPoint)
 const {
   activeBlendPoint,
-  blendDragging,
-  blendHandleHover,
+  isBlendDragging,
+  isBlendHandleHover,
   blendHandleStyle,
   onBlendHandleDoubleClick,
   onBlendHandlePointerDown,
@@ -173,7 +177,7 @@ const {
   onBlendHandlePointerLeave,
 } = useFusionBlendControl({
   stageRef,
-  enabled: showBlendPad,
+  isEnabled: shouldShowBlendPad,
   imageCount,
   blendPoint: sourceBlendPoint,
   nodeWidth,
@@ -212,11 +216,11 @@ const blendWeightBadges = computed(() =>
       } => !!badge,
     ),
 )
-const showBlendWeightBadges = computed(
-  () => showBlendPad.value && (blendDragging.value || blendHandleHover.value),
+const shouldShowBlendWeightBadges = computed(
+  () => shouldShowBlendPad.value && (isBlendDragging.value || isBlendHandleHover.value),
 )
 const fusionRays = computed(() => {
-  if (!showBlendPad.value) return []
+  if (!shouldShowBlendPad.value) return []
   return lineSlotAnchors.value.map((anchor, index) => {
     const dx = anchor.x - activeBlendPoint.value.x
     const dy = anchor.y - activeBlendPoint.value.y

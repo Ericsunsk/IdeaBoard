@@ -43,9 +43,9 @@ describe('useFlowTransientUiDismissal', () => {
     const harness = createHarness()
 
     harness.dismissTransientCanvasUi({
-      closeOutpaint: true,
-      closeBoardHeader: true,
-      closeContextMenu: true,
+      shouldCloseOutpaint: true,
+      shouldCloseBoardHeader: true,
+      shouldCloseContextMenu: true,
     })
 
     expect(harness.cancelFlowOutpaintMode).toHaveBeenCalledTimes(1)
@@ -59,9 +59,9 @@ describe('useFlowTransientUiDismissal', () => {
     const harness = createHarness()
 
     harness.dismissTransientCanvasUi({
-      closeOutpaint: true,
-      clearNodePanel: false,
-      hideStrength: false,
+      shouldCloseOutpaint: true,
+      shouldClearNodePanel: false,
+      shouldHideStrength: false,
     })
 
     expect(harness.cancelFlowOutpaintMode).toHaveBeenCalledTimes(1)

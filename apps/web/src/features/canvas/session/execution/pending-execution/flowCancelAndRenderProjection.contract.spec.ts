@@ -78,8 +78,12 @@ describe('flow cancel and render projection', () => {
     Object.freeze(baseEdges)
 
     const running = projectPendingImageExecutionEdges(baseEdges, core.snapshot())
-    expect(running.edges[0]).toMatchObject({ animated: true })
-    expect(running.edges[1]).toMatchObject({ animated: true })
+    expect(running.edges[0]).toMatchObject({ animated: true } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
+    expect(running.edges[1]).toMatchObject({ animated: true } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
 
     const cancellation = core.cancel([firstLease])
     expect(cancellation).toEqual({
@@ -95,8 +99,12 @@ describe('flow cancel and render projection', () => {
 
     const render = projectPendingImageExecutionEdges(baseEdges, snapshot)
     expect(render).toMatchObject({ didChange: true })
-    expect(render.edges[0]).toMatchObject({ animated: false })
-    expect(render.edges[1]).toMatchObject({ animated: true })
+    expect(render.edges[0]).toMatchObject({ animated: false } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
+    expect(render.edges[1]).toMatchObject({ animated: true } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
 
     // No duplicate mutable edge store: the immutable base edges are untouched,
     // re-projection derives equal edges, and projecting rendered edges again is
@@ -125,7 +133,11 @@ describe('flow cancel and render projection', () => {
       [imageInputEdge('edge-1', imageNodeId(1)), imageInputEdge('edge-2', imageNodeId(2))],
       core.snapshot(),
     )
-    expect(render.edges[0]).toMatchObject({ animated: false })
-    expect(render.edges[1]).toMatchObject({ animated: false })
+    expect(render.edges[0]).toMatchObject({ animated: false } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
+    expect(render.edges[1]).toMatchObject({ animated: false } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
   })
 })

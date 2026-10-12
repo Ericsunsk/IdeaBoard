@@ -79,13 +79,13 @@ type BoardSessionMessage = {
 }
 
 type BoardSessionSaveOptions = {
-  waitForPreview?: boolean | undefined
+  shouldWaitForPreview?: boolean | undefined
 }
 
 type BoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict' | 'archived'
 
 type BoardSessionRemoteSyncResult =
-  { ok: true } | { ok: false; reason: BoardSessionRemoteSyncFailureReason; error: unknown }
+  { isOk: true } | { isOk: false; reason: BoardSessionRemoteSyncFailureReason; error: unknown }
 
 export type BoardSessionSaveResult = {
   snapshot: BoardSnapshot
@@ -168,7 +168,7 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
       return {
         snapshot,
         remoteSync: {
-          ok: false,
+          isOk: false,
           reason: 'sync-failed',
           error: createAuthUnavailableError(),
         },
@@ -198,7 +198,7 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
       return {
         snapshot: stabilizedSnapshot,
         remoteSync: {
-          ok: false,
+          isOk: false,
           reason: classifyRemoteSyncFailure(cause),
           error: withWorkspaceUnavailableCode(cause),
         },
@@ -207,10 +207,10 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
     const previewRefreshTask = refreshPreview(boardId, stabilizedSnapshot).catch((error) => {
       console.warn('[canvas] refresh board preview after save failed', boardId, error)
     })
-    if (saveOptions.waitForPreview) {
+    if (saveOptions.shouldWaitForPreview) {
       await previewRefreshTask
     }
-    return { snapshot: stabilizedSnapshot, remoteSync: { ok: true } }
+    return { snapshot: stabilizedSnapshot, remoteSync: { isOk: true } }
   }
 
   async function refreshPreview(boardId: string, snapshot: BoardSnapshot): Promise<void> {

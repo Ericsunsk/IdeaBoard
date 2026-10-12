@@ -171,7 +171,7 @@ describe('canvasGraphMutation', () => {
     const base = createStateFromSnapshot(snapshot)
     const draft = createDraft(base)
 
-    stageRemoveNode(draft, imageId, { removeConnectedEdges: true })
+    stageRemoveNode(draft, imageId, { shouldRemoveConnectedEdges: true })
 
     expect(draft.nodeWrites.get(imageId)).toBeNull()
     expect(draft.edgeWrites.get(toCanvasGraphEdgeId(1))).toBeNull()
@@ -191,7 +191,7 @@ describe('canvasGraphMutation', () => {
     stageMoveNodeToGroup(draft, secondPromptId, groupId)
     expect(getDraftGroupIdForNode(draft, secondPromptId)).toBe(groupId)
 
-    stageRemoveNode(draft, imageId, { removeConnectedEdges: true })
+    stageRemoveNode(draft, imageId, { shouldRemoveConnectedEdges: true })
     expect(getDraftConnectedEdgeIds(draft, imageId).size).toBe(0)
     expect(getDraftConnectedEdgeIds(draft, promptId).size).toBe(0)
   })
@@ -227,7 +227,7 @@ describe('canvasGraphMutation', () => {
 
     commitEdgeWrites(
       state,
-      new Map([[edgeId, { id: edgeId, connection: createConnection(2, 1, 2), selected: false }]]),
+      new Map([[edgeId, { id: edgeId, connection: createConnection(2, 1, 2), isSelected: false }]]),
     )
     expect(state.indexes.outgoingEdgesByNodeId.get(imageId)).toContain(edgeId)
     expect(state.indexes.incomingEdgesByNodeId.get(promptId)).toContain(edgeId)

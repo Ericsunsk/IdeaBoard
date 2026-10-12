@@ -100,7 +100,7 @@ describe('canvasGraphPatchAlgebra', () => {
     expect(isSameJsonValue({ x: 1 }, undefined)).toBe(false)
   })
 
-  it('normalizes staged writes into added/updated/removed/selected sets', () => {
+  it('normalizes staged writes into added/updated/removed/isSelected sets', () => {
     const base = createStateFromSnapshot(createSampleSnapshot())
     const draft = createDraft(base)
     const promptId = toCanvasGraphNodeId('prompt', 1)

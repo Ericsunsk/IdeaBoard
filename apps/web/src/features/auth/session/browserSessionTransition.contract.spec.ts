@@ -24,13 +24,13 @@ import { makeSessionUser } from '../../../test/factories'
 function createHarness(
   overrides: Partial<{
     user: User | null
-    loaded: boolean
+    isLoaded: boolean
     validatedAt: number
   }> = {},
   nowSource: number | (() => number) = 1_001,
 ) {
   let user = overrides.user ?? null
-  let loaded = overrides.loaded ?? false
+  let loaded = overrides.isLoaded ?? false
   let validatedAt = overrides.validatedAt ?? 0
   const getNow = typeof nowSource === 'function' ? nowSource : () => nowSource
   const transport = {
@@ -77,7 +77,7 @@ describe('browser session transition', () => {
   it('commits a refreshed identity and clears auth-scoped cache only when it changes', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-1' }),
-      loaded: true,
+      isLoaded: true,
       validatedAt: 0,
     })
     harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-2' }) })
@@ -94,7 +94,7 @@ describe('browser session transition', () => {
   it('discards a stale in-flight fetch that resolves after an identity switch', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-2' }),
-      loaded: true,
+      isLoaded: true,
     })
     let resolveStale!: (value: { user: User }) => void
     harness.loadUser.mockReturnValueOnce(
@@ -116,7 +116,7 @@ describe('browser session transition', () => {
   it('ignores a stale 401 from a previous identity epoch instead of clearing the new identity', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-2' }),
-      loaded: true,
+      isLoaded: true,
     })
     let rejectStale!: (reason: unknown) => void
     harness.loadUser.mockReturnValueOnce(
@@ -136,7 +136,10 @@ describe('browser session transition', () => {
   })
 
   it('clears local state when a fresh user projection is rejected as unauthorized', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.loadUser.mockRejectedValue({ status: 401 })
 
     await expect(harness.transition.fetchUserInfo(true)).resolves.toBeNull()
@@ -148,7 +151,10 @@ describe('browser session transition', () => {
   })
 
   it('keeps the stale user and marks unloaded on 500 so the next nav retries', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.loadUser.mockRejectedValue({ status: 500 })
 
     await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
@@ -163,7 +169,10 @@ describe('browser session transition', () => {
   })
 
   it('keeps the stale user and marks unloaded on timeouts without a status', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.loadUser.mockRejectedValue(new Error('upstream unavailable'))
 
     await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
@@ -178,7 +187,7 @@ describe('browser session transition', () => {
   it('keeps the stale user for fresh ensureSession probes on server errors', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-1' }),
-      loaded: true,
+      isLoaded: true,
       validatedAt: 0,
     })
     harness.loadUser.mockRejectedValue({ status: 503 })
@@ -193,7 +202,10 @@ describe('browser session transition', () => {
   })
 
   it('retries a transient projection failure once when requested, then commits', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.loadUser
       .mockRejectedValueOnce({ status: 500 })
       .mockResolvedValueOnce({ user: makeSessionUser({ public_id: 'user-2' }) })
@@ -207,7 +219,10 @@ describe('browser session transition', () => {
   })
 
   it('clears the stale identity after a post-auth retry is exhausted', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.loadUser.mockRejectedValue({ status: 500 })
 
     await expect(
@@ -221,7 +236,10 @@ describe('browser session transition', () => {
   })
 
   it('does not retry when the projection is rejected as unauthorized', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.loadUser.mockRejectedValue({ status: 403 })
 
     await expect(
@@ -265,7 +283,10 @@ describe('browser session transition', () => {
   })
 
   it('does not clear local state when logout fails', async () => {
-    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      isLoaded: true,
+    })
     harness.transport.logout.mockResolvedValue(false)
 
     await expect(harness.transition.logout()).resolves.toBe(false)
@@ -279,7 +300,7 @@ describe('browser session transition', () => {
     const harness = createHarness(
       {
         user: makeSessionUser({ public_id: 'user-1' }),
-        loaded: true,
+        isLoaded: true,
         validatedAt: now - SESSION_TRUST_WINDOW_MS,
       },
       now,
@@ -299,7 +320,7 @@ describe('browser session transition', () => {
     const harness = createHarness(
       {
         user: makeSessionUser({ public_id: 'user-1' }),
-        loaded: true,
+        isLoaded: true,
         validatedAt: now - SESSION_TRUST_WINDOW_MS + 1,
       },
       now,
@@ -315,7 +336,7 @@ describe('browser session transition', () => {
 
   it('reprobes an unverified session instead of trusting it', async () => {
     const harness = createHarness(
-      { user: makeSessionUser({ public_id: 'user-1' }), loaded: true, validatedAt: 0 },
+      { user: makeSessionUser({ public_id: 'user-1' }), isLoaded: true, validatedAt: 0 },
       1_000_000,
     )
     harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
@@ -332,7 +353,7 @@ describe('browser session transition', () => {
     const harness = createHarness(
       {
         user: makeSessionUser({ public_id: 'user-1' }),
-        loaded: true,
+        isLoaded: true,
         validatedAt: now - 60_000,
       },
       now,
@@ -349,7 +370,7 @@ describe('browser session transition', () => {
   it('reuses the cache across navigations until the trust window lapses', async () => {
     const clock = { now: 1_000_000 }
     const harness = createHarness(
-      { user: makeSessionUser({ public_id: 'user-1' }), loaded: true, validatedAt: 0 },
+      { user: makeSessionUser({ public_id: 'user-1' }), isLoaded: true, validatedAt: 0 },
       () => clock.now,
     )
     harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
@@ -375,7 +396,7 @@ describe('browser session transition', () => {
   it('clears stale avatars when the server no longer has one', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/old.png' }),
-      loaded: true,
+      isLoaded: true,
     })
     mocks.readStoredSessionUser.mockReturnValue(
       makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/old.png' }),
@@ -405,7 +426,7 @@ describe('browser session transition', () => {
       public_id: 'user-1',
       avatar: '/uploads/profile/U1/avatar.png',
     })
-    const harness = createHarness({ user: serverUser, loaded: true })
+    const harness = createHarness({ user: serverUser, isLoaded: true })
     await harness.transition.logout()
     expect(harness.getUser()).toBeNull()
     expect(mocks.clearPersistedSession).toHaveBeenCalled()
@@ -430,7 +451,7 @@ describe('browser session transition', () => {
   it('never carries an avatar across identities', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar.png' }),
-      loaded: true,
+      isLoaded: true,
     })
     mocks.readStoredSessionUser.mockReturnValue(
       makeSessionUser({ public_id: 'user-1', avatar: '/uploads/profile/U1/avatar.png' }),
@@ -445,7 +466,7 @@ describe('browser session transition', () => {
   it('keeps an explicitly committed avatar instead of merging', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-1' }),
-      loaded: true,
+      isLoaded: true,
     })
 
     harness.transition.setAuth(

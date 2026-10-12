@@ -72,7 +72,7 @@ const model = defineModel<string>({ required: true })
 
 function controlState(invalid: boolean) {
   return resolveInteractiveControlState({
-    disabled: props.disabled,
+    isDisabled: props.disabled,
     tone: invalid ? 'danger' : 'default',
   })
 }

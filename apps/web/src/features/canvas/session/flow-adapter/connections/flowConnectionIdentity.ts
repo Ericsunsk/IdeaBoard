@@ -74,7 +74,7 @@ export function createFlowEdgeProjectionIndex(
       endpoint: flowEdgeIdentityToCanvasConnectionEndpoint(edge),
     })),
     baseConnections: collectStoreConnections(store),
-    allocateGeneratedIds: false,
+    shouldAllocateGeneratedIds: false,
   })
 
   return {

@@ -110,7 +110,7 @@ function reserveExplicitConnectionIds<TFlowEdge extends FlowEdgeIdentityRecord>(
 }
 
 type FlowConnectionClaimCursor<TFlowEdge extends FlowEdgeIdentityRecord> = {
-  allocateGeneratedIds: boolean
+  shouldAllocateGeneratedIds: boolean
   indexes: FlowConnectionClaimIndexes
   explicitOwnerByConnectionId: Map<number, TFlowEdge>
   claimedConnectionIds: Set<number>
@@ -128,7 +128,7 @@ function claimCandidateConnectionId<TFlowEdge extends FlowEdgeIdentityRecord>(
     explicitId !== null &&
     cursor.explicitOwnerByConnectionId.get(explicitId) === edge &&
     !cursor.claimedConnectionIds.has(explicitId) &&
-    (cursor.allocateGeneratedIds || cursor.indexes.baseConnectionIds.has(explicitId))
+    (cursor.shouldAllocateGeneratedIds || cursor.indexes.baseConnectionIds.has(explicitId))
   ) {
     return explicitId
   }
@@ -141,14 +141,14 @@ function claimCandidateConnectionId<TFlowEdge extends FlowEdgeIdentityRecord>(
     if (reusedId !== null) return reusedId
   }
 
-  if (cursor.allocateGeneratedIds) return cursor.allocateGeneratedConnectionId()
+  if (cursor.shouldAllocateGeneratedIds) return cursor.allocateGeneratedConnectionId()
   return null
 }
 
 export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentityRecord>(options: {
   candidates: readonly FlowConnectionClaimCandidate<TFlowEdge>[]
   baseConnections?: readonly CanvasConnection[] | undefined
-  allocateGeneratedIds: boolean
+  shouldAllocateGeneratedIds: boolean
 }): FlowConnectionClaimIndex<TFlowEdge> {
   const baseConnections = options.baseConnections ?? []
   const indexes = indexBaseConnections(baseConnections)
@@ -194,7 +194,7 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
   }
 
   const cursor: FlowConnectionClaimCursor<TFlowEdge> = {
-    allocateGeneratedIds: options.allocateGeneratedIds,
+    shouldAllocateGeneratedIds: options.shouldAllocateGeneratedIds,
     indexes,
     explicitOwnerByConnectionId,
     claimedConnectionIds,

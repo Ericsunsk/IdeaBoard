@@ -35,7 +35,7 @@ export type CanvasConnectionCommandLifecycleOptions = {
   ) => string | null
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
-  markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
+  markFlowExecutionNodeDirty: (nodeId: string, options?: { shouldIncludeSelf?: boolean }) => void
 }
 
 type CanvasConnectionValidationFailure =
@@ -105,7 +105,7 @@ export function createCanvasConnectionCommandLifecycle(
     if (staleFlowEdgeIds.length > 0) {
       options.graphAdapter.removeEdges(
         staleFlowEdgeIds,
-        createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+        createFlowGraphCommandOptions({ shouldRecordHistory: false, shouldMarkDirty: false }),
       )
     }
     return true
@@ -159,7 +159,7 @@ export function createCanvasConnectionCommandLifecycle(
 
     const didCommitProjection = commitConnectProjection(replacement, store)
     if (!didCommitProjection) return false
-    options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
+    options.markFlowExecutionNodeDirty(resolvedConnection.target, { shouldIncludeSelf: true })
     return true
   }
 

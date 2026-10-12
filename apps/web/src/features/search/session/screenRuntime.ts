@@ -89,35 +89,35 @@ function createSearchScreenView(
     results: {
       items: computed(() => session().feed.results.value),
       hasMore: computed(() => session().feed.hasMore.value),
-      loading: computed(() => session().feed.loading.value),
-      loadingMore: computed(() => session().feed.loadingMore.value),
+      isLoading: computed(() => session().feed.loading.value),
+      isLoadingMore: computed(() => session().feed.loadingMore.value),
       hasError: computed(() => session().feed.hasError.value),
       failedImages: computed(() => session().feed.failedImages.value),
       savedKeys: computed(() => session().feed.savedKeys.value),
     },
     library: {
-      open: computed({
+      isOpen: computed({
         get: () => session().library.open.value,
-        set: (value: boolean) => {
-          session().library.open.value = value
+        set: (isOpen: boolean) => {
+          session().library.open.value = isOpen
         },
       }),
-      expanded: computed({
+      isExpanded: computed({
         get: () => session().library.expanded.value,
-        set: (value: boolean) => {
-          session().library.expanded.value = value
+        set: (isExpanded: boolean) => {
+          session().library.expanded.value = isExpanded
         },
       }),
       folderFacts: libraryCoordinator.folderFacts,
       mutationPublisher: libraryCoordinator,
-      mounted: libraryIslandMounted,
+      isMounted: libraryIslandMounted,
       isDropTarget: isTriggerHoveredDuringDrag,
     },
     selection: {
       count: computed(() => session().batch.selected.value.length),
     },
     preview: {
-      visible: computed(() => session().lightbox.visible.value),
+      isVisible: computed(() => session().lightbox.visible.value),
       activeResult: computed(() => session().lightbox.activeResult.value),
     },
   }
@@ -212,8 +212,8 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   provideSearchLibraryCoordinator(libraryCoordinator)
   const scopeKey = computed(() => options.userPublicID.value ?? 'anonymous')
   const current = shallowRef(createScopedSession(scopeKey.value))
-  const mounted = ref(false)
-  const libraryIslandMounted = ref(current.value.session.library.open.value)
+  const isMounted = ref(false)
+  const isLibraryIslandMounted = ref(current.value.session.library.open.value)
   const isTriggerHoveredDuringDrag = ref(false)
   const savePopover = shallowRef<SearchSavePopoverController | null>(null)
   const savePopoverAnchor = ref<HTMLElement | null>(null)
@@ -292,11 +292,11 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
     clearAutoOpenTimer()
     isTriggerHoveredDuringDrag.value = false
     libraryCoordinator.reset()
-    libraryIslandMounted.value = false
+    isLibraryIslandMounted.value = false
     previous.stop()
     current.value = createScopedSession(nextScope, transferredReferences)
 
-    if (mounted.value) {
+    if (isMounted.value) {
       session().activate()
       if (shouldContinueVisionSearch) void session().resumePendingAction()
     }
@@ -305,7 +305,7 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   const view = createSearchScreenView(
     session,
     libraryCoordinator,
-    libraryIslandMounted,
+    isLibraryIslandMounted,
     isTriggerHoveredDuringDrag,
   )
   const workspaceId = computed(() => selectedWorkspaceId.value)
@@ -332,8 +332,8 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
         savePopoverAnchor.value = anchor
         const request: SearchSavePopoverRequest = {
           result,
-          saved: session().feed.savedKeys.value.has(libraryAssetKey(result.provider, result.id)),
-          authenticated: options.isAuthenticated(),
+          isSaved: session().feed.savedKeys.value.has(libraryAssetKey(result.provider, result.id)),
+          isAuthenticated: options.isAuthenticated(),
         }
         savePopover.value?.toggle(event, request)
       },
@@ -391,8 +391,8 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
     },
   }
 
-  watch(view.library.open, (open) => {
-    if (open) libraryIslandMounted.value = true
+  watch(view.library.isOpen, (isOpen) => {
+    if (isOpen) isLibraryIslandMounted.value = true
   })
   watch(selectedWorkspaceId, (next, previous) => {
     if (next !== previous) libraryCoordinator.reset()
@@ -406,7 +406,7 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   )
 
   onMounted(() => {
-    mounted.value = true
+    isMounted.value = true
     session().activate()
     void session().resumePendingAction()
   })

@@ -33,10 +33,8 @@ import {
   type ResolvedFlowNodeChanges,
 } from './groupMembershipRuntime'
 
-type SelectableFlowItem = {
-  id: string
-  selected?: boolean
-}
+type SelectableFlowItem = Pick<Node, 'id'> &
+  Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>
 
 import type { CanvasSelectionGroupAction } from '../groupContracts'
 export type { CanvasSelectionGroupAction } from '../groupContracts'
@@ -135,8 +133,8 @@ export function useCanvasGroupRuntime(
     try {
       const store = options.readCanvasGraphStore()
       transaction = store.beginTransaction('node-update', {
-        recordHistory: false,
-        markDirty: false,
+        shouldRecordHistory: false,
+        shouldMarkDirty: false,
       })
       stage(store, transaction)
       return transaction.commit().didChange
@@ -178,7 +176,7 @@ export function useCanvasGroupRuntime(
       return options.edges.value.some((edge) => (edge as SelectableFlowItem).selected === true)
     }
     const store = options.readCanvasGraphStore()
-    return store.getEdgeIds().some((edgeId) => store.getEdge(edgeId)?.selected === true)
+    return store.getEdgeIds().some((edgeId) => store.getEdge(edgeId)?.isSelected === true)
   }
 
   function readSelectedGraphNodeIds(): CanvasGraphNodeId[] | null {
@@ -202,7 +200,7 @@ export function useCanvasGroupRuntime(
     }
     if (selectedFlowNodeIds.some((nodeId) => !isCanvasGraphNodeId(nodeId))) return null
     const store = options.readCanvasGraphStore()
-    return store.getNodeIds().filter((nodeId) => store.getNode(nodeId)?.selected === true)
+    return store.getNodeIds().filter((nodeId) => store.getNode(nodeId)?.isSelected === true)
   }
 
   function isSameNodeSet(left: readonly CanvasGraphNodeId[], right: readonly CanvasGraphNodeId[]) {
@@ -440,8 +438,8 @@ export function useCanvasGroupRuntime(
     const shouldDeleteMembers = nodeIds.length > 0
     const summary = commitCanvasGraphDeleteGroupIntent(store, {
       groupId: group.id as CanvasGraphGroupId,
-      deleteMembers: shouldDeleteMembers,
-      removeConnectedEdges: true,
+      shouldDeleteMembers: shouldDeleteMembers,
+      shouldRemoveConnectedEdges: true,
     })
     if (!summary.didChange) return false
 
@@ -539,17 +537,21 @@ function createGroupTransformRuntime(
   function createPositionChanges(
     positions: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
     delta: CanvasPoint,
-    dragging: boolean,
+    isDragging: boolean,
   ): NodeChange[] {
-    return Array.from(positions, ([nodeId, startPosition]) => ({
-      id: nodeId,
-      type: 'position',
-      position: {
-        x: startPosition.x + delta.x,
-        y: startPosition.y + delta.y,
-      },
-      dragging,
-    })) as NodeChange[]
+    return Array.from(
+      positions,
+      ([nodeId, startPosition]) =>
+        ({
+          id: nodeId,
+          type: 'position',
+          position: {
+            x: startPosition.x + delta.x,
+            y: startPosition.y + delta.y,
+          },
+          dragging: isDragging,
+        }) satisfies Partial<import('@vue-flow/core').NodeChange>,
+    ) as NodeChange[]
   }
 
   function readGroupMemberNodePositions(store: CanvasGraphStore, groupId: CanvasGraphGroupId) {

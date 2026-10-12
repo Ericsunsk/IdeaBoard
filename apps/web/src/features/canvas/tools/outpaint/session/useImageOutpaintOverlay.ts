@@ -249,7 +249,7 @@ export function useImageOutpaintOverlay(options: UseImageOutpaintOverlayOptions)
   }
 
   useCanvasCustomLayerOverlay({
-    visible: isOutpaintMode,
+    isVisible: isOutpaintMode,
     ignore: ['[data-outpaint-frame]', '[data-outpaint-composer]'],
     ignoreEscape: [
       '[data-outpaint-composer]',

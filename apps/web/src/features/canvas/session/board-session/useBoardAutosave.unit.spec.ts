@@ -47,7 +47,7 @@ describe('useBoardAutosave', () => {
       const isSaving = ref(false)
       const resumeSignal = ref('')
       const save = vi
-        .fn<(options?: { silent?: boolean | undefined }) => Promise<boolean>>()
+        .fn<(options?: { isSilent?: boolean | undefined }) => Promise<boolean>>()
         .mockResolvedValueOnce(false)
         .mockImplementation(async () => {
           isDirty.value = false
@@ -100,10 +100,10 @@ describe('useBoardAutosave', () => {
       expect(save).toHaveBeenCalledOnce()
       expect(isDirty.value).toBe(true)
 
-      await autosave.flushAutosave({ silent: false })
+      await autosave.flushAutosave({ isSilent: false })
 
       expect(save).toHaveBeenCalledTimes(2)
-      expect(save).toHaveBeenLastCalledWith({ silent: false })
+      expect(save).toHaveBeenLastCalledWith({ isSilent: false })
     } finally {
       vi.useRealTimers()
     }

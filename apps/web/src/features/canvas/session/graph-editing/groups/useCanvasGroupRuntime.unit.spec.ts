@@ -6,21 +6,19 @@ import { CanvasGraphSession, type CanvasGraphStore } from '../../../core/graph'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 
-type SelectableHarnessNode = Node & {
-  selected?: boolean
-}
+type SelectableHarnessNode = Node & Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>
 
 function createPromptNode(
   id: number,
   x: number,
   y: number,
-  selected = false,
+  isSelected = false,
 ): SelectableHarnessNode {
   return {
     id: `prompt-${id}`,
     type: 'canvas',
     position: { x, y },
-    selected,
+    selected: isSelected,
     data: {
       kind: 'prompt',
       nodeType: 'prompt',
@@ -85,8 +83,8 @@ function createHarness(
   // production reconcile would already have mirrored it into the store.
   {
     const initial = graphSession.store.beginTransaction('node-update', {
-      recordHistory: false,
-      markDirty: false,
+      shouldRecordHistory: false,
+      shouldMarkDirty: false,
     })
     initial.selectNode('prompt-1', true)
     initial.selectNode('prompt-2', true)
@@ -107,16 +105,20 @@ function createHarness(
   graphSession.subscribe((event) => {
     for (const record of event.patch.nodes.records) {
       if (!record.after) continue
-      const selected = record.after.selected
+      const isSelected = record.after.isSelected
       nodes.value = nodes.value.map((node) =>
-        node.id === record.id ? { ...node, selected } : node,
+        node.id === record.id ? { ...node, selected: isSelected } : node,
       ) as SelectableHarnessNode[]
     }
     for (const record of event.patch.edges.records) {
       if (!record.after) continue
-      const selected = record.after.selected
+      const isSelected = record.after.isSelected
       edges.value = edges.value.map((edge) =>
-        edge.id === record.id ? { ...edge, selected } : edge,
+        edge.id === record.id
+          ? ({ ...edge, selected: isSelected } satisfies Partial<
+              import('@vue-flow/core').GraphEdge
+            >)
+          : edge,
       )
     }
   })
@@ -208,7 +210,7 @@ describe('useCanvasGroupRuntime', () => {
     expect(harness.runtime.internal.selectedGroupId.value).toBe('group-1')
     expect(harness.runtime.view.groupFrames.value[0]).toMatchObject({
       id: 'group-1',
-      selected: true,
+      isSelected: true,
     })
     expect(harness.nodes.value.map((node) => node.selected)).toEqual([false, false])
   })

@@ -62,8 +62,8 @@ async function setMotion(isReduced: boolean) {
 
 function makeLayers(): RetouchLayer[] {
   return [
-    { id: 'source', name: 'Original', type: 'source', visible: true },
-    { id: 'hsl', name: 'Hue', type: 'effect', kind: 'hsl', visible: true },
+    { id: 'source', name: 'Original', type: 'source', isVisible: true },
+    { id: 'hsl', name: 'Hue', type: 'effect', kind: 'hsl', isVisible: true },
   ] as unknown as RetouchLayer[]
 }
 

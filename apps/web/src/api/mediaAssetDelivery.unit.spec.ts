@@ -153,7 +153,7 @@ describe('workspace mediaAssetDelivery', () => {
     mocks.request.mockResolvedValue(assetEnvelope('ready'))
     const scope = effectScope()
     const delivery = scope.run(() =>
-      useMediaAssetDelivery(ref(ASSET_ID), ref<'thumb'>('thumb'), { enabled: visibility }),
+      useMediaAssetDelivery(ref(ASSET_ID), ref<'thumb'>('thumb'), { isEnabled: visibility }),
     )
     if (!delivery) throw new Error('delivery composable was not created')
     await Promise.resolve()

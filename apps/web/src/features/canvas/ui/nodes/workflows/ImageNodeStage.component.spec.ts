@@ -23,24 +23,24 @@ vi.mock('../../../session/flow-adapter/projection/useDisplayImagePreview', () =>
   }),
 }))
 
-function renderImageStage(toolActive: boolean) {
+function renderImageStage(isToolActive: boolean) {
   return render(ImageNodeStage, {
     props: {
       nodeId: 'image-1',
       stageWidth: 280,
       stageHeight: 280,
       displayImage: { url: 'https://provider.example/image.png' },
-      imageToolStageBinding: { active: toolActive } as ImageToolStageBinding,
-      active: false,
-      dragging: false,
+      imageToolStageBinding: { isActive: isToolActive } as ImageToolStageBinding,
+      isActive: false,
+      isDragging: false,
     },
     global: {
       stubs: {
         StagePresentation: { template: '<div><slot /></div>' },
         NodeStageFrame: {
-          props: ['transparent'],
+          props: ['isTransparent'],
           template:
-            '<div data-testid="node-stage-frame" :data-transparent="String(transparent)"><slot /></div>',
+            '<div data-testid="node-stage-frame" :data-transparent="String(isTransparent)"><slot /></div>',
         },
       },
     },
@@ -55,9 +55,9 @@ describe('ImageNodeStage disabled state', () => {
         stageWidth: 280,
         stageHeight: 280,
         displayImage: null,
-        directGenerating: true,
-        active: false,
-        dragging: false,
+        isDirectGenerating: true,
+        isActive: false,
+        isDragging: false,
       },
       global: {
         stubs: {
@@ -82,8 +82,8 @@ describe('ImageNodeStage Library import recovery', () => {
         stageHeight: 280,
         displayImage: { url: 'https://provider.example/preview.png' },
         libraryImport: { state: 'pending', libraryAssetId: 'lasset_asset0007' },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -106,8 +106,8 @@ describe('ImageNodeStage Library import recovery', () => {
           libraryAssetId: 'lasset_asset0007',
           failureMessage: '素材导入失败',
         },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -124,8 +124,8 @@ describe('ImageNodeStage Library import recovery', () => {
         stageHeight: 280,
         displayImage: { url: 'blob:local-image' },
         localUpload: { previewUrl: 'blob:local-image', failureMessage: '上传失败' },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -146,8 +146,8 @@ describe('ImageNodeStage Library import recovery', () => {
         stageHeight: 280,
         displayImage: null,
         localUpload: { previewUrl: 'blob:local-image' },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -167,8 +167,8 @@ describe('ImageNodeStage Library import recovery', () => {
         stageHeight: 280,
         displayImage: { url: '' },
         localUpload: { previewUrl: 'blob:local-image' },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -187,8 +187,8 @@ describe('ImageNodeStage Library import recovery', () => {
         stageWidth: 280,
         stageHeight: 280,
         displayImage: { url: 'blob:local-image' },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -211,8 +211,8 @@ describe('ImageNodeStage Library import recovery', () => {
           url: '/api/v1/workspaces/ws_test123/media-assets/asset_5/content',
           assetId: 'asset_5',
         },
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
@@ -246,16 +246,16 @@ describe('ImageNodeStage image tool presentation', () => {
         stageHeight: 280,
         displayImage: { url: 'https://provider.example/image.png' },
         imageToolStageBinding: null,
-        active: false,
-        dragging: false,
+        isActive: false,
+        isDragging: false,
       },
       global: {
         stubs: {
           StagePresentation: { template: '<div><slot /></div>' },
           NodeStageFrame: {
-            props: ['transparent'],
+            props: ['isTransparent'],
             template:
-              '<div data-testid="node-stage-frame" :data-transparent="String(transparent)"><slot /></div>',
+              '<div data-testid="node-stage-frame" :data-transparent="String(isTransparent)"><slot /></div>',
           },
         },
       },

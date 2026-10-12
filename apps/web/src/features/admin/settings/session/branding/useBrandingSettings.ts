@@ -40,17 +40,17 @@ export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFe
     queryFn: ({ signal }) => fetchBrandingSetting(signal),
   })
   const setting = computed(() => brandingQuery.data.value)
-  const loading = computed(() => brandingQuery.isLoading.value || brandingQuery.isFetching.value)
+  const isLoading = computed(() => brandingQuery.isLoading.value || brandingQuery.isFetching.value)
   const saveMutation = useMutation({
     mutationFn: (draft: BrandingSetting) => saveBrandingSetting(draft),
   })
-  const saving = computed(() => saveMutation.isPending.value)
+  const isSaving = computed(() => saveMutation.isPending.value)
   const lifecycle = useSettingsLifecycle({
     defaultValue: DEFAULT_SITE_BRANDING_SETTING,
     source: setting,
     loadError: brandingQuery.error,
-    loading,
-    saving,
+    isLoading,
+    isSaving,
     normalize: normalizeSiteBrandingSetting,
     isSame: isSameBrandingSetting,
     validate: validateSiteBrandingSetting,
@@ -107,11 +107,11 @@ export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFe
     form: lifecycle.form,
     handleUploadLogo,
     isDirty: lifecycle.isDirty,
-    loading: lifecycle.loading,
+    isLoading: lifecycle.isLoading,
     logoPreviewURL,
     reset: lifecycle.reset,
     save: saveSetting,
-    saving: lifecycle.saving,
+    isSaving: lifecycle.isSaving,
     uploading,
     validationError: lifecycle.validationError,
   }

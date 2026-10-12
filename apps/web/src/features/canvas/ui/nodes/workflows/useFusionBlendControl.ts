@@ -7,7 +7,7 @@ import {
 
 interface UseFusionBlendControlOptions {
   stageRef: Ref<HTMLElement | null>
-  enabled: Ref<boolean>
+  isEnabled: Ref<boolean>
   imageCount: Ref<number>
   blendPoint: Ref<unknown>
   nodeWidth: Ref<number | undefined>
@@ -16,14 +16,14 @@ interface UseFusionBlendControlOptions {
 
 export function useFusionBlendControl({
   stageRef,
-  enabled,
+  isEnabled,
   imageCount,
   blendPoint,
   nodeWidth,
   onCommit,
 }: UseFusionBlendControlOptions) {
-  const blendDragging = ref(false)
-  const blendHandleHover = ref(false)
+  const isBlendDragging = ref(false)
+  const isBlendHandleHover = ref(false)
   const draftBlendPoint = ref<FusionBlendPoint | null>(null)
   const activeBlendPointerId = ref<number | null>(null)
   // Stage rect cached at pointerdown so per-pointermove resolution avoids
@@ -46,7 +46,7 @@ export function useFusionBlendControl({
   }
 
   function commitBlendPoint(point: FusionBlendPoint) {
-    if (!enabled.value) return
+    if (!isEnabled.value) return
     onCommit(constrainBlendPointForCurrentInputs(point))
   }
 
@@ -66,7 +66,7 @@ export function useFusionBlendControl({
   }
 
   function resolveBlendPointFromPointer(event: PointerEvent): FusionBlendPoint | null {
-    const rect = blendDragging.value && cachedStageRect ? cachedStageRect : readStageRect()
+    const rect = isBlendDragging.value && cachedStageRect ? cachedStageRect : readStageRect()
     if (!rect || rect.width <= 0 || rect.height <= 0) return null
     return {
       x: (event.clientX - rect.left) / rect.width,
@@ -75,7 +75,7 @@ export function useFusionBlendControl({
   }
 
   function onBlendPointerMove(event: PointerEvent) {
-    if (!blendDragging.value) return
+    if (!isBlendDragging.value) return
     if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value)
       return
     const point = resolveBlendPointFromPointer(event)
@@ -122,8 +122,8 @@ export function useFusionBlendControl({
     ownerWindow.addEventListener('resize', refreshCachedStageRect)
   }
 
-  function stopBlendDrag(commit = false) {
-    if (commit && draftBlendPoint.value) {
+  function stopBlendDrag(shouldCommit = false) {
+    if (shouldCommit && draftBlendPoint.value) {
       commitBlendPoint(draftBlendPoint.value)
       void nextTick(() => {
         draftBlendPoint.value = null
@@ -131,8 +131,8 @@ export function useFusionBlendControl({
     } else {
       draftBlendPoint.value = null
     }
-    blendDragging.value = false
-    blendHandleHover.value = false
+    isBlendDragging.value = false
+    isBlendHandleHover.value = false
     activeBlendPointerId.value = null
     cachedStageRect = null
     tryReleaseBlendCapture()
@@ -140,14 +140,14 @@ export function useFusionBlendControl({
   }
 
   function onBlendPointerUp(event: PointerEvent) {
-    if (!blendDragging.value) return
+    if (!isBlendDragging.value) return
     if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value)
       return
     stopBlendDrag(true)
   }
 
   function onBlendPointerCancel(event: PointerEvent) {
-    if (!blendDragging.value) return
+    if (!isBlendDragging.value) return
     if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value)
       return
     // A cancelled pointer was never released by the user: revert the draft
@@ -156,9 +156,9 @@ export function useFusionBlendControl({
   }
 
   function onBlendHandlePointerDown(event: PointerEvent) {
-    if (!enabled.value) return
-    blendDragging.value = true
-    blendHandleHover.value = true
+    if (!isEnabled.value) return
+    isBlendDragging.value = true
+    isBlendHandleHover.value = true
     activeBlendPointerId.value = event.pointerId
     cachedStageRect = readStageRect()
     const handleElement = event.currentTarget as HTMLElement | null
@@ -178,11 +178,11 @@ export function useFusionBlendControl({
   }
 
   function onBlendHandlePointerEnter() {
-    blendHandleHover.value = true
+    isBlendHandleHover.value = true
   }
 
   function onBlendHandlePointerLeave() {
-    if (!blendDragging.value) blendHandleHover.value = false
+    if (!isBlendDragging.value) isBlendHandleHover.value = false
   }
 
   function onBlendHandleDoubleClick() {
@@ -190,19 +190,19 @@ export function useFusionBlendControl({
     commitBlendPoint(getDefaultBlendPointForImageCount(imageCount.value, nodeWidth.value))
   }
 
-  watch(enabled, (isEnabled) => {
-    if (!isEnabled && blendDragging.value) stopBlendDrag(false)
+  watch(isEnabled, (isEnabled) => {
+    if (!isEnabled && isBlendDragging.value) stopBlendDrag(false)
   })
 
   onScopeDispose(() => {
-    if (blendDragging.value) stopBlendDrag(false)
+    if (isBlendDragging.value) stopBlendDrag(false)
     else cleanupBlendDragListeners()
   })
 
   return {
     activeBlendPoint,
-    blendDragging,
-    blendHandleHover,
+    isBlendDragging,
+    isBlendHandleHover,
     blendHandleStyle,
     onBlendHandleDoubleClick,
     onBlendHandlePointerDown,

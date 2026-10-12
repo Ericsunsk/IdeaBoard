@@ -32,7 +32,7 @@ describe('canvasGraphStoreTelemetryProbe', () => {
     const store = CanvasGraphStore.fromSnapshot(createEmptyBoardSnapshot(), telemetry)
 
     store
-      .beginTransaction('node-update', { recordHistory: true, markDirty: true })
+      .beginTransaction('node-update', { shouldRecordHistory: true, shouldMarkDirty: true })
       .addNode({
         id: 1,
         type: 'prompt',

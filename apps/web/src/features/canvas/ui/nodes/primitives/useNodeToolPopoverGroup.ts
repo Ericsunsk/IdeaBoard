@@ -6,13 +6,13 @@ type PopoverRootRef = Ref<HTMLElement | null | undefined>
 interface NodeToolPopoverGroupOptions<T extends string> {
   keys: readonly T[]
   rootRefs: PopoverRootRef[]
-  closeOnEscape?: boolean | undefined
+  shouldCloseOnEscape?: boolean | undefined
 }
 
 export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopoverGroupOptions<T>) {
   const activeKey = ref<T | null>(null)
   const keySet = new Set(options.keys)
-  const closeOnEscape = options.closeOnEscape ?? true
+  const shouldCloseOnEscape = options.shouldCloseOnEscape ?? true
 
   function isOpen(key: T) {
     return computed(() => activeKey.value === key)
@@ -37,9 +37,9 @@ export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopov
   }
 
   useCanvasCustomLayerOverlay({
-    visible: computed(() => activeKey.value !== null),
+    isVisible: computed(() => activeKey.value !== null),
     roots: options.rootRefs,
-    dismissibleBy: closeOnEscape ? ['outside-pointer', 'escape'] : ['outside-pointer'],
+    dismissibleBy: shouldCloseOnEscape ? ['outside-pointer', 'escape'] : ['outside-pointer'],
     onDismiss: () => close(),
   })
 

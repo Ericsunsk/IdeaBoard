@@ -54,7 +54,7 @@ class MockEventSource {
   static instances: MockEventSource[] = []
 
   onerror: ((event: Event) => void) | null = null
-  closed = false
+  isClosed = false
   readonly url: string
   private listeners: Record<string, EventListener[]> = {}
 
@@ -76,7 +76,7 @@ class MockEventSource {
   }
 
   close() {
-    this.closed = true
+    this.isClosed = true
   }
 
   emit(type: string, data: unknown) {
@@ -266,7 +266,7 @@ describe('identity switch resets workspace delivery and streams', () => {
     })
     harness.transition.setAuth(makeSessionUser({ public_id: 'user-2' }))
 
-    expect(MockEventSource.instances[0]?.closed).toBe(true)
+    expect(MockEventSource.instances[0]?.isClosed).toBe(true)
     stop()
   })
 
@@ -294,9 +294,9 @@ describe('identity switch resets workspace delivery and streams', () => {
     expect(seen).toHaveBeenCalledTimes(1)
     expect(seenJoined).toHaveBeenCalledTimes(1)
     stopNew()
-    expect(MockEventSource.instances[1]?.closed).toBe(false)
+    expect(MockEventSource.instances[1]?.isClosed).toBe(false)
     stopJoined()
-    expect(MockEventSource.instances[1]?.closed).toBe(true)
+    expect(MockEventSource.instances[1]?.isClosed).toBe(true)
   })
 
   it('keeps new media invalidation subscribed after both old refcount disposers run', async () => {
@@ -309,7 +309,7 @@ describe('identity switch resets workspace delivery and streams', () => {
 
     stopOld()
     stopOldJoined()
-    expect(MockEventSource.instances[1]?.closed).toBe(false)
+    expect(MockEventSource.instances[1]?.isClosed).toBe(false)
     MockEventSource.instances[1]?.emit('media.asset_ready', {
       id: 'evt_media123',
       type: 'media.asset_ready',
@@ -323,7 +323,7 @@ describe('identity switch resets workspace delivery and streams', () => {
     await getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
     expect(mocks.request).toHaveBeenCalledTimes(2)
     stopNew()
-    expect(MockEventSource.instances[1]?.closed).toBe(true)
+    expect(MockEventSource.instances[1]?.isClosed).toBe(true)
   })
 
   it('aborts old batch reads and rejects late results without replacing new metadata', async () => {
@@ -359,7 +359,7 @@ describe('identity switch resets workspace delivery and streams', () => {
 
     clearStoredAuthState()
 
-    expect(MockEventSource.instances[0]?.closed).toBe(true)
+    expect(MockEventSource.instances[0]?.isClosed).toBe(true)
     await getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
     expect(mocks.request).toHaveBeenCalledTimes(2)
     stop()

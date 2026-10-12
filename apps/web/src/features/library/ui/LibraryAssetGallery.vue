@@ -2,12 +2,12 @@
   <div
     ref="scrollAreaRef"
     class="mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-[var(--radius-board-dialog)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    :aria-busy="loading"
+    :aria-busy="isLoading"
     @scroll="emit('scroll')"
   >
     <!-- 骨架加载状态 -->
     <div
-      v-if="loading && assets.length === 0"
+      v-if="isLoading && assets.length === 0"
       class="grid h-full min-h-40 grid-cols-2 gap-2 overflow-hidden"
       aria-busy="true"
     >
@@ -16,7 +16,7 @@
 
     <!-- 空状态提示 -->
     <div
-      v-else-if="!loading && assets.length === 0 && !errorMessage"
+      v-else-if="!isLoading && assets.length === 0 && !errorMessage"
       class="grid h-full min-h-40 place-items-center rounded-[var(--radius-board-dialog)] border border-dashed border-border px-5 text-center"
     >
       <div>
@@ -136,7 +136,7 @@
         v-if="hasMore"
         type="button"
         class="mx-auto my-3 block rounded-full border border-border bg-card/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer"
-        :disabled="loading"
+        :disabled="isLoading"
         @click="emit('load-more')"
       >
         {{ t('library.actions.loadMore') }}
@@ -159,7 +159,7 @@ import {
 
 const props = defineProps<{
   assets: LibraryAssetView[]
-  loading: boolean
+  isLoading: boolean
   errorMessage: string | null
   hasMore: boolean
   isExpanded: boolean
@@ -253,9 +253,9 @@ const galleryLayout = computed(() => {
     const estimatedHeight = failedImages.value.has(asset.id)
       ? Math.max(imageHeight, fallbackHeight.value)
       : imageHeight
-    const measured = measuredCards.value.get(asset.id)
+    const isMeasured = measuredCards.value.get(asset.id)
     const height =
-      measured && Math.abs(measured.width - width) < 0.1 ? measured.height : estimatedHeight
+      isMeasured && Math.abs(isMeasured.width - width) < 0.1 ? isMeasured.height : estimatedHeight
     bottoms[lane] = top + height + gap
     return {
       asset,

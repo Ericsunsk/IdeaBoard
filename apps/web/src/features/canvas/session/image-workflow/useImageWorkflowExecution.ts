@@ -28,7 +28,7 @@ export type UseImageWorkflowExecutionOptions = {
   readCanvasGraphStore: () => CanvasGraphStore
   rendererMetrics: CanvasRendererMetricsPort
   boardBaseSnapshot: Ref<BoardSnapshot>
-  flushAutosave: (options?: { silent?: boolean }) => Promise<void>
+  flushAutosave: (options?: { isSilent?: boolean }) => Promise<void>
   refreshNodeInternals: (nodeIds: string[]) => void
   feedback: CanvasTaskExecutionFeedback
   executionCore: PendingImageExecutionCore

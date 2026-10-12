@@ -1,7 +1,7 @@
 <template>
   <div
     class="workflow-node-header"
-    :class="{ 'rounded-t-xl': rounded, 'is-active': active, 'is-copy-mode': copyMode }"
+    :class="{ 'rounded-t-xl': isRounded, 'is-active': isActive, 'is-copy-mode': isCopyMode }"
     @mousedown="onHeaderMouseDown"
   >
     <div class="node-header-title">
@@ -37,9 +37,9 @@ import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   title: string
-  active?: boolean
-  copyMode?: boolean
-  rounded?: boolean
+  isActive?: boolean
+  isCopyMode?: boolean
+  isRounded?: boolean
 }>()
 
 const emit = defineEmits<{

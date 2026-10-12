@@ -3,11 +3,11 @@ import { render } from '../../../../test/render'
 import CanvasGroupFramesOverlay from './CanvasGroupFramesOverlay.vue'
 import type { CanvasGroupFrame } from '../../core/graph/canvasGroupGeometry.ts'
 
-function createFrame(id: string, selected: boolean, left = 100, top = 80): CanvasGroupFrame {
+function createFrame(id: string, isSelected: boolean, left = 100, top = 80): CanvasGroupFrame {
   return {
     id: id as CanvasGroupFrame['id'],
     nodeIds: ['image-1', 'prompt-1'],
-    selected,
+    isSelected,
     order: 0,
     bounds: {
       left,

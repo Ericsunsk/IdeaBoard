@@ -3,11 +3,11 @@ import { useVueFlow, type EdgeChange, type Elements } from '@vue-flow/core'
 import { createCanvasSelectionController } from './canvasSelectionController'
 
 export type DismissTransientCanvasUiOptions = {
-  closeOutpaint?: boolean
-  closeBoardHeader?: boolean
-  closeContextMenu?: boolean
-  clearNodePanel?: boolean
-  hideStrength?: boolean
+  shouldCloseOutpaint?: boolean
+  shouldCloseBoardHeader?: boolean
+  shouldCloseContextMenu?: boolean
+  shouldClearNodePanel?: boolean
+  shouldHideStrength?: boolean
 }
 
 export type DismissTransientCanvasUi = (options?: DismissTransientCanvasUiOptions) => void
@@ -40,7 +40,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     removeSelectedElements,
     addSelectedNodes,
     findNode,
-    nodesSelectionActive,
+    nodesSelectionActive: isNodesSelectionActive,
   } = useVueFlow()
   const selectionController = createCanvasSelectionController({
     readElements: () => [...getSelectedElements.value],
@@ -65,22 +65,22 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     clearSelection()
     options.onSelectionChanged?.([])
     options.dismissTransientCanvasUi({
-      closeOutpaint: true,
-      closeBoardHeader: true,
-      closeContextMenu: true,
+      shouldCloseOutpaint: true,
+      shouldCloseBoardHeader: true,
+      shouldCloseContextMenu: true,
     })
   }
 
   function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
-    options.dismissTransientCanvasUi({ closeOutpaint: true })
+    options.dismissTransientCanvasUi({ shouldCloseOutpaint: true })
     options.onSelectionChanged?.(readSelectedElements())
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
     const event = args[1]
     if (event.button === 0) {
-      options.dismissTransientCanvasUi({ closeOutpaint: true })
+      options.dismissTransientCanvasUi({ shouldCloseOutpaint: true })
     }
   }
 
@@ -97,9 +97,9 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     if (options.activeTool.value !== 'select') return
     selectionController.beginMarquee(event)
     options.dismissTransientCanvasUi({
-      closeOutpaint: true,
-      closeBoardHeader: true,
-      closeContextMenu: true,
+      shouldCloseOutpaint: true,
+      shouldCloseBoardHeader: true,
+      shouldCloseContextMenu: true,
     })
   }
 
@@ -108,7 +108,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     selectionController.endMarquee(event, selectedElements)
     options.onSelectionChanged?.(readSelectedElements())
 
-    nodesSelectionActive.value = readSelectedNodeIds().size > 1
+    isNodesSelectionActive.value = readSelectedNodeIds().size > 1
   }
 
   function filterMarqueeEdgeChanges(changes: EdgeChange[]): EdgeChange[] {

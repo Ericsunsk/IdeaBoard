@@ -4,7 +4,7 @@
       v-for="item in actionItems"
       :key="item.kind"
       class="retouch-effect-actions__button node-tool-icon-button--accent-hover"
-      :active="selectedKind === item.kind"
+      :is-active="selectedKind === item.kind"
       :aria-label="item.label"
       :tooltip="item.label"
       @click="emit('select-retouch', item.kind)"

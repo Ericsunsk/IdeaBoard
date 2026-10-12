@@ -8,7 +8,7 @@ import { noRetry } from '../../../../core/query/queryDefaults'
 const pageSize = PAGE_SIZES.standard
 
 export function useRewardHistory(enabled: MaybeRefOrGetter<boolean> = true) {
-  const { workspaceId, selectionSettled } = useAccountWorkspace()
+  const { workspaceId, isSelectionSettled } = useAccountWorkspace()
 
   const query = useInfiniteQuery({
     queryKey: computed(() => rewardRedemptionsQueryKeys.list(workspaceId.value ?? '')),
@@ -23,7 +23,7 @@ export function useRewardHistory(enabled: MaybeRefOrGetter<boolean> = true) {
       ),
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.next_cursor,
-    enabled: () => toValue(enabled) && selectionSettled.value,
+    enabled: () => toValue(enabled) && isSelectionSettled.value,
     ...noRetry(),
   })
 

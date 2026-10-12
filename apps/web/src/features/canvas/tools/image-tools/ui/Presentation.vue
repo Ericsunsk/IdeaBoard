@@ -10,7 +10,7 @@
     :draw-mode="chromeModel.mask.drawMode"
     :brush-size="chromeModel.mask.brushSize"
     :mask-layer-opacity="chromeModel.mask.layerOpacity"
-    :direct-generating="chromeModel.mask.directGenerating"
+    :is-direct-generating="chromeModel.mask.directGenerating"
     :can-undo="chromeModel.mask.canUndo"
     :can-redo="chromeModel.mask.canRedo"
     @set-draw-mode="chromeCommands.setMaskDrawMode"

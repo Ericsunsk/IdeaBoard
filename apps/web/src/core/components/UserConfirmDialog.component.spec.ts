@@ -35,18 +35,18 @@ const DialogContentStub = defineComponent({
   `,
 })
 
-function renderConfirmDialog(loading = false) {
+function renderConfirmDialog(isLoading = false) {
   const onVisibleUpdate = vi.fn()
   const onConfirm = vi.fn()
   const view = renderWithUser(UserConfirmDialog, {
     props: {
-      visible: true,
+      isVisible: true,
       title: '删除确认',
       message: '确定删除吗？',
       confirmLabel: '删除',
       intent: 'danger',
-      loading,
-      'onUpdate:visible': onVisibleUpdate,
+      isLoading,
+      'onUpdate:isVisible': onVisibleUpdate,
       onConfirm,
     },
     global: {

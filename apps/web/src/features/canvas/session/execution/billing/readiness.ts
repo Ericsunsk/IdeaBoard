@@ -26,7 +26,7 @@ export type CanvasBillingQuoteState = {
   totalCredits?: number
   availableCredits?: number
   priceVersionId?: number
-  sufficient?: boolean
+  isSufficient?: boolean
   reason?: string | undefined
 }
 
@@ -43,7 +43,7 @@ type CanvasBillingReadinessRequest = Parameters<typeof fetchCanvasBillingReadine
 export type CanvasBillingReadinessStore = {
   ensureService: (
     service: Service,
-    options?: { force?: boolean; request?: CanvasBillingReadinessRequest },
+    options?: { shouldForce?: boolean; request?: CanvasBillingReadinessRequest },
   ) => Promise<void>
   ensureMatrix: (
     entries: Array<{
@@ -86,7 +86,7 @@ export function createCanvasBillingReadinessStore(
   } = {},
 ): CanvasBillingReadinessStore {
   const fetchReadiness = options.fetchReadiness ?? fetchCanvasBillingReadiness
-  const customFetcher = options.fetchReadiness !== undefined
+  const isCustomFetcher = options.fetchReadiness !== undefined
   const fetchReadinessMatrix = options.fetchReadinessMatrix ?? fetchCanvasBillingReadinessMatrix
   const now = options.now ?? Date.now
   const cacheMs = options.cacheMs ?? 60_000
@@ -110,7 +110,7 @@ export function createCanvasBillingReadinessStore(
         totalCredits: billing.total_credits,
         availableCredits: billing.available_credits,
         priceVersionId: billing.price_version_id,
-        sufficient: false,
+        isSufficient: false,
         reason: i18n.global.t('billing.insufficientBalanceDetail', {
           required: formatIdeaAmount(billing.total_credits),
           available: formatIdeaAmount(billing.available_credits),
@@ -138,7 +138,7 @@ export function createCanvasBillingReadinessStore(
       totalCredits: billing.total_credits,
       availableCredits: billing.available_credits,
       priceVersionId: billing.price_version_id,
-      sufficient: billing.sufficient,
+      isSufficient: billing.sufficient,
     }
   }
 
@@ -161,7 +161,7 @@ export function createCanvasBillingReadinessStore(
   async function ensureService(
     service: Service,
     requestOptions: {
-      force?: boolean
+      shouldForce?: boolean
       request?: CanvasBillingReadinessRequest
     } = {},
   ): Promise<void> {
@@ -169,7 +169,7 @@ export function createCanvasBillingReadinessStore(
     const lastFailureAt = failedAt.get(stateKey)
     if (lastFailureAt !== undefined && now() - lastFailureAt < cacheMs) return
     const lastLoadedAt = loadedAt.get(stateKey) ?? 0
-    if (!requestOptions.force && lastLoadedAt > 0 && now() - lastLoadedAt < cacheMs) return
+    if (!requestOptions.shouldForce && lastLoadedAt > 0 && now() - lastLoadedAt < cacheMs) return
     const existing = pending.get(stateKey)
     if (existing) return existing
 
@@ -203,7 +203,7 @@ export function createCanvasBillingReadinessStore(
   ): Promise<void> {
     // Custom fetchers are used by isolated consumers/tests that only implement the
     // single-service contract; preserve that adapter seam without issuing a real request.
-    if (customFetcher && options.fetchReadinessMatrix === undefined) {
+    if (isCustomFetcher && options.fetchReadinessMatrix === undefined) {
       await Promise.all(entries.map(({ service, request }) => ensureService(service, { request })))
       return
     }
@@ -281,7 +281,7 @@ export function useCanvasBillingQuote(
       request: readinessRequest,
       // Readiness quotes include quantity and resolution. Dynamic node controls
       // must bypass the service-level cache when they provide a concrete request.
-      force: readinessRequest !== undefined,
+      shouldForce: readinessRequest !== undefined,
     })
   })
   return computed(() => {

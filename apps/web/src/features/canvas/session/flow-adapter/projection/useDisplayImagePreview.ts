@@ -29,7 +29,7 @@ interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>
   assetId?: MaybeRefOrGetter<MediaAssetId | null | undefined>
   isVisible?: MaybeRefOrGetter<boolean>
-  keepPreviousOnSourceChange?: boolean
+  shouldKeepPreviousOnSourceChange?: boolean
 }
 
 const DEFAULT_MAX_SIDE = 1280
@@ -313,7 +313,7 @@ export function useDisplayImagePreview(
     return 'large-preview'
   })
   const mediaDelivery = useMediaAssetDelivery(resolvedAssetId, resolvedMediaTier, {
-    enabled: isVisible,
+    isEnabled: isVisible,
   })
   const previewUrl = ref<string | null>(null)
   const isResolved = ref(false)
@@ -342,7 +342,7 @@ export function useDisplayImagePreview(
       () => resolvedAssetId.value,
       isVisible,
     ],
-    ([currentSource, maxSide, assetId, visible]) => {
+    ([currentSource, maxSide, assetId, isVisible]) => {
       requestToken += 1
       const token = requestToken
       previewController?.abort()
@@ -352,7 +352,7 @@ export function useDisplayImagePreview(
       activeSource = currentSource
       isResolved.value = false
 
-      if (!currentSource || !visible) return
+      if (!currentSource || !isVisible) return
       if (maxSide === null) {
         previewUrl.value = null
         return
@@ -432,7 +432,7 @@ export function useDisplayImagePreview(
 
       if (currentSource !== displayedSource.value) {
         displayedSource.value = currentSource
-        if (!options.keepPreviousOnSourceChange) displayedUrl.value = ''
+        if (!options.shouldKeepPreviousOnSourceChange) displayedUrl.value = ''
       }
       setPinnedDisplayUrl(nextUrl)
       if (!nextUrl || nextUrl === displayedUrl.value) return

@@ -7,13 +7,13 @@ async function flushPromises() {
 }
 
 function createHarness(overrides: Partial<BoardAutosavePolicyDeps> = {}) {
-  const state = { dirty: false, saving: false }
+  const state = { isDirty: false, isSaving: false }
   const defaultSave = vi.fn(async () => true)
   const policy = createBoardAutosavePolicy({
-    isDirty: () => state.dirty,
-    isSaving: () => state.saving,
+    isDirty: () => state.isDirty,
+    isSaving: () => state.isSaving,
     markDirty: () => {
-      state.dirty = true
+      state.isDirty = true
     },
     save: defaultSave,
     delay: 20,
@@ -30,13 +30,13 @@ describe('createBoardAutosavePolicy', () => {
       let canRun = false
       const { state, save, policy } = createHarness({ canRun: () => canRun })
 
-      state.dirty = true
+      state.isDirty = true
       policy.markDirtyAndSchedule()
       await vi.advanceTimersByTimeAsync(20)
       await flushPromises()
 
       expect(save).not.toHaveBeenCalled()
-      expect(state.dirty).toBe(true)
+      expect(state.isDirty).toBe(true)
 
       canRun = true
       await policy.flushAutosave()
@@ -55,18 +55,18 @@ describe('createBoardAutosavePolicy', () => {
         save: vi.fn(async () => false),
       })
 
-      state.dirty = true
+      state.isDirty = true
       policy.markDirtyAndSchedule()
       await vi.advanceTimersByTimeAsync(20)
       await flushPromises()
 
       expect(save).toHaveBeenCalledOnce()
-      expect(state.dirty).toBe(true)
+      expect(state.isDirty).toBe(true)
 
-      await policy.flushAutosave({ silent: false })
+      await policy.flushAutosave({ isSilent: false })
 
       expect(save).toHaveBeenCalledTimes(2)
-      expect(save).toHaveBeenLastCalledWith({ silent: false })
+      expect(save).toHaveBeenLastCalledWith({ isSilent: false })
       policy.dispose()
     } finally {
       vi.useRealTimers()
@@ -78,27 +78,27 @@ describe('createBoardAutosavePolicy', () => {
     try {
       const { state, save, policy } = createHarness({
         save: vi
-          .fn<(options?: { silent?: boolean | undefined }) => Promise<boolean>>()
+          .fn<(options?: { isSilent?: boolean | undefined }) => Promise<boolean>>()
           .mockResolvedValueOnce(false)
           .mockImplementation(async () => {
-            state.dirty = false
+            state.isDirty = false
             return true
           }),
       })
 
-      state.dirty = true
+      state.isDirty = true
       policy.markDirtyAndSchedule()
       await vi.advanceTimersByTimeAsync(20)
       await flushPromises()
 
       expect(save).toHaveBeenCalledTimes(1)
-      expect(state.dirty).toBe(true)
+      expect(state.isDirty).toBe(true)
 
       policy.handleResumeSignal('1:user-a', '')
       await flushPromises()
 
       expect(save).toHaveBeenCalledTimes(2)
-      expect(state.dirty).toBe(false)
+      expect(state.isDirty).toBe(false)
       policy.dispose()
     } finally {
       vi.useRealTimers()
@@ -110,12 +110,12 @@ describe('createBoardAutosavePolicy', () => {
     try {
       const { state, save, policy } = createHarness()
 
-      state.dirty = true
+      state.isDirty = true
       policy.handleHidden()
       await flushPromises()
       expect(save).toHaveBeenCalledTimes(1)
 
-      state.dirty = true
+      state.isDirty = true
       policy.handleOnlineChange(false, true)
       await flushPromises()
       expect(save).toHaveBeenCalledTimes(2)
@@ -133,7 +133,7 @@ describe('createBoardAutosavePolicy', () => {
     vi.useFakeTimers()
     try {
       const { state, save, policy } = createHarness()
-      state.dirty = true
+      state.isDirty = true
 
       policy.markDirtyAndSchedule()
       policy.dispose()
@@ -153,20 +153,20 @@ describe('createBoardAutosavePolicy', () => {
     vi.useFakeTimers()
     try {
       const { state, save, policy } = createHarness()
-      let advanced = false
+      let isAdvanced = false
       save.mockImplementation(async () => {
-        state.dirty = false
-        if (!advanced) {
-          advanced = true
+        state.isDirty = false
+        if (!isAdvanced) {
+          isAdvanced = true
           policy.markDirtyAndSchedule()
         }
         return true
       })
 
-      state.dirty = true
+      state.isDirty = true
       await policy.flushAutosave()
       expect(save).toHaveBeenCalledTimes(2)
-      expect(state.dirty).toBe(false)
+      expect(state.isDirty).toBe(false)
 
       // The trailing debounce from the mid-save edit finds no dirty
       // state and issues no extra save.

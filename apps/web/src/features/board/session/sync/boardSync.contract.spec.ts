@@ -262,7 +262,10 @@ describe('boardSync', () => {
       state: makeState(1_500, 'remote-only-state'),
     })
 
-    await hydrateBoardsFromServer({ preserveLocalNewer: false, rollbackBoardIds: ['local-only'] })
+    await hydrateBoardsFromServer({
+      shouldPreserveLocalNewer: false,
+      rollbackBoardIds: ['local-only'],
+    })
 
     expect(listBoards().map((board) => board.id)).toEqual(['remote-only'])
     expect(getBoardState('local-only')).toBeNull()
@@ -308,7 +311,7 @@ describe('boardSync', () => {
       state: makeState(1_000, 'remote-older'),
     })
 
-    await hydrateBoardsFromServer({ preserveLocalNewer: false })
+    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
 
     const boardNames = new Map(listBoards().map((board) => [board.id, board.name]))
     expect(boardNames.get('board-a')).toBe('Remote Winner')
@@ -330,7 +333,7 @@ describe('boardSync', () => {
       state: makeState(1_000, 'remote-winner'),
     })
 
-    await hydrateBoardsFromServer({ preserveLocalNewer: false })
+    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
 
     expect(listBoards()[0]?.name).toBe('Remote Winner')
     expect(getPromptText('board-1')).toBe('remote-winner')
@@ -342,7 +345,7 @@ describe('boardSync', () => {
 
     const result = await hydrateBoardsFromServer()
 
-    expect(result.ok).toBe(false)
+    expect(result.isOk).toBe(false)
     expect(listBoards()[0]?.name).toBe('Local Board')
   })
 
@@ -352,8 +355,8 @@ describe('boardSync', () => {
 
     const result = await hydrateBoardsFromServer()
 
-    expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected hydrate failure')
+    expect(result.isOk).toBe(false)
+    if (result.isOk) throw new Error('expected hydrate failure')
     expect(result.error).toBeInstanceOf(BoardWorkspaceUnavailableError)
     expect(mocks.request).not.toHaveBeenCalled()
   })
@@ -373,7 +376,7 @@ describe('boardSync', () => {
     setTimeout(() => getWorkspaceSelectionStore().select(WORKSPACE_ID), 10)
     const result = await hydrateTask
 
-    expect(result.ok).toBe(true)
+    expect(result.isOk).toBe(true)
     expect(listBoards().map((board) => board.id)).toEqual(['late-board'])
     expect(getPromptText('late-board')).toBe('late-ready')
   })
@@ -384,8 +387,8 @@ describe('boardSync', () => {
 
     const result = await hydrateBoardsFromServer({ waitForWorkspaceTimeoutMs: 20 })
 
-    expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected hydrate failure')
+    expect(result.isOk).toBe(false)
+    if (result.isOk) throw new Error('expected hydrate failure')
     expect(result.error).toBeInstanceOf(BoardWorkspaceUnavailableError)
     expect(mocks.request).not.toHaveBeenCalled()
   })
@@ -426,7 +429,7 @@ describe('boardSync', () => {
     replaceBoards([boardMeta('board-b', 'User B Board', 3_000)])
     resolveRequest(apiState.boardsResponse)
 
-    await expect(hydrateTask).resolves.toMatchObject({ ok: false })
+    await expect(hydrateTask).resolves.toMatchObject({ isOk: false })
     expect(listBoards()).toEqual([boardMeta('board-b', 'User B Board', 3_000)])
     expect(getBoardState('board-a')).toBeNull()
   })
@@ -456,7 +459,7 @@ describe('boardSync', () => {
     getWorkspaceSelectionStore().select(workspaceB)
     resolveRequest(apiState.boardsResponse)
 
-    await expect(hydrateTask).resolves.toMatchObject({ ok: false })
+    await expect(hydrateTask).resolves.toMatchObject({ isOk: false })
     expect(listBoards()).toEqual([])
     expect(getBoardState('board-a')).toBeNull()
 
@@ -568,7 +571,7 @@ describe('boardSync', () => {
 
     const result = await hydrateBoardsFromServer()
 
-    expect(result).toMatchObject({ ok: false, error: expect.anything() })
+    expect(result).toMatchObject({ isOk: false, error: expect.anything() })
   })
 
   it('rejects a remote board with a broken timestamp instead of fabricating now()', async () => {
@@ -580,7 +583,7 @@ describe('boardSync', () => {
 
     const result = await hydrateBoardsFromServer()
 
-    expect(result).toMatchObject({ ok: false, error: expect.any(BoardPayloadError) })
+    expect(result).toMatchObject({ isOk: false, error: expect.any(BoardPayloadError) })
     expect(listBoards().map((board) => board.id)).toEqual(['board-1'])
   })
 
@@ -652,11 +655,11 @@ describe('boardSync', () => {
       const result = await hydrateBoardsFromServer()
 
       expect(result).toMatchObject({
-        ok: false,
+        isOk: false,
         error: expect.objectContaining({
           code: 'INVALID_BOARD_STATE',
           boundary: 'server-hydration',
-          recoverable: true,
+          isRecoverable: true,
         }),
       })
       expect(getBoardState('board-older')).toBeNull()
@@ -666,7 +669,7 @@ describe('boardSync', () => {
         expect.objectContaining({
           code: 'INVALID_BOARD_STATE',
           boundary: 'server-hydration',
-          recoverable: true,
+          isRecoverable: true,
         }),
       )
     } finally {
@@ -713,11 +716,11 @@ describe('boardSync', () => {
       const result = await hydrateBoardsFromServer()
 
       expect(result).toMatchObject({
-        ok: false,
+        isOk: false,
         error: expect.objectContaining({
           code: 'INVALID_BOARD_STATE',
           boundary: 'server-hydration',
-          recoverable: true,
+          isRecoverable: true,
         }),
       })
       expect(getBoardState('board-invalid')).toBeNull()
@@ -728,7 +731,7 @@ describe('boardSync', () => {
         expect.objectContaining({
           code: 'INVALID_BOARD_STATE',
           boundary: 'server-hydration',
-          recoverable: true,
+          isRecoverable: true,
         }),
       )
     } finally {
@@ -934,7 +937,10 @@ describe('boardSync', () => {
       state: makeState(1_000, 'remote-v8'),
     })
 
-    await hydrateBoardsFromServer({ preserveLocalNewer: false, rollbackBoardIds: ['board-1'] })
+    await hydrateBoardsFromServer({
+      shouldPreserveLocalNewer: false,
+      rollbackBoardIds: ['board-1'],
+    })
 
     expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Newer Revision' })
     expect(getPromptText('board-1')).toBe('remote-v8')

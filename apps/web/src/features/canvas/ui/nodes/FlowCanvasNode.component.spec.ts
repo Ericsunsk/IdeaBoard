@@ -35,12 +35,12 @@ function createPromptData(snapshot: PromptNodeItem): FlowNodeData {
 
 function createImageActionBinding(): ImageActionBinding {
   return {
-    actionMenuVisible: false,
-    promptComposerVisible: false,
+    isActionMenuVisible: false,
+    isPromptComposerVisible: false,
     promptPlaceholder: '',
-    directGenerating: false,
+    isDirectGenerating: false,
     strengthControl: {
-      visible: false,
+      isVisible: false,
       activeAction: null,
       getValue: () => 50,
       setRangeRef: vi.fn(),
@@ -118,10 +118,10 @@ function createFusionSnapshot(overrides: Partial<FusionNodeItem> = {}): FusionNo
 
 function renderFlowCanvasNode(
   input: {
-    selected?: boolean
-    dragging?: boolean
-    generationAvailable?: boolean
-    connectionDropTarget?: boolean
+    isSelected?: boolean
+    isDragging?: boolean
+    isGenerationAvailable?: boolean
+    isConnectionDropTarget?: boolean
   } = {},
 ) {
   const snapshot = createPromptSnapshot()
@@ -129,13 +129,14 @@ function renderFlowCanvasNode(
     props: {
       nodeId: 'prompt-1',
       data: createPromptData(snapshot),
-      selected: input.selected ?? false,
-      dragging: input.dragging ?? false,
-      copyMode: false,
-      generationAvailable: input.generationAvailable ?? true,
-      connectionDropTarget: input.connectionDropTarget ?? false,
+      selected: input.isSelected ?? false,
+      dragging: input.isDragging ?? false,
+      isCopyMode: false,
+      isGenerationAvailable: input.isGenerationAvailable ?? true,
+      isConnectionDropTarget: input.isConnectionDropTarget ?? false,
       imagePresentation: createImagePresentation(),
-    },
+    } satisfies Partial<Pick<import('@vue-flow/core').NodeProps, 'selected' | 'dragging'>> &
+      Record<string, unknown>,
     global: {
       stubs: {
         FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
@@ -160,7 +161,7 @@ describe('FlowCanvasNode prompt rendering', () => {
 
   it('keeps the full prompt body for selected nodes at rest', () => {
     const view = renderFlowCanvasNode({
-      selected: true,
+      isSelected: true,
     })
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
@@ -168,8 +169,8 @@ describe('FlowCanvasNode prompt rendering', () => {
 
   it('keeps the full prompt body while a selected node is dragging', () => {
     const view = renderFlowCanvasNode({
-      selected: true,
-      dragging: true,
+      isSelected: true,
+      isDragging: true,
     })
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
@@ -180,16 +181,16 @@ describe('FlowCanvasNode prompt rendering', () => {
       props: {
         nodeId: 'prompt-1',
         data: createPromptData(createPromptSnapshot()),
-        connectionDropTarget: true,
+        isConnectionDropTarget: true,
         imagePresentation: createImagePresentation(),
       },
       global: {
         stubs: {
           FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
           NodeStageFrame: {
-            props: ['connectionDropTarget'],
+            props: ['isConnectionDropTarget'],
             template:
-              '<div data-testid="node-stage-frame" :data-connection-drop-target="String(connectionDropTarget)"><slot /></div>',
+              '<div data-testid="node-stage-frame" :data-connection-drop-target="String(isConnectionDropTarget)"><slot /></div>',
           },
         },
       },
@@ -203,7 +204,7 @@ describe('FlowCanvasNode prompt rendering', () => {
 
   it('disables prompt submission while generation is unavailable', () => {
     const view = renderFlowCanvasNode({
-      generationAvailable: false,
+      isGenerationAvailable: false,
     })
 
     expect(view.getByLabelText('Send')).toBeDisabled()
@@ -243,9 +244,9 @@ describe('FlowCanvasNode image presentation', () => {
         nodeId: 'image-1',
         data: createImageData(createImageSnapshot()),
         imagePresentation: createImagePresentation({
-          actionMenuVisible: true,
+          isActionMenuVisible: true,
           promptPlaceholder: '输入提示词改造这张图',
-          promptComposerVisible: true,
+          isPromptComposerVisible: true,
         }),
       },
       global: {
@@ -269,9 +270,9 @@ describe('FlowCanvasNode image presentation', () => {
         nodeId: 'image-1',
         data: createImageData(createImageSnapshot()),
         imagePresentation: createImagePresentation({
-          actionMenuVisible: true,
+          isActionMenuVisible: true,
           promptPlaceholder: '输入提示词改造这张图',
-          promptComposerVisible: true,
+          isPromptComposerVisible: true,
         }),
       },
       global: {
@@ -403,7 +404,7 @@ describe('FlowCanvasNode fusion presentation', () => {
             ],
           }),
         ),
-        fusionPresentation: { promptComposerVisible: true },
+        fusionPresentation: { isPromptComposerVisible: true },
         imagePresentation: createImagePresentation(),
       },
       global: {

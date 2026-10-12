@@ -495,7 +495,7 @@ async function confirmArchivedDelete(item: AdminBillableItemCard) {
     message: BILLING_PRICING_MESSAGES.deleteMessage(item.displayName),
     confirmLabel: BILLING_PRICING_MESSAGES.deleteConfirm,
     intent: 'danger',
-    reason: { required: true },
+    reason: { isRequired: true },
   })
   if (!confirmed) return
   const operatorReason = requireDestructiveReason(confirm)

@@ -197,7 +197,7 @@ describe('useWorkspaceAccountControls', () => {
 
     controls.viewModel.balance.value.command?.()
     expect(overlay.viewModel.initialTab.value).toBe('billing')
-    expect(overlay.viewModel.visible.value).toBe(true)
+    expect(overlay.viewModel.isVisible.value).toBe(true)
   })
 
   it('exposes a recoverable error instead of leaving a failed balance busy', () => {
@@ -215,7 +215,7 @@ describe('useWorkspaceAccountControls', () => {
 
     controls.viewModel.balance.value.command?.()
     expect(overlay.viewModel.initialTab.value).toBe('billing')
-    expect(overlay.viewModel.visible.value).toBe(true)
+    expect(overlay.viewModel.isVisible.value).toBe(true)
   })
 
   it('routes account controls through the supplied navigation adapter and exposes admin only to admins', async () => {
@@ -229,7 +229,7 @@ describe('useWorkspaceAccountControls', () => {
     const logout = vi.fn()
     const { controls, overlay } = renderAccountControls({
       navigation: { navigate, logout },
-      showHome: false,
+      shouldShowHome: false,
     })
     const items = controls.viewModel.menuItems.value
 
@@ -241,7 +241,7 @@ describe('useWorkspaceAccountControls', () => {
     controls.commands.goHome()
 
     expect(overlay.viewModel.initialTab.value).toBe('profile')
-    expect(overlay.viewModel.visible.value).toBe(true)
+    expect(overlay.viewModel.isVisible.value).toBe(true)
     expect(navigate).toHaveBeenCalledWith(ADMIN_ROOT_PATH)
     expect(navigate).toHaveBeenCalledWith(HOME_PATH)
     expect(logout).toHaveBeenCalledOnce()

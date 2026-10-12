@@ -55,9 +55,9 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     keys: ['aspect-ratio', 'output-count', 'output-resolution'] as const,
     rootRefs: [actionsRef],
   })
-  const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
-  const outputCountPickerVisible = toolPopovers.isOpen('output-count')
-  const outputResolutionPickerVisible = toolPopovers.isOpen('output-resolution')
+  const isAspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
+  const isOutputCountPickerVisible = toolPopovers.isOpen('output-count')
+  const isOutputResolutionPickerVisible = toolPopovers.isOpen('output-resolution')
   const textarea = useAutoResizeTextarea(inputRef, {
     watchSource: options.modelValue,
     onResize: options.onTextareaResize,
@@ -113,14 +113,14 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
 
   return {
     actionsRef,
-    aspectRatioPickerVisible,
+    isAspectRatioPickerVisible,
     aspectRatioValue,
     canSubmit,
     draft,
     inputRef,
-    outputCountPickerVisible,
+    isOutputCountPickerVisible,
     outputCountValue,
-    outputResolutionPickerVisible,
+    isOutputResolutionPickerVisible,
     outputResolutionValue,
     selectAspectRatio,
     selectOutputCount,

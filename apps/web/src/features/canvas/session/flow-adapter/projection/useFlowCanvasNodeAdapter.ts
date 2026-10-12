@@ -34,7 +34,7 @@ export function useFlowCanvasNodeAdapter({
   const isPromptNode = computed(() => data().kind === 'prompt')
   const isImageNode = computed(() => data().kind === 'image')
   const isFusionNode = computed(() => data().kind === 'fusion')
-  const disableHandleRailInteraction = computed(
+  const shouldDisableHandleRailInteraction = computed(
     () => isImageNode.value && (outpaintModeActive() || isRetouchActive()),
   )
   const promptUiState = computed<PromptNodeUiState | undefined>(
@@ -70,13 +70,13 @@ export function useFlowCanvasNodeAdapter({
   const libraryImport = computed(() => imageSnapshot.value?.libraryImport)
   const localUpload = computed(() => data().localUpload)
 
-  const imageGenerating = computed(() => imageDirectGenerating())
-  const nodeRunning = computed(() => imageGenerating.value || !!uiState()?.isRunning)
-  const imageInputLocked = computed(
+  const isImageGenerating = computed(() => imageDirectGenerating())
+  const isNodeRunning = computed(() => isImageGenerating.value || !!uiState()?.isRunning)
+  const isImageInputLocked = computed(
     () =>
       !!libraryImport.value ||
       !!localUpload.value ||
-      (imageGenerating.value && !displayImage.value),
+      (isImageGenerating.value && !displayImage.value),
   )
   const imageEmptyIconVariant = computed<'image' | 'fusion'>(() => {
     const imageUiState = uiState() as NodeUiState<'image'> | undefined
@@ -85,25 +85,25 @@ export function useFlowCanvasNodeAdapter({
 
   const stageHeight = computed(() => {
     if (!imageSnapshot.value) return 280
-    const hasImageFrame = !!displayImage.value || imageGenerating.value
+    const hasImageFrame = !!displayImage.value || isImageGenerating.value
     const ratio = resolveImageNodeDisplayRatio(imageSnapshot.value)
     return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, hasImageFrame)
   })
 
   return {
-    disableHandleRailInteraction,
+    shouldDisableHandleRailInteraction,
     displayImage,
     fusionSnapshot,
     imageEmptyIconVariant,
-    imageGenerating,
-    imageInputLocked,
+    isImageGenerating,
+    isImageInputLocked,
     libraryImport,
     localUpload,
     imageSnapshot,
     isFusionNode,
     isImageNode,
     isPromptNode,
-    nodeRunning,
+    isNodeRunning,
     promptSnapshot,
     promptUiState,
     stageHeight,

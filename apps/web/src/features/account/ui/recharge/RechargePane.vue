@@ -52,7 +52,7 @@ import HistoryTable from './HistoryTable.vue'
 import PendingOrders from './PendingOrders.vue'
 import PurchaseCard from './PurchaseCard.vue'
 
-const props = defineProps<{ active: boolean; paymentReturn: PaymentReturnContext | null }>()
+const props = defineProps<{ isActive: boolean; paymentReturn: PaymentReturnContext | null }>()
 const { t } = useI18n()
 const {
   purchaseOptions,
@@ -83,7 +83,7 @@ const {
   pendingOrderActionPending,
   pendingOrderActionTarget,
   pendingOrderActionError,
-} = useRecharge(toRef(props, 'active'), toRef(props, 'paymentReturn'))
+} = useRecharge(toRef(props, 'isActive'), toRef(props, 'paymentReturn'))
 
 async function checkout(ideaQuantity: number) {
   try {

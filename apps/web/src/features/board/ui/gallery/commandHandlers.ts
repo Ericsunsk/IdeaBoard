@@ -82,12 +82,15 @@ function createCatalogHydration({
         const result = await (options.hydrateOptions
           ? catalog.commands.hydrate({
               ...options.hydrateOptions,
-              includeDocuments: false,
-              force: true,
+              shouldIncludeDocuments: false,
+              shouldForce: true,
             })
-          : catalog.commands.hydrate({ includeDocuments: false, force: options.force === true }))
+          : catalog.commands.hydrate({
+              shouldIncludeDocuments: false,
+              shouldForce: options.force === true,
+            }))
         if (!isCurrent(token)) return
-        if (!result.ok) {
+        if (!result.isOk) {
           if (!options.hydrateOptions) catalogHydrationFailed.value = true
           feedback.catalogSyncFailed()
           return
@@ -118,7 +121,7 @@ function createCatalogHydration({
     const pending = initialize({
       force: true,
       hydrateOptions: boardId
-        ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] }
+        ? { shouldPreserveLocalNewer: false, rollbackBoardIds: [boardId] }
         : undefined,
     })
     const token = capture()
@@ -173,7 +176,7 @@ export function createCommandHandlers({
       },
     )
     if (!result) return
-    if (!result.ok) {
+    if (!result.isOk) {
       if (result.reason === 'scope-changed') return
       feedback.createFailed(result)
       warn('[boards] failed to sync new board', result.error)
@@ -192,7 +195,7 @@ export function createCommandHandlers({
       },
     )
     if (!result) return
-    if (!result.ok) {
+    if (!result.isOk) {
       if (result.reason === 'scope-changed') return
       feedback.copyFailed(result)
       if (result.reason !== 'source-missing') {
@@ -210,7 +213,7 @@ export function createCommandHandlers({
       boardId,
       nextName: state.renameDraft.value,
     })
-    if (!result.ok) {
+    if (!result.isOk) {
       switch (result.reason) {
         case 'scope-changed':
           return
@@ -228,10 +231,10 @@ export function createCommandHandlers({
           feedback.renameSyncFailed(result)
           state.catalogRecoveryBoardId.value =
             result.reason === 'revision-conflict' || result.reason === 'idempotency-conflict'
-              ? result.hydrate?.ok === true
+              ? result.hydrate?.isOk === true
                 ? null
                 : boardId
-              : result.rollback.ok
+              : result.rollback.isOk
                 ? null
                 : boardId
           warn('[boards] failed to sync renamed board', result.error)
@@ -249,14 +252,14 @@ export function createCommandHandlers({
     const result = await runCatalogCommand(
       () => catalog.commands.delete({ boardId: board.id }),
       (error) => {
-        const failure = { ok: false as const, reason: 'sync-failed' as const, error }
+        const failure = { isOk: false as const, reason: 'sync-failed' as const, error }
         feedback.deleteFailed(failure)
         warn('[boards] failed to sync deleted board', error)
       },
     )
     try {
       if (!result) return
-      if (!result.ok) {
+      if (!result.isOk) {
         if (result.reason === 'scope-changed') {
           resetDeleteState()
           return

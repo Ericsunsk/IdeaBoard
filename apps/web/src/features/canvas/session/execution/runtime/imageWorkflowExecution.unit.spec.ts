@@ -68,15 +68,15 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
   const nodes = shallowRef<Node[]>(flow.nodes)
   const edges = shallowRef<Edge[]>(flow.edges)
   const markDirty = vi.fn()
-  const flushAutosave = vi.fn(async (_options?: { silent?: boolean }) => undefined)
+  const flushAutosave = vi.fn(async (_options?: { isSilent?: boolean }) => undefined)
   const graphAdapter = useCanvasVueFlowGraphAdapter({
     nodes,
     edges,
     afterCommand: (result) => {
       const sideEffects = readFlowGraphCommandSideEffects(result.metadata)
-      if (result.didChange && sideEffects?.markDirty !== false) {
+      if (result.didChange && sideEffects?.shouldMarkDirty !== false) {
         markDirty()
-        void flushAutosave({ silent: true })
+        void flushAutosave({ isSilent: true })
       }
     },
   })
@@ -96,7 +96,7 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
         const next = boardSnapshotToFlow(store.exportSnapshot(base))
         graphAdapter.replaceGraph(
           { nodes: next.nodes, edges: next.edges },
-          createFlowGraphCommandOptions({ recordHistory: false }),
+          createFlowGraphCommandOptions({ shouldRecordHistory: false }),
         )
       },
     }),
@@ -138,7 +138,7 @@ describe('useImageWorkflowExecution', () => {
       harness.nodes.value.find((node) => node.id !== 'image-1')?.data.snapshotNode,
     ).toMatchObject({ sourceImageUrl: 'https://example.com/result.png', outputStatus: 'ready' })
     expect(harness.markDirty).toHaveBeenCalled()
-    expect(harness.flushAutosave).toHaveBeenCalledWith({ silent: true })
+    expect(harness.flushAutosave).toHaveBeenCalledWith({ isSilent: true })
   })
 
   it('cancels a real reserved pending node when submit is cancelled', async () => {

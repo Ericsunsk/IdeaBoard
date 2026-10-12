@@ -74,7 +74,7 @@ const {
   handleVisibilityChange,
   requestClose: requestOverlayClose,
 } = useOverlayInteractionLifecycle({
-  visible: () => props.visible,
+  isVisible: () => props.visible,
   busy,
   surface: defineDialogSurfaceIntent(),
   onReset: () => {

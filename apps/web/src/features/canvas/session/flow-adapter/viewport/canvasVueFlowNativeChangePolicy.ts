@@ -2,16 +2,12 @@ import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 
 export type CanvasVueFlowNativeChangeClassification = 'no-op' | 'visual-only' | 'graph-affecting'
 
-type NativeNodeChangeState = Node & {
-  selected?: boolean
-  dragging?: boolean
-  dimensions?: unknown
-  handleBounds?: unknown
-  resizing?: boolean
-}
-type NativeEdgeChangeState = Edge & {
-  selected?: boolean
-}
+type NativeNodeChangeState = Node &
+  Partial<Pick<import('@vue-flow/core').GraphNode, 'selected' | 'dragging' | 'resizing'>> & {
+    dimensions?: unknown
+    handleBounds?: unknown
+  }
+type NativeEdgeChangeState = Edge & Partial<Pick<import('@vue-flow/core').GraphEdge, 'selected'>>
 
 function createNodeLookup(nodes: Node[]): Map<string, Node> {
   return new Map(nodes.map((node) => [node.id, node]))

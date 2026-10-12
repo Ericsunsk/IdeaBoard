@@ -10,14 +10,7 @@ type CanvasPerfMetadataInput = CanvasPerfMetadata | (() => CanvasPerfMetadata)
 const DEFAULT_MIN_DURATION_MS = 16
 
 export function isCanvasPerfProbeEnabled(): boolean {
-  const env = (
-    import.meta as ImportMeta & {
-      readonly env?: {
-        readonly DEV?: boolean
-        readonly VITE_CANVAS_PERF_PROBE?: string
-      }
-    }
-  ).env
+  const env = import.meta.env
   return env?.DEV === true && env.VITE_CANVAS_PERF_PROBE === 'true'
 }
 

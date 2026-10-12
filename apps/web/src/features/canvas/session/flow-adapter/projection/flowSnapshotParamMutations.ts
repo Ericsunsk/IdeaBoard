@@ -152,7 +152,7 @@ function patchAspectRatioParam(
 function patchFusionInputImagesParam(
   snapshotNode: FusionNodeItem,
   nextInputImages: PromptNodeInputImage[],
-  inputUnchanged: boolean,
+  isInputUnchanged: boolean,
 ): CanvasNodeItem {
   const nextBlendPoint = constrainFusionBlendPoint(
     snapshotNode.blendPoint,
@@ -160,12 +160,12 @@ function patchFusionInputImagesParam(
     snapshotNode.width,
   )
   const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
-  const blendUnchanged = areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)
-  if (inputUnchanged && blendUnchanged) return snapshotNode
+  const isBlendUnchanged = areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)
+  if (isInputUnchanged && isBlendUnchanged) return snapshotNode
   return {
     ...snapshotNode,
     inputImages: nextInputImages,
-    ...(blendUnchanged ? {} : { blendPoint: nextBlendPoint }),
+    ...(isBlendUnchanged ? {} : { blendPoint: nextBlendPoint }),
   }
 }
 
@@ -176,16 +176,16 @@ function patchInputImagesParam(
   if (!hasInputImages(snapshotNode)) return snapshotNode
   const inputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
   const nextInputImages = normalizePromptInputImages(value, inputLimit)
-  const inputUnchanged = arePromptInputImagesEqual(
+  const isInputUnchanged = arePromptInputImagesEqual(
     snapshotNode.inputImages,
     nextInputImages,
     inputLimit,
   )
   if (snapshotNode.type !== 'fusion') {
-    if (inputUnchanged) return snapshotNode
+    if (isInputUnchanged) return snapshotNode
     return { ...snapshotNode, inputImages: nextInputImages }
   }
-  return patchFusionInputImagesParam(snapshotNode, nextInputImages, inputUnchanged)
+  return patchFusionInputImagesParam(snapshotNode, nextInputImages, isInputUnchanged)
 }
 
 function patchBlendPointParam(

@@ -54,8 +54,8 @@
 
           <div v-if="item.status === 'checkout_open'" class="grid w-full shrink-0 gap-2 sm:w-36">
             <Button
-              :loading="isActionPending(item.public_token, 'continue')"
-              :disabled="actionPending"
+              :is-loading="isActionPending(item.public_token, 'continue')"
+              :is-disabled="actionPending"
               :class="[accountPrimaryActionButtonClass, 'w-full']"
               @click="emit('continue', item.public_token)"
               >{{ t('account.topUp.continuePayment') }}</Button
@@ -64,8 +64,8 @@
               variant="outline"
               size="sm"
               class="w-full"
-              :loading="isActionPending(item.public_token, 'abandon')"
-              :disabled="actionPending"
+              :is-loading="isActionPending(item.public_token, 'abandon')"
+              :is-disabled="actionPending"
               @click="emit('abandon', item.public_token)"
               >{{ t('account.topUp.abandonOrder') }}</Button
             >
@@ -84,7 +84,7 @@
             variant="ghost"
             size="sm"
             class="!p-0"
-            :disabled="actionPending"
+            :is-disabled="actionPending"
             @click="retryAction(item.public_token)"
             >{{
               actionTarget?.kind === 'continue'

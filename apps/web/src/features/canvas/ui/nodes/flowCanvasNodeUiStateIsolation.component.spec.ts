@@ -69,12 +69,12 @@ function createFusionData(snapshot: FusionNodeItem): FlowNodeData {
 function createImagePresentation(nodeId: string) {
   return createImageNodePresentationResolver({
     actionBindingFor: () => ({
-      actionMenuVisible: false,
-      promptComposerVisible: false,
+      isActionMenuVisible: false,
+      isPromptComposerVisible: false,
       promptPlaceholder: '',
-      directGenerating: false,
+      isDirectGenerating: false,
       strengthControl: {
-        visible: false,
+        isVisible: false,
         activeAction: null,
         getValue: () => 50,
         setRangeRef: vi.fn(),

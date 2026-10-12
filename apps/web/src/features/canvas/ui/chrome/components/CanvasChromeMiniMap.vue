@@ -1,9 +1,9 @@
 <template>
   <CanvasMiniMap
-    v-if="enabled"
+    v-if="isEnabled"
     class="canvas-chrome-region canvas-chrome-region--minimap"
     :class="{ 'is-hidden': isHidden }"
-    :inert="inert"
+    :inert="isInert"
     @center-requested="emit('center-requested', $event)"
     @drag-start="emit('drag-start')"
     @drag-move="emit('drag-move', $event)"
@@ -20,8 +20,8 @@ type MiniMapPoint = {
 }
 
 defineProps<{
-  enabled: boolean
-  inert: boolean
+  isEnabled: boolean
+  isInert: boolean
   isHidden: boolean
 }>()
 

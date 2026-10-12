@@ -141,9 +141,9 @@ export function createCanvasHandleProximityCoordinator(geometry: CanvasHandlePro
     }
   }
 
-  function setSuspended(suspended: boolean) {
-    if (isSuspended === suspended) return
-    isSuspended = suspended
+  function setSuspended(shouldSuspend: boolean) {
+    if (isSuspended === shouldSuspend) return
+    isSuspended = shouldSuspend
     evaluate(lastPointer)
   }
 

@@ -79,9 +79,9 @@ export class CanvasGraphTransaction {
     return this
   }
 
-  selectNode(nodeId: CanvasGraphNodeId, selected: boolean): this {
+  selectNode(nodeId: CanvasGraphNodeId, isSelected: boolean): this {
     this.assertOpen()
-    stageSelectNode(this.draft, nodeId, selected)
+    stageSelectNode(this.draft, nodeId, isSelected)
     return this
   }
 
@@ -125,16 +125,16 @@ export class CanvasGraphTransaction {
     return this
   }
 
-  selectEdge(edgeId: CanvasGraphEdgeId, selected: boolean): this {
+  selectEdge(edgeId: CanvasGraphEdgeId, isSelected: boolean): this {
     this.assertOpen()
-    stageSelectEdge(this.draft, edgeId, selected)
+    stageSelectEdge(this.draft, edgeId, isSelected)
     return this
   }
 
   batchDelete(options: {
     nodeIds?: CanvasGraphNodeId[]
     edgeIds?: CanvasGraphEdgeId[]
-    removeConnectedEdges?: boolean
+    shouldRemoveConnectedEdges?: boolean
   }): this {
     this.assertOpen()
     stageBatchDelete(this.draft, options)
@@ -166,10 +166,10 @@ export class CanvasGraphTransaction {
     return createSummary(this.reason, this.options, this.draft.base, createChangeSet(), this.draft)
   }
 
-  private assertOpen(requireCurrentRevision = true) {
+  private assertOpen(shouldRequireCurrentRevision = true) {
     if (this.status !== 'open') {
       throw new Error(`CanvasGraphTransaction is already ${this.status}`)
     }
-    if (requireCurrentRevision) this.store._assertTransactionCurrent(this.draft)
+    if (shouldRequireCurrentRevision) this.store._assertTransactionCurrent(this.draft)
   }
 }

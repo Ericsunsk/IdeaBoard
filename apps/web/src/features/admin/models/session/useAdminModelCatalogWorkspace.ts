@@ -184,8 +184,8 @@ export function useAdminModelCatalogWorkspace(
 
       await invalidateCatalog()
       feedback.catalogSynced()
-    } catch (err) {
-      feedback.syncFailed(err)
+    } catch (caughtError) {
+      feedback.syncFailed(caughtError)
     } finally {
       isRefreshing.value = false
     }
@@ -220,8 +220,8 @@ export function useAdminModelCatalogWorkspace(
       })
       addDialogVisible.value = false
       feedback.imported(toAdd.length)
-    } catch (err) {
-      feedback.addFailed(err)
+    } catch (caughtError) {
+      feedback.addFailed(caughtError)
     }
   }
 
@@ -236,7 +236,7 @@ export function useAdminModelCatalogWorkspace(
       message: `确定要从模型库中移除模型「${model.name} (${model.id})」吗？引用该模型的功能定价映射将一并移除，需重新指定模型。该操作将记录操作人与原因。`,
       confirmLabel: '确认删除',
       intent: 'danger',
-      reason: { required: true },
+      reason: { isRequired: true },
     })
     if (!confirmed) return
     const operatorReason = requireDestructiveReason(adminConfirm)
@@ -245,8 +245,8 @@ export function useAdminModelCatalogWorkspace(
     try {
       await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason })
       feedback.deleted(model.name)
-    } catch (err) {
-      feedback.deleteFailed(err)
+    } catch (caughtError) {
+      feedback.deleteFailed(caughtError)
     }
   }
 
@@ -268,8 +268,8 @@ export function useAdminModelCatalogWorkspace(
       editDialogVisible.value = false
       feedback.saved(editingModel.value != null)
       editingModel.value = null
-    } catch (err) {
-      feedback.saveFailed(err)
+    } catch (caughtError) {
+      feedback.saveFailed(caughtError)
     }
   }
 

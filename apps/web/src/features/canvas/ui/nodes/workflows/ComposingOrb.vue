@@ -17,7 +17,7 @@ let context: CanvasRenderingContext2D | null = null
 let intersectionObserver: IntersectionObserver | null = null
 let motionPreferenceQuery: MediaQueryList | null = null
 let isIntersecting = true
-let prefersReducedMotion = false
+let isReducedMotionPreferred = false
 
 function drawFrame(timeSeconds: number) {
   if (!context) return
@@ -40,7 +40,7 @@ function animationLoop(timestamp: number) {
 
 function canAnimate() {
   return (
-    !prefersReducedMotion &&
+    !isReducedMotionPreferred &&
     isIntersecting &&
     document.visibilityState !== 'hidden' &&
     animationFrameId === null
@@ -49,7 +49,7 @@ function canAnimate() {
 
 function reconcileAnimation() {
   if (!canAnimate()) {
-    if (prefersReducedMotion || !isIntersecting || document.visibilityState === 'hidden') {
+    if (isReducedMotionPreferred || !isIntersecting || document.visibilityState === 'hidden') {
       stopAnimation()
     }
     return
@@ -62,8 +62,8 @@ function handleVisibilityChange() {
 }
 
 function handleMotionPreferenceChange(event: MediaQueryListEvent) {
-  prefersReducedMotion = event.matches
-  if (prefersReducedMotion) drawFrame(STATIC_FRAME_SECONDS)
+  isReducedMotionPreferred = event.matches
+  if (isReducedMotionPreferred) drawFrame(STATIC_FRAME_SECONDS)
   reconcileAnimation()
 }
 
@@ -77,7 +77,7 @@ onMounted(() => {
   context = canvas.getContext('2d')
   if (!context) return
 
-  prefersReducedMotion = getMotionPreference() === 'reduce'
+  isReducedMotionPreferred = getMotionPreference() === 'reduce'
   drawFrame(STATIC_FRAME_SECONDS)
 
   motionPreferenceQuery = window.matchMedia('(prefers-reduced-motion: reduce)')

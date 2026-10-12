@@ -151,9 +151,9 @@ describe('useCanvasGraphEditing', () => {
       width: 200,
       height: 100,
       ratio: 0.5,
-      dimensionsKnown: true,
+      isDimensionsKnown: true,
       warnings: [],
-      compressed: false,
+      isCompressed: false,
     }))
   })
 

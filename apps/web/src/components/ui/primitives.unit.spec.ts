@@ -18,7 +18,7 @@ describe('Standard shadcn-vue primitives', () => {
 
   it('renders standard Button component with loading and compact size', () => {
     const wrapper = mount(Button, {
-      props: { variant: 'outline', size: 'compact', loading: true },
+      props: { variant: 'outline', size: 'compact', isLoading: true },
       slots: { default: 'Click me' },
     })
     expect(wrapper.text()).toBe('Click me')

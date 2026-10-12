@@ -12,7 +12,7 @@ vi.mock('./accountWorkspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./accountWorkspace')>()),
   useAccountWorkspace: () => ({
     workspaceId: ref('ws_1'),
-    selectionSettled: ref(true),
+    isSelectionSettled: ref(true),
   }),
 }))
 
@@ -92,7 +92,7 @@ describe('Account permission-403', () => {
     expect(setAvatarLocal).not.toHaveBeenCalled()
     expect(success).not.toHaveBeenCalled()
     expect(failure).toHaveBeenCalledWith(error)
-    expect(workflow.uploading.value).toBe(false)
+    expect(workflow.isUploading.value).toBe(false)
   })
 
   it('performs no password/logout/navigation transition and routes 403 through password feedback', async () => {
@@ -131,7 +131,7 @@ describe('Account permission-403', () => {
     expect(success).not.toHaveBeenCalled()
     expect(failure).toHaveBeenCalledWith(error)
     expect(workflow.form.value.oldPassword).toBe('old-pass')
-    expect(workflow.loading.value).toBe(false)
+    expect(workflow.isLoading.value).toBe(false)
   })
 
   it('performs no checkout navigation and keeps the payment form retryable on 403', async () => {
@@ -150,7 +150,7 @@ describe('Account permission-403', () => {
         ideas_per_usd: 100,
         terms: { version: '2026-08-01', url: '/terms' },
         refund_policy: { version: '2026-08-01', url: '/refund-policy' },
-      }),
+      } satisfies Partial<import('./payments/resource').PaymentPurchaseOptions>),
       createCheckout,
       getReturnStatus: vi.fn(),
       listPendingOrders: vi.fn().mockResolvedValue({ items: [] }),
@@ -160,7 +160,7 @@ describe('Account permission-403', () => {
       subscribe: vi.fn(() => () => undefined),
     }
     const { user } = renderWithUser(RechargePane, {
-      props: { active: true, paymentReturn: null },
+      props: { isActive: true, paymentReturn: null },
       global: {
         plugins: [[VueQueryPlugin, { queryClient }]],
         provide: {

@@ -1,9 +1,9 @@
 export type InteractiveControlTone = 'default' | 'danger'
 
 export type InteractiveControlStateOptions = {
-  disabled?: boolean
+  isDisabled?: boolean
   pending?: boolean
-  selected?: boolean
+  isSelected?: boolean
   tone?: InteractiveControlTone
 }
 
@@ -21,21 +21,21 @@ export function resolveInteractiveControlState(
   options: InteractiveControlStateOptions = {},
 ): InteractiveControlStateAttrs {
   const pending = options.pending === true
-  const disabled = pending || options.disabled === true
+  const disabled = pending || options.isDisabled === true
   const state: InteractiveControlState = pending
     ? 'loading'
     : disabled
       ? 'disabled'
-      : options.selected
+      : options.isSelected
         ? 'selected'
         : 'idle'
 
   return {
     disabled,
     ...(pending ? { 'aria-busy': 'true' as const } : {}),
-    ...(options.selected === undefined
+    ...(options.isSelected === undefined
       ? {}
-      : { 'aria-pressed': options.selected ? ('true' as const) : ('false' as const) }),
+      : { 'aria-pressed': options.isSelected ? ('true' as const) : ('false' as const) }),
     'data-control-state': state,
     ...(options.tone === 'danger' ? { 'data-control-tone': 'danger' as const } : {}),
   }

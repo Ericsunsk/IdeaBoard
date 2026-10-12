@@ -61,7 +61,7 @@ describe('useFlowCanvasNodeHandlers', () => {
 
     expect(options.markFlowExecutionNodeDirty).toHaveBeenCalledTimes(1)
     expect(options.markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', {
-      includeSelf: true,
+      shouldIncludeSelf: true,
     })
   })
 })

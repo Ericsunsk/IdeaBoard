@@ -48,7 +48,7 @@ function mountLifecycle(query: Record<string, string | undefined>) {
         route: { query } as never,
         persistence: persistence as never,
         history: { undo: vi.fn(), redo: vi.fn() } as never,
-        duplicateModifierPressed: ref(false),
+        isDuplicateModifierPressed: ref(false),
         keyboard: {
           onDeleteInlineSelection: () => false,
           isShortcutSuppressed: () => false,
@@ -64,12 +64,12 @@ function mountLifecycle(query: Record<string, string | undefined>) {
   // The shell toggles the lifecycle host through v-if so unmount (and its
   // benchmark cleanup) runs without a raw unmount call.
   const Shell = defineComponent({
-    props: { visible: { type: Boolean, default: true } },
+    props: { isVisible: { type: Boolean, default: true } },
     setup(props) {
-      return () => (props.visible ? h(Inner) : h('div'))
+      return () => (props.isVisible ? h(Inner) : h('div'))
     },
   })
-  const view = render(Shell, { props: { visible: true }, global: { plugins: [router] } })
+  const view = render(Shell, { props: { isVisible: true }, global: { plugins: [router] } })
   return { view, persistence, benchmark }
 }
 
@@ -147,7 +147,7 @@ describe('CanvasScreen public surface', () => {
       { id: 'fusion-1', type: 'remove' },
     ])
 
-    await flagged.view.rerender({ visible: false })
+    await flagged.view.rerender({ isVisible: false })
     expect(
       (window as unknown as Record<string, unknown>).__ideaboardCanvasBenchmarkActions,
     ).toBeUndefined()
@@ -159,6 +159,6 @@ describe('CanvasScreen public surface', () => {
       (window as unknown as Record<string, unknown>).__ideaboardCanvasBenchmarkActions,
     ).toBeUndefined()
     expect(plain.persistence.recoverBoardSession).toHaveBeenCalledTimes(1)
-    await plain.view.rerender({ visible: false })
+    await plain.view.rerender({ isVisible: false })
   })
 })

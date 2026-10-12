@@ -80,7 +80,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
   const nodeUploadRequests = new Map<string, number>()
   const localUploads = new Map<string, LocalUpload>()
   let uploadRequestSequence = 0
-  let disposed = false
+  let isDisposed = false
 
   function buildInFlightUploadKey(boardId: string, file: File): string {
     return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
@@ -204,7 +204,8 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
           Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
             ? height / width
             : null
-        const preparedRatio = prepared.dimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
+        const preparedRatio =
+          prepared.isDimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
         const mediaRef: MediaRef = {
@@ -250,8 +251,8 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       return false
     }
     const previewUrl = createObjectUrl(file)
-    const previewReady = await preloadLocalPreview(previewUrl)
-    if (!previewReady) {
+    const isPreviewReady = await preloadLocalPreview(previewUrl)
+    if (!isPreviewReady) {
       revokeObjectUrl(previewUrl)
       options.onWarning(i18n.global.t('canvas.session.uploadFailed'))
       return false
@@ -271,17 +272,17 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     }
     const boardId = readCurrentBoardIdRef(options.currentBoardId)
     const previewRatio = await resolveLocalPreviewRatio(file)
-    if (disposed || !isBoardStillCurrent(boardId)) return null
+    if (isDisposed || !isBoardStillCurrent(boardId)) return null
     const previewUrl = createObjectUrl(file)
-    const previewReady = await preloadLocalPreview(previewUrl)
-    if (!previewReady) {
+    const isPreviewReady = await preloadLocalPreview(previewUrl)
+    if (!isPreviewReady) {
       revokeObjectUrl(previewUrl)
       return {
         kind: 'rejected',
         failureMessage: i18n.global.t('canvas.session.uploadFailed'),
       }
     }
-    if (disposed || !isBoardStillCurrent(boardId)) {
+    if (isDisposed || !isBoardStillCurrent(boardId)) {
       revokeObjectUrl(previewUrl)
       return null
     }
@@ -389,7 +390,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
   }
 
   function disposeLocalUploads() {
-    disposed = true
+    isDisposed = true
     for (const nodeId of Array.from(localUploads.keys())) releaseLocalUpload(nodeId)
   }
 

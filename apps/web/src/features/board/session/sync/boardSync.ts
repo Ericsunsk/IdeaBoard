@@ -59,7 +59,7 @@ import {
   rememberBoardServerContent,
 } from './boardDraftState'
 
-export type HydrateBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }
+export type HydrateBoardsFromServerResult = { isOk: true } | { isOk: false; error: unknown }
 
 const hydrateInFlight = new Map<string, Promise<HydrateBoardsFromServerResult>>()
 const pendingRollbackBoardIds = new Set<string>()
@@ -69,15 +69,15 @@ const pendingRollbackBoardIds = new Set<string>()
 subscribeBoardScopeChange(() => pendingRollbackBoardIds.clear())
 
 export type HydrateBoardsFromServerOptions = {
-  preserveLocalNewer?: boolean
+  shouldPreserveLocalNewer?: boolean
   rollbackBoardIds?: string[]
   waitForWorkspaceTimeoutMs?: number
-  includeDocuments?: boolean
-  force?: boolean
+  shouldIncludeDocuments?: boolean
+  shouldForce?: boolean
 }
 
 type ResolvedHydrateBoardsFromServerOptions = {
-  preserveLocalNewer: boolean
+  shouldPreserveLocalNewer: boolean
   rollbackBoardIds: Set<string>
 }
 
@@ -126,7 +126,7 @@ function toLocalState(boardId: string, document: WorkspaceBoardDocument): BoardS
     mode: 'result',
     boundary: 'server-hydration',
   })
-  if (result.ok) return result.value
+  if (result.isOk) return result.value
   console.warn('[boards] invalid remote board state rejected', boardId, result.error)
   throw new RemoteBoardStateError(boardId, result.error)
 }
@@ -192,7 +192,7 @@ function applyRemoteBoardsToLocal(
       else meta.revision = localMeta.revision
     }
   })
-  if (!options.preserveLocalNewer) {
+  if (!options.shouldPreserveLocalNewer) {
     replaceBoards(metas, { publish: false })
     replaceBoardStateMap(stateMap)
     Object.entries(stateMap).forEach(([id, state]) => rememberBoardServerContent(id, state))
@@ -288,13 +288,14 @@ function resolveHydrateOptions(
   options: HydrateBoardsFromServerOptions,
 ): ResolvedHydrateBoardsFromServerOptions {
   const requestedRollbackBoardIds = normalizeRollbackBoardIds(options.rollbackBoardIds ?? [])
-  const shouldUsePendingRollback = options.preserveLocalNewer === false
+  const shouldUsePendingRollback = options.shouldPreserveLocalNewer === false
   const rollbackBoardIds = new Set([
     ...requestedRollbackBoardIds,
     ...(shouldUsePendingRollback ? pendingRollbackBoardIds : []),
   ])
   return {
-    preserveLocalNewer: options.preserveLocalNewer !== false || rollbackBoardIds.size > 0,
+    shouldPreserveLocalNewer:
+      options.shouldPreserveLocalNewer !== false || rollbackBoardIds.size > 0,
     rollbackBoardIds,
   }
 }
@@ -302,27 +303,27 @@ function resolveHydrateOptions(
 async function listRemoteBoards(
   workspaceId: string,
   scope: CompleteBoardScope,
-  includeDocuments: boolean,
+  shouldIncludeDocuments: boolean,
   rollbackBoardIds: Set<string>,
-  force: boolean,
+  shouldForce: boolean,
 ): Promise<Array<{ meta: WorkspaceBoardMeta; state: BoardState | null }>> {
   // Hydrate is the explicit visible/recovery freshness path. Query still
   // owns request de-duplication, AbortSignal, cache and revision guards.
   const metas = await queryClient.fetchQuery({
     ...boardListOptions(workspaceId),
-    ...(force ? { staleTime: 0 } : {}),
+    ...(shouldForce ? { staleTime: 0 } : {}),
   })
   if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
   return Promise.all(
     metas.map(async (meta) => {
-      if (!includeDocuments && !rollbackBoardIds.has(meta.id)) return { meta, state: null }
+      if (!shouldIncludeDocuments && !rollbackBoardIds.has(meta.id)) return { meta, state: null }
       const cached = queryClient.getQueryData<WorkspaceBoardDocument>(
         boardQueryKeys.document(workspaceId, meta.id),
       )
       const isDocumentBehindCatalog = cached !== undefined && cached.revision < meta.revision
       const document = await queryClient.fetchQuery({
         ...boardDocumentOptions(workspaceId, meta.id),
-        ...(force || isDocumentBehindCatalog ? { staleTime: 0 } : {}),
+        ...(shouldForce || isDocumentBehindCatalog ? { staleTime: 0 } : {}),
       })
       // Invalid remote snapshots fail the whole hydrate (legacy parity);
       // local boards stay untouched on the failure path below.
@@ -380,12 +381,12 @@ async function resolveHydrateScope(options: HydrateBoardsFromServerOptions): Pro
 export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOptions = {}) {
   const waited = await resolveHydrateScope(options)
   // Signed-out surfaces (public landing) have no scope and nothing to sync.
-  if (!waited.userScope) return { ok: true } satisfies HydrateBoardsFromServerResult
+  if (!waited.userScope) return { isOk: true } satisfies HydrateBoardsFromServerResult
   // Authed without a workspace selection fails closed: the request target
   // must never be inferred from a board id.
   if (!waited.workspaceId) {
     return {
-      ok: false,
+      isOk: false,
       error: new BoardWorkspaceUnavailableError(),
     } satisfies HydrateBoardsFromServerResult
   }
@@ -396,7 +397,7 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
   const workspaceId = scope.workspaceId
   const resolvedOptions = resolveHydrateOptions(options)
   const rollbackKey = [...resolvedOptions.rollbackBoardIds].sort().join(',')
-  const hydrateKey = `${boardScopeKey(scope)}:${resolvedOptions.preserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}:${options.includeDocuments !== false}:${options.force !== false}`
+  const hydrateKey = `${boardScopeKey(scope)}:${resolvedOptions.shouldPreserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}:${options.shouldIncludeDocuments !== false}:${options.shouldForce !== false}`
   const inFlight = hydrateInFlight.get(hydrateKey)
   if (inFlight) return inFlight
   const task = (async () => {
@@ -410,9 +411,9 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
       remoteBoards = await listRemoteBoards(
         workspaceId,
         scope,
-        options.includeDocuments !== false,
+        options.shouldIncludeDocuments !== false,
         resolvedOptions.rollbackBoardIds,
-        options.force !== false,
+        options.shouldForce !== false,
       )
     } finally {
       stopScope()
@@ -424,16 +425,17 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
       ...resolvedOptions,
       // A catalog-only reload replaces only the requested rollback document;
       // unrelated cached/local documents remain a draft overlay.
-      preserveLocalNewer: options.includeDocuments === false || resolvedOptions.preserveLocalNewer,
+      shouldPreserveLocalNewer:
+        options.shouldIncludeDocuments === false || resolvedOptions.shouldPreserveLocalNewer,
     })
     resolvedOptions.rollbackBoardIds.forEach((boardId) => {
       pendingRollbackBoardIds.delete(boardId)
     })
-    return { ok: true } satisfies HydrateBoardsFromServerResult
+    return { isOk: true } satisfies HydrateBoardsFromServerResult
   })()
     .catch((error) => {
       console.warn('[boards] hydrate from server failed', error)
-      return { ok: false, error } satisfies HydrateBoardsFromServerResult
+      return { isOk: false, error } satisfies HydrateBoardsFromServerResult
     })
     .finally(() => {
       hydrateInFlight.delete(hydrateKey)
@@ -445,16 +447,16 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
 /** Scope-bound production observers; server catalog and local draft stay separate. */
 export function observeBoardServerSnapshots(
   onCatalog: (boards: BoardMeta[] | null) => void,
-  includeDocuments: boolean,
+  shouldIncludeDocuments: boolean,
 ): () => void {
   const scope = getBoardScope()
   if (!scope.userScope || !scope.workspaceId) return () => {}
   const workspaceId = scope.workspaceId
   const documents = new Map<string, () => void>()
-  let disposed = false
+  let isDisposed = false
   let metas: WorkspaceBoardMeta[] | undefined
   function projectDocuments() {
-    if (disposed || !metas || !isBoardScopeCurrent(scope)) return
+    if (isDisposed || !metas || !isBoardScopeCurrent(scope)) return
     try {
       applyRemoteBoardsToLocal(
         metas.map((meta) => {
@@ -468,7 +470,7 @@ export function observeBoardServerSnapshots(
             state: document ? toLocalState(meta.id, document) : null,
           }
         }),
-        { preserveLocalNewer: true, rollbackBoardIds: new Set() },
+        { shouldPreserveLocalNewer: true, rollbackBoardIds: new Set() },
         true,
       )
     } catch {
@@ -477,7 +479,7 @@ export function observeBoardServerSnapshots(
   }
   const listObserver = new QueryObserver(queryClient, boardListOptions(workspaceId))
   const consumeList = (next: WorkspaceBoardMeta[] | undefined) => {
-    if (disposed || !next || !isBoardScopeCurrent(scope)) return
+    if (isDisposed || !next || !isBoardScopeCurrent(scope)) return
     metas = next
     onCatalog(next.map(toLocalMeta).filter((meta): meta is BoardMeta => meta !== null))
     const ids = new Set(next.map((meta) => meta.id))
@@ -487,7 +489,7 @@ export function observeBoardServerSnapshots(
         documents.delete(id)
       }
     })
-    if (includeDocuments) {
+    if (shouldIncludeDocuments) {
       next.forEach((meta) => {
         if (documents.has(meta.id)) return
         const observer = new QueryObserver(queryClient, boardDocumentOptions(workspaceId, meta.id))
@@ -508,7 +510,7 @@ export function observeBoardServerSnapshots(
   const stopInvalidation = subscribeBoardQueryScopeInvalidation({
     convergence: {
       requestCatalogHydrate: () =>
-        hydrateBoardsFromServer({ includeDocuments: false, force: true }),
+        hydrateBoardsFromServer({ shouldIncludeDocuments: false, shouldForce: true }),
     },
   })
   const stopScope = subscribeBoardScopeChange(() => {
@@ -518,8 +520,8 @@ export function observeBoardServerSnapshots(
     }
   })
   function stop() {
-    if (disposed) return
-    disposed = true
+    if (isDisposed) return
+    isDisposed = true
     stopInvalidation()
     stopList()
     documents.forEach((unsubscribe) => unsubscribe())
@@ -650,7 +652,7 @@ export function clearPendingBoardSyncRollback(boardId: string) {
 
 export async function syncDeleteBoardToServer(boardId: string) {
   // v1 has no hard delete; gallery delete archives (already-archived
-  // reads 404 so replays converge to remoteWasMissing upstream).
+  // reads 404 so replays converge to isRemoteWasMissing upstream).
   const workspaceId = requireBoardWorkspaceId()
   await archiveWorkspaceBoard(workspaceId, boardId)
   // Delete convergence mirrors share_revoked: invalidate the list and drop

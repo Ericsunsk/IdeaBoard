@@ -2,9 +2,9 @@
   <div class="image-node-output-count-wrap node-tool-output-count-wrap">
     <button
       class="image-node-output-count node-tool-output-count node-tool-button"
-      :class="{ active: visible, 'canvas-tool-tooltip-trigger': !!tooltip }"
+      :class="{ active: isVisible, 'canvas-tool-tooltip-trigger': !!tooltip }"
       type="button"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :aria-label="label"
       @click.stop="emit('toggle')"
     >
@@ -13,14 +13,14 @@
         {{ tooltip }}
       </span>
     </button>
-    <NodeToolPopover :visible="visible">
+    <NodeToolPopover :is-visible="isVisible">
       <button
         v-for="option in options"
         :key="option"
         type="button"
         class="image-node-output-count-option node-tool-output-count-option"
         :class="{ active: option === modelValue }"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :role="optionRole"
         :aria-checked="optionRole === 'menuitemradio' ? option === modelValue : undefined"
         @click.stop="emit('select', option)"
@@ -38,15 +38,15 @@ withDefaults(
   defineProps<{
     modelValue: T
     options: readonly T[]
-    visible: boolean
+    isVisible: boolean
     label: string
     tooltip: string
-    disabled?: boolean
+    isDisabled?: boolean
     format?: (value: T) => string
     optionRole?: 'menuitemradio' | undefined
   }>(),
   {
-    disabled: false,
+    isDisabled: false,
     format: (value: T) => String(value),
     optionRole: undefined,
   },

@@ -3,17 +3,17 @@ import { createFusionNodePresentationResolver } from './fusionNodePresentation'
 
 describe('Fusion Node presentation seam', () => {
   it('keeps the Fusion presentation binding stable until visibility changes', () => {
-    let promptComposerVisible = false
+    let isPromptComposerVisible = false
     const resolver = createFusionNodePresentationResolver({
-      promptComposerVisibleFor: () => promptComposerVisible,
+      promptComposerVisibleFor: () => isPromptComposerVisible,
     })
 
     const initial = resolver.forNode('fusion-1')
     expect(resolver.forNode('fusion-1')).toBe(initial)
-    expect(initial).toEqual({ promptComposerVisible: false })
+    expect(initial).toEqual({ isPromptComposerVisible: false })
 
-    promptComposerVisible = true
-    expect(resolver.forNode('fusion-1')).toEqual({ promptComposerVisible: true })
+    isPromptComposerVisible = true
+    expect(resolver.forNode('fusion-1')).toEqual({ isPromptComposerVisible: true })
     expect(resolver.forNode('fusion-1')).not.toBe(initial)
   })
 })

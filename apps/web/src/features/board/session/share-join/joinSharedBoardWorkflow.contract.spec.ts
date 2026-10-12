@@ -46,7 +46,7 @@ describe('joinSharedBoardByToken', () => {
     resetWorkspaceSelectionStore()
     getWorkspaceSelectionStore().select(WORKSPACE_ID)
     mocks.request.mockResolvedValue(joinEnvelope('board-1'))
-    mocks.hydrateBoardsFromServer.mockResolvedValue({ ok: true })
+    mocks.hydrateBoardsFromServer.mockResolvedValue({ isOk: true })
   })
 
   it('rejects an empty token before calling the API', async () => {
@@ -90,7 +90,7 @@ describe('joinSharedBoardByToken', () => {
   it('rejects when catalog hydrate fails after joining', async () => {
     const hydrateError = new Error('network failed')
     mocks.hydrateBoardsFromServer.mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       error: hydrateError,
     })
 

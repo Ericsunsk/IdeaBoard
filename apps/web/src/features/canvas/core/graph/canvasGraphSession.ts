@@ -64,10 +64,10 @@ export class CanvasGraphSession {
       if (this.#disposed) return
       listener(event)
     })
-    let unsubscribed = false
+    let isUnsubscribed = false
     const unsubscribe = () => {
-      if (unsubscribed) return
-      unsubscribed = true
+      if (isUnsubscribed) return
+      isUnsubscribed = true
       this.#unsubscribeCommitListeners.delete(unsubscribe)
       unsubscribeStore()
     }

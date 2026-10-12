@@ -104,7 +104,7 @@ describe('prompt config workspace facade', () => {
     expect(result).toBeNull()
     expect(feedback.savePromptFailed).toHaveBeenCalledWith(error)
     expect(workspace.promptMap[featureSlug]).toBe('Unsaved prompt')
-    expect(workspace.saving[featureSlug]).toBe(false)
+    expect(workspace.isSaving[featureSlug]).toBe(false)
   })
 
   it('blocks duplicate prompt saves and settles saving state once', async () => {
@@ -119,14 +119,14 @@ describe('prompt config workspace facade', () => {
     const duplicateSave = workspace.savePrompt(featureSlug)
 
     // The save runs through the async-action gate before the transport call.
-    await vi.waitFor(() => expect(workspace.saving[featureSlug]).toBe(true))
+    await vi.waitFor(() => expect(workspace.isSaving[featureSlug]).toBe(true))
     await vi.waitFor(() => expect(mockResource.savePrompt).toHaveBeenCalledOnce())
     await expect(duplicateSave).resolves.toBeNull()
 
     saveRequest.resolve(makeFeaturePrompt({ prompt: 'Committed prompt' }))
 
     await expect(firstSave).resolves.toMatchObject({ prompt: 'Committed prompt' })
-    expect(workspace.saving[featureSlug]).toBe(false)
+    expect(workspace.isSaving[featureSlug]).toBe(false)
     expect(feedback.promptSaved).toHaveBeenCalledOnce()
   })
 
@@ -150,7 +150,7 @@ describe('prompt config workspace facade', () => {
 
     expect(mockResource.fetchPrompts).toHaveBeenCalledWith(controller.signal)
     expect(feedback.loadPromptsFailed).not.toHaveBeenCalled()
-    expect(workspace.loading.value).toBe(false)
+    expect(workspace.isLoading.value).toBe(false)
   })
 })
 

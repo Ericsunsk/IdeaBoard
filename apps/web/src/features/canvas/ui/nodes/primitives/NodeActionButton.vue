@@ -5,13 +5,13 @@
     :class="[
       variantClass,
       {
-        active,
-        'w-full': full,
-        'ml-auto': pushRight,
+        isActive,
+        'w-full': isFull,
+        'ml-auto': isPushRight,
         'canvas-tool-tooltip-trigger': !!resolvedTooltip,
       },
     ]"
-    :disabled="disabled"
+    :disabled="isDisabled"
     :aria-label="resolvedAriaLabel"
     @click="emit('click', $event)"
   >
@@ -28,19 +28,19 @@ import { computed } from 'vue'
 const props = withDefaults(
   defineProps<{
     variant?: NodeActionButtonVariant
-    active?: boolean
-    disabled?: boolean
-    full?: boolean
-    pushRight?: boolean
+    isActive?: boolean
+    isDisabled?: boolean
+    isFull?: boolean
+    isPushRight?: boolean
     ariaLabel?: string | undefined
     tooltip?: string | undefined
   }>(),
   {
     variant: 'tool',
-    active: false,
-    disabled: false,
-    full: false,
-    pushRight: false,
+    isActive: false,
+    isDisabled: false,
+    isFull: false,
+    isPushRight: false,
     ariaLabel: undefined,
     tooltip: undefined,
   },

@@ -1,8 +1,8 @@
 <template>
   <div
     class="image-action-menu node-tool-surface"
-    :class="{ 'strength-mode': showStrengthControl }"
-    :style="showStrengthControl ? strengthMenuStyle : undefined"
+    :class="{ 'strength-mode': shouldShowStrengthControl }"
+    :style="shouldShowStrengthControl ? strengthMenuStyle : undefined"
     @mousedown.stop
     @click.stop
   >
@@ -95,7 +95,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const actionMenuItems = computed(() => getImageActionMenuItems((key) => t(key)))
-const showStrengthControl = computed(() => props.strengthControl.visible)
+const shouldShowStrengthControl = computed(() => props.strengthControl.isVisible)
 const billingStore = useCanvasBillingReadinessStore()
 const actionMenuMotion = createPopoverMotionTransition()
 const outputResolution = computed(() => props.outputResolution ?? '1k')
@@ -172,12 +172,14 @@ function getStrengthAction(item: ImageActionMenuItem): ImageStrengthAction | nul
 
 function isStrengthActive(item: ImageActionMenuItem) {
   const action = getStrengthAction(item)
-  return !!action && showStrengthControl.value && props.strengthControl.activeAction === action
+  return (
+    !!action && shouldShowStrengthControl.value && props.strengthControl.activeAction === action
+  )
 }
 
 function isStrengthHidden(item: ImageActionMenuItem) {
   const action = getStrengthAction(item)
-  return showStrengthControl.value && props.strengthControl.activeAction !== action
+  return shouldShowStrengthControl.value && props.strengthControl.activeAction !== action
 }
 
 function getItemStrengthValue(item: ImageActionMenuItem) {

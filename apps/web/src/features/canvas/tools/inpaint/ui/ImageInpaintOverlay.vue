@@ -1,7 +1,7 @@
 <template>
   <div
     class="inpaint-overlay"
-    :class="{ 'is-image-layer-hidden': !imageLayerVisible }"
+    :class="{ 'is-image-layer-hidden': !isImageLayerVisible }"
     data-inpaint
   >
     <canvas
@@ -34,7 +34,7 @@ const props = defineProps<{
   canvasWidth: number
   canvasHeight: number
   maskLayerOpacity: number
-  imageLayerVisible: boolean
+  isImageLayerVisible: boolean
   brushSize: number
   setCanvasRef: (element: Element | null) => void
 }>()

@@ -73,20 +73,20 @@ const rows = computed(() => [
   {
     key: 'configured',
     label: '收款配置',
-    status: M.paymentConfiguredState(summary.value?.configured ?? false),
+    status: M.paymentConfiguredState(summary.value?.isConfigured ?? false),
     variant: 'neutral' as const,
   },
   {
     key: 'product',
     label: '商品税率',
-    status: PAYMENTS_MESSAGES.productReadyState(summary.value?.productReady ?? false),
-    variant: summary.value?.productReady ? ('success' as const) : ('neutral' as const),
+    status: PAYMENTS_MESSAGES.productReadyState(summary.value?.isProductReady ?? false),
+    variant: summary.value?.isProductReady ? ('success' as const) : ('neutral' as const),
   },
   {
     key: 'webhook',
     label: 'Webhook',
-    status: PAYMENTS_MESSAGES.webhookReadyState(summary.value?.webhookReady ?? false),
-    variant: summary.value?.webhookReady ? ('success' as const) : ('neutral' as const),
+    status: PAYMENTS_MESSAGES.webhookReadyState(summary.value?.isWebhookReady ?? false),
+    variant: summary.value?.isWebhookReady ? ('success' as const) : ('neutral' as const),
   },
 ])
 

@@ -89,7 +89,7 @@ export function usePendingImageResultExecution(
         position: { x: node.position.x, y: node.position.y },
         dimensions: { width, height },
         computedPosition: { x: node.position.x, y: node.position.y },
-        measured: width > 0 && height > 0,
+        isMeasured: width > 0 && height > 0,
       }
     },
   }
@@ -244,7 +244,7 @@ export function usePendingImageResultExecution(
       id: nextNode.id as `image-${number}`,
       kind: 'image',
       snapshot: pendingImageNode,
-      selected: false,
+      isSelected: false,
     })
     return {
       resultNodeId: nextNode.id,
@@ -300,8 +300,8 @@ export function usePendingImageResultExecution(
       return connection
     })
     const transaction = store.beginTransaction('node-update', {
-      recordHistory: false,
-      markDirty: true,
+      shouldRecordHistory: false,
+      shouldMarkDirty: true,
     })
     try {
       plans.forEach((plan) => {
@@ -333,8 +333,8 @@ export function usePendingImageResultExecution(
   ) {
     const store = writeGraphStore()
     const transaction = store.beginTransaction('node-update', {
-      recordHistory: false,
-      markDirty: true,
+      shouldRecordHistory: false,
+      shouldMarkDirty: true,
     })
     for (const slot of slots) {
       const taskId = slot.taskId.trim()
@@ -361,11 +361,13 @@ export function usePendingImageResultExecution(
   function removePendingResults(resultNodeIds: readonly string[]) {
     const store = writeGraphStore()
     const transaction = store.beginTransaction('delete', {
-      recordHistory: false,
-      markDirty: true,
+      shouldRecordHistory: false,
+      shouldMarkDirty: true,
     })
     resultNodeIds.forEach((resultNodeId) =>
-      transaction.removeNode(resultNodeId as `image-${number}`, { removeConnectedEdges: true }),
+      transaction.removeNode(resultNodeId as `image-${number}`, {
+        shouldRemoveConnectedEdges: true,
+      }),
     )
     try {
       transaction.commit()

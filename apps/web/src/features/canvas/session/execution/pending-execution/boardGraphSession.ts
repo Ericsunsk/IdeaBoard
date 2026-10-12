@@ -130,8 +130,8 @@ export class BoardGraphSession {
   ): PendingImageDomainMutationResult {
     const store = this.#graphSession.store
     const transaction = store.beginTransaction('result-materialize', {
-      recordHistory: false,
-      markDirty: true,
+      shouldRecordHistory: false,
+      shouldMarkDirty: true,
     })
     const outcomes: PendingImageDomainMutationOutcome[] = []
 

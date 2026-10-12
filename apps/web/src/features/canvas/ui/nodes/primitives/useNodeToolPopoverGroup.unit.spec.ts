@@ -2,7 +2,7 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
 
-function mountPopoverGroup(options: { closeOnEscape?: boolean | undefined } = {}) {
+function mountPopoverGroup(options: { shouldCloseOnEscape?: boolean | undefined } = {}) {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const rootRef = ref<HTMLElement | null>(null)
@@ -14,7 +14,7 @@ function mountPopoverGroup(options: { closeOnEscape?: boolean | undefined } = {}
         popovers = useNodeToolPopoverGroup({
           keys: ['aspect-ratio', 'output-count'] as const,
           rootRefs: [rootRef],
-          closeOnEscape: options.closeOnEscape,
+          shouldCloseOnEscape: options.shouldCloseOnEscape,
         })
         return () => h('div', { ref: rootRef }, 'actions')
       },
@@ -64,7 +64,7 @@ describe('useNodeToolPopoverGroup', () => {
   })
 
   it('respects the Escape close option', async () => {
-    const harness = mountPopoverGroup({ closeOnEscape: false })
+    const harness = mountPopoverGroup({ shouldCloseOnEscape: false })
     await nextTick()
 
     try {

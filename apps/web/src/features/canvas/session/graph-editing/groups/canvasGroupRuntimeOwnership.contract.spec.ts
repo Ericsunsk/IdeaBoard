@@ -6,21 +6,19 @@ import { CanvasGraphSession } from '../../../core/graph'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 
-type SelectableHarnessNode = Node & {
-  selected?: boolean
-}
+type SelectableHarnessNode = Node & Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>
 
 function createPromptFlowNode(
   id: number,
   x: number,
   y: number,
-  selected = false,
+  isSelected = false,
 ): SelectableHarnessNode {
   return {
     id: `prompt-${id}`,
     type: 'canvas',
     position: { x, y },
-    selected,
+    selected: isSelected,
     data: {
       kind: 'prompt',
       nodeType: 'prompt',
@@ -61,13 +59,13 @@ function createSnapshot(
 }
 
 function createHarness(
-  nodeDefs: Array<{ id: number; x: number; y: number; selected?: boolean }> = [
-    { id: 1, x: 40, y: 40, selected: true },
-    { id: 2, x: 400, y: 40, selected: true },
+  nodeDefs: Array<{ id: number; x: number; y: number; isSelected?: boolean }> = [
+    { id: 1, x: 40, y: 40, isSelected: true },
+    { id: 2, x: 400, y: 40, isSelected: true },
   ],
 ) {
   const nodes = shallowRef<SelectableHarnessNode[]>(
-    nodeDefs.map(({ id, x, y, selected }) => createPromptFlowNode(id, x, y, selected ?? false)),
+    nodeDefs.map(({ id, x, y, isSelected }) => createPromptFlowNode(id, x, y, isSelected ?? false)),
   )
   const edges = shallowRef<Edge[]>([])
   const boardBaseSnapshot = ref(createSnapshot(nodeDefs))
@@ -76,25 +74,26 @@ function createHarness(
   // production reconcile would already have mirrored it into the store.
   {
     const initial = graphSession.store.beginTransaction('node-update', {
-      recordHistory: false,
-      markDirty: false,
+      shouldRecordHistory: false,
+      shouldMarkDirty: false,
     })
     for (const def of nodeDefs) {
-      if (def.selected) initial.selectNode(`prompt-${def.id}`, true)
+      if (def.isSelected) initial.selectNode(`prompt-${def.id}`, true)
     }
     initial.commit()
   }
-  const commits: Array<{ reason: string; recordHistory: boolean; markDirty: boolean }> = []
+  const commits: Array<{ reason: string; shouldRecordHistory: boolean; shouldMarkDirty: boolean }> =
+    []
   let historyCount = 0
   let autosaveCount = 0
   graphSession.subscribe((event) => {
     commits.push({
       reason: event.summary.reason,
-      recordHistory: event.summary.shouldRecordHistory,
-      markDirty: event.summary.shouldMarkDirty,
+      shouldRecordHistory: event.summary.shouldRecordHistory,
+      shouldMarkDirty: event.summary.shouldMarkDirty,
     })
-    if (event.sideEffects.recordHistory) historyCount += 1
-    if (event.sideEffects.markDirty) autosaveCount += 1
+    if (event.sideEffects.shouldRecordHistory) historyCount += 1
+    if (event.sideEffects.shouldMarkDirty) autosaveCount += 1
   })
   const syncGroups = () => {
     boardBaseSnapshot.value = {
@@ -113,16 +112,20 @@ function createHarness(
   graphSession.subscribe((event) => {
     for (const record of event.patch.nodes.records) {
       if (!record.after) continue
-      const selected = record.after.selected
+      const isSelected = record.after.isSelected
       nodes.value = nodes.value.map((node) =>
-        node.id === record.id ? { ...node, selected } : node,
+        node.id === record.id ? { ...node, selected: isSelected } : node,
       ) as SelectableHarnessNode[]
     }
     for (const record of event.patch.edges.records) {
       if (!record.after) continue
-      const selected = record.after.selected
+      const isSelected = record.after.isSelected
       edges.value = edges.value.map((edge) =>
-        edge.id === record.id ? { ...edge, selected } : edge,
+        edge.id === record.id
+          ? ({ ...edge, selected: isSelected } satisfies Partial<
+              import('@vue-flow/core').GraphEdge
+            >)
+          : edge,
       )
     }
   })
@@ -165,7 +168,7 @@ function createHarness(
       const storeSelectedNodes = new Set(
         graphSession.store
           .getNodeIds()
-          .filter((nodeId) => graphSession.store.getNode(nodeId)?.selected === true),
+          .filter((nodeId) => graphSession.store.getNode(nodeId)?.isSelected === true),
       )
       const flowSelectedNodes = new Set(
         nodes.value.filter((node) => node.selected === true).map((node) => node.id),
@@ -174,11 +177,15 @@ function createHarness(
       const storeSelectedEdges = new Set(
         graphSession.store
           .getEdgeIds()
-          .filter((edgeId) => graphSession.store.getEdge(edgeId)?.selected === true),
+          .filter((edgeId) => graphSession.store.getEdge(edgeId)?.isSelected === true),
       )
       const flowSelectedEdges = new Set(
         edges.value
-          .filter((edge) => (edge as { selected?: boolean }).selected === true)
+          .filter(
+            (edge) =>
+              (edge as Edge & Partial<Pick<import('@vue-flow/core').GraphEdge, 'selected'>>)
+                .selected === true,
+          )
           .map((edge) => edge.id),
       )
       expect(flowSelectedEdges).toEqual(storeSelectedEdges)
@@ -206,7 +213,9 @@ describe('canvas group runtime ownership', () => {
 
     expect(harness.runtime.commands.groupSelectedNodes()).toBe(true)
 
-    expect(harness.commits).toEqual([{ reason: 'group', recordHistory: true, markDirty: true }])
+    expect(harness.commits).toEqual([
+      { reason: 'group', shouldRecordHistory: true, shouldMarkDirty: true },
+    ])
     expect(harness.historyCount()).toBe(1)
     expect(harness.autosaveCount()).toBe(1)
     expect(harness.boardBaseSnapshot.value.groups).toHaveLength(1)
@@ -220,7 +229,9 @@ describe('canvas group runtime ownership', () => {
 
     expect(harness.runtime.commands.ungroupSelectedGroup()).toBe(true)
 
-    expect(harness.commits).toEqual([{ reason: 'ungroup', recordHistory: true, markDirty: true }])
+    expect(harness.commits).toEqual([
+      { reason: 'ungroup', shouldRecordHistory: true, shouldMarkDirty: true },
+    ])
     expect(harness.historyCount()).toBe(1)
     expect(harness.autosaveCount()).toBe(1)
     expect(harness.boardBaseSnapshot.value.groups).toEqual([])
@@ -235,7 +246,7 @@ describe('canvas group runtime ownership', () => {
     expect(harness.runtime.commands.deleteSelectedGroup()).toBe(true)
 
     expect(harness.commits).toEqual([
-      { reason: 'group-delete', recordHistory: true, markDirty: true },
+      { reason: 'group-delete', shouldRecordHistory: true, shouldMarkDirty: true },
     ])
     expect(harness.historyCount()).toBe(1)
     expect(harness.autosaveCount()).toBe(1)
@@ -254,7 +265,7 @@ describe('canvas group runtime ownership', () => {
     expect(harness.runtime.commands.groupDrag.commit()).toBe(true)
 
     expect(harness.commits).toEqual([
-      { reason: 'group-move', recordHistory: true, markDirty: true },
+      { reason: 'group-move', shouldRecordHistory: true, shouldMarkDirty: true },
     ])
     expect(harness.historyCount()).toBe(1)
     expect(harness.autosaveCount()).toBe(1)
@@ -278,7 +289,7 @@ describe('canvas group runtime ownership', () => {
     expect(harness.runtime.commands.groupResize.commit()).toBe(true)
 
     expect(harness.commits).toEqual([
-      { reason: 'group-resize', recordHistory: true, markDirty: true },
+      { reason: 'group-resize', shouldRecordHistory: true, shouldMarkDirty: true },
     ])
     expect(harness.historyCount()).toBe(1)
     expect(harness.autosaveCount()).toBe(1)
@@ -287,9 +298,9 @@ describe('canvas group runtime ownership', () => {
 
   it('joins a pending group node with one group-membership transaction', () => {
     const harness = createHarness([
-      { id: 1, x: 40, y: 40, selected: true },
-      { id: 2, x: 400, y: 40, selected: true },
-      { id: 3, x: 200, y: 120, selected: false },
+      { id: 1, x: 40, y: 40, isSelected: true },
+      { id: 2, x: 400, y: 40, isSelected: true },
+      { id: 3, x: 200, y: 120, isSelected: false },
     ])
     expect(harness.runtime.commands.groupSelectedNodes()).toBe(true)
     harness.resetCounts()
@@ -298,7 +309,7 @@ describe('canvas group runtime ownership', () => {
     expect(harness.runtime.commands.handleNodeClick('prompt-3')).toBe(true)
 
     expect(harness.commits).toEqual([
-      { reason: 'group-membership', recordHistory: true, markDirty: true },
+      { reason: 'group-membership', shouldRecordHistory: true, shouldMarkDirty: true },
     ])
     expect(harness.historyCount()).toBe(1)
     expect(harness.autosaveCount()).toBe(1)

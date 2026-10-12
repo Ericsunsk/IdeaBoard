@@ -36,7 +36,7 @@ export type PendingWorkflowAssemblyOptions = {
   readCanvasGraphStore: () => CanvasGraphStore
   rendererMetrics: CanvasRendererMetricsPort
   refreshNodeInternals?: ((nodeIds: string[]) => void) | undefined
-  flushAutosave?: ((options?: { silent?: boolean }) => Promise<void>) | undefined
+  flushAutosave?: ((options?: { isSilent?: boolean }) => Promise<void>) | undefined
   pendingResults?: PendingImageResultExecution | undefined
   executionCore: PendingImageExecutionCore
   isNodeExecutionActive: (nodeId: string) => boolean
@@ -86,7 +86,7 @@ export function assemblePendingImageWorkflow(
 
   async function flushPendingTaskSnapshot() {
     try {
-      await options.flushAutosave?.({ silent: true })
+      await options.flushAutosave?.({ isSilent: true })
     } catch (error) {
       console.warn('[canvas] flush pending task snapshot failed', error)
       options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))

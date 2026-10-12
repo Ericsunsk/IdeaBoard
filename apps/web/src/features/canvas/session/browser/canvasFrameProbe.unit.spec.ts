@@ -72,7 +72,7 @@ describe('canvasFrameProbe', () => {
     session.mark('pointermove', { selectedCount: 2 })
     frame.flush(150)
 
-    const summary = session.end({ committed: true })
+    const summary = session.end({ isCommitted: true })
 
     expect(summary).toEqual({
       scene: 'pan',
@@ -83,7 +83,7 @@ describe('canvasFrameProbe', () => {
       droppedFrames: 1,
       sampleCount: 2,
       frameBudgetMs: 16.7,
-      metadata: { nodeCount: 3, committed: true },
+      metadata: { nodeCount: 3, isCommitted: true },
       marks: [{ name: 'pointermove', atMs: 20, metadata: { selectedCount: 2 } }],
     })
     expect(info).toHaveBeenCalledTimes(1)

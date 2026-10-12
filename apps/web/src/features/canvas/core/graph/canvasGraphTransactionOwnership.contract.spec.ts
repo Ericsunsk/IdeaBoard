@@ -137,7 +137,7 @@ describe('canvas graph transaction ownership', () => {
     const deleteNotifications = subscribeOnce(deleteStore)
     const deleteSummary = commitCanvasGraphDeleteIntent(deleteStore, {
       nodeIds: [toCanvasGraphNodeId('image', 1)],
-      removeConnectedEdges: true,
+      shouldRemoveConnectedEdges: true,
     })
 
     expect(deleteSummary.reason).toBe('delete')
@@ -151,7 +151,7 @@ describe('canvas graph transaction ownership', () => {
 
     const summary = commitCanvasGraphDeleteIntent(store, {
       nodeIds: [toCanvasGraphNodeId('image', 1), toCanvasGraphNodeId('prompt', 1)],
-      removeConnectedEdges: true,
+      shouldRemoveConnectedEdges: true,
     })
 
     expect(summary.reason).toBe('batch-delete')
@@ -259,7 +259,7 @@ describe('canvas graph transaction ownership', () => {
     const nodeId = toCanvasGraphNodeId('image', 3)
 
     const summary = store
-      .beginTransaction('result-materialize', { recordHistory: false, markDirty: true })
+      .beginTransaction('result-materialize', { shouldRecordHistory: false, shouldMarkDirty: true })
       .updateNode(nodeId, { outputStatus: 'ready', pendingTaskId: undefined })
       .commit()
 
@@ -274,7 +274,7 @@ describe('canvas graph transaction ownership', () => {
     const { summaries } = subscribeOnce(store)
 
     const summary = store
-      .beginTransaction('node-update', { recordHistory: false, markDirty: false })
+      .beginTransaction('node-update', { shouldRecordHistory: false, shouldMarkDirty: false })
       .selectNode(toCanvasGraphNodeId('prompt', 1), true)
       .commit()
 
@@ -302,8 +302,8 @@ describe('canvas graph transaction ownership', () => {
     const historyRecord = vi.fn()
     const markDirty = vi.fn()
     session.subscribe((event) => {
-      if (event.sideEffects.recordHistory) historyRecord(event.patch)
-      if (event.sideEffects.markDirty) markDirty()
+      if (event.sideEffects.shouldRecordHistory) historyRecord(event.patch)
+      if (event.sideEffects.shouldMarkDirty) markDirty()
     })
 
     commitCanvasGraphConnectIntent(session.store, {
@@ -314,14 +314,14 @@ describe('canvas graph transaction ownership', () => {
     expect(markDirty).toHaveBeenCalledTimes(1)
 
     session.store
-      .beginTransaction('result-materialize', { recordHistory: false, markDirty: true })
+      .beginTransaction('result-materialize', { shouldRecordHistory: false, shouldMarkDirty: true })
       .updateNode(toCanvasGraphNodeId('image', 1), { x: 41 })
       .commit()
     expect(historyRecord).toHaveBeenCalledTimes(1)
     expect(markDirty).toHaveBeenCalledTimes(2)
 
     session.store
-      .beginTransaction('node-update', { recordHistory: false, markDirty: false })
+      .beginTransaction('node-update', { shouldRecordHistory: false, shouldMarkDirty: false })
       .selectNode(toCanvasGraphNodeId('prompt', 1), true)
       .commit()
     expect(historyRecord).toHaveBeenCalledTimes(1)

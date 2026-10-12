@@ -75,7 +75,7 @@ describe('admin user commands', () => {
       expect.objectContaining({
         title: '确认解除封禁',
         confirmLabel: '确认解封',
-        reason: expect.objectContaining({ required: true }),
+        reason: expect.objectContaining({ isRequired: true }),
       }),
     )
     expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith({
@@ -160,7 +160,7 @@ describe('admin user commands', () => {
       expect.objectContaining({
         title: '确认伪装登录',
         intent: 'danger',
-        reason: expect.objectContaining({ required: true }),
+        reason: expect.objectContaining({ isRequired: true }),
       }),
     )
     expect(harness.feedback.impersonationStarted).toHaveBeenCalledWith('erin')

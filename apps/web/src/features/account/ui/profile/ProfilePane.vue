@@ -8,8 +8,8 @@
           <button
             type="button"
             class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-pill border-0 bg-transparent p-0 text-primary-foreground outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-wait"
-            :disabled="avatarUploading"
-            :aria-busy="avatarUploading"
+            :disabled="isAvatarUploading"
+            :aria-busy="isAvatarUploading"
             :aria-label="t('account.profile.changeAvatar')"
             :title="t('account.profile.changeAvatar')"
             @click="openAvatarPicker"
@@ -30,13 +30,13 @@
             <span
               class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--color-foreground)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
-                avatarUploading
+                isAvatarUploading
                   ? 'opacity-100'
                   : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
               "
               aria-hidden="true"
             >
-              <Camera class="size-6" :class="avatarUploading ? 'animate-pulse' : ''" />
+              <Camera class="size-6" :class="isAvatarUploading ? 'animate-pulse' : ''" />
             </span>
           </button>
           <input
@@ -46,7 +46,7 @@
             type="file"
             name="avatar-file"
             accept="image/*"
-            :disabled="avatarUploading"
+            :disabled="isAvatarUploading"
             @change="onAvatarFileChange"
           />
         </div>
@@ -113,7 +113,7 @@ type ProfileField = {
 
 const { t } = useI18n()
 const userStore = useUserStore()
-const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
+const { isUploading: isAvatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 // Session profile facts from `GET /api/v1/user`: display_name/role/avatar

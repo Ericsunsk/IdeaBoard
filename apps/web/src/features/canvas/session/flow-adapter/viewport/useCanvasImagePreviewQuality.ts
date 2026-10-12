@@ -23,14 +23,14 @@ type ResolveCanvasImagePreviewMaxSideOptions = {
   stageHeight: number
   zoomLevel: number
   devicePixelRatio?: number
-  forceFullQuality?: boolean | undefined
+  shouldForceFullQuality?: boolean | undefined
 }
 
 type UseCanvasImagePreviewQualityOptions = {
   stageWidth: MaybeRefOrGetter<number>
   stageHeight: MaybeRefOrGetter<number>
   zoomLevel: MaybeRefOrGetter<number>
-  forceFullQuality?: MaybeRefOrGetter<boolean>
+  shouldForceFullQuality?: MaybeRefOrGetter<boolean>
   devicePixelRatio?: MaybeRefOrGetter<number | undefined>
 }
 
@@ -41,7 +41,7 @@ function normalizePositiveNumber(value: unknown, fallback: number): number {
 export function resolveCanvasImagePreviewMaxSide(
   options: ResolveCanvasImagePreviewMaxSideOptions,
 ): CanvasImagePreviewMaxSide {
-  if (options.forceFullQuality) return CANVAS_IMAGE_PREVIEW_MAX_SIDE.full
+  if (options.shouldForceFullQuality) return CANVAS_IMAGE_PREVIEW_MAX_SIDE.full
 
   const stageWidth = normalizePositiveNumber(options.stageWidth, IMAGE_NODE_EMPTY_SIZE)
   const stageHeight = normalizePositiveNumber(options.stageHeight, stageWidth)
@@ -95,7 +95,7 @@ export function useCanvasImagePreviewQuality(options: UseCanvasImagePreviewQuali
       stageHeight: toValue(options.stageHeight),
       zoomLevel: toValue(options.zoomLevel),
       devicePixelRatio: toValue(options.devicePixelRatio) ?? systemDevicePixelRatio.value,
-      forceFullQuality: toValue(options.forceFullQuality),
+      shouldForceFullQuality: toValue(options.shouldForceFullQuality),
     }),
   )
 

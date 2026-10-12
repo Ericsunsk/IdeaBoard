@@ -43,7 +43,7 @@ type DeleteStorageProfileCommandOptions = {
 
 export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOptions) {
   const resource = options.resource ?? createAdminStorageResource()
-  const loading = ref(false)
+  const isLoading = ref(false)
   // 行开关乐观收口到共享 useOptimisticToggle：intent 同 tick 翻转，
   // pending 按 id 独立；成功后等回填 reconcile，失败回滚。toast 语义不变。
   const toggle = useOptimisticToggle<string>()
@@ -72,7 +72,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
   async function loadData() {
     await options.runAsyncAction(refreshStorageData, {
-      loading,
+      isLoading,
       feedback: {
         error: (error) => {
           options.feedback.loadProfilesFailed(error)
@@ -83,7 +83,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
   async function refreshData() {
     await options.runAsyncAction(refreshStorageData, {
-      loading,
+      isLoading,
       feedback: {
         error: options.feedback.refreshFailed,
       },
@@ -123,7 +123,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
         options.feedback.applyCurrentSucceeded(response.message)
       },
       {
-        loading: applyingPending,
+        isLoading: applyingPending,
         before: () => {
           applyingId.value = storage.id
         },
@@ -166,7 +166,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
         if (response) options.feedback.saveDraftSucceeded(response.message)
       },
       {
-        onFailure: (_, __, error) => {
+        onFailure: (_, _previous, error) => {
           options.feedback.saveDraftFailed(error)
         },
       },
@@ -189,7 +189,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
         options.feedback.testConnectionSucceeded(response.message)
       },
       {
-        loading: testingPending,
+        isLoading: testingPending,
         before: () => {
           testingId.value = storage.id
         },
@@ -215,7 +215,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
       message: `确定删除存储「${storage.name}」吗？此操作不可恢复，且将记录操作人与原因。`,
       confirmLabel: '确定删除',
       intent: 'danger',
-      reason: { required: true },
+      reason: { isRequired: true },
     })
     if (!confirmed) return
     const operatorReason = requireDestructiveReason(options.confirm)
@@ -269,7 +269,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
   }
 
   return {
-    loading,
+    isLoading,
     toggle,
     applyingId,
     testingId,

@@ -26,7 +26,7 @@ function galleryAsset(index: number): LibraryAssetView {
 
 const baseProps = (assets: LibraryAssetView[]) => ({
   assets,
-  loading: false,
+  isLoading: false,
   errorMessage: null as string | null,
   hasMore: false,
   isExpanded: false,
@@ -40,6 +40,9 @@ describe('LibraryAssetGallery', () => {
     const { rerender } = render(LibraryAssetGallery, { props: baseProps(assets) })
 
     expect(screen.getAllByRole('article')).toHaveLength(5)
+    for (const image of screen.getAllByRole('img')) {
+      expect(image).toHaveAttribute('loading', 'lazy')
+    }
     for (const asset of assets) {
       expect(screen.getByText(asset.title as string)).toBeInTheDocument()
     }

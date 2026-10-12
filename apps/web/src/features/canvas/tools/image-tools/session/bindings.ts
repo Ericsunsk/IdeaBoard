@@ -18,7 +18,7 @@ type ImageToolAnchorRect = RetouchChromeAnchorRect
 
 export type ImageToolStageBinding = {
   nodeId: string
-  active: boolean
+  isActive: boolean
   mode: RetouchMode | null
   /** Zero-copy GPU stage. Null outside adjust mode or before adapter setup. */
   retouchStage: Pick<
@@ -31,15 +31,15 @@ export type ImageToolStageBinding = {
 import type { ImageActionStrengthControlHandlers } from '../core/model.ts'
 
 export type ImageActionStrengthControl = ImageActionStrengthControlHandlers & {
-  visible: boolean
+  isVisible: boolean
   activeAction: ImageStrengthAction | null
 }
 
 export type ImageActionBinding = {
-  actionMenuVisible: boolean
-  promptComposerVisible: boolean
+  isActionMenuVisible: boolean
+  isPromptComposerVisible: boolean
   promptPlaceholder: string
-  directGenerating: boolean
+  isDirectGenerating: boolean
   strengthControl: ImageActionStrengthControl
 }
 

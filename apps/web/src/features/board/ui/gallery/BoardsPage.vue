@@ -85,7 +85,7 @@
         }}</span>
         <Button
           type="button"
-          :disabled="isCatalogReloadPending"
+          :is-disabled="isCatalogReloadPending"
           :class="catalogClasses.recoveryButton"
           @click="reloadCatalog"
           >{{
@@ -182,14 +182,14 @@
               <div :class="catalogClasses.deleteDialogFooter">
                 <Button
                   type="button"
-                  :disabled="isDeletePending"
+                  :is-disabled="isDeletePending"
                   :class="catalogClasses.deleteCancelButton"
                   @click="closeDeleteDialogView"
                   >{{ t('common.actions.cancel') }}</Button
                 >
                 <Button
                   type="button"
-                  :disabled="isDeletePending"
+                  :is-disabled="isDeletePending"
                   :class="catalogClasses.deleteConfirmButton"
                   @click="confirmDelete"
                   >{{
@@ -301,7 +301,7 @@ const {
   handleVisibilityChange: handleDeleteDialogVisibilityChange,
   requestClose: requestDeleteDialogClose,
 } = useOverlayInteractionLifecycle({
-  visible: deleteDialogVisible,
+  isVisible: deleteDialogVisible,
   busy: isDeletePending,
   surface: defineDialogSurfaceIntent(),
   onVisibilityChange: (visible) => {

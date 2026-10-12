@@ -11,7 +11,7 @@ type UseFlowCanvasNodeHandlersOptions = {
   updatePromptText: (nodeId: string, value: string) => void
   updateNodeParams: (nodeId: string, payload: FlowSnapshotParamPatch) => void
   resetImage: (nodeId: string) => void
-  markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
+  markFlowExecutionNodeDirty: (nodeId: string, options?: { shouldIncludeSelf?: boolean }) => void
   /** Trailing delay for text-only dirty marks; injectable for specs. */
   textDirtyDelayMs?: number | undefined
 }
@@ -62,7 +62,7 @@ export function useFlowCanvasNodeHandlers(options: UseFlowCanvasNodeHandlersOpti
   }
 
   function onFlowDeleteNode(nodeId: string) {
-    options.dismissTransientCanvasUi({ closeContextMenu: true })
+    options.dismissTransientCanvasUi({ shouldCloseContextMenu: true })
     options.discardFlowImageToolNodeEdits(nodeId)
     options.deleteNode(nodeId)
   }
@@ -74,7 +74,7 @@ export function useFlowCanvasNodeHandlers(options: UseFlowCanvasNodeHandlersOpti
 
   function onFlowNodeParamUpdate(nodeId: string, payload: FlowSnapshotParamPatch) {
     options.updateNodeParams(nodeId, payload)
-    options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
+    options.markFlowExecutionNodeDirty(nodeId, { shouldIncludeSelf: true })
   }
 
   function onFlowImageReset(nodeId: string) {

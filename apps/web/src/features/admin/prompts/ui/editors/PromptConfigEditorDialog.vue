@@ -6,7 +6,7 @@
     :description="PROMPTS_MESSAGES.editorDescription"
     size="form"
     content-layout="plain"
-    :busy="saving"
+    :busy="isSaving"
     @update:visible="onVisibleUpdate"
   >
     <div v-if="item" class="flex flex-col gap-4">
@@ -28,7 +28,7 @@
               v-for="variable in variables"
               :key="variable.key"
               type="button"
-              :disabled="saving"
+              :disabled="isSaving"
               class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary-line-strong hover:bg-primary-faint-soft hover:text-primary cursor-pointer disabled:opacity-50"
               @click="insertVariable(variable.key)"
             >
@@ -46,7 +46,7 @@
           auto-grow
           :aria-label="PROMPTS_MESSAGES.editorTemplateAria(item.title)"
           :placeholder="PROMPTS_MESSAGES.editorPlaceholder"
-          :disabled="saving"
+          :disabled="isSaving"
           @update:model-value="emit('update:draft', $event)"
         />
       </div>
@@ -75,9 +75,9 @@
       <AdminDialogActions
         :cancel-label="PROMPTS_MESSAGES.cancel"
         :confirm-label="PROMPTS_MESSAGES.save"
-        :loading="saving"
-        :disabled="saving || !validation?.canSave || !validation?.isDirty"
-        :cancel-disabled="saving"
+        :loading="isSaving"
+        :disabled="isSaving || !validation?.canSave || !validation?.isDirty"
+        :cancel-disabled="isSaving"
         @cancel="emit('close')"
         @confirm="emit('save')"
       />
@@ -100,7 +100,7 @@ const props = defineProps<{
   item: FeatureItem | null
   draft: string
   validation: PromptDraftValidation | null
-  saving: boolean
+  isSaving: boolean
   variables: readonly FeaturePromptVariable[]
   header: string
 }>()

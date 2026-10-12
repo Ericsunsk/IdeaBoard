@@ -28,10 +28,10 @@ type BoardRepositoryMutations = Pick<
 >
 
 export type BoardRepositoryRenameResult =
-  | { ok: true; board: BoardMeta }
-  | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
+  | { isOk: true; board: BoardMeta }
+  | { isOk: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
   | {
-      ok: false
+      isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
       boardId: string
       previousBoard: BoardMeta
@@ -100,17 +100,17 @@ function cloneBoards(boards: BoardMeta[]): BoardMeta[] {
 }
 
 function toRenameFailure(
-  remote: Exclude<BoardRenameRemoteResult, { ok: true }>,
+  remote: Exclude<BoardRenameRemoteResult, { isOk: true }>,
   rollback: BoardRollbackRenameResult,
   hydrate?: HydrateBoardsFromServerResult,
 ): BoardRepositoryRenameResult {
   return {
-    ok: false,
+    isOk: false,
     reason: remote.reason,
     boardId: remote.boardId,
     previousBoard: remote.previousBoard,
     error: remote.error,
-    rolledBackBoard: rollback.ok ? rollback.board : undefined,
+    rolledBackBoard: rollback.isOk ? rollback.board : undefined,
     rollback,
     hydrate,
   }
@@ -131,7 +131,7 @@ export function createBoardRepository(
   let serverBoards: BoardMeta[] | null = null
   let stopServer: (() => void) | undefined
   let shouldObserveDocuments: boolean | undefined
-  let disposed = false
+  let isDisposed = false
   const draftGuardStops = new Set<() => void>()
 
   function refresh() {
@@ -154,13 +154,13 @@ export function createBoardRepository(
       : cloneBoards(local)
   }
 
-  function observeServer(includeDocuments: boolean) {
-    shouldObserveDocuments = includeDocuments
+  function observeServer(shouldIncludeDocuments: boolean) {
+    shouldObserveDocuments = shouldIncludeDocuments
     stopServer?.()
     stopServer = deps.observeServer?.((next) => {
       serverBoards = next
       refresh()
-    }, includeDocuments)
+    }, shouldIncludeDocuments)
   }
 
   function enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -181,7 +181,7 @@ export function createBoardRepository(
   }
 
   function scopeChangedResult(): BoardScopeChangedResult {
-    return { ok: false, reason: 'scope-changed' }
+    return { isOk: false, reason: 'scope-changed' }
   }
 
   const unsubscribe = deps.subscribe(refresh)
@@ -203,7 +203,7 @@ export function createBoardRepository(
       const token = captureScope()
       return enqueue(async () => {
         if (!isScopeCurrent(token)) {
-          return { ok: false, error: new BoardRepositoryScopeChangedError() }
+          return { isOk: false, error: new BoardRepositoryScopeChangedError() }
         }
         const didObserveDocuments = shouldObserveDocuments
         stopServer?.()
@@ -211,17 +211,17 @@ export function createBoardRepository(
         const observeOptions = deps.observeServer
           ? {
               ...options,
-              includeDocuments: options.includeDocuments ?? true,
-              force: options.force ?? true,
+              shouldIncludeDocuments: options.shouldIncludeDocuments ?? true,
+              shouldForce: options.shouldForce ?? true,
             }
           : options
         let shouldResumeDocuments = didObserveDocuments
         try {
           const result = await deps.hydrate(observeOptions)
-          if (result.ok) shouldResumeDocuments = observeOptions.includeDocuments !== false
+          if (result.isOk) shouldResumeDocuments = observeOptions.shouldIncludeDocuments !== false
           return result
         } finally {
-          if (shouldResumeDocuments !== undefined && isScopeCurrent(token) && !disposed)
+          if (shouldResumeDocuments !== undefined && isScopeCurrent(token) && !isDisposed)
             observeServer(shouldResumeDocuments)
         }
       })
@@ -242,11 +242,11 @@ export function createBoardRepository(
         if (!isScopeCurrent(token)) return scopeChangedResult()
         const mutations = deps.createCommands({ isCurrent: () => isScopeCurrent(token) })
         const optimistic = mutations.renameOptimistic(input)
-        if (!optimistic.ok) return optimistic
+        if (!optimistic.isOk) return optimistic
 
         const remote = await optimistic.confirm()
         if (!isScopeCurrent(token)) return scopeChangedResult()
-        if (remote.ok) return remote
+        if (remote.isOk) return remote
 
         const rollback = mutations.rollbackOptimisticRename({
           boardId: remote.boardId,
@@ -255,7 +255,7 @@ export function createBoardRepository(
         const hydrate =
           remote.reason === 'revision-conflict' || remote.reason === 'idempotency-conflict'
             ? await deps.hydrate({
-                preserveLocalNewer: false,
+                shouldPreserveLocalNewer: false,
                 rollbackBoardIds: [remote.boardId],
               })
             : undefined
@@ -290,7 +290,7 @@ export function createBoardRepository(
     },
     commands,
     dispose() {
-      disposed = true
+      isDisposed = true
       draftGuardStops.forEach((stop) => stop())
       draftGuardStops.clear()
       stopServer?.()
@@ -298,7 +298,7 @@ export function createBoardRepository(
       unsubscribeScope()
     },
     registerDraftGuard(guard) {
-      if (disposed) return () => {}
+      if (isDisposed) return () => {}
       const unregister = registerBoardDraftGuard(guard)
       const stop = () => {
         unregister()

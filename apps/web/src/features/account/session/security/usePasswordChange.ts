@@ -53,7 +53,7 @@ export function usePasswordChange(deps: PasswordChangeDependencies = {}) {
 
   const form = ref<PasswordForm>(emptyPasswordForm())
   const errors = ref<Record<PasswordField, string>>(emptyPasswordForm())
-  const loading = ref(false)
+  const isLoading = ref(false)
 
   function resolveFieldError(field: PasswordField) {
     const value = form.value[field]
@@ -126,7 +126,7 @@ export function usePasswordChange(deps: PasswordChangeDependencies = {}) {
         return true
       },
       {
-        loading,
+        isLoading,
         feedback: profileFeedback.passwordChange,
       },
     )
@@ -135,7 +135,7 @@ export function usePasswordChange(deps: PasswordChangeDependencies = {}) {
   return {
     form,
     errors,
-    loading,
+    isLoading,
     validateField,
     clearFieldError,
     handleNewPasswordInput,

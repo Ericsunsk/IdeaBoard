@@ -92,6 +92,62 @@ function isBooleanType(type) {
   )
 }
 
+function isExternalDeclaration(declaration) {
+  const file = declaration.getSourceFile().fileName
+  if (file.includes('/node_modules/') || file.includes('/src/api/generated-query/')) return true
+  for (let owner = declaration; owner; owner = owner.parent) {
+    if (ts.getJSDocTags(owner).some((tag) => tag.tagName.text === 'externalContract')) return true
+    if (ts.isTypeAliasDeclaration(owner) || ts.isInterfaceDeclaration(owner)) break
+  }
+  return false
+}
+
+function hasExternalProperty(type, name) {
+  if (!type) return false
+  if (type.isUnionOrIntersection())
+    return type.types.some((member) => hasExternalProperty(member, name))
+  return type.getProperty(name)?.declarations?.some(isExternalDeclaration) ?? false
+}
+
+function isDictionaryEntry(checker, type, name) {
+  if (!type) return false
+  if (type.getProperty(name)) return false
+  if (type.isUnionOrIntersection())
+    return type.types.some((member) => isDictionaryEntry(checker, member, name))
+  return Boolean(checker.getIndexTypeOfType(type, ts.IndexKind.String))
+}
+
+function isVuePropOption(checker, node, name) {
+  if (name !== 'default' && name !== 'required') return false
+  const option = node.parent?.parent
+  const prop = option?.parent
+  const props = prop?.parent?.parent
+  if (
+    !prop ||
+    !ts.isPropertyAssignment(prop) ||
+    !props ||
+    !ts.isPropertyAssignment(props) ||
+    props.name.getText() !== 'props'
+  )
+    return false
+  const call = props.parent?.parent
+  if (!call || !ts.isCallExpression(call)) return false
+  const declaration = checker.getResolvedSignature(call)?.declaration
+  return (
+    declaration?.name?.getText() === 'defineComponent' &&
+    declaration.getSourceFile().fileName.includes('/node_modules/@vue/runtime-core/')
+  )
+}
+
+function propsDefaultType(checker, object) {
+  const call = object.parent
+  if (!ts.isCallExpression(call) || call.expression.getText() !== 'withDefaults') return undefined
+  const props = call.arguments[0]
+  return props && ts.isCallExpression(props) && props.typeArguments?.[0]
+    ? checker.getTypeFromTypeNode(props.typeArguments[0])
+    : undefined
+}
+
 export const booleanPrefixRule = {
   meta: {
     type: 'suggestion',
@@ -119,18 +175,25 @@ export const booleanPrefixRule = {
       )
         return
       const tsNode = services.esTreeNodeToTSNodeMap.get(node)
+      if (declarationKind === 'member') {
+        if (isExternalDeclaration(tsNode.parent)) return
+        const container = tsNode.parent?.parent
+        if (container && hasExternalProperty(checker.getTypeAtLocation(container), node.name))
+          return
+      }
       // A contextual package/DOM options key is somebody else's public API.
       if (
         declarationKind === 'property' &&
         tsNode.parent &&
-        ts.isPropertyAssignment(tsNode.parent)
+        (ts.isPropertyAssignment(tsNode.parent) || ts.isShorthandPropertyAssignment(tsNode.parent))
       ) {
-        const contextual = checker.getContextualType(tsNode.parent.parent)
-        const property = contextual?.getProperty(node.name)
+        const object = tsNode.parent.parent
+        const contextual = checker.getContextualType(object)
         if (
-          property?.declarations?.some((declaration) =>
-            declaration.getSourceFile().fileName.includes('/node_modules/'),
-          )
+          hasExternalProperty(contextual, node.name) ||
+          isDictionaryEntry(checker, contextual, node.name) ||
+          hasExternalProperty(propsDefaultType(checker, object), node.name) ||
+          isVuePropOption(checker, tsNode, node.name)
         )
           return
       }

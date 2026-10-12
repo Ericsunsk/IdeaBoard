@@ -4,7 +4,7 @@ export type OverlayDismissal = 'close-control' | 'escape' | 'mask' | 'outside-po
 
 export type OverlaySurfaceIntent = {
   dismissibleBy: readonly OverlayDismissal[]
-  restoreFocus: boolean
+  shouldRestoreFocus: boolean
 }
 
 /**
@@ -21,14 +21,14 @@ export function defineDialogSurfaceIntent(
 ): OverlaySurfaceIntent {
   return {
     dismissibleBy: overrides.dismissibleBy ?? [...defaultDialogDismissals],
-    restoreFocus: overrides.restoreFocus ?? true,
+    shouldRestoreFocus: overrides.shouldRestoreFocus ?? true,
   }
 }
 
 export type OverlayBusyMode = 'block' | 'abort'
 
 type OverlayInteractionLifecycleOptions = {
-  visible: MaybeRefOrGetter<boolean>
+  isVisible: MaybeRefOrGetter<boolean>
   busy?: MaybeRefOrGetter<boolean>
   /**
    * 'block' (default): irreversible commits lock every dismissal path while busy.
@@ -51,7 +51,7 @@ export function useOverlayInteractionLifecycle(options: OverlayInteractionLifecy
   let closeRequested = false
 
   watch(
-    () => toValue(options.visible),
+    () => toValue(options.isVisible),
     (visible, wasVisible) => {
       if (!visible || wasVisible) return
 
@@ -71,7 +71,7 @@ export function useOverlayInteractionLifecycle(options: OverlayInteractionLifecy
   }
 
   function requestClose(dismissal: OverlayDismissal) {
-    if (!toValue(options.visible) || closeRequested || !canDismiss(dismissal)) return false
+    if (!toValue(options.isVisible) || closeRequested || !canDismiss(dismissal)) return false
 
     if (isBusy.value && busyMode === 'abort') options.onAbort?.()
     closeRequested = true
@@ -81,7 +81,7 @@ export function useOverlayInteractionLifecycle(options: OverlayInteractionLifecy
 
   function handleVisibilityChange(visible: boolean) {
     if (visible) {
-      if (toValue(options.visible)) return false
+      if (toValue(options.isVisible)) return false
       options.onVisibilityChange(true)
       return true
     }
@@ -90,13 +90,13 @@ export function useOverlayInteractionLifecycle(options: OverlayInteractionLifecy
   }
 
   function completeClose() {
-    if (toValue(options.visible)) return false
+    if (toValue(options.isVisible)) return false
 
     closeRequested = false
     const target = focusReturnTarget
     focusReturnTarget = null
 
-    if (!options.surface.restoreFocus || !target?.isConnected) return false
+    if (!options.surface.shouldRestoreFocus || !target?.isConnected) return false
     target.focus()
     return true
   }

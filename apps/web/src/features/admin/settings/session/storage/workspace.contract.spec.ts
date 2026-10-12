@@ -52,7 +52,7 @@ describe('admin storage workspace facade', () => {
 
     await workspace.loadData()
     expect(workspace.storages.value).toHaveLength(1)
-    expect(workspace.loading.value).toBe(false)
+    expect(workspace.isLoading.value).toBe(false)
   })
 
   it.each([false, true])(
@@ -383,7 +383,7 @@ describe('admin storage workspace facade', () => {
         message: '确定删除存储「对象存储」吗？此操作不可恢复，且将记录操作人与原因。',
         confirmLabel: '确定删除',
         intent: 'danger',
-        reason: { required: true },
+        reason: { isRequired: true },
       }),
     )
 

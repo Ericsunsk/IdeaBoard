@@ -9,7 +9,7 @@ type CreateCanvasWorkspaceImageWorkflowOptions = {
   board: ReturnType<typeof useBoardRuntime>
   graph: ReturnType<typeof createCanvasWorkspaceGraphRuntime>
   flowPaneAdapter: CanvasVueFlowAdapter
-  flushAutosave: (options?: { silent?: boolean }) => Promise<void>
+  flushAutosave: (options?: { isSilent?: boolean }) => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   ui: CanvasImageWorkflowUiAdapter
   feedback: Pick<CanvasFeedback, 'imageTools' | 'taskExecution'>

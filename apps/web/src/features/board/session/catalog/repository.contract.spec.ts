@@ -22,16 +22,16 @@ function createHarness() {
   const renameOptimistic = vi.fn<BoardCommands['renameOptimistic']>(
     ({ boardId, nextName }): BoardOptimisticRenameResult => {
       const previousBoard = boards.value.find((item) => item.id === boardId)
-      if (!previousBoard) return { ok: false as const, reason: 'invalid-name' as const }
+      if (!previousBoard) return { isOk: false as const, reason: 'invalid-name' as const }
       const previous = { ...previousBoard }
       previousBoard.name = nextName
       emit()
       return {
-        ok: true,
+        isOk: true,
         board: { ...previousBoard },
         previousBoard: previous,
         confirm: vi.fn<() => Promise<BoardRenameRemoteResult>>(async () => ({
-          ok: true,
+          isOk: true,
           board: { ...previousBoard },
         })),
       }
@@ -40,34 +40,34 @@ function createHarness() {
   const rollbackOptimisticRename = vi.fn(
     ({ boardId, previousName }: { boardId: string; previousName: string }) => {
       const current = boards.value.find((item) => item.id === boardId)
-      if (!current) return { ok: false as const, reason: 'invalid-name' as const }
+      if (!current) return { isOk: false as const, reason: 'invalid-name' as const }
       current.name = previousName
       emit()
-      return { ok: true as const, board: { ...current } }
+      return { isOk: true as const, board: { ...current } }
     },
   )
   const create = vi.fn(async () => {
     const created = board('board-2', 'Untitled')
     boards.value = [created, ...boards.value]
     emit()
-    return { ok: true as const, board: created }
+    return { isOk: true as const, board: created }
   })
   const duplicate = vi.fn(async ({ sourceBoardId }: { sourceBoardId: string }) => {
     const source = boards.value.find((item) => item.id === sourceBoardId)
-    if (!source) return { ok: false as const, reason: 'source-missing' as const }
+    if (!source) return { isOk: false as const, reason: 'source-missing' as const }
     const copy = board('board-copy', `${source.name} Copy`)
     boards.value = [copy, ...boards.value]
     emit()
-    return { ok: true as const, board: copy }
+    return { isOk: true as const, board: copy }
   })
   const deleteBoard = vi.fn(async ({ boardId }: { boardId: string }) => {
     boards.value = boards.value.filter((item) => item.id !== boardId)
     emit()
-    return { ok: true as const, remoteWasMissing: false }
+    return { isOk: true as const, isRemoteWasMissing: false }
   })
   const hydrate = vi.fn(async () => {
     emit()
-    return { ok: true as const }
+    return { isOk: true as const }
   })
   const dependencies: BoardRepositoryDependencies = {
     listBoards,
@@ -114,7 +114,7 @@ describe('BoardRepository contract', () => {
     const result = await catalog.commands.rename({ boardId: 'board-1', nextName: 'Renamed' })
     await nextTick()
 
-    expect(result).toMatchObject({ ok: true, board: { name: 'Renamed' } })
+    expect(result).toMatchObject({ isOk: true, board: { name: 'Renamed' } })
     expect(boardsConsumer.value).toEqual(['Renamed'])
     expect(canvasConsumer.value).toBe('Renamed')
   })
@@ -174,7 +174,7 @@ describe('BoardRepository contract', () => {
     let releaseCreate!: () => void
     const createStarted = vi.fn()
     const duplicate = vi.fn(async () => ({
-      ok: true as const,
+      isOk: true as const,
       board: board('board-copy', 'Copy'),
     }))
     harness.dependencies.createCommands = ({ isCurrent } = { isCurrent: () => true }) => ({
@@ -184,13 +184,13 @@ describe('BoardRepository contract', () => {
           releaseCreate = resolve
         })
         return isCurrent()
-          ? { ok: true as const, board: board('board-2', 'Untitled') }
-          : { ok: false as const, reason: 'scope-changed' as const }
+          ? { isOk: true as const, board: board('board-2', 'Untitled') }
+          : { isOk: false as const, reason: 'scope-changed' as const }
       }),
       renameOptimistic: harness.renameOptimistic,
       rollbackOptimisticRename: harness.rollbackOptimisticRename,
       duplicate,
-      delete: vi.fn(async () => ({ ok: true as const, remoteWasMissing: false })),
+      delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
     })
     const catalog = createBoardRepository(harness.dependencies)
 
@@ -200,8 +200,8 @@ describe('BoardRepository contract', () => {
     harness.changeScope('scope-b')
     releaseCreate()
 
-    await expect(inFlight).resolves.toEqual({ ok: false, reason: 'scope-changed' })
-    await expect(queued).resolves.toEqual({ ok: false, reason: 'scope-changed' })
+    await expect(inFlight).resolves.toEqual({ isOk: false, reason: 'scope-changed' })
+    await expect(queued).resolves.toEqual({ isOk: false, reason: 'scope-changed' })
     expect(duplicate).not.toHaveBeenCalled()
     expect(catalog.viewModel.scope.value).toBe('scope-b')
   })
@@ -216,11 +216,11 @@ describe('BoardRepository contract', () => {
         current.name = nextName
         harness.emit()
         return {
-          ok: true as const,
+          isOk: true as const,
           board: { ...current },
           previousBoard,
           confirm: vi.fn<() => Promise<BoardRenameRemoteResult>>(async () => ({
-            ok: false as const,
+            isOk: false as const,
             reason: 'sync-failed' as const,
             boardId,
             board: { ...current },
@@ -236,7 +236,7 @@ describe('BoardRepository contract', () => {
     expect(catalog.viewModel.byId.value.get('board-1')?.name).toBe('Unconfirmed')
 
     await expect(pending).resolves.toMatchObject({
-      ok: false,
+      isOk: false,
       reason: 'sync-failed',
       boardId: 'board-1',
       previousBoard: { name: 'Original' },
@@ -260,11 +260,11 @@ describe('BoardRepository contract', () => {
         current.name = nextName
         harness.emit()
         return {
-          ok: true,
+          isOk: true,
           board: { ...current },
           previousBoard,
           confirm: vi.fn(async () => ({
-            ok: false as const,
+            isOk: false as const,
             reason: 'revision-conflict' as const,
             boardId,
             board: { ...current },
@@ -277,19 +277,19 @@ describe('BoardRepository contract', () => {
     harness.hydrate.mockImplementationOnce(async () => {
       harness.boards.value = [board('board-1', 'Remote Winner')]
       harness.emit()
-      return { ok: true as const }
+      return { isOk: true as const }
     })
 
     const result = await catalog.commands.rename({ boardId: 'board-1', nextName: 'Taken' })
 
     expect(result).toMatchObject({
-      ok: false,
+      isOk: false,
       reason: 'revision-conflict',
-      rollback: { ok: true, board: { name: 'Original' } },
-      hydrate: { ok: true },
+      rollback: { isOk: true, board: { name: 'Original' } },
+      hydrate: { isOk: true },
     })
     expect(harness.hydrate).toHaveBeenCalledWith({
-      preserveLocalNewer: false,
+      shouldPreserveLocalNewer: false,
       rollbackBoardIds: ['board-1'],
     })
     expect(catalog.viewModel.byId.value.get('board-1')?.name).toBe('Remote Winner')
@@ -306,11 +306,11 @@ describe('BoardRepository contract', () => {
         current.name = nextName
         harness.emit()
         return {
-          ok: true,
+          isOk: true,
           board: { ...current },
           previousBoard,
           confirm: vi.fn(async () => ({
-            ok: false as const,
+            isOk: false as const,
             reason: 'idempotency-conflict' as const,
             boardId,
             board: { ...current },
@@ -324,12 +324,12 @@ describe('BoardRepository contract', () => {
     const result = await catalog.commands.rename({ boardId: 'board-1', nextName: 'Taken' })
 
     expect(result).toMatchObject({
-      ok: false,
+      isOk: false,
       reason: 'idempotency-conflict',
-      rollback: { ok: true, board: { name: 'Original' } },
+      rollback: { isOk: true, board: { name: 'Original' } },
     })
     expect(harness.hydrate).toHaveBeenCalledWith({
-      preserveLocalNewer: false,
+      shouldPreserveLocalNewer: false,
       rollbackBoardIds: ['board-1'],
     })
   })

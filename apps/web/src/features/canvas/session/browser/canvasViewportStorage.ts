@@ -104,8 +104,8 @@ export function writeCanvasViewportState(
     updatedAt: Number.isFinite(now) ? now : Date.now(),
   })
   if (!next) return null
-  const ok = writeLocalStorageItem(key, JSON.stringify(next), (error) =>
+  const isOk = writeLocalStorageItem(key, JSON.stringify(next), (error) =>
     console.warn('[canvas] persist viewport failed', error),
   )
-  return ok ? next : null
+  return isOk ? next : null
 }

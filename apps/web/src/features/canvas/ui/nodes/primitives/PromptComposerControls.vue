@@ -8,25 +8,25 @@
     :rows="rows"
     :placeholder="placeholder"
     :aria-label="placeholder || t('canvas.controls.prompt')"
-    :disabled="disabled"
+    :disabled="isDisabled"
     @focus="emit('focus')"
   />
   <div ref="actionsRef" :class="actionsClass">
     <NodeAspectRatioPicker
       v-if="shouldRenderAspectRatio"
       :model-value="aspectRatioValue"
-      :visible="aspectRatioPickerVisible"
-      :disabled="disabled"
+      :is-visible="isAspectRatioPickerVisible"
+      :is-disabled="isDisabled"
       @toggle="toggleAspectRatioPicker"
       @select="selectAspectRatio"
     />
     <!-- @vue-generic {number} -->
     <NodeTextOptionPicker
-      v-if="showOutputCount"
+      v-if="shouldShowOutputCount"
       :model-value="outputCountValue"
       :options="IMAGE_OUTPUT_COUNT_PRESET_OPTIONS"
-      :visible="outputCountPickerVisible"
-      :disabled="disabled"
+      :is-visible="isOutputCountPickerVisible"
+      :is-disabled="isDisabled"
       :tooltip="t('canvas.controls.selectImageCountTooltip')"
       :label="t('canvas.controls.imageCountLabel')"
       @toggle="toggleOutputCountPicker"
@@ -34,11 +34,11 @@
     />
     <!-- @vue-generic {OutputResolution} -->
     <NodeTextOptionPicker
-      v-if="showOutputResolution"
+      v-if="shouldShowOutputResolution"
       :model-value="outputResolutionValue"
       :options="OUTPUT_RESOLUTION_OPTIONS"
-      :visible="outputResolutionPickerVisible"
-      :disabled="disabled"
+      :is-visible="isOutputResolutionPickerVisible"
+      :is-disabled="isDisabled"
       :format="formatOutputResolution"
       option-role="menuitemradio"
       :tooltip="t('canvas.controls.selectResolutionTooltip')"
@@ -46,7 +46,7 @@
       @toggle="toggleOutputResolutionPicker"
       @select="selectOutputResolution"
     />
-    <div v-if="showSubmit" class="canvas-credit-submit-control">
+    <div v-if="shouldShowSubmit" class="canvas-credit-submit-control">
       <button
         :class="sendButtonClass"
         type="button"
@@ -100,30 +100,30 @@ const props = withDefaults(
     actionsClass: string
     sendButtonClass: string
     rows?: number | string
-    disabled?: boolean
-    allowEmpty?: boolean
-    submitDisabled?: boolean
-    showSubmit?: boolean
-    showOutputCount?: boolean
-    showOutputResolution?: boolean
+    isDisabled?: boolean
+    shouldAllowEmpty?: boolean
+    isSubmitDisabled?: boolean
+    shouldShowSubmit?: boolean
+    shouldShowOutputCount?: boolean
+    shouldShowOutputResolution?: boolean
     aspectRatio?: PromptAspectRatio | undefined
-    showAspectRatio?: boolean
-    autofocus?: boolean
+    shouldShowAspectRatio?: boolean
+    isAutofocus?: boolean
     billingState?: CanvasBillingQuoteState | null
   }>(),
   {
-    allowEmpty: false,
+    shouldAllowEmpty: false,
     aspectRatio: undefined,
-    autofocus: false,
+    isAutofocus: false,
     billingState: null,
-    disabled: false,
+    isDisabled: false,
     outputResolution: undefined,
     rows: 1,
-    showAspectRatio: true,
-    showOutputCount: true,
-    showOutputResolution: true,
-    showSubmit: true,
-    submitDisabled: false,
+    shouldShowAspectRatio: true,
+    shouldShowOutputCount: true,
+    shouldShowOutputResolution: true,
+    shouldShowSubmit: true,
+    isSubmitDisabled: false,
   },
 )
 
@@ -158,14 +158,14 @@ const formatOutputResolution = (value: OutputResolution) => value.toUpperCase()
 
 const {
   actionsRef,
-  aspectRatioPickerVisible,
+  isAspectRatioPickerVisible,
   aspectRatioValue,
   canSubmit,
   draft,
   inputRef,
-  outputCountPickerVisible,
+  isOutputCountPickerVisible,
   outputCountValue,
-  outputResolutionPickerVisible,
+  isOutputResolutionPickerVisible,
   outputResolutionValue,
   selectAspectRatio,
   selectOutputCount,
@@ -180,11 +180,11 @@ const {
   outputCount: () => props.outputCount,
   outputResolution: () => props.outputResolution ?? '1k',
   aspectRatio: () => props.aspectRatio,
-  disabled: () => props.disabled,
-  submitDisabled: () => props.submitDisabled,
-  allowEmpty: () => props.allowEmpty,
-  autofocus: () => props.autofocus,
-  showAspectRatio: () => props.showAspectRatio,
+  disabled: () => props.isDisabled,
+  submitDisabled: () => props.isSubmitDisabled,
+  allowEmpty: () => props.shouldAllowEmpty,
+  autofocus: () => props.isAutofocus,
+  showAspectRatio: () => props.shouldShowAspectRatio,
   onTextUpdate: (value) => emit('update:modelValue', value),
   onOutputCountUpdate: (value) => emit('update:output-count', value),
   onOutputResolutionUpdate: (value) => emit('update:output-resolution', value),

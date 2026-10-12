@@ -27,15 +27,15 @@ describe('Account overlay', () => {
 
     overlay.commands.open('billing')
 
-    expect(overlay.viewModel.visible.value).toBe(true)
+    expect(overlay.viewModel.isVisible.value).toBe(true)
     expect(overlay.viewModel.initialTab.value).toBe('billing')
 
     route.path = '/user/login'
     route.fullPath = '/user/login'
     await nextTick()
 
-    expect(overlay.viewModel.allowed.value).toBe(false)
-    expect(overlay.viewModel.visible.value).toBe(false)
+    expect(overlay.viewModel.isAllowed.value).toBe(false)
+    expect(overlay.viewModel.isVisible.value).toBe(false)
 
     scope.stop()
   })
@@ -68,7 +68,7 @@ describe('Account overlay', () => {
     )!
     await nextTick()
 
-    expect(overlay.viewModel.visible.value).toBe(true)
+    expect(overlay.viewModel.isVisible.value).toBe(true)
     expect(overlay.viewModel.initialTab.value).toBe('recharge')
     expect(overlay.viewModel.paymentReturn.value).toEqual({
       publicToken,
@@ -85,7 +85,7 @@ describe('Account overlay', () => {
     route.fullPath = '/user/boards?boardId=board-8'
     await nextTick()
 
-    expect(overlay.viewModel.visible.value).toBe(true)
+    expect(overlay.viewModel.isVisible.value).toBe(true)
     expect(replace).toHaveBeenCalledOnce()
 
     scope.stop()
@@ -123,7 +123,7 @@ describe('Account overlay', () => {
     await nextTick()
 
     expect(replace).not.toHaveBeenCalled()
-    expect(overlay.viewModel.visible.value).toBe(false)
+    expect(overlay.viewModel.isVisible.value).toBe(false)
 
     scope.stop()
   })

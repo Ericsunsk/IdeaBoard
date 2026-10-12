@@ -16,7 +16,9 @@ describe('projectPendingImageExecutionEdges', () => {
     )
 
     expect(result).toMatchObject({ didChange: true })
-    expect(result.edges[0]).toMatchObject({ animated: true })
+    expect(result.edges[0]).toMatchObject({ animated: true } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
     expect(result.edges[1]).not.toHaveProperty('animated')
 
     const completed = projectPendingImageExecutionEdges(result.edges, {
@@ -25,6 +27,8 @@ describe('projectPendingImageExecutionEdges', () => {
       executions: [{ resultNodeId: 'image-2', status: 'succeeded', taskId: 'task-1' }],
     })
 
-    expect(completed.edges[0]).toMatchObject({ animated: false })
+    expect(completed.edges[0]).toMatchObject({ animated: false } satisfies Partial<
+      import('@vue-flow/core').Edge
+    >)
   })
 })

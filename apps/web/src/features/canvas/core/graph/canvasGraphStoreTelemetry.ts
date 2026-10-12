@@ -18,8 +18,8 @@ export type CanvasGraphDraftCounts = {
 }
 
 export type CanvasGraphCommitTelemetry = {
-  recordHistory: boolean
-  markDirty: boolean
+  shouldRecordHistory: boolean
+  shouldMarkDirty: boolean
 }
 
 export type CanvasGraphStoreTelemetry = {

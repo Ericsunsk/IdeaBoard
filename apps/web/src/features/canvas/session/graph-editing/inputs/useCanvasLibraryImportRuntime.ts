@@ -118,7 +118,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
           },
         }
       },
-      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+      createFlowGraphCommandOptions({ shouldRecordHistory: false, shouldMarkDirty: false }),
     )
   }
 
@@ -159,7 +159,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     libraryAssetId: string,
     attachment: BoardAttachment,
     error: unknown,
-    notify: boolean,
+    shouldNotify: boolean,
   ) {
     if (!isCurrentAttachment(attachment)) return
     if (
@@ -175,7 +175,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
       (current) => failLibraryImport(current, libraryAssetId, message) ?? current,
     )
     options.refreshNodeInternals([nodeId])
-    if (notify) options.onWarning(message)
+    if (shouldNotify) options.onWarning(message)
   }
 
   function materializePending(
@@ -183,7 +183,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     libraryAssetId: string,
     fallbackRatio: number,
     attachment: BoardAttachment,
-    notifyFailure: boolean,
+    shouldNotifyFailure: boolean,
   ): boolean {
     const activeNodeIds = activeNodeIdsByAttachment.get(attachment) ?? new Set<string>()
     if (activeNodeIds.has(nodeId)) return false
@@ -209,7 +209,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
         ),
       )
       .catch((error: unknown) =>
-        failImport(nodeId, libraryAssetId, attachment, error, notifyFailure),
+        failImport(nodeId, libraryAssetId, attachment, error, shouldNotifyFailure),
       )
       .finally(() => {
         activeNodeIds.delete(nodeId)
@@ -221,10 +221,10 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     candidate: CanvasLibraryImportDescriptor,
     center: { x: number; y: number },
   ): Promise<CanvasGraphNodeIdForKind<'image'> | null> {
-    const previewReady = await (options.preloadImage ?? preloadImage)(candidate.previewUrl).catch(
+    const isPreviewReady = await (options.preloadImage ?? preloadImage)(candidate.previewUrl).catch(
       () => false,
     )
-    if (!previewReady) {
+    if (!isPreviewReady) {
       options.onWarning(i18n.global.t('canvas.session.libraryImportFailed'))
       return null
     }

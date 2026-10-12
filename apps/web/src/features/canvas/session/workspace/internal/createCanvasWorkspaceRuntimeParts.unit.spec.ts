@@ -418,11 +418,11 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const { board, graph, imageWorkflow, events, viewportRuntime, runtime } =
       createWorkspacePartsHarness()
 
-    await runtime.persistence.flushAutosave({ silent: false })
+    await runtime.persistence.flushAutosave({ isSilent: false })
     await runtime.persistence.recoverBoardSession()
 
     expect(events).toEqual(['viewport', 'autosave'])
-    expect(board.boardSession.flushAutosave).toHaveBeenCalledWith({ silent: false })
+    expect(board.boardSession.flushAutosave).toHaveBeenCalledWith({ isSilent: false })
     expect(viewportRuntime.loadBoardAndProbe).toHaveBeenCalledTimes(1)
     expect(imageWorkflow.reattachPendingImageResults).toHaveBeenCalledTimes(1)
     expect(graph.resumePendingLibraryImports).toHaveBeenCalledTimes(1)

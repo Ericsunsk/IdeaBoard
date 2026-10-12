@@ -28,12 +28,12 @@ import {
 import { deleteBoardState, duplicateBoardState } from '../persistence/state'
 import { writeBoardListMeta } from '../sync/boardQueries'
 
-export type BoardScopeChangedResult = { ok: false; reason: 'scope-changed' }
+export type BoardScopeChangedResult = { isOk: false; reason: 'scope-changed' }
 
 export type BoardCreateResult =
-  | { ok: true; board: BoardMeta }
+  | { isOk: true; board: BoardMeta }
   | {
-      ok: false
+      isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
       board: BoardMeta
       error: unknown
@@ -41,10 +41,10 @@ export type BoardCreateResult =
   | BoardScopeChangedResult
 
 export type BoardRenameResult =
-  | { ok: true; board: BoardMeta }
-  | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
+  | { isOk: true; board: BoardMeta }
+  | { isOk: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
   | {
-      ok: false
+      isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
       boardId: string
       error: unknown
@@ -52,9 +52,9 @@ export type BoardRenameResult =
   | BoardScopeChangedResult
 
 export type BoardRenameRemoteResult =
-  | { ok: true; board: BoardMeta }
+  | { isOk: true; board: BoardMeta }
   | {
-      ok: false
+      isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
       boardId: string
       board: BoardMeta
@@ -64,24 +64,24 @@ export type BoardRenameRemoteResult =
 
 export type BoardOptimisticRenameResult =
   | {
-      ok: true
+      isOk: true
       board: BoardMeta
       previousBoard: BoardMeta
       confirm: () => Promise<BoardRenameRemoteResult>
     }
-  | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
+  | { isOk: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
   | BoardScopeChangedResult
 
 export type BoardRollbackRenameResult =
-  | { ok: true; board: BoardMeta }
-  | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
+  | { isOk: true; board: BoardMeta }
+  | { isOk: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
   | BoardScopeChangedResult
 
 export type BoardDuplicateResult =
-  | { ok: true; board: BoardMeta }
-  | { ok: false; reason: 'source-missing'; error?: undefined }
+  | { isOk: true; board: BoardMeta }
+  | { isOk: false; reason: 'source-missing'; error?: undefined }
   | {
-      ok: false
+      isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
       board: BoardMeta
       error: unknown
@@ -89,9 +89,9 @@ export type BoardDuplicateResult =
   | BoardScopeChangedResult
 
 export type BoardDeleteResult =
-  | { ok: true; remoteWasMissing: boolean }
-  | { ok: false; reason: 'sync-failed'; error: unknown }
-  | { ok: false; reason: 'local-missing'; error?: undefined }
+  | { isOk: true; isRemoteWasMissing: boolean }
+  | { isOk: false; reason: 'sync-failed'; error: unknown }
+  | { isOk: false; reason: 'local-missing'; error?: undefined }
   | BoardScopeChangedResult
 
 export interface BoardCommandDependencies {
@@ -181,9 +181,9 @@ async function archiveServerBoardAfterScopeChange(
 }
 
 type SyncRegisteredBoardResult =
-  | { ok: true; board: BoardMeta }
+  | { isOk: true; board: BoardMeta }
   | {
-      ok: false
+      isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
       board: BoardMeta
       error: unknown
@@ -199,18 +199,18 @@ async function syncRegisteredBoard(
 ): Promise<SyncRegisteredBoardResult> {
   try {
     await deps.syncBoard(board.id)
-    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
-    return { ok: true, board }
+    if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
+    return { isOk: true, board }
   } catch (error) {
-    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+    if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
     deps.deleteBoard(board.id)
     deps.deleteBoardState(board.id)
     const conflictKind = deps.getSyncConflictKind(error)
     if (conflictKind) {
       await deps.hydrateBoards()
-      return { ok: false as const, reason: conflictKind, board, error }
+      return { isOk: false as const, reason: conflictKind, board, error }
     }
-    return { ok: false as const, reason: 'sync-failed' as const, board, error }
+    return { isOk: false as const, reason: 'sync-failed' as const, board, error }
   }
 }
 
@@ -228,9 +228,9 @@ export function createBoardCommands(
     // ordinary document content can never piggyback a rename (or vice versa).
     return deps
       .syncRenameBoard(boardId, board.name)
-      .then(() => ({ ok: true as const, board }))
+      .then(() => ({ isOk: true as const, board }))
       .catch((error) => ({
-        ok: false as const,
+        isOk: false as const,
         reason: deps.getSyncConflictKind(error) ?? ('sync-failed' as const),
         boardId,
         board,
@@ -246,22 +246,22 @@ export function createBoardCommands(
     boardId: string
     nextName: string
   }): BoardOptimisticRenameResult {
-    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+    if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
     if (deps.isNameTaken(nextName, boardId)) {
-      return { ok: false, reason: 'local-name-conflict' }
+      return { isOk: false, reason: 'local-name-conflict' }
     }
     const previousBoard = deps.getBoard(boardId)
     if (!previousBoard) {
-      return { ok: false, reason: 'invalid-name' }
+      return { isOk: false, reason: 'invalid-name' }
     }
     const previous = cloneBoardMeta(previousBoard)
     const renamed = deps.renameBoard(boardId, nextName)
     if (!renamed) {
-      return { ok: false, reason: 'invalid-name' }
+      return { isOk: false, reason: 'invalid-name' }
     }
     const board = cloneBoardMeta(renamed)
     return {
-      ok: true,
+      isOk: true,
       board,
       previousBoard: previous,
       confirm: () => confirmOptimisticRename(boardId, board, previous),
@@ -275,16 +275,16 @@ export function createBoardCommands(
     boardId: string
     previousName: string
   }): BoardRollbackRenameResult {
-    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+    if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
     if (deps.isNameTaken(previousName, boardId)) {
-      return { ok: false, reason: 'local-name-conflict' }
+      return { isOk: false, reason: 'local-name-conflict' }
     }
     const rolledBack = deps.renameBoard(boardId, previousName)
     if (!rolledBack) {
-      return { ok: false, reason: 'invalid-name' }
+      return { isOk: false, reason: 'invalid-name' }
     }
     deps.clearSyncRollback(boardId)
-    return { ok: true, board: cloneBoardMeta(rolledBack) }
+    return { isOk: true, board: cloneBoardMeta(rolledBack) }
   }
 
   async function createServerBoardAndSync(
@@ -302,7 +302,7 @@ export function createBoardCommands(
       workspaceId = resolveWorkspace()
     } catch (error) {
       cleanupLocal()
-      return { ok: false, reason: 'sync-failed', board: localBoard, error }
+      return { isOk: false, reason: 'sync-failed', board: localBoard, error }
     }
 
     let server: WorkspaceBoardMeta
@@ -311,14 +311,14 @@ export function createBoardCommands(
     } catch (error) {
       // A scope switch mid-create drops every local follow-up: the temp
       // board stays in its own scope and the new scope is never touched.
-      if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+      if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
       cleanupLocal()
       const conflictKind = deps.getSyncConflictKind(error)
       if (conflictKind) {
         await deps.hydrateBoards()
-        return { ok: false, reason: conflictKind, board: localBoard, error }
+        return { isOk: false, reason: conflictKind, board: localBoard, error }
       }
-      return { ok: false, reason: 'sync-failed', board: localBoard, error }
+      return { isOk: false, reason: 'sync-failed', board: localBoard, error }
     }
 
     // The server-minted identity belongs to the captured workspace. If the
@@ -326,7 +326,7 @@ export function createBoardCommands(
     // the captured workspace and never register it into the new scope.
     if (!deps.isMutationCurrent()) {
       await archiveServerBoardAfterScopeChange(deps, workspaceId, server.id)
-      return { ok: false, reason: 'scope-changed' }
+      return { isOk: false, reason: 'scope-changed' }
     }
 
     const registered = registerServerBoard({
@@ -337,7 +337,7 @@ export function createBoardCommands(
     cleanupLocal()
     if (!registered) {
       return {
-        ok: false,
+        isOk: false,
         reason: 'sync-failed',
         board: { ...localBoard, id: server.id },
         error: new Error('Board registration failed'),
@@ -361,18 +361,18 @@ export function createBoardCommands(
 
     async rename({ boardId, nextName }) {
       const optimistic = renameOptimistic({ boardId, nextName })
-      if (!optimistic.ok) return optimistic
+      if (!optimistic.isOk) return optimistic
       const remote = await optimistic.confirm()
-      if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
-      if (remote.ok) return { ok: true, board: remote.board }
+      if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
+      if (remote.isOk) return { isOk: true, board: remote.board }
       {
         const isConflict =
           remote.reason === 'revision-conflict' || remote.reason === 'idempotency-conflict'
         await deps.hydrateBoards(
-          isConflict ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] } : undefined,
+          isConflict ? { shouldPreserveLocalNewer: false, rollbackBoardIds: [boardId] } : undefined,
         )
         return {
-          ok: false,
+          isOk: false,
           reason: remote.reason,
           boardId,
           error: remote.error,
@@ -387,7 +387,7 @@ export function createBoardCommands(
     async duplicate({ sourceBoardId }) {
       const copy = deps.duplicateBoard(sourceBoardId)
       if (!copy) {
-        return { ok: false, reason: 'source-missing' }
+        return { isOk: false, reason: 'source-missing' }
       }
       return createServerBoardAndSync(
         copy,
@@ -401,25 +401,25 @@ export function createBoardCommands(
     },
 
     async delete({ boardId }) {
-      let remoteWasMissing = false
+      let isRemoteWasMissing = false
       try {
         await deps.syncDeleteBoard(boardId)
       } catch (error) {
-        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+        if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
         if (!deps.isNotFoundError(error)) {
-          return { ok: false, reason: 'sync-failed', error }
+          return { isOk: false, reason: 'sync-failed', error }
         }
-        remoteWasMissing = true
+        isRemoteWasMissing = true
       }
 
-      if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+      if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
 
       const deleted = deps.deleteBoard(boardId)
       if (!deleted) {
-        return { ok: false, reason: 'local-missing' }
+        return { isOk: false, reason: 'local-missing' }
       }
       deps.deleteBoardState(boardId)
-      return { ok: true, remoteWasMissing }
+      return { isOk: true, isRemoteWasMissing }
     },
   }
 }

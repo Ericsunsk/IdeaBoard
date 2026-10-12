@@ -15,9 +15,9 @@ export function useAccountWorkspace(options?: { enabled?: MaybeRefOrGetter<boole
   // authed account surfaces behave unchanged.
   const selection = useWorkspaceSelection({ enabled: options?.enabled })
   const workspaceId = computed(() => selection.selectedId.value)
-  const selectionPending = computed(() => selection.status.value === 'loading')
+  const isSelectionPending = computed(() => selection.status.value === 'loading')
   // Settled covers ready/empty/error/hidden/forbidden: anything past
   // loading with a null id fails closed with workspace guidance.
-  const selectionSettled = computed(() => selection.status.value !== 'loading')
-  return { workspaceId, selectionPending, selectionSettled }
+  const isSelectionSettled = computed(() => selection.status.value !== 'loading')
+  return { workspaceId, isSelectionPending, isSelectionSettled }
 }

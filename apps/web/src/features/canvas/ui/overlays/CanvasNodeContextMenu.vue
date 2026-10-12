@@ -1,7 +1,7 @@
 <template>
   <Transition v-bind="transientOverlayMotion">
     <div
-      v-if="visible"
+      v-if="isVisible"
       ref="menuRef"
       class="canvas-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-[var(--canvas-radius-xl)] bg-[var(--canvas-glass-bg)] p-1.5 shadow-[var(--canvas-shadow-floating)] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-glass-border)]"
       :style="menuStyle"
@@ -36,7 +36,7 @@ import { createPopoverMotionTransition } from '../../../../core/motion/popoverMo
 import { handleMenuKeyboardNavigation } from '../../../../core/interaction/menuKeyboardNavigation'
 
 const props = defineProps<{
-  visible: boolean
+  isVisible: boolean
   x: number
   y: number
   items: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
@@ -57,7 +57,7 @@ let resizeObserver: ResizeObserver | null = null
 let positionContainer: HTMLElement | null = null
 
 function updatePosition() {
-  if (!props.visible) return
+  if (!props.isVisible) return
   const menu = menuRef.value
   const container =
     menu?.offsetParent instanceof HTMLElement ? menu.offsetParent : menu?.parentElement
@@ -102,15 +102,15 @@ function stopPositionTracking() {
 }
 
 watch(
-  () => [props.visible, props.x, props.y, props.items.length] as const,
+  () => [props.isVisible, props.x, props.y, props.items.length] as const,
   () => void nextTick(updatePosition),
   { immediate: true },
 )
 
 watch(
-  () => props.visible,
-  (visible) => {
-    if (visible) {
+  () => props.isVisible,
+  (isVisible) => {
+    if (isVisible) {
       focusReturnTarget = resolveFocusReturnTarget()
       void nextTick(() => {
         startPositionTracking()
@@ -127,7 +127,7 @@ watch(
 )
 
 onMounted(() => {
-  if (props.visible) void nextTick(startPositionTracking)
+  if (props.isVisible) void nextTick(startPositionTracking)
 })
 onBeforeUnmount(stopPositionTracking)
 

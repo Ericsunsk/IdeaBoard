@@ -20,8 +20,8 @@ export type SaveStatus =
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'archived' | 'save-failed'
 type ValueRef<T> = { value: T }
 type SaveCurrentBoardSnapshotOptions = {
-  waitForPreview?: boolean | undefined
-  silent?: boolean | undefined
+  shouldWaitForPreview?: boolean | undefined
+  isSilent?: boolean | undefined
 }
 
 export type BoardSyncCoordinatorOptions = {
@@ -59,7 +59,7 @@ export type BoardSaveReconciliation = {
 }
 
 export type BoardSaveResult = {
-  saved: boolean
+  isSaved: boolean
   reconciliation?: BoardSaveReconciliation | undefined
 }
 
@@ -104,12 +104,12 @@ export function createBoardSyncCoordinator(
   let lastNotifiedSaveFailure: { boardId: string; kind: SaveFailureKind } | null = null
 
   function shouldNotifySaveFailure(
-    silent: boolean | undefined,
+    isSilent: boolean | undefined,
     boardId: string,
     kind: SaveFailureKind,
   ): boolean {
     const isRepeatedSilentFailure =
-      silent &&
+      isSilent &&
       lastNotifiedSaveFailure?.boardId === boardId &&
       lastNotifiedSaveFailure.kind === kind
     if (isRepeatedSilentFailure) return false
@@ -290,11 +290,11 @@ export function createBoardSyncCoordinator(
     hasLocalDraftAdvanced: boolean,
     canApplyReconciliation: boolean,
   ): void {
-    if (remoteSync.ok) {
+    if (remoteSync.isOk) {
       const hasUnreconciledDraft = hasLocalDraftAdvanced || !canApplyReconciliation
       options.isDirty.value = hasUnreconciledDraft
       options.saveStatus.value = hasUnreconciledDraft ? 'pending' : 'saved'
-      if (!saveOptions.silent && !hasUnreconciledDraft) {
+      if (!saveOptions.isSilent && !hasUnreconciledDraft) {
         options.onSuccess(i18n.global.t('canvas.session.saved'))
       }
       return
@@ -307,7 +307,7 @@ export function createBoardSyncCoordinator(
           ? 'archived'
           : 'retry'
     options.saveStatus.value = failureStatus
-    if (shouldNotifySaveFailure(saveOptions.silent, boardId, remoteSync.reason)) {
+    if (shouldNotifySaveFailure(saveOptions.isSilent, boardId, remoteSync.reason)) {
       notifyRemoteSyncFailure(boardId, remoteSync.reason, remoteSync.error)
     }
   }
@@ -370,7 +370,7 @@ export function createBoardSyncCoordinator(
     console.warn('[canvas] save board snapshot failed', error)
     if (
       isSaveStillCurrent() &&
-      shouldNotifySaveFailure(saveOptions.silent, boardId, 'save-failed')
+      shouldNotifySaveFailure(saveOptions.isSilent, boardId, 'save-failed')
     ) {
       options.onError(userFacingErrorCopy(error, i18n.global.t('canvas.session.saveFailed')))
     }
@@ -382,7 +382,7 @@ export function createBoardSyncCoordinator(
     const boardId = options.boardSession.currentBoardId.value
     if (!boardId) {
       options.onWarning(i18n.global.t('canvas.session.missingBoardIdSave'))
-      return { saved: false }
+      return { isSaved: false }
     }
     const saveToken = ++saveSequence
     const saveAttachmentEpoch = options.readBoardAttachmentEpoch()
@@ -406,15 +406,15 @@ export function createBoardSyncCoordinator(
           promptNodes: snapshot.promptNodes.length,
           fusionNodes: snapshot.fusionNodes.length,
           connections: snapshot.connections.length,
-          waitForPreview: !!saveOptions.waitForPreview,
+          shouldWaitForPreview: !!saveOptions.shouldWaitForPreview,
         }),
         () =>
           options.boardSession.save(snapshot, {
-            waitForPreview: saveOptions.waitForPreview,
+            shouldWaitForPreview: saveOptions.shouldWaitForPreview,
           }),
         50,
       )
-      if (remoteSync.ok) {
+      if (remoteSync.isOk) {
         clearNotifiedSaveFailure(boardId)
       }
       const reconciliation = settleCommittedSave({
@@ -429,12 +429,12 @@ export function createBoardSyncCoordinator(
         isSaveStillCurrent,
       })
       return {
-        saved: remoteSync.ok,
+        isSaved: remoteSync.isOk,
         reconciliation,
       }
     } catch (error) {
       settleSaveFailure(error, boardId, saveOptions, isSaveStillCurrent)
-      return { saved: false }
+      return { isSaved: false }
     } finally {
       if (saveToken === saveSequence) {
         options.isSavingBoard.value = false

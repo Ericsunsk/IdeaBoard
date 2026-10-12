@@ -12,7 +12,9 @@
 // request, but the workspace adapter refuses to send them (v1 rejects raw
 // media URLs and has no numeric-id mapping): unmappable inputs fail closed
 // with `CanvasWorkspaceTaskUnmappableError` instead of a cryptic 422.
+/** @externalContract Canvas task request parameters. */
 export type CanvasTaskParams = {
+  use_mask?: boolean
   ratio?: string
   custom_width?: number
   custom_height?: number
@@ -43,6 +45,7 @@ export type CanvasTaskRequestData = {
   params?: CanvasTaskParams
 }
 
+/** @externalContract Canvas task readiness billing response. */
 type SubmitTaskReadinessBilling = {
   sufficient: boolean
   unit_credits: number
@@ -55,6 +58,7 @@ type SubmitTaskReadinessBilling = {
   [key: string]: unknown
 }
 
+/** @externalContract Canvas task readiness response. */
 export type SubmitTaskReadinessData = {
   ready: boolean
   message?: string

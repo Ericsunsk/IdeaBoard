@@ -31,7 +31,7 @@ function makeDeps(): BoardCommandDependencies {
     syncBoard: vi.fn(async () => undefined),
     syncRenameBoard: vi.fn(async () => undefined),
     syncDeleteBoard: vi.fn(async () => undefined),
-    hydrateBoards: vi.fn(async () => ({ ok: true as const })),
+    hydrateBoards: vi.fn(async () => ({ isOk: true as const })),
     getSyncConflictKind: vi.fn((error: unknown) => {
       if (typeof error !== 'object' || !error) return null
       const record = error as { status?: unknown; code?: unknown }
@@ -81,7 +81,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.create()) as BoardCreateResult
 
-    expect(result).toMatchObject({ ok: true, board: { id: 'board-server-1' } })
+    expect(result).toMatchObject({ isOk: true, board: { id: 'board-server-1' } })
     expect(deps.createBoard).toHaveBeenCalledWith('Untitled')
     expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Untitled')
     expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
@@ -95,7 +95,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.create()) as BoardCreateResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
+    expect(result).toMatchObject({ isOk: false, reason: 'sync-failed' })
     expect(deps.createBoard).toHaveBeenCalledWith('Untitled')
     expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
@@ -112,7 +112,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.create()) as BoardCreateResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
+    expect(result).toMatchObject({ isOk: false, reason: 'sync-failed' })
     expect(deps.createServerBoard).not.toHaveBeenCalled()
     expect(deps.syncBoard).not.toHaveBeenCalled()
     expect(deps.deleteBoard).toHaveBeenCalledWith('created-board')
@@ -124,7 +124,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.create()) as BoardCreateResult
 
-    expect(result).toEqual({ ok: false, reason: 'scope-changed' })
+    expect(result).toEqual({ isOk: false, reason: 'scope-changed' })
     expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Untitled')
     expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
     expect(deps.registerServerBoard).not.toHaveBeenCalled()
@@ -141,13 +141,13 @@ describe('boardCommands', () => {
       nextName: 'Taken',
     })) as BoardRenameResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'revision-conflict' })
+    expect(result).toMatchObject({ isOk: false, reason: 'revision-conflict' })
     expect(deps.isNameTaken).toHaveBeenCalledWith('Taken', 'board-a')
     expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'Taken')
     expect(deps.syncRenameBoard).toHaveBeenCalledWith('board-a', 'Taken')
     expect(deps.syncBoard).not.toHaveBeenCalled()
     expect(deps.hydrateBoards).toHaveBeenCalledWith({
-      preserveLocalNewer: false,
+      shouldPreserveLocalNewer: false,
       rollbackBoardIds: ['board-a'],
     })
   })
@@ -161,7 +161,7 @@ describe('boardCommands', () => {
     })
 
     expect(result).toMatchObject({
-      ok: true,
+      isOk: true,
       board: { id: 'board-a', name: 'New Local' },
       previousBoard: { id: 'board-a', name: 'Board' },
     })
@@ -169,9 +169,9 @@ describe('boardCommands', () => {
     expect(deps.syncRenameBoard).not.toHaveBeenCalled()
     expect(deps.syncBoard).not.toHaveBeenCalled()
 
-    if (!result.ok) throw new Error('expected optimistic rename to succeed')
+    if (!result.isOk) throw new Error('expected optimistic rename to succeed')
     await expect(result.confirm()).resolves.toMatchObject({
-      ok: true,
+      isOk: true,
       board: { id: 'board-a', name: 'New Local' },
     })
     expect(deps.syncRenameBoard).toHaveBeenCalledWith('board-a', 'New Local')
@@ -187,10 +187,10 @@ describe('boardCommands', () => {
       boardId: 'board-a',
       nextName: 'Taken Remote',
     })
-    if (!result.ok) throw new Error('expected optimistic rename to succeed')
+    if (!result.isOk) throw new Error('expected optimistic rename to succeed')
 
     await expect(result.confirm()).resolves.toMatchObject({
-      ok: false,
+      isOk: false,
       reason: 'revision-conflict',
       boardId: 'board-a',
       board: { id: 'board-a', name: 'Taken Remote' },
@@ -208,7 +208,7 @@ describe('boardCommands', () => {
       previousName: 'Board',
     })
 
-    expect(result).toMatchObject({ ok: true, board: { id: 'board-a', name: 'Board' } })
+    expect(result).toMatchObject({ isOk: true, board: { id: 'board-a', name: 'Board' } })
     expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'Board')
     expect(deps.clearSyncRollback).toHaveBeenCalledWith('board-a')
   })
@@ -222,7 +222,7 @@ describe('boardCommands', () => {
       nextName: 'Existing',
     })) as BoardRenameResult
 
-    expect(result).toEqual({ ok: false, reason: 'local-name-conflict' })
+    expect(result).toEqual({ isOk: false, reason: 'local-name-conflict' })
     expect(deps.renameBoard).not.toHaveBeenCalled()
     expect(deps.syncRenameBoard).not.toHaveBeenCalled()
     expect(deps.syncBoard).not.toHaveBeenCalled()
@@ -237,7 +237,7 @@ describe('boardCommands', () => {
       sourceBoardId: 'source-board',
     })) as BoardDuplicateResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
+    expect(result).toMatchObject({ isOk: false, reason: 'sync-failed' })
     expect(deps.duplicateBoard).toHaveBeenCalledWith('source-board')
     expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Source Copy')
     expect(deps.duplicateBoardState).toHaveBeenCalledWith('source-board', 'board-server-1')
@@ -254,7 +254,7 @@ describe('boardCommands', () => {
       sourceBoardId: 'source-board',
     })) as BoardDuplicateResult
 
-    expect(result).toMatchObject({ ok: true, board: { id: 'board-server-1' } })
+    expect(result).toMatchObject({ isOk: true, board: { id: 'board-server-1' } })
     expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoard).toHaveBeenCalledWith('copy-board')
     expect(deps.deleteBoardState).not.toHaveBeenCalled()
@@ -268,7 +268,7 @@ describe('boardCommands', () => {
       sourceBoardId: 'source-board',
     })) as BoardDuplicateResult
 
-    expect(result).toEqual({ ok: false, reason: 'scope-changed' })
+    expect(result).toEqual({ isOk: false, reason: 'scope-changed' })
     expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Source Copy')
     expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
     expect(deps.registerServerBoard).not.toHaveBeenCalled()
@@ -283,7 +283,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.create()) as BoardCreateResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'idempotency-conflict' })
+    expect(result).toMatchObject({ isOk: false, reason: 'idempotency-conflict' })
     expect(deps.hydrateBoards).toHaveBeenCalledWith()
   })
 
@@ -296,7 +296,7 @@ describe('boardCommands', () => {
       sourceBoardId: 'source-board',
     })) as BoardDuplicateResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'revision-conflict' })
+    expect(result).toMatchObject({ isOk: false, reason: 'revision-conflict' })
     expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoardState).toHaveBeenCalledWith('board-server-1')
     expect(deps.hydrateBoards).toHaveBeenCalledWith()
@@ -308,7 +308,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.delete({ boardId: 'board-a' })) as BoardDeleteResult
 
-    expect(result).toEqual({ ok: true, remoteWasMissing: true })
+    expect(result).toEqual({ isOk: true, isRemoteWasMissing: true })
     expect(deps.deleteBoard).toHaveBeenCalledWith('board-a')
     expect(deps.deleteBoardState).toHaveBeenCalledWith('board-a')
   })
@@ -320,7 +320,7 @@ describe('boardCommands', () => {
 
     const result = (await commands.delete({ boardId: 'board-a' })) as BoardDeleteResult
 
-    expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
+    expect(result).toMatchObject({ isOk: false, reason: 'sync-failed' })
     expect(deps.deleteBoard).not.toHaveBeenCalled()
     expect(deps.deleteBoardState).not.toHaveBeenCalled()
   })

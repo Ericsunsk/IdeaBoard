@@ -38,7 +38,7 @@ describe('groupMembershipRuntime', () => {
         id: 'group-1',
         nodeIds: [],
         bounds: { left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200 },
-        selected: true,
+        isSelected: true,
         order: 0,
       },
     ])
@@ -77,19 +77,19 @@ describe('groupMembershipRuntime', () => {
   it('captures pending group join and joins node when clicked', () => {
     const { runtime, session } = createHarness()
 
-    const captured = runtime.capturePendingGroupJoinFromSelectedGroup()
-    expect(captured).toBe(true)
+    const isCaptured = runtime.capturePendingGroupJoinFromSelectedGroup()
+    expect(isCaptured).toBe(true)
     expect(runtime.pendingGroupJoin.value).toEqual({
       groupId: 'group-1',
       nodeIds: ['prompt-1'],
     })
 
-    const joined = runtime.joinPendingGroupNode('prompt-1')
-    expect(joined).toBe(true)
+    const isJoined = runtime.joinPendingGroupNode('prompt-1')
+    expect(isJoined).toBe(true)
     expect(runtime.pendingGroupJoin.value).toBe(null)
 
     expect(session.store.getGroupIdForNode('prompt-1')).toBe('group-1')
-    expect(session.store.getNode('prompt-1')?.selected).toBe(true)
+    expect(session.store.getNode('prompt-1')?.isSelected).toBe(true)
   })
 
   it('resolves removed flow node changes into graph node ids', () => {

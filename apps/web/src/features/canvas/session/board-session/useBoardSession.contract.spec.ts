@@ -122,10 +122,10 @@ describe('useBoardSession', () => {
       createUploadLifecycle,
     })
 
-    const result = await session.save(snapshot, { waitForPreview: true })
+    const result = await session.save(snapshot, { shouldWaitForPreview: true })
 
     expect(result.snapshot).toBe(stabilizedSnapshot)
-    expect(result.remoteSync).toEqual({ ok: true })
+    expect(result.remoteSync).toEqual({ isOk: true })
     expect(createUploadLifecycle).toHaveBeenCalledWith({
       userUid: 'user-uid',
       boardId: 'board-a',
@@ -183,8 +183,8 @@ describe('useBoardSession', () => {
     const result = await session.save(snapshot)
 
     expect(result.snapshot).toBe(snapshot)
-    expect(result.remoteSync.ok).toBe(false)
-    if (!result.remoteSync.ok) {
+    expect(result.remoteSync.isOk).toBe(false)
+    if (!result.remoteSync.isOk) {
       expect(result.remoteSync.reason).toBe('sync-failed')
       expect(result.remoteSync.error).toBeInstanceOf(Error)
       expect((result.remoteSync.error as Error).message).toContain('user session is missing')
@@ -227,8 +227,8 @@ describe('useBoardSession', () => {
     const result = await session.save(snapshot)
 
     expect(result.snapshot).toBe(stabilizedSnapshot)
-    expect(result.remoteSync.ok).toBe(false)
-    if (!result.remoteSync.ok) {
+    expect(result.remoteSync.isOk).toBe(false)
+    if (!result.remoteSync.isOk) {
       expect(result.remoteSync.reason).toBe('sync-failed')
       expect(userErrorCode(result.remoteSync.error)).toBe(BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE)
     }
@@ -265,7 +265,7 @@ describe('useBoardSession', () => {
     expect(repository.save).not.toHaveBeenCalled()
   })
 
-  it('waits for preview renderer and repository sync when waitForPreview is enabled', async () => {
+  it('waits for preview renderer and repository sync when shouldWaitForPreview is enabled', async () => {
     const syncGate = createDeferred<void>()
     const lifecycle = {
       stabilizeSnapshotForSave: vi.fn(async () => makeSnapshot(250)),
@@ -288,7 +288,7 @@ describe('useBoardSession', () => {
     })
     let isResolved = false
 
-    const savePromise = session.save(makeSnapshot(100), { waitForPreview: true }).then(() => {
+    const savePromise = session.save(makeSnapshot(100), { shouldWaitForPreview: true }).then(() => {
       isResolved = true
     })
     await flushMicrotasks()
@@ -330,11 +330,11 @@ describe('useBoardSession', () => {
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
 
-    const result = await session.save(snapshot, { waitForPreview: true })
+    const result = await session.save(snapshot, { shouldWaitForPreview: true })
 
     expect(result).toEqual({
       snapshot: stabilizedSnapshot,
-      remoteSync: { ok: false, reason: 'sync-failed', error: remoteError },
+      remoteSync: { isOk: false, reason: 'sync-failed', error: remoteError },
     })
     expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
@@ -370,9 +370,9 @@ describe('useBoardSession', () => {
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
 
-    const result = await session.save(snapshot, { waitForPreview: true })
+    const result = await session.save(snapshot, { shouldWaitForPreview: true })
 
-    expect(result.remoteSync).toEqual({ ok: false, reason: 'archived', error: archivedError })
+    expect(result.remoteSync).toEqual({ isOk: false, reason: 'archived', error: archivedError })
     expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
   })
@@ -410,9 +410,9 @@ describe('useBoardSession', () => {
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
 
-    const result = await session.save(snapshot, { waitForPreview: true })
+    const result = await session.save(snapshot, { shouldWaitForPreview: true })
 
-    expect(result.remoteSync).toEqual({ ok: false, reason: 'conflict', error: conflictError })
+    expect(result.remoteSync).toEqual({ isOk: false, reason: 'conflict', error: conflictError })
     expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
   })

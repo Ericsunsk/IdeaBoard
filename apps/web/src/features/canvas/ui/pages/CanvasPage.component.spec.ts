@@ -126,9 +126,9 @@ describe('CanvasPage', () => {
     const { snapshot, repository, session, createUploadLifecycle, stabilizeSnapshotForSave } =
       await renderCanvasPage()
 
-    const result = await session.save(snapshot, { waitForPreview: true })
+    const result = await session.save(snapshot, { shouldWaitForPreview: true })
 
-    expect(result.remoteSync).toEqual({ ok: true })
+    expect(result.remoteSync).toEqual({ isOk: true })
     expect(createUploadLifecycle).toHaveBeenCalledWith({
       userUid: 'USER01',
       boardId: 'board-a',
@@ -147,8 +147,8 @@ describe('CanvasPage', () => {
 
     const unavailable = await session.save(snapshot)
 
-    expect(unavailable.remoteSync.ok).toBe(false)
-    if (!unavailable.remoteSync.ok) {
+    expect(unavailable.remoteSync.isOk).toBe(false)
+    if (!unavailable.remoteSync.isOk) {
       expect(userErrorCode(unavailable.remoteSync.error)).toBe(BOARD_SESSION_AUTH_UNAVAILABLE_CODE)
     }
     expect(repository.saveLocal).toHaveBeenCalledWith('board-a', snapshot)
@@ -156,9 +156,9 @@ describe('CanvasPage', () => {
     expect(createUploadLifecycle).not.toHaveBeenCalled()
 
     userStore.setAuth(makeSessionUser({ storage_namespace: 'USER01' }))
-    const recovered = await session.save(snapshot, { waitForPreview: true })
+    const recovered = await session.save(snapshot, { shouldWaitForPreview: true })
 
-    expect(recovered.remoteSync).toEqual({ ok: true })
+    expect(recovered.remoteSync).toEqual({ isOk: true })
     expect(repository.save).toHaveBeenCalledWith('board-a', snapshot)
   })
 })

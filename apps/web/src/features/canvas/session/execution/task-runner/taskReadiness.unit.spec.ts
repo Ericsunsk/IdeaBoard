@@ -31,8 +31,14 @@ describe('task readiness billing updates', () => {
         available_credits: 3,
         reserved_credits: 0,
         sufficient: false,
-      },
-    } as const
+      } satisfies Partial<
+        NonNullable<
+          import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData['billing']
+        >
+      >,
+    } as const satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >
     mocks.fetchReadiness.mockResolvedValue(readiness)
     const listener = vi.fn()
     const unsubscribe = subscribeCanvasTaskReadiness(listener)
@@ -65,8 +71,14 @@ describe('task readiness billing updates', () => {
         available_credits: 0,
         reserved_credits: 0,
         sufficient: true,
-      },
-    } as const
+      } satisfies Partial<
+        NonNullable<
+          import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData['billing']
+        >
+      >,
+    } as const satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >
     mocks.fetchReadiness.mockResolvedValue(readiness)
 
     await expect(
@@ -115,7 +127,9 @@ describe('task readiness billing updates', () => {
       service: 'generation',
       error_code: 'service_resolution_unavailable',
       message: 'This resolution is unavailable right now.',
-    })
+    } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
 
     await expect(
       assertTaskSubmitReady({

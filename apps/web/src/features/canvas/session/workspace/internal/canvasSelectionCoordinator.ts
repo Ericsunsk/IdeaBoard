@@ -6,7 +6,7 @@ import {
 import { parseFlowNodeId } from '../../../session/flow-adapter'
 import type { CanvasRendererSelectableElement } from '../model.ts'
 
-type Selectable = { id: string; selected?: boolean }
+type Selectable = Pick<CanvasRendererSelectableElement, 'id' | 'selected'>
 
 export type CanvasSelectionStore = {
   getNodeIds: () => readonly CanvasGraphNodeId[]

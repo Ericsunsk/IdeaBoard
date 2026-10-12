@@ -59,7 +59,7 @@ type CanvasImageWorkflowGraphPort = Pick<
 > & {
   getMediaInputImages: GenerationIntentOptions['getMediaInputImages']
   updateSnapshotNodeParam: ImageActionIntentRouterOptions['params']['updateNodeParam']
-  markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
+  markNodeExecutionDirty: (nodeId: string, options?: { shouldIncludeSelf?: boolean }) => void
 }
 
 export type CanvasImageWorkflowUiAdapter = {
@@ -155,7 +155,7 @@ export function useCanvasImageWorkflow(
     payload: Parameters<CanvasImageWorkflowGraphPort['updateSnapshotNodeParam']>[1],
   ) {
     graph.updateSnapshotNodeParam(nodeId, payload)
-    graph.markNodeExecutionDirty(nodeId, { includeSelf: true })
+    graph.markNodeExecutionDirty(nodeId, { shouldIncludeSelf: true })
   }
 
   const { strengthControl, outpaint, imageTools } = useWorkflowImageEditing(options, execution)

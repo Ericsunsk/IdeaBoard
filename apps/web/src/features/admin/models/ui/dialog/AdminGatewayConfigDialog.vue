@@ -242,8 +242,8 @@ async function loadGatewayConfig() {
       account_id: data.account_id ?? '',
       gateway_id: data.gateway_id ?? '',
     })
-  } catch (err) {
-    error.value = formatAdminDisplayError(err, MODELS_MESSAGES.gatewayLoadFailed)
+  } catch (caughtError) {
+    error.value = formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewayLoadFailed)
   } finally {
     loading.value = false
   }
@@ -265,7 +265,7 @@ const handleTestConnection = form.handleSubmit(async (values) => {
       feedback.testFailed(MODELS_MESSAGES.gatewayProbeRequired)
       return
     }
-    const res = await resource.value.testConnection(
+    const response = await resource.value.testConnection(
       {
         base_url: finalBaseUrl,
         token: values.token.trim() || undefined,
@@ -274,13 +274,13 @@ const handleTestConnection = form.handleSubmit(async (values) => {
       },
       { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )
-    if (res.success) {
-      feedback.testPassed(res.message)
+    if (response.success) {
+      feedback.testPassed(response.message)
     } else {
-      feedback.testFailed(res.message)
+      feedback.testFailed(response.message)
     }
-  } catch (err) {
-    feedback.testFailed(formatAdminDisplayError(err, MODELS_MESSAGES.gatewayTestFailed))
+  } catch (caughtError) {
+    feedback.testFailed(formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewayTestFailed))
   } finally {
     testing.value = false
   }
@@ -317,13 +317,13 @@ const handleSave = form.handleSubmit(async (values) => {
     // saved 必须是服务端确认的真相：重读失败就报错、不关弹窗、不 emit。
     try {
       emit('saved', await resource.value.get())
-    } catch (err) {
-      error.value = formatAdminDisplayError(err, MODELS_MESSAGES.gatewayRereadFailed)
+    } catch (caughtError) {
+      error.value = formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewayRereadFailed)
       return
     }
     emit('update:visible', false)
-  } catch (err) {
-    error.value = formatAdminDisplayError(err, MODELS_MESSAGES.gatewaySaveFailed)
+  } catch (caughtError) {
+    error.value = formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewaySaveFailed)
   } finally {
     saving.value = false
   }

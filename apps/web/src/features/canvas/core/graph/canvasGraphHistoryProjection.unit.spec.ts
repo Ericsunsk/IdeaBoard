@@ -71,8 +71,8 @@ function createDraft(base: CanvasGraphStoreState): CanvasGraphTransactionDraft {
 }
 
 const RECORD_HISTORY: Required<CanvasGraphTransactionOptions> = {
-  recordHistory: true,
-  markDirty: true,
+  shouldRecordHistory: true,
+  shouldMarkDirty: true,
 }
 
 describe('canvasGraphHistoryProjection', () => {
@@ -118,7 +118,7 @@ describe('canvasGraphHistoryProjection', () => {
     stageSelectNode(draft, promptId, true)
     const changes = normalizeTransactionChanges(draft)
     const commitPatch = createCommitPatch(draft)
-    base.nodesById.get(promptId)!.selected = true
+    base.nodesById.get(promptId)!.isSelected = true
 
     const summary = createSummary('node-update', RECORD_HISTORY, base, changes, draft, commitPatch)
 
@@ -130,7 +130,7 @@ describe('canvasGraphHistoryProjection', () => {
       selectedNodeIds: [promptId],
     })
     expect(summary.projectionPatch.nodes.selectionChanged).toEqual([
-      { id: promptId, selected: true },
+      { id: promptId, isSelected: true },
     ])
   })
 
@@ -158,7 +158,7 @@ describe('canvasGraphHistoryProjection', () => {
     })
   })
 
-  it('honors recordHistory and markDirty options independently', () => {
+  it('honors shouldRecordHistory and shouldMarkDirty options independently', () => {
     const base = createStateFromSnapshot(createSampleSnapshot())
     const draft = createDraft(base)
     const added = stageAddNode(draft, createPromptNode(9, 100, 100))
@@ -166,7 +166,7 @@ describe('canvasGraphHistoryProjection', () => {
 
     const materialized = createSummary(
       'result-materialize',
-      { recordHistory: false, markDirty: true },
+      { shouldRecordHistory: false, shouldMarkDirty: true },
       base,
       changes,
       draft,
@@ -176,7 +176,7 @@ describe('canvasGraphHistoryProjection', () => {
 
     const silent = createSummary(
       'node-update',
-      { recordHistory: false, markDirty: false },
+      { shouldRecordHistory: false, shouldMarkDirty: false },
       base,
       changes,
       draft,

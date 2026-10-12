@@ -18,8 +18,8 @@ describe('Admin System Settings lifecycle', () => {
   it('keeps one deterministic loading, draft, save, reset, failure, and background-refresh contract', async () => {
     const remote = ref<ExampleSetting | undefined>()
     const loadError = ref<unknown>()
-    const loading = ref(true)
-    const saving = ref(false)
+    const isLoading = ref(true)
+    const isSaving = ref(false)
     const cacheSaved = vi.fn<() => Promise<void>>().mockResolvedValue()
     const feedback = {
       loadFailed: vi.fn(),
@@ -33,16 +33,16 @@ describe('Admin System Settings lifecycle', () => {
       defaultValue: { value: 8 },
       source: remote,
       loadError,
-      loading,
-      saving,
+      isLoading,
+      isSaving,
       normalize: (setting) => ({ value: setting?.value ?? 8 }),
       isSame: (left, right) => left.value === right.value,
       validate: (draft) => (draft.value > 0 ? '' : '值必须大于 0'),
       save: (_draft) => {
-        saving.value = true
+        isSaving.value = true
         return new Promise<ExampleSetting>((resolve, reject) => {
           resolveSave = (saved) => {
-            saving.value = false
+            isSaving.value = false
             if (failNextSave) {
               reject(new Error('save failed'))
               return
@@ -55,10 +55,10 @@ describe('Admin System Settings lifecycle', () => {
       feedback,
     })
 
-    expect(lifecycle.loading.value).toBe(true)
+    expect(lifecycle.isLoading.value).toBe(true)
     expect(lifecycle.isDirty.value).toBe(false)
 
-    loading.value = false
+    isLoading.value = false
     remote.value = { value: 12 }
     await nextTick()
     expect(lifecycle.form.value).toEqual({ value: 12 })
@@ -71,7 +71,7 @@ describe('Admin System Settings lifecycle', () => {
     expect(lifecycle.form.value).toEqual({ value: 16 })
 
     const saveResult = lifecycle.save()
-    expect(lifecycle.saving.value).toBe(true)
+    expect(lifecycle.isSaving.value).toBe(true)
     resolveSave?.({ value: 16 })
     await expect(saveResult).resolves.toBe(true)
     expect(cacheSaved).toHaveBeenCalledWith({ value: 16 })
@@ -87,7 +87,7 @@ describe('Admin System Settings lifecycle', () => {
     lifecycle.form.value.value = 24
     failNextSave = true
     const failedSaveResult = lifecycle.save()
-    expect(lifecycle.saving.value).toBe(true)
+    expect(lifecycle.isSaving.value).toBe(true)
     resolveSave?.({ value: 24 })
     await expect(failedSaveResult).resolves.toBe(false)
     expect(lifecycle.form.value).toEqual({ value: 24 })

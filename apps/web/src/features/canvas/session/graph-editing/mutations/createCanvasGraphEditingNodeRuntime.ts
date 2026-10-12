@@ -10,19 +10,19 @@ export function createCanvasGraphEditingNodeRuntime(options: {
   updateSnapshotNode: (
     nodeId: string,
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
-    options?: { history?: boolean },
+    options?: { shouldRecordHistory?: boolean },
   ) => void
-  markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
+  markFlowExecutionNodeDirty: (nodeId: string, options?: { shouldIncludeSelf?: boolean }) => void
   deleteNode: (nodeId: string) => boolean
   updatePromptText: (nodeId: string, value: string) => void
   updateNodeParams: (nodeId: string, payload: FlowSnapshotParamPatch) => void
-  dismissTransientCanvasUi: (options?: { closeContextMenu?: boolean }) => void
+  dismissTransientCanvasUi: (options?: { shouldCloseContextMenu?: boolean }) => void
   discardNodeEdits: (nodeId: string) => void
 }) {
   const applyImageFile = async (nodeId: string, file: File) => {
-    const updated = await options.applyImageFileToImageNode(nodeId, file)
-    if (updated) options.discardNodeEdits(nodeId)
-    return updated
+    const isUpdated = await options.applyImageFileToImageNode(nodeId, file)
+    if (isUpdated) options.discardNodeEdits(nodeId)
+    return isUpdated
   }
   const media = useFlowNodeMediaInputs({
     pickImageFile: options.browser.pickImageFile,

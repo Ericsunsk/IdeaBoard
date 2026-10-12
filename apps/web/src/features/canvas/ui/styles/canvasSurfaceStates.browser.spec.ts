@@ -285,10 +285,18 @@ describe('Canvas surface states browser contract', () => {
       h('div', [
         h('div', { class: 'workflow-node running', style: 'position: relative;' }),
         h('button', { class: 'node-tool-output-count active', type: 'button' }, '4'),
-        h('button', { class: 'node-tool-output-count', type: 'button', disabled: true }, '2'),
-        h(NodeStageFrame, { loading: true }, { default: () => 'stage' }),
-        h(NodeStageFrame, { connectionDropTarget: true }, { default: () => 'target' }),
-        h(NodeStageFrame, { active: true }, { default: () => 'active' }),
+        h(
+          'button',
+          {
+            class: 'node-tool-output-count',
+            type: 'button',
+            disabled: true,
+          } satisfies import('vue').ButtonHTMLAttributes,
+          '2',
+        ),
+        h(NodeStageFrame, { isLoading: true }, { default: () => 'stage' }),
+        h(NodeStageFrame, { isConnectionDropTarget: true }, { default: () => 'target' }),
+        h(NodeStageFrame, { isActive: true }, { default: () => 'active' }),
       ]),
     )
     try {
@@ -362,7 +370,7 @@ describe('Canvas surface states browser contract', () => {
         drawMode: 'paint',
         brushSize: 24,
         maskLayerOpacity: 60,
-        directGenerating: true,
+        isDirectGenerating: true,
         anchorRect: ANCHOR_RECT,
       }),
     )

@@ -6,7 +6,7 @@ import { createBoardAutosavePolicy } from './autosavePolicy'
 export type UseBoardAutosaveOptions = {
   isDirty: Ref<boolean>
   isSaving: Ref<boolean>
-  save: (options?: { silent?: boolean | undefined }) => Promise<boolean>
+  save: (options?: { isSilent?: boolean | undefined }) => Promise<boolean>
   canRun?: (() => boolean) | undefined
   resumeSignal?: Ref<unknown> | undefined
   delay?: number | undefined
@@ -31,7 +31,7 @@ export function useBoardAutosave(options: UseBoardAutosaveOptions) {
     onSave: () => recordCanvasInteractionCount('autosaveSaveCount'),
   })
   const visibility = useDocumentVisibility()
-  const online = useOnline()
+  const isOnline = useOnline()
   // Intentional `tryOnScopeDispose`: the autosave coordinator stays safe when
   // instantiated outside a component scope; the trailing debounce drops on
   // dispose either way (see the policy).
@@ -45,8 +45,8 @@ export function useBoardAutosave(options: UseBoardAutosaveOptions) {
     }
   })
 
-  watch(online, (next, prev) => {
-    policy.handleOnlineChange(prev, next)
+  watch(isOnline, (isNextEnabled, wasPreviouslyEnabled) => {
+    policy.handleOnlineChange(wasPreviouslyEnabled, isNextEnabled)
   })
 
   if (options.resumeSignal) {

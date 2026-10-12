@@ -41,14 +41,14 @@ function createHarness(
       byId: computed(() => new Map(boards.value.map((board) => [board.id, board]))),
     },
     commands: {
-      hydrate: vi.fn(async () => ({ ok: true as const })),
-      create: vi.fn(async () => ({ ok: true as const, board: makeBoard('created-board') })),
+      hydrate: vi.fn(async () => ({ isOk: true as const })),
+      create: vi.fn(async () => ({ isOk: true as const, board: makeBoard('created-board') })),
       rename: vi.fn(async ({ boardId, nextName }) => ({
-        ok: true as const,
+        isOk: true as const,
         board: makeBoard(boardId, nextName),
       })),
-      duplicate: vi.fn(async () => ({ ok: true as const, board: makeBoard('copied-board') })),
-      delete: vi.fn(async () => ({ ok: true as const, remoteWasMissing: false })),
+      duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('copied-board') })),
+      delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
     },
     dispose: vi.fn(),
   }
@@ -94,7 +94,7 @@ describe('createGalleryController', () => {
     vi.mocked(harness.catalog.commands.create).mockImplementation(async () => {
       expect(harness.controller.viewModel.activeMenuBoardId.value).toBeNull()
       expect(harness.navigation.openBoard).not.toHaveBeenCalled()
-      return { ok: true, board: makeBoard('created-board') }
+      return { isOk: true, board: makeBoard('created-board') }
     })
 
     await harness.controller.commands.createAndOpenBoard()
@@ -134,13 +134,13 @@ describe('createGalleryController', () => {
     const board = makeBoard('board-1', 'Original')
     const syncError = { status: 409, code: 'board_revision_conflict' }
     vi.mocked(harness.catalog.commands.rename).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       reason: 'revision-conflict',
       boardId: board.id,
       previousBoard: board,
       error: syncError,
-      rollback: { ok: true, board },
-      hydrate: { ok: false, error: new Error('hydrate failed') },
+      rollback: { isOk: true, board },
+      hydrate: { isOk: false, error: new Error('hydrate failed') },
     })
     harness.controller.commands.startRename(board)
     harness.controller.commands.updateRenameDraft('Conflicting')
@@ -153,8 +153,8 @@ describe('createGalleryController', () => {
     expect(harness.warn).toHaveBeenCalledWith('[boards] failed to sync renamed board', syncError)
 
     vi.mocked(harness.catalog.commands.hydrate)
-      .mockResolvedValueOnce({ ok: false, error: new Error('still unavailable') })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ isOk: false, error: new Error('still unavailable') })
+      .mockResolvedValueOnce({ isOk: true })
 
     await harness.controller.commands.reloadCatalog()
     expect(harness.feedback.catalogSyncFailed).toHaveBeenCalledOnce()
@@ -163,9 +163,9 @@ describe('createGalleryController', () => {
 
     await harness.controller.commands.reloadCatalog()
     expect(harness.catalog.commands.hydrate).toHaveBeenLastCalledWith({
-      includeDocuments: false,
-      force: true,
-      preserveLocalNewer: false,
+      shouldIncludeDocuments: false,
+      shouldForce: true,
+      shouldPreserveLocalNewer: false,
       rollbackBoardIds: [board.id],
     })
     expect(harness.controller.viewModel.catalogRecoveryBoardId.value).toBeNull()
@@ -176,7 +176,8 @@ describe('createGalleryController', () => {
     const harness = createHarness()
     const board = makeBoard('board-1')
     const firstDelete = deferred<
-      { ok: true; remoteWasMissing: boolean } | { ok: false; reason: 'sync-failed'; error: unknown }
+      | { isOk: true; isRemoteWasMissing: boolean }
+      | { isOk: false; reason: 'sync-failed'; error: unknown }
     >()
     vi.mocked(harness.catalog.commands.delete).mockReturnValueOnce(firstDelete.promise)
     harness.controller.commands.toggleBoardMenu(board.id)
@@ -190,7 +191,7 @@ describe('createGalleryController', () => {
     expect(harness.controller.viewModel.isDeletePending.value).toBe(true)
 
     const error = new Error('delete failed')
-    firstDelete.resolve({ ok: false, reason: 'sync-failed', error })
+    firstDelete.resolve({ isOk: false, reason: 'sync-failed', error })
     await pendingConfirmation
 
     expect(harness.controller.viewModel.isDeletePending.value).toBe(false)
@@ -200,8 +201,8 @@ describe('createGalleryController', () => {
     expect(harness.warn).toHaveBeenCalledWith('[boards] failed to sync deleted board', error)
 
     vi.mocked(harness.catalog.commands.delete).mockResolvedValueOnce({
-      ok: true,
-      remoteWasMissing: false,
+      isOk: true,
+      isRemoteWasMissing: false,
     })
     await harness.controller.commands.confirmDelete()
 
@@ -240,7 +241,7 @@ describe('createGalleryController', () => {
 
     const hydrateError = new Error('hydrate failed')
     vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       error: hydrateError,
     })
     await harness.controller.commands.initialize()
@@ -248,7 +249,7 @@ describe('createGalleryController', () => {
     expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(true)
     expect(harness.feedback.catalogSyncFailed).toHaveBeenCalledOnce()
 
-    vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({ ok: true })
+    vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({ isOk: true })
     await harness.controller.commands.reloadCatalog()
     expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
     expect(harness.feedback.catalogReloaded).toHaveBeenCalledOnce()
@@ -265,7 +266,7 @@ describe('createGalleryController', () => {
     const harness = createHarness()
     const createError = new Error('create sync failed')
     vi.mocked(harness.catalog.commands.create).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       reason: 'sync-failed',
       board: makeBoard('failed-create'),
       error: createError,
@@ -281,7 +282,7 @@ describe('createGalleryController', () => {
     harness.controller.commands.toggleBoardMenu(source.id)
     vi.mocked(harness.catalog.commands.duplicate).mockImplementationOnce(async () => {
       expect(harness.controller.viewModel.activeMenuBoardId.value).toBeNull()
-      return { ok: true, board: makeBoard('copy') }
+      return { isOk: true, board: makeBoard('copy') }
     })
 
     await harness.controller.commands.duplicateBoard(source.id)
@@ -296,12 +297,12 @@ describe('createGalleryController', () => {
     const harness = createHarness()
     const board = makeBoard('board-1')
     vi.mocked(harness.catalog.commands.rename).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       reason: 'sync-failed',
       boardId: board.id,
       previousBoard: board,
       error: new Error('failed'),
-      rollback: { ok: false, reason: 'invalid-name' },
+      rollback: { isOk: false, reason: 'invalid-name' },
     })
     harness.controller.commands.startRename(board)
     await harness.controller.commands.commitRename()
@@ -339,11 +340,11 @@ describe('createGalleryController', () => {
         byId: computed(() => new Map()),
       },
       commands: {
-        hydrate: vi.fn(async () => ({ ok: true as const })),
-        create: vi.fn(async () => ({ ok: true as const, board: makeBoard('b') })),
-        rename: vi.fn(async () => ({ ok: true as const, board: makeBoard('b') })),
-        duplicate: vi.fn(async () => ({ ok: true as const, board: makeBoard('b') })),
-        delete: vi.fn(async () => ({ ok: true as const, remoteWasMissing: false })),
+        hydrate: vi.fn(async () => ({ isOk: true as const })),
+        create: vi.fn(async () => ({ isOk: true as const, board: makeBoard('b') })),
+        rename: vi.fn(async () => ({ isOk: true as const, board: makeBoard('b') })),
+        duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('b') })),
+        delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
       },
       dispose: vi.fn(),
     }
@@ -435,7 +436,7 @@ describe('createGalleryController', () => {
   it('auto-hydrates once when the scope becomes ready after a failure', async () => {
     const harness = createHarness()
     vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       error: new Error('no workspace'),
     })
     await harness.controller.commands.initialize()
@@ -447,7 +448,7 @@ describe('createGalleryController', () => {
     await nextTick()
     expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(1)
 
-    vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({ ok: true })
+    vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({ isOk: true })
     harness.scope.value = 'user-2'
     await nextTick()
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -479,7 +480,7 @@ describe('createGalleryController', () => {
       let changeScope!: (scope: string) => void
       const hydrate = vi
         .fn<BoardRepository['commands']['hydrate']>()
-        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({ isOk: true })
         .mockReturnValueOnce(oldRefresh.promise)
         .mockReturnValueOnce(newRefresh.promise)
       const repository = createBoardRepository({
@@ -506,7 +507,7 @@ describe('createGalleryController', () => {
       expect(hydrate).toHaveBeenCalledTimes(2)
 
       const scopeChanged = new Error('BOARD_HYDRATE_SCOPE_CHANGED')
-      if (completion === 'failure') oldRefresh.resolve({ ok: false, error: scopeChanged })
+      if (completion === 'failure') oldRefresh.resolve({ isOk: false, error: scopeChanged })
       else oldRefresh.reject(scopeChanged)
       await vi.waitFor(() => expect(hydrate).toHaveBeenCalledTimes(3))
 
@@ -515,7 +516,7 @@ describe('createGalleryController', () => {
       expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
       expect(harness.controller.viewModel.visibleBoards.value[0]?.id).toBe('workspace-b')
 
-      newRefresh.resolve({ ok: true })
+      newRefresh.resolve({ isOk: true })
       await harness.controller.commands.initialize()
       expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
       expect(harness.feedback.catalogSyncFailed).not.toHaveBeenCalled()
@@ -524,8 +525,8 @@ describe('createGalleryController', () => {
 
   it('keeps the initial loading state until the current workspace hydrate completes', async () => {
     const harness = createHarness()
-    const oldRefresh = deferred<{ ok: true }>()
-    const newRefresh = deferred<{ ok: true }>()
+    const oldRefresh = deferred<{ isOk: true }>()
+    const newRefresh = deferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(newRefresh.promise)
@@ -533,19 +534,19 @@ describe('createGalleryController', () => {
 
     harness.scope.value = 'workspace-b'
     await nextTick()
-    oldRefresh.resolve({ ok: true })
+    oldRefresh.resolve({ isOk: true })
     await initialLoad
 
     expect(harness.controller.viewModel.isBoardsLoading.value).toBe(true)
-    newRefresh.resolve({ ok: true })
+    newRefresh.resolve({ isOk: true })
     await harness.controller.commands.initialize()
     expect(harness.controller.viewModel.isBoardsLoading.value).toBe(false)
   })
 
   it('hydrates a workspace that becomes ready while an obsolete initial load is pending', async () => {
     const harness = createHarness()
-    const oldRefresh = deferred<{ ok: true }>()
-    const newRefresh = deferred<{ ok: true }>()
+    const oldRefresh = deferred<{ isOk: true }>()
+    const newRefresh = deferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(newRefresh.promise)
@@ -556,18 +557,18 @@ describe('createGalleryController', () => {
     await nextTick()
 
     expect(harness.catalog.commands.hydrate).toHaveBeenCalledTimes(2)
-    oldRefresh.resolve({ ok: true })
+    oldRefresh.resolve({ isOk: true })
     await initialLoad
     expect(harness.controller.viewModel.isBoardsLoading.value).toBe(true)
-    newRefresh.resolve({ ok: true })
+    newRefresh.resolve({ isOk: true })
     await harness.controller.commands.initialize()
     expect(harness.controller.viewModel.isBoardsLoading.value).toBe(false)
   })
 
   it('preserves a current workspace failure and reports its exception after an old success', async () => {
     const harness = createHarness()
-    const oldRefresh = deferred<{ ok: true }>()
-    const newRefresh = deferred<{ ok: true }>()
+    const oldRefresh = deferred<{ isOk: true }>()
+    const newRefresh = deferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(newRefresh.promise)
@@ -580,7 +581,7 @@ describe('createGalleryController', () => {
 
     expect(harness.feedback.catalogSyncFailed).toHaveBeenCalledOnce()
     expect(harness.warn).toHaveBeenCalledWith('[boards] failed to hydrate catalog', currentFailure)
-    oldRefresh.resolve({ ok: true })
+    oldRefresh.resolve({ isOk: true })
     await initialLoad
     expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(true)
     expect(harness.feedback.catalogSyncFailed).toHaveBeenCalledOnce()
@@ -589,7 +590,7 @@ describe('createGalleryController', () => {
   it('ignores a focus refresh superseded by another focus refresh in the same workspace', async () => {
     const harness = createHarness()
     await harness.controller.commands.initialize()
-    const oldRefresh = deferred<{ ok: true }>()
+    const oldRefresh = deferred<{ isOk: true }>()
     const latestRefresh = deferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
@@ -602,9 +603,9 @@ describe('createGalleryController', () => {
     window.dispatchEvent(new Event('focus'))
     await nextTick()
     now.mockRestore()
-    latestRefresh.resolve({ ok: false, error: new Error('latest failure') })
+    latestRefresh.resolve({ isOk: false, error: new Error('latest failure') })
     await harness.controller.commands.initialize()
-    oldRefresh.resolve({ ok: true })
+    oldRefresh.resolve({ isOk: true })
     await previous
 
     expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(true)
@@ -614,29 +615,29 @@ describe('createGalleryController', () => {
   it('does not release the current retry guard when an old workspace retry finishes', async () => {
     const harness = createHarness()
     vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       error: new Error('initial failure'),
     })
     await harness.controller.commands.initialize()
-    const oldRetry = deferred<{ ok: true }>()
+    const oldRetry = deferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate).mockReturnValueOnce(oldRetry.promise)
     const retry = harness.controller.commands.reloadCatalog()
     vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       error: new Error('new workspace failure'),
     })
     harness.scope.value = 'workspace-b'
     await nextTick()
     await harness.controller.commands.initialize()
-    const newRetry = deferred<{ ok: true }>()
+    const newRetry = deferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate).mockReturnValueOnce(newRetry.promise)
     const currentRetry = harness.controller.commands.reloadCatalog()
-    oldRetry.resolve({ ok: true })
+    oldRetry.resolve({ isOk: true })
     await retry
 
     expect(harness.controller.viewModel.isCatalogReloadPending.value).toBe(true)
     expect(harness.feedback.catalogReloaded).not.toHaveBeenCalled()
-    newRetry.resolve({ ok: true })
+    newRetry.resolve({ isOk: true })
     await currentRetry
     expect(harness.controller.viewModel.isCatalogReloadPending.value).toBe(false)
     expect(harness.feedback.catalogReloaded).toHaveBeenCalledOnce()
@@ -645,15 +646,15 @@ describe('createGalleryController', () => {
   it('ignores hydration and retry completions after disposal', async () => {
     const harness = createHarness()
     vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({
-      ok: false,
+      isOk: false,
       error: new Error('initial failure'),
     })
     await harness.controller.commands.initialize()
-    const retryResult = deferred<{ ok: true }>()
+    const retryResult = deferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate).mockReturnValueOnce(retryResult.promise)
     const retry = harness.controller.commands.reloadCatalog()
     harness.controller.dispose()
-    retryResult.resolve({ ok: true })
+    retryResult.resolve({ isOk: true })
     await retry
 
     expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(true)
@@ -667,18 +668,18 @@ describe('createGalleryController', () => {
       const harness = createHarness()
       const board = makeBoard('board-1')
       vi.mocked(harness.catalog.commands.rename).mockResolvedValueOnce({
-        ok: false,
+        isOk: false,
         reason: 'sync-failed',
         boardId: board.id,
         previousBoard: board,
         error: new Error('rename failed'),
-        rollback: { ok: false, reason: 'invalid-name' },
+        rollback: { isOk: false, reason: 'invalid-name' },
       })
       harness.controller.commands.startRename(board)
       await harness.controller.commands.commitRename()
       harness.warn.mockClear()
       const oldReload = deferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
-      const newRefresh = deferred<{ ok: true }>()
+      const newRefresh = deferred<{ isOk: true }>()
       vi.mocked(harness.catalog.commands.hydrate)
         .mockReturnValueOnce(oldReload.promise)
         .mockReturnValueOnce(newRefresh.promise)
@@ -686,8 +687,8 @@ describe('createGalleryController', () => {
       harness.scope.value = 'workspace-b'
       await nextTick()
       const scopeChanged = new Error('BOARD_HYDRATE_SCOPE_CHANGED')
-      if (completion === 'success') oldReload.resolve({ ok: true })
-      else if (completion === 'failure') oldReload.resolve({ ok: false, error: scopeChanged })
+      if (completion === 'success') oldReload.resolve({ isOk: true })
+      else if (completion === 'failure') oldReload.resolve({ isOk: false, error: scopeChanged })
       else oldReload.reject(scopeChanged)
       await reload
 
@@ -696,7 +697,7 @@ describe('createGalleryController', () => {
       expect(harness.warn).not.toHaveBeenCalled()
       expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
       expect(harness.controller.viewModel.isBoardsLoading.value).toBe(true)
-      newRefresh.resolve({ ok: true })
+      newRefresh.resolve({ isOk: true })
       await harness.controller.commands.initialize()
       expect(harness.controller.viewModel.isBoardsLoading.value).toBe(false)
     },

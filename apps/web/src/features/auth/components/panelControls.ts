@@ -19,7 +19,7 @@ export function useAuthPanelControls() {
     resolveInteractiveControlState({ pending: loading.value }),
   )
   const secondaryControlState = computed(() =>
-    resolveInteractiveControlState({ disabled: loading.value }),
+    resolveInteractiveControlState({ isDisabled: loading.value }),
   )
   return {
     t,

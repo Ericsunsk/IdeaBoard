@@ -9,7 +9,7 @@ function createTerminalPositionChange(nodeId: string): NodeChange {
     id: nodeId,
     type: 'position',
     dragging: false,
-  } as unknown as NodeChange
+  } satisfies Partial<import('@vue-flow/core').NodeChange> as unknown as NodeChange
 }
 
 function createHarness() {
@@ -107,11 +107,11 @@ describe('createCanvasNodeDragLifecycle', () => {
           position: { x: 620, y: 96 },
           from: { x: 40, y: 40 },
           dragging: true,
-        },
+        } satisfies Partial<import('@vue-flow/core').NodeChange>,
       ],
     ])
     expect(harness.store.getNode('prompt-1')).toMatchObject({
-      selected: false,
+      isSelected: false,
       snapshot: { x: 620, y: 96 },
     })
     expect(harness.lifecycleOrder).toEqual(['begin', 'membership-stage', 'membership:620'])
@@ -165,7 +165,7 @@ describe('createCanvasNodeDragLifecycle', () => {
           id: 'prompt-1',
           position: { x: 620, y: 96 },
           dragging: false,
-        }),
+        } satisfies Partial<import('@vue-flow/core').GraphNode>),
       ],
     ])
   })
@@ -208,7 +208,7 @@ describe('createCanvasNodeDragLifecycle', () => {
         position: { x: 160, y: 120 },
         from: { x: 40, y: 40 },
         dragging: true,
-      },
+      } satisfies Partial<import('@vue-flow/core').NodeChange>,
     ])
     expect(harness.store.getNode('prompt-2')).toMatchObject({
       snapshot: { x: 900, y: 120 },
@@ -253,7 +253,7 @@ describe('createCanvasNodeDragLifecycle', () => {
     })
 
     expect(harness.store.getNode('prompt-1')).toMatchObject({
-      selected: true,
+      isSelected: true,
       snapshot: { x: 160, y: 120 },
     })
   })
@@ -315,7 +315,7 @@ describe('createCanvasNodeDragLifecycle', () => {
       }),
     ).not.toThrow()
     expect(harness.store.getNode('prompt-1')).toMatchObject({
-      selected: true,
+      isSelected: true,
       snapshot: { x: 260, y: 160 },
     })
     expect(harness.store.getNode('prompt-2')).toMatchObject({ snapshot: { text: 'ready' } })

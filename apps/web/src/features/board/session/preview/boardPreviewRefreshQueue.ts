@@ -99,7 +99,7 @@ export function createBoardPreviewRefreshQueue(
     boardId: string,
   ): BoardState | null {
     const normalized = normalizeLatestBoardState(state, { mode: 'result', boundary })
-    if (normalized.ok) return normalized.value
+    if (normalized.isOk) return normalized.value
     if (state) {
       deps.warn('[boards] invalid board state for preview refresh', boardId, normalized.error)
     }

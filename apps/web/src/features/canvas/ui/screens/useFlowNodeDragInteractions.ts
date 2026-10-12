@@ -4,7 +4,7 @@ import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
 type UseFlowNodeDragInteractionsOptions = {
   beginNodeDragTransaction: (nodeIds: readonly string[]) => void
   commitNodeDragTransaction: () => void
-  duplicateModifierPressed: Ref<boolean>
+  isDuplicateModifierPressed: Ref<boolean>
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   dismissTransientCanvasUi: DismissTransientCanvasUi
@@ -17,19 +17,19 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   function onNodeDragStart(nodeIds: readonly string[]) {
     if (options.isNodeDragLocked?.()) return
     pendingDragStopCommit = null
-    options.dismissTransientCanvasUi({ closeOutpaint: true })
+    options.dismissTransientCanvasUi({ shouldCloseOutpaint: true })
     options.beginNodeDragTransaction(nodeIds)
-    options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
+    options.beginFlowNodeDragDuplicateTracking(options.isDuplicateModifierPressed.value)
   }
 
   function onNodeDragStop() {
     if (options.isNodeDragLocked?.()) return
     options.dismissTransientCanvasUi({
-      closeOutpaint: true,
-      clearNodePanel: false,
-      hideStrength: false,
+      shouldCloseOutpaint: true,
+      shouldClearNodePanel: false,
+      shouldHideStrength: false,
     })
-    const isDuplicateMode = options.duplicateModifierPressed.value
+    const isDuplicateMode = options.isDuplicateModifierPressed.value
     const commitToken = {}
     queueMicrotask(() => {
       if (pendingDragStopCommit !== commitToken) return

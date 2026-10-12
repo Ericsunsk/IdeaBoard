@@ -61,10 +61,10 @@ export function createBoardSessionRepository(
     // hydration must not silently replace or mask a recoverable local validation error.
     loadBoardState(normalized)
     const hydrateResult = await boardRepository.commands.hydrate({
-      includeDocuments: true,
-      force: false,
+      shouldIncludeDocuments: true,
+      shouldForce: false,
     })
-    if (!hydrateResult.ok && hydrateResult.error instanceof InvalidBoardStateError) {
+    if (!hydrateResult.isOk && hydrateResult.error instanceof InvalidBoardStateError) {
       throw hydrateResult.error
     }
     const state = loadBoardState(normalized)

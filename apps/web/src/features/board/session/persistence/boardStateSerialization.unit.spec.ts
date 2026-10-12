@@ -129,13 +129,13 @@ describe('boardStateSerialization', () => {
       { mode: 'result', boundary: 'unit-test' },
     )
 
-    expect(result.ok).toBe(false)
-    if (result.ok) return
+    expect(result.isOk).toBe(false)
+    if (result.isOk) return
     expect(result.error).toEqual(
       expect.objectContaining({
         code: 'INVALID_BOARD_STATE',
         boundary: 'unit-test',
-        recoverable: true,
+        isRecoverable: true,
       }),
     )
     expect(result.error.issues[0]).toEqual(
@@ -160,13 +160,13 @@ describe('boardStateSerialization', () => {
       boundary: 'unit-test',
     })
 
-    expect(result.ok).toBe(false)
-    if (result.ok) return
+    expect(result.isOk).toBe(false)
+    if (result.isOk) return
     expect(result.error).toEqual(
       expect.objectContaining({
         code: 'INVALID_BOARD_STATE',
         boundary: 'unit-test',
-        recoverable: true,
+        isRecoverable: true,
       }),
     )
     expect(result.error.issues[0]).toEqual(

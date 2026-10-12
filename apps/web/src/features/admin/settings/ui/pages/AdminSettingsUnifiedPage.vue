@@ -161,9 +161,9 @@ async function loadSearchProviders() {
       (left, right) =>
         SEARCH_PROVIDERS.indexOf(left.provider) - SEARCH_PROVIDERS.indexOf(right.provider),
     )
-  } catch (err) {
+  } catch (caughtError) {
     if (generation !== searchRequestGeneration) return
-    searchFeedback.loadFailed(err)
+    searchFeedback.loadFailed(caughtError)
   } finally {
     if (generation === searchRequestGeneration) searchLoading.value = false
   }

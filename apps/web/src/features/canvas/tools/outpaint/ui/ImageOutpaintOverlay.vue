@@ -27,10 +27,10 @@
           class="image-node-outpaint-composer"
           offset="10px"
           :placeholder="outpaintPromptPlaceholder"
-          :allow-empty="true"
+          :should-allow-empty="true"
           :output-count="1"
-          :show-output-count="false"
-          :show-output-resolution="false"
+          :should-show-output-count="false"
+          :should-show-output-resolution="false"
           :billing-state="billingQuote"
           @submit="onSubmit"
         />

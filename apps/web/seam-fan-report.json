@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "c7a8840b7e54c045cf3166705f2b1a92769f8aae",
+  "checkpointSha": "6d769b0017782d70234644e8cf8b2ebdebc8b066",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all active Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -26378,6 +26378,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/billing/canvasBillingReadinessResource.unit.spec.ts",
+          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/billing/readiness.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
@@ -26485,6 +26490,11 @@
         {
           "from": "src/features/canvas/session/execution/commands/imageTaskRequests.unit.spec.ts",
           "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/commands/imageTaskRequests.unit.spec.ts",
+          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
           "kind": "type-only"
         },
         {
@@ -26579,7 +26589,17 @@
         },
         {
           "from": "src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/edgeProjection.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/flowCancelAndRenderProjection.contract.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -27083,6 +27103,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.unit.spec.ts",
+          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/task-runner/taskResultErrors.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -27245,6 +27270,11 @@
         {
           "from": "src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
           "to": "src/api/workspaceTaskTransport.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.unit.spec.ts",
+          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
           "kind": "runtime"
         },
         {
@@ -28062,6 +28092,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/connections/nodeDragLifecycle.unit.spec.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/connections/nodeDragLifecycle.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
         },
         {
@@ -28247,11 +28282,21 @@
         {
           "from": "src/features/canvas/session/flow-adapter/projection/canvasEdgeProjection.unit.spec.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/canvasEdgeProjection.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/flow-adapter/projection/canvasEdgeProjection.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/canvasGraphCommitProjection.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -28272,6 +28317,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/projection/canvasGraphCommitProjection.ts",
           "to": "src/features/canvas/session/browser/canvasPerfProbe.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/canvasGraphCommitProjection.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -28348,6 +28398,11 @@
           "from": "src/features/canvas/session/flow-adapter/projection/flowNodeSourceResolution.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/flowSnapshotAdapter.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/flow-adapter/projection/flowSnapshotAdapter.ts",
@@ -28457,6 +28512,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
         },
         {
@@ -28472,6 +28532,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.ts",
           "to": "src/features/canvas/session/browser/canvasPerfProbe.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useCanvasVueFlowGraphAdapter.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -28592,6 +28657,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/viewport/canvasSelectionController.unit.spec.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/viewport/canvasSelectionController.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
         },
         {
@@ -28617,6 +28687,11 @@
         {
           "from": "src/features/canvas/session/flow-adapter/viewport/canvasVueFlowNativeChangeAdapter.ts",
           "to": "src/features/canvas/session/browser/canvasPerfProbe.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/viewport/canvasVueFlowNativeChangePolicy.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -28723,6 +28798,11 @@
           "from": "src/features/canvas/session/flow-adapter/viewport/useVueFlowSelectionAdapter.ts",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/viewport/useVueFlowSelectionAdapter.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/flow-adapter/viewport/useVueFlowSelectionAdapter.unit.spec.ts",
@@ -28912,6 +28992,11 @@
         {
           "from": "src/features/canvas/session/graph-editing/groups/canvasGroupRuntimeOwnership.contract.spec.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/canvasGroupRuntimeOwnership.contract.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
         },
         {
@@ -29052,6 +29137,11 @@
         {
           "from": "src/features/canvas/session/graph-editing/groups/groupResizeRuntime.unit.spec.ts",
           "to": "src/features/canvas/core/graph/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -29098,6 +29188,11 @@
           "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/graph-editing/groups/useCanvasGroupRuntime.unit.spec.ts",
@@ -30659,6 +30754,11 @@
         {
           "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
           "to": "src/features/canvas/session/graph-editing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "runtime"
         },
         {
@@ -33236,6 +33336,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/FlowCanvasNode.component.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNode.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -33263,6 +33368,11 @@
           "from": "src/features/canvas/ui/nodes/FlowCanvasNode.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNode.vue",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/nodes/FlowCanvasNode.vue",

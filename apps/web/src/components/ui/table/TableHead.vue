@@ -2,11 +2,11 @@
   <th
     data-ui="table-head"
     :scope="props.scope"
-    :aria-sort="props.sortable ? props.sortDirection : undefined"
+    :aria-sort="props.isSortable ? props.sortDirection : undefined"
     :class="cn(tableHeadClasses, props.class)"
   >
     <button
-      v-if="props.sortable"
+      v-if="props.isSortable"
       type="button"
       :class="tableSortButtonClasses"
       @click="emits('sort', $event)"
@@ -35,10 +35,10 @@ const props = withDefaults(
   defineProps<{
     class?: HTMLAttributes['class']
     scope?: string
-    sortable?: boolean
+    isSortable?: boolean
     sortDirection?: 'ascending' | 'descending' | 'none'
   }>(),
-  { class: undefined, scope: 'col', sortable: false, sortDirection: 'none' },
+  { class: undefined, scope: 'col', isSortable: false, sortDirection: 'none' },
 )
 
 const emits = defineEmits<{

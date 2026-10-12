@@ -6,7 +6,7 @@
       :model-value="modelValue ?? ''"
       :aria-label="ariaLabel"
       :aria-busy="loading || undefined"
-      :invalid="invalid"
+      :invalid="isInvalid"
       :size="size === 'small' ? 'compact' : 'default'"
       :type="type"
       :disabled="disabled"
@@ -17,7 +17,7 @@
           adminInputChromeClass,
           'pr-9',
           size === 'small' ? 'text-admin-meta' : 'text-admin-body',
-          invalid && '!border-destructive focus-visible:ring-destructive/20',
+          isInvalid && '!border-destructive focus-visible:ring-destructive/20',
           props.class,
         )
       "
@@ -39,7 +39,7 @@
     v-bind="attrs"
     :model-value="modelValue ?? ''"
     :aria-label="ariaLabel"
-    :invalid="invalid"
+    :invalid="isInvalid"
     :size="size === 'small' ? 'compact' : 'default'"
     :type="type"
     :disabled="disabled"
@@ -49,7 +49,7 @@
       cn(
         adminInputChromeClass,
         size === 'small' ? 'text-admin-meta' : 'text-admin-body',
-        invalid && '!border-destructive focus-visible:ring-destructive/20',
+        isInvalid && '!border-destructive focus-visible:ring-destructive/20',
         props.class,
       )
     "
@@ -76,7 +76,7 @@ const props = withDefaults(
     readonly?: boolean | undefined
     placeholder?: string | undefined
     ariaLabel?: string | undefined
-    invalid?: boolean | undefined
+    isInvalid?: boolean | undefined
     size?: 'small' | 'default' | undefined
     loading?: boolean | undefined
     loadingLabel?: string | undefined
@@ -90,7 +90,7 @@ const props = withDefaults(
     readonly: false,
     placeholder: undefined,
     ariaLabel: undefined,
-    invalid: false,
+    isInvalid: false,
     size: 'default',
     loading: false,
     loadingLabel: 'Testing…',

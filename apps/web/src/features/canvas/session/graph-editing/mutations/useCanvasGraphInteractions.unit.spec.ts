@@ -43,7 +43,7 @@ function createFlowImage(snapshot: ImageNodeItem): Node<FlowNodeData> {
   return {
     id: `image-${snapshot.id}`,
     type: 'canvas',
-    selected: true,
+    isSelected: true,
     position: { x: snapshot.x, y: snapshot.y },
     data: {
       kind: 'image',
@@ -71,12 +71,12 @@ function createHarness(images: ImageNodeItem[] = [createImageSnapshot()]) {
     operationWarning: vi.fn(),
     operationLoading: vi.fn(() => loading),
   }
-  let attached = true
+  let isAttached = true
   const interactions = useCanvasGraphInteractions({
     nodes,
     edges,
     readCanvasGraphStore: () => graphSession.store,
-    isGraphSessionAttached: () => attached,
+    isGraphSessionAttached: () => isAttached,
     selection: { selectedElements, clear },
     browser: { downloadImage },
     preview: { openNodeImage },
@@ -94,8 +94,8 @@ function createHarness(images: ImageNodeItem[] = [createImageSnapshot()]) {
     loading,
     image: images[0]!,
     graphSession,
-    setAttached: (value: boolean) => {
-      attached = value
+    setAttached: (isValue: boolean) => {
+      isAttached = isValue
     },
   }
 }

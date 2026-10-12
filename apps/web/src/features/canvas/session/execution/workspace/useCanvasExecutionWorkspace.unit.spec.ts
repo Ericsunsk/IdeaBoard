@@ -93,12 +93,12 @@ function createReattachWorkspace(
   waitTaskImageResults: (
     taskId: string,
   ) => Promise<Array<{ url: string; resultIndex: number; assetId?: string }>>,
-  hydrate = true,
+  shouldHydrate = true,
 ) {
   const store = graphSession.store
   const attachment = core.currentAttachment()
   if (!attachment) throw new Error('Expected an attached Board')
-  if (hydrate) {
+  if (shouldHydrate) {
     collectPendingImageTasks(store.exportSnapshot()).forEach((pending) => {
       core.hydratePendingLease(attachment, pending)
     })
@@ -182,7 +182,7 @@ describe('useCanvasExecutionWorkspace', () => {
         clientActionId: expect.any(String),
       }),
     ])
-    expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
+    expect(flushAutosave).toHaveBeenCalledWith({ isSilent: true })
     expect(core.factFor('image-1')).toMatchObject({ status: 'succeeded' })
   })
 

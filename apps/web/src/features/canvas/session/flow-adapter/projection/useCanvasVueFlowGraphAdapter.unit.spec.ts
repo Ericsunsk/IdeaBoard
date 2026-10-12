@@ -6,15 +6,31 @@ import {
   type CanvasVueFlowGraphActions,
 } from './useCanvasVueFlowGraphAdapter'
 
-type SelectableNode = Node & { selected?: boolean }
-type SelectableEdge = Edge & { selected?: boolean }
-type MeasuredNode = Node & {
-  dimensions?: { width: number; height: number }
-  handleBounds?: unknown
-  resizing?: boolean
-}
+type SelectableNode = Node & Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>
+type SelectableEdge = Edge & Partial<Pick<import('@vue-flow/core').GraphEdge, 'selected'>>
+/** @externalContract Vue Flow renderer node fixtures, including runtime-only metadata. */
+type MeasuredNode = Node &
+  Partial<Pick<import('@vue-flow/core').GraphNode, 'selected' | 'dragging' | 'resizing'>> & {
+    computedPosition?: unknown
+    initialized?: boolean
+    dimensions?: { width: number; height: number }
+    handleBounds?: unknown
+  }
 
 describe('useCanvasVueFlowGraphAdapter', () => {
+  it('strips native initialized metadata before binding controlled nodes', () => {
+    const nodes = shallowRef<Node[]>([])
+    const edges = shallowRef<Edge[]>([])
+    const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
+    const node = { id: 'node-1', position: { x: 0, y: 0 }, data: {} }
+
+    const rendererNode = { ...node, initialized: true } satisfies MeasuredNode
+    adapter.replaceNodes([rendererNode])
+
+    expect(nodes.value).toEqual([node])
+    expect(nodes.value[0]).not.toHaveProperty('initialized')
+  })
+
   it('applies an incremental projection without creating a Flow command', () => {
     const unchangedNode: Node = { id: 'node-2', position: { x: 20, y: 0 }, data: {} }
     const changedNode: Node = { id: 'node-1', position: { x: 0, y: 0 }, data: {} }
@@ -28,7 +44,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       handleBounds: { source: [], target: [] },
       dragging: false,
       initialized: true,
-    }
+    } satisfies Partial<MeasuredNode>
     const updateNode = vi.fn((id, update) => {
       if (id !== runtimeNode.id) return
       Object.assign(runtimeNode, typeof update === 'function' ? update(runtimeNode) : update)
@@ -49,13 +65,15 @@ describe('useCanvasVueFlowGraphAdapter', () => {
 
     expect(nodes.value).toEqual([projectedNode, unchangedNode])
     expect(nodes.value[1]).toBe(unchangedNode)
-    expect(updateNode).toHaveBeenCalledWith('node-1', expect.any(Function), { replace: false })
+    expect(updateNode).toHaveBeenCalledWith('node-1', expect.any(Function), {
+      replace: false,
+    } satisfies NonNullable<Parameters<import('@vue-flow/core').Actions['updateNode']>[2]>)
     expect(runtimeNode).toMatchObject({
       computedPosition: { x: 0, y: 0, z: 0 },
       handleBounds: { source: [], target: [] },
       initialized: true,
       position: { x: 40, y: 0 },
-    })
+    } satisfies Partial<MeasuredNode>)
     expect(beforeCommand).not.toHaveBeenCalled()
     expect(afterCommand).not.toHaveBeenCalled()
   })
@@ -80,7 +98,9 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     })
 
     expect(nodes.value).toEqual([projectedNode])
-    expect(updateNode).toHaveBeenCalledWith('node-1', expect.any(Function), { replace: false })
+    expect(updateNode).toHaveBeenCalledWith('node-1', expect.any(Function), {
+      replace: false,
+    } satisfies NonNullable<Parameters<import('@vue-flow/core').Actions['updateNode']>[2]>)
     expect(setNodes).not.toHaveBeenCalled()
   })
 
@@ -120,11 +140,19 @@ describe('useCanvasVueFlowGraphAdapter', () => {
 
     adapter.replaceGraph({ nodes: [], edges: [renderEdge] })
     expect(edges.value[0]).not.toHaveProperty('animated')
-    expect(setEdges).toHaveBeenLastCalledWith([expect.not.objectContaining({ animated: true })])
+    expect(setEdges).toHaveBeenLastCalledWith([
+      expect.not.objectContaining({ animated: true } satisfies Partial<
+        import('@vue-flow/core').Edge
+      >),
+    ])
 
     adapter.replaceEdges([renderEdge])
     expect(edges.value[0]).not.toHaveProperty('animated')
-    expect(setEdges).toHaveBeenLastCalledWith([expect.not.objectContaining({ animated: true })])
+    expect(setEdges).toHaveBeenLastCalledWith([
+      expect.not.objectContaining({ animated: true } satisfies Partial<
+        import('@vue-flow/core').Edge
+      >),
+    ])
 
     adapter.addEdges({ ...renderEdge, id: 'edge-2' })
     expect(edges.value).toEqual([
@@ -284,7 +312,10 @@ describe('useCanvasVueFlowGraphAdapter', () => {
 
     expect(applyNodeChanges).toHaveBeenCalledOnce()
     expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
-    expect(result.after.nodes[0]).toMatchObject({ id: 'node-1', selected: true })
+    expect(result.after.nodes[0]).toMatchObject({
+      id: 'node-1',
+      selected: true,
+    } satisfies Partial<MeasuredNode>)
     expect(beforeCommand).not.toHaveBeenCalled()
   })
 
@@ -295,7 +326,11 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const nodes = shallowRef<Node[]>(nativeNodes)
     const edges = shallowRef<Edge[]>([])
     const applyNodeChanges = vi.fn((changes) => {
-      expect(changes).toEqual([{ id: 'node-1', type: 'select', selected: true }])
+      expect(changes).toEqual([
+        { id: 'node-1', type: 'select', selected: true } satisfies Partial<
+          import('@vue-flow/core').NodeChange
+        >,
+      ])
       ;(nodeToSelect as SelectableNode).selected = true
       return nativeNodes
     }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyNodeChanges']>
@@ -313,7 +348,10 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     expect(applyNodeChanges).toHaveBeenCalledOnce()
     expect(nodes.value).toBe(nativeNodes)
     expect(nodes.value[1]).toBe(unchangedNode)
-    expect(nodes.value[0]).toMatchObject({ id: 'node-1', selected: true })
+    expect(nodes.value[0]).toMatchObject({
+      id: 'node-1',
+      selected: true,
+    } satisfies Partial<MeasuredNode>)
     expect(afterCommand).not.toHaveBeenCalled()
   })
 
@@ -347,7 +385,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         dimensions: { width: 100, height: 80 },
         handleBounds: { source: [], target: [] },
         resizing: false,
-      } as MeasuredNode,
+      } satisfies Partial<MeasuredNode> as MeasuredNode,
     ])
     const edges = shallowRef<Edge[]>([])
     const applyNodeChanges = vi.fn()
@@ -417,9 +455,23 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         id: 'node-1',
         position: { x: 0, y: 0 },
         data: {},
-        handleBounds: { source: [{ id: 'out' }], target: [] },
+        handleBounds: {
+          source: [
+            {
+              id: 'out',
+              nodeId: 'node-1',
+              position: 'right' as import('@vue-flow/core').Position,
+              type: 'source',
+              x: 0,
+              y: 0,
+              width: 1,
+              height: 1,
+            },
+          ],
+          target: [],
+        },
         resizing: true,
-      } as MeasuredNode,
+      } satisfies Partial<MeasuredNode> as MeasuredNode,
     ])
     const edges = shallowRef<Edge[]>([])
     const applyNodeChanges = vi.fn()
@@ -433,7 +485,21 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       {
         id: 'node-1',
         type: 'dimensions',
-        handleBounds: { source: [{ id: 'out' }], target: [] },
+        handleBounds: {
+          source: [
+            {
+              id: 'out',
+              nodeId: 'node-1',
+              position: 'right' as import('@vue-flow/core').Position,
+              type: 'source',
+              x: 0,
+              y: 0,
+              width: 1,
+              height: 1,
+            },
+          ],
+          target: [],
+        },
       } as unknown as NodeChange,
     ])
     const repeatedResizingResult = adapter.applyNodeChanges([
@@ -462,7 +528,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       data: {},
       handleBounds: { source: [], target: [] },
       resizing: false,
-    } as MeasuredNode
+    } satisfies Partial<MeasuredNode> as MeasuredNode
     const nodes = shallowRef<Node[]>([measuredNode])
     const edges = shallowRef<Edge[]>([])
     const applyNodeChanges = vi.fn((changes) => {
@@ -485,9 +551,23 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       {
         id: 'node-1',
         type: 'dimensions',
-        handleBounds: { source: [{ id: 'out' }], target: [] },
+        handleBounds: {
+          source: [
+            {
+              id: 'out',
+              nodeId: 'node-1',
+              position: 'right' as import('@vue-flow/core').Position,
+              type: 'source',
+              x: 0,
+              y: 0,
+              width: 1,
+              height: 1,
+            },
+          ],
+          target: [],
+        },
         resizing: true,
-      } as unknown as NodeChange,
+      } satisfies Partial<import('@vue-flow/core').NodeChange> as unknown as NodeChange,
     ])
 
     expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
@@ -556,7 +636,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
         edges.value[0] = {
           ...(edges.value[0] as SelectableEdge),
           selected: change.selected,
-        } as unknown as Edge
+        } satisfies Partial<import('@vue-flow/core').GraphEdge> as unknown as Edge
       }
       return edges.value
     }) as unknown as NonNullable<CanvasVueFlowGraphActions['applyEdgeChanges']>
@@ -571,7 +651,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const result = adapter.applyEdgeChanges([{ id: 'edge-1', type: 'select', selected: true }])
 
     expect(result).toMatchObject({ command: 'applyEdgeChanges', didChange: false })
-    expect(result.after.edges[0]).toMatchObject({ selected: true })
+    expect(result.after.edges[0]).toMatchObject({ selected: true } satisfies Partial<MeasuredNode>)
     expect(applyEdgeChanges).toHaveBeenCalledOnce()
     expect(afterCommand).not.toHaveBeenCalled()
   })

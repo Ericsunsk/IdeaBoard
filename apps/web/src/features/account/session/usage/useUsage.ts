@@ -19,7 +19,7 @@ export function useUsage(
   enabled: MaybeRefOrGetter<boolean> = true,
 ) {
   const selectedRange = computed(() => toValue(range))
-  const { workspaceId, selectionSettled } = useAccountWorkspace()
+  const { workspaceId, isSelectionSettled } = useAccountWorkspace()
   const lastSuccessful = shallowRef<SuccessfulUsage>()
   const query = useQuery({
     queryKey: computed(() => usageQueryKeys.current(workspaceId.value ?? '', selectedRange.value)),
@@ -31,7 +31,7 @@ export function useUsage(
         usage: await fetchUsage(requestWorkspaceId, requestRange, signal),
       }
     },
-    enabled: () => toValue(enabled) && selectionSettled.value,
+    enabled: () => toValue(enabled) && isSelectionSettled.value,
     ...accountScoped(STALE_TIME_MS.usage),
     refetchOnWindowFocus: true,
     ...noRetry(),

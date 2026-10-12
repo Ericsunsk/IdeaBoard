@@ -23,7 +23,7 @@ interface ParsedNodeRef {
 interface ParsedHandleRef {
   direction: 'in' | 'out'
   port: CanvasConnectionPort | null
-  auto: boolean
+  shouldAuto: boolean
 }
 
 type FlowEdgeLike = {
@@ -48,9 +48,9 @@ function parseHandleRef(handleId: string | null | undefined): ParsedHandleRef | 
   if (!handleId) return null
   const [direction, rawPort] = handleId.split(':')
   if ((direction !== 'in' && direction !== 'out') || !rawPort) return null
-  if (rawPort === AUTO_HANDLE_PORT) return { direction, port: null, auto: true }
+  if (rawPort === AUTO_HANDLE_PORT) return { direction, port: null, shouldAuto: true }
   const port = rawPort as CanvasConnectionPort
-  return { direction, port, auto: false }
+  return { direction, port, shouldAuto: false }
 }
 
 function buildContractNode(

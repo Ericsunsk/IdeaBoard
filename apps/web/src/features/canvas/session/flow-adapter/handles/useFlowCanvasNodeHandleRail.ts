@@ -19,7 +19,7 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
     { immediate: false },
   )
 
-  const showHandleControls = computed(
+  const shouldShowHandleControls = computed(
     () =>
       isPointerOverNode.value ||
       isKeyboardFocusWithinNode.value ||
@@ -113,7 +113,7 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
   })
 
   return {
-    showHandleControls,
+    shouldShowHandleControls,
     refreshTransientHandleVisibility,
   }
 }

@@ -6,7 +6,7 @@ export type AdminConfirmIntent = 'warn' | 'danger'
 // operator note. When present, the dialog renders a reason field and the
 // caller reads it via readConfirmReason() after confirm() resolves true.
 export type AdminConfirmReasonSpec = {
-  required: boolean
+  isRequired: boolean
   label?: string | undefined
   placeholder?: string | undefined
 }
@@ -75,7 +75,7 @@ export function useAdminConfirm(): AdminConfirmPort {
         intent: options.intent,
         reason: '',
         reasonEnabled: options.reason !== undefined,
-        reasonRequired: options.reason?.required === true,
+        reasonRequired: options.reason?.isRequired === true,
         reasonLabel: options.reason?.label ?? '操作原因（内部审计记录）',
         reasonPlaceholder: options.reason?.placeholder ?? '请填写操作原因…',
         loading: false,

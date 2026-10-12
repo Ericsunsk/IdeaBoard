@@ -9,11 +9,11 @@
     <img
       :src="displayUrl || undefined"
       :alt="alt"
-      :draggable="draggable"
+      :draggable="isDraggable"
       :class="{ invisible: !displayUrl }"
     />
     <button
-      v-if="removable"
+      v-if="isRemovable"
       class="node-input-thumbnail-remove"
       type="button"
       :title="resolvedRemoveTitle"
@@ -39,8 +39,8 @@ const props = withDefaults(
     src: string
     assetId?: string | undefined
     alt?: string
-    draggable?: boolean
-    removable?: boolean
+    isDraggable?: boolean
+    isRemovable?: boolean
     previewMaxSide?: number
     removeTitle?: string | undefined
     removeAriaLabel?: string | undefined
@@ -48,8 +48,8 @@ const props = withDefaults(
   {
     alt: '',
     assetId: undefined,
-    draggable: false,
-    removable: false,
+    isDraggable: false,
+    isRemovable: false,
     previewMaxSide: 128,
     removeTitle: undefined,
     removeAriaLabel: undefined,

@@ -255,7 +255,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
       action: options.selectionGroupAction.value,
       nodes: options.nodes.value,
       frames: options.groupFrames.value,
-      requireSelectedGroupFrame: true,
+      shouldRequireSelectedGroupFrame: true,
     })
     if (options.selectionGroupAction.value.kind === 'ungroup' && !bounds) {
       closeSelectionGroupAction()
@@ -265,11 +265,11 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     event.preventDefault()
     event.stopPropagation()
     options.dismissTransientCanvasUi({
-      closeOutpaint: true,
-      closeBoardHeader: true,
-      closeContextMenu: true,
-      clearNodePanel: false,
-      hideStrength: false,
+      shouldCloseOutpaint: true,
+      shouldCloseBoardHeader: true,
+      shouldCloseContextMenu: true,
+      shouldClearNodePanel: false,
+      shouldHideStrength: false,
     })
     isSelectionGroupActionMenuOpen.value = true
   }
@@ -324,8 +324,8 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     closeSelectionGroupAction()
   })
 
-  watch(options.isEnabled, (enabled) => {
-    if (!enabled) closeSelectionGroupAction()
+  watch(options.isEnabled, (isEnabled) => {
+    if (!isEnabled) closeSelectionGroupAction()
   })
 
   return {

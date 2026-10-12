@@ -12,12 +12,12 @@ export type BoardStateValidationIssue = {
 export type BoardStateValidationErrorContext = {
   code: 'INVALID_BOARD_STATE'
   boundary: string
-  recoverable: true
+  isRecoverable: true
   issues: BoardStateValidationIssue[]
 }
 
 export type LatestBoardStateValidationResult<T> =
-  { ok: true; value: T } | { ok: false; error: BoardStateValidationErrorContext }
+  { isOk: true; value: T } | { isOk: false; error: BoardStateValidationErrorContext }
 
 export type LatestBoardStateNullableOptions = {
   mode?: 'nullable'
@@ -37,7 +37,7 @@ const DEFAULT_VALIDATION_BOUNDARY = 'board-state'
 export class InvalidBoardStateError extends Error {
   readonly code = 'INVALID_BOARD_STATE'
   readonly boundary: string
-  readonly recoverable = true
+  readonly isRecoverable = true
   readonly issues: BoardStateValidationIssue[]
 
   constructor(context: BoardStateValidationErrorContext) {
@@ -76,7 +76,7 @@ function toValidationErrorContext(
   return {
     code: 'INVALID_BOARD_STATE',
     boundary,
-    recoverable: true,
+    isRecoverable: true,
     issues: issues.map(toValidationIssue),
   }
 }
@@ -88,7 +88,7 @@ function toSerializationErrorContext(
   return {
     code: 'INVALID_BOARD_STATE',
     boundary,
-    recoverable: true,
+    isRecoverable: true,
     issues: [
       {
         path: '$',
@@ -101,9 +101,9 @@ function toSerializationErrorContext(
 
 function serializeJson(value: unknown, boundary: string): LatestBoardStateValidationResult<string> {
   try {
-    return { ok: true, value: JSON.stringify(value) ?? 'null' }
+    return { isOk: true, value: JSON.stringify(value) ?? 'null' }
   } catch (error) {
-    return { ok: false, error: toSerializationErrorContext(error, boundary) }
+    return { isOk: false, error: toSerializationErrorContext(error, boundary) }
   }
 }
 
@@ -113,10 +113,10 @@ function serializableEquality(
   boundary: string,
 ): LatestBoardStateValidationResult<boolean> {
   const leftJson = serializeJson(left, boundary)
-  if (!leftJson.ok) return leftJson
+  if (!leftJson.isOk) return leftJson
   const rightJson = serializeJson(right, boundary)
-  if (!rightJson.ok) return rightJson
-  return { ok: true, value: leftJson.value === rightJson.value }
+  if (!rightJson.isOk) return rightJson
+  return { isOk: true, value: leftJson.value === rightJson.value }
 }
 
 function successResult<T>(
@@ -126,9 +126,9 @@ function successResult<T>(
   boundary: string,
 ): T | null | LatestBoardStateValidationResult<T> {
   const equality = serializableEquality(input, output, boundary)
-  if (!equality.ok) return options?.mode === 'result' ? equality : null
+  if (!equality.isOk) return options?.mode === 'result' ? equality : null
   const value = equality.value ? (input as T) : output
-  return options?.mode === 'result' ? { ok: true, value } : value
+  return options?.mode === 'result' ? { isOk: true, value } : value
 }
 
 function normalizeWithLatestSchema<T>(
@@ -142,7 +142,7 @@ function normalizeWithLatestSchema<T>(
     return successResult(stateLike, directParsed.output, options, boundary)
   }
   const error = toValidationErrorContext(directParsed.issues, boundary)
-  return options?.mode === 'result' ? { ok: false, error } : null
+  return options?.mode === 'result' ? { isOk: false, error } : null
 }
 
 function normalizeLatestBoardSnapshot(snapshotLike: unknown): BoardSnapshot | null
@@ -182,7 +182,7 @@ export function assertLatestBoardSnapshot(
   boundary = DEFAULT_VALIDATION_BOUNDARY,
 ): BoardSnapshot {
   const result = normalizeLatestBoardSnapshot(snapshotLike, { mode: 'result', boundary })
-  if (!result.ok) throw new InvalidBoardStateError(result.error)
+  if (!result.isOk) throw new InvalidBoardStateError(result.error)
   return result.value
 }
 
@@ -191,6 +191,6 @@ export function assertLatestBoardState(
   boundary = DEFAULT_VALIDATION_BOUNDARY,
 ): BoardState {
   const result = normalizeLatestBoardState(stateLike, { mode: 'result', boundary })
-  if (!result.ok) throw new InvalidBoardStateError(result.error)
+  if (!result.isOk) throw new InvalidBoardStateError(result.error)
   return result.value
 }

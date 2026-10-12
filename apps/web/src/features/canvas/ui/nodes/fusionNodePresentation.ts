@@ -1,5 +1,5 @@
 export type FusionNodePresentationBinding = {
-  promptComposerVisible: boolean
+  isPromptComposerVisible: boolean
 }
 
 export type FusionNodePresentationBindingSource = {
@@ -16,11 +16,11 @@ export function createFusionNodePresentationResolver(
   const cache = new Map<string, FusionNodePresentationBinding>()
 
   function forNode(nodeId: string): FusionNodePresentationBinding {
-    const promptComposerVisible = source.promptComposerVisibleFor(nodeId)
+    const isPromptComposerVisible = source.promptComposerVisibleFor(nodeId)
     const cached = cache.get(nodeId)
-    if (cached?.promptComposerVisible === promptComposerVisible) return cached
+    if (cached?.isPromptComposerVisible === isPromptComposerVisible) return cached
 
-    const binding = { promptComposerVisible }
+    const binding = { isPromptComposerVisible }
     cache.set(nodeId, binding)
     return binding
   }

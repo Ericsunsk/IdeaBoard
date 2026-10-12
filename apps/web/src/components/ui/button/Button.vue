@@ -3,10 +3,10 @@
     :as="as"
     :as-child="asChild"
     :class="cn(buttonVariants({ variant: props.variant, size: props.size }), props.class)"
-    :disabled="disabled || loading || undefined"
-    :aria-busy="loading || undefined"
+    :disabled="isDisabled || isLoading || undefined"
+    :aria-busy="isLoading || undefined"
   >
-    <Spinner v-if="props.loading" class="size-4 shrink-0 mr-2" aria-hidden="true" />
+    <Spinner v-if="props.isLoading" class="size-4 shrink-0 mr-2" aria-hidden="true" />
     <slot />
   </Primitive>
 </template>
@@ -22,8 +22,8 @@ interface Props extends PrimitiveProps {
   variant?: ButtonVariants['variant'] | undefined
   size?: ButtonVariants['size'] | undefined
   class?: HTMLAttributes['class'] | undefined
-  disabled?: boolean | undefined
-  loading?: boolean | undefined
+  isDisabled?: boolean | undefined
+  isLoading?: boolean | undefined
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -31,7 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
   variant: 'default',
   size: 'default',
   class: undefined,
-  disabled: false,
-  loading: false,
+  isDisabled: false,
+  isLoading: false,
 })
 </script>

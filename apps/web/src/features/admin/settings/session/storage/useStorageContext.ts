@@ -58,7 +58,7 @@ export function useStorageContext(options: UseAdminStorageContextOptions) {
     fetchBucketDomains: editor.fetchBucketDomains,
     // Workspace-owned: apply/test/delete/enable orchestration.
     cards: workspace.cards,
-    loading: workspace.loading,
+    loading: workspace.isLoading,
     storages: workspace.storages,
     creatableProviders: workspace.creatableProviders,
     applyingId: workspace.applyingId,

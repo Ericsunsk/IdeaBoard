@@ -26,7 +26,7 @@ function asset(index: number, height = 600): LibraryAssetView {
 }
 const propsFor = (assets: LibraryAssetView[], isLoading = false) => ({
   assets,
-  loading: isLoading,
+  isLoading: isLoading,
   errorMessage: null,
   hasMore: true,
   isExpanded: false,

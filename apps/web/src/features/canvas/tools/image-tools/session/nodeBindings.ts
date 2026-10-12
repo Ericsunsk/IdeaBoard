@@ -8,7 +8,7 @@ import { i18n } from '../../../../../core/i18n'
 function areStageBindingsEqual(left: ImageToolStageBinding, right: ImageToolStageBinding): boolean {
   return (
     left.nodeId === right.nodeId &&
-    left.active === right.active &&
+    left.isActive === right.isActive &&
     left.mode === right.mode &&
     Object.is(left.retouchStage, right.retouchStage)
   )
@@ -20,11 +20,11 @@ function areActionBindingsEqual(left: ImageActionBinding, right: ImageActionBind
   const leftControl = left.strengthControl
   const rightControl = right.strengthControl
   return (
-    left.actionMenuVisible === right.actionMenuVisible &&
-    left.promptComposerVisible === right.promptComposerVisible &&
+    left.isActionMenuVisible === right.isActionMenuVisible &&
+    left.isPromptComposerVisible === right.isPromptComposerVisible &&
     left.promptPlaceholder === right.promptPlaceholder &&
-    left.directGenerating === right.directGenerating &&
-    leftControl.visible === rightControl.visible &&
+    left.isDirectGenerating === right.isDirectGenerating &&
+    leftControl.isVisible === rightControl.isVisible &&
     Object.is(leftControl.activeAction, rightControl.activeAction) &&
     leftControl.getValue === rightControl.getValue &&
     leftControl.setRangeRef === rightControl.setRangeRef &&
@@ -63,7 +63,7 @@ export function createImageToolNodeBindings(
     const mode = session.retouchNodeId.value === nodeId ? session.retouchMode.value : null
     const nextBinding: ImageToolStageBinding = {
       nodeId,
-      active: mode != null,
+      isActive: mode != null,
       mode,
       retouchStage:
         session.retouchNodeId.value === nodeId && session.retouchMode.value === 'adjust'
@@ -76,19 +76,19 @@ export function createImageToolNodeBindings(
 
   function actionBindingFor(nodeId: string): ImageActionBinding {
     const hasCommittedMask = !!session.inpaint.getCommittedMaskData(nodeId)
-    const actionMenuVisible = ui.isImageActionPanelVisible(nodeId)
+    const isActionMenuVisible = ui.isImageActionPanelVisible(nodeId)
     const activeStrengthAction = ui.strengthControl.activeAction.value
-    const directGenerating =
+    const isDirectGenerating =
       execution.isNodeExecutionActive(nodeId) || session.applyScope.pendingNodeId.value === nodeId
     const nextBinding: ImageActionBinding = {
-      actionMenuVisible,
-      promptComposerVisible: ui.isImagePromptComposerVisible(nodeId),
+      isActionMenuVisible,
+      isPromptComposerVisible: ui.isImagePromptComposerVisible(nodeId),
       promptPlaceholder: hasCommittedMask
         ? i18n.global.t('canvas.tools.maskPromptPlaceholder')
         : i18n.global.t('canvas.tools.optionalPromptPlaceholder'),
-      directGenerating,
+      isDirectGenerating,
       strengthControl: {
-        visible: !!activeStrengthAction && actionMenuVisible,
+        isVisible: !!activeStrengthAction && isActionMenuVisible,
         activeAction: activeStrengthAction,
         getValue: ui.strengthControl.getValue,
         setRangeRef: ui.strengthControl.setRangeRef,

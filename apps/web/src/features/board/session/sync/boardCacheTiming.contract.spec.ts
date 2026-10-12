@@ -58,7 +58,7 @@ describe('board cache timing', () => {
       gcTime: 10 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
-    })
+    } satisfies Partial<import('@tanstack/vue-query').QueryObserverOptions>)
   })
 
   it('accountScoped() defaults to 15s freshness and keeps the global retry policy', () => {

@@ -16,7 +16,7 @@
         class="prompt-text-composer-image-thumb aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)]"
         :src="item.url"
         :asset-id="item.mediaRef?.assetId"
-        :removable="!disabled"
+        :is-removable="!isDisabled"
         :data-image-id="item.id"
         @mousedown.stop
         @contextmenu.stop.prevent="emit('image-input-preview', item)"
@@ -26,7 +26,7 @@
         v-if="canAddImageInput"
         class="prompt-text-composer-image-add node-input-thumbnail-add node-tool-output-count node-tool-button canvas-tool-tooltip-trigger"
         type="button"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :aria-label="t('canvas.controls.addImageInput')"
         @click="emit('image-input-open')"
       >
@@ -42,13 +42,13 @@
       :output-resolution="outputResolution"
       :aspect-ratio="aspectRatio"
       :placeholder="placeholder"
-      :disabled="disabled"
-      :allow-empty="allowEmpty"
-      :submit-disabled="submitDisabled"
-      :show-aspect-ratio="showAspectRatio"
-      :show-output-count="showOutputCount"
-      :show-output-resolution="showOutputResolution"
-      :autofocus="autofocus"
+      :is-disabled="isDisabled"
+      :should-allow-empty="shouldAllowEmpty"
+      :is-submit-disabled="isSubmitDisabled"
+      :should-show-aspect-ratio="shouldShowAspectRatio"
+      :should-show-output-count="shouldShowOutputCount"
+      :should-show-output-resolution="shouldShowOutputResolution"
+      :is-autofocus="isAutofocus"
       :billing-state="billingState"
       :textarea-class="promptTextInputClass"
       actions-class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
@@ -79,34 +79,34 @@ const props = withDefaults(
     outputCount: number
     outputResolution?: OutputResolution | undefined
     placeholder?: string
-    disabled?: boolean
-    allowEmpty?: boolean
-    submitDisabled?: boolean
+    isDisabled?: boolean
+    shouldAllowEmpty?: boolean
+    isSubmitDisabled?: boolean
     aspectRatio?: PromptAspectRatio | undefined
     imageInputs?: PromptTextComposerImageInput[]
     maxImageInputs?: number
-    showAspectRatio?: boolean
-    showImageInput?: boolean
-    showOutputCount?: boolean
-    showOutputResolution?: boolean
-    autofocus?: boolean
+    shouldShowAspectRatio?: boolean
+    shouldShowImageInput?: boolean
+    shouldShowOutputCount?: boolean
+    shouldShowOutputResolution?: boolean
+    isAutofocus?: boolean
     variant?: 'node' | 'floating'
     billingState?: CanvasBillingQuoteState | null
   }>(),
   {
-    allowEmpty: false,
+    shouldAllowEmpty: false,
     aspectRatio: undefined,
-    autofocus: false,
-    disabled: false,
+    isAutofocus: false,
+    isDisabled: false,
     imageInputs: () => [],
     maxImageInputs: 4,
     outputResolution: undefined,
     placeholder: 'type your idea...',
-    showAspectRatio: true,
-    showImageInput: false,
-    showOutputCount: true,
-    showOutputResolution: true,
-    submitDisabled: false,
+    shouldShowAspectRatio: true,
+    shouldShowImageInput: false,
+    shouldShowOutputCount: true,
+    shouldShowOutputResolution: true,
+    isSubmitDisabled: false,
     variant: 'node',
     billingState: null,
   },
@@ -148,7 +148,7 @@ const visibleImageInputs = computed(() =>
   props.imageInputs.filter((item) => item.id && item.url).slice(0, maxVisibleImageInputs.value),
 )
 const shouldShowImageInputRow = computed(
-  () => props.showImageInput && maxVisibleImageInputs.value > 0,
+  () => props.shouldShowImageInput && maxVisibleImageInputs.value > 0,
 )
 const canAddImageInput = computed(
   () => visibleImageInputs.value.length < maxVisibleImageInputs.value,

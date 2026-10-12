@@ -44,7 +44,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   rendererMetrics: CanvasRendererMetricsPort
   boardBaseSnapshot: Ref<BoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
-  flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
+  flushAutosave?: (options?: { isSilent?: boolean }) => Promise<void>
   pendingResults?: PendingImageResultExecution
   taskAdapter?: CanvasTaskSubmissionAdapter
   waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>

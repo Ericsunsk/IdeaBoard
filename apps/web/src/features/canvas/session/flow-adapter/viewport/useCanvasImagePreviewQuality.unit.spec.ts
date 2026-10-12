@@ -52,7 +52,7 @@ describe('useCanvasImagePreviewQuality', () => {
         stageHeight: 180,
         zoomLevel: 20,
         devicePixelRatio: 2,
-        forceFullQuality: true,
+        shouldForceFullQuality: true,
       }),
     ).toBe(CANVAS_IMAGE_PREVIEW_MAX_SIDE.full)
   })
@@ -72,15 +72,18 @@ describe('useCanvasImagePreviewQuality', () => {
       })
       vi.stubGlobal(
         'matchMedia',
-        vi.fn(() => ({
-          matches: true,
-          addEventListener: (_type: string, listener: () => void) => {
-            changeListeners.add(listener)
-          },
-          removeEventListener: (_type: string, listener: () => void) => {
-            changeListeners.delete(listener)
-          },
-        })),
+        vi.fn(
+          () =>
+            ({
+              matches: true,
+              addEventListener: (_type: string, listener: () => void) => {
+                changeListeners.add(listener)
+              },
+              removeEventListener: (_type: string, listener: () => void) => {
+                changeListeners.delete(listener)
+              },
+            }) satisfies Pick<MediaQueryList, 'matches'> & Record<string, unknown>,
+        ),
       )
 
       const scope = effectScope()

@@ -311,9 +311,9 @@ describe('screenRuntime', () => {
 
       expect(runtime.savePopoverAnchor.value).toBe(anchor)
       expect(toggle).toHaveBeenCalledOnce()
-      const request = toggle.mock.calls[0]?.[1] as { result: unknown; authenticated: boolean }
+      const request = toggle.mock.calls[0]?.[1] as { result: unknown; isAuthenticated: boolean }
       expect(request.result).toBe(result)
-      expect(request.authenticated).toBe(true)
+      expect(request.isAuthenticated).toBe(true)
     } finally {
       anchor.remove()
       unmount()

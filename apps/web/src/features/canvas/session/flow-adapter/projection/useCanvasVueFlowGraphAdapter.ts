@@ -22,12 +22,12 @@ export type {
 } from './canvasVueFlowGraphCommandRunner'
 
 export type CanvasVueFlowGraphNodeUpdateOptions = CanvasVueFlowGraphCommandOptions & {
-  replace?: boolean
+  shouldReplace?: boolean
 }
 
 export type CanvasVueFlowGraphRemoveNodesOptions = CanvasVueFlowGraphCommandOptions & {
-  removeConnectedEdges?: boolean
-  removeChildren?: boolean
+  shouldRemoveConnectedEdges?: boolean
+  shouldRemoveChildren?: boolean
 }
 
 export type CanvasVueFlowIncrementalProjection = Readonly<{
@@ -84,15 +84,15 @@ function createGraph(nodes: Node[], edges: Edge[]): CanvasVueFlowGraph {
   return { nodes, edges: toCanvasSemanticEdges(edges) }
 }
 
-type VueFlowRuntimeNode = Node & {
-  computedPosition?: unknown
-  handleBounds?: unknown
-  isParent?: boolean
-  resizing?: boolean
-  dragging?: boolean
-  initialized?: boolean
-  events?: unknown
-}
+/** @externalContract Vue Flow node metadata; initialized is present at runtime but omitted from GraphNode. */
+type VueFlowRuntimeNode = Node &
+  Partial<Pick<import('@vue-flow/core').GraphNode, 'dragging' | 'resizing'>> & {
+    computedPosition?: unknown
+    handleBounds?: unknown
+    isParent?: boolean
+    initialized?: boolean
+    events?: unknown
+  }
 
 /**
  * Canvas owns semantic graph state; Vue Flow owns measurements and interaction
@@ -184,13 +184,16 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
    */
   function updateRendererNodeProjection(node: Node) {
     const controlledNode = toControlledNode(node)
-    const selected = (controlledNode as Node & { selected?: boolean }).selected ?? false
+    const isSelected =
+      (controlledNode as Node & Partial<Pick<import('@vue-flow/core').GraphNode, 'selected'>>)
+        .selected ?? false
     options.actions?.updateNode?.(
       controlledNode.id,
-      () => ({
-        ...controlledNode,
-        selected,
-      }),
+      () =>
+        ({
+          ...controlledNode,
+          selected: isSelected,
+        }) satisfies Partial<import('@vue-flow/core').GraphNode>,
       { replace: false },
     )
   }
@@ -327,10 +330,10 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     plan: IncrementalProjectionPlan,
     nextEdges: Edge[] | undefined,
     changedEdgeIds: readonly string[],
-    edgesApplied: boolean,
+    isEdgesApplied: boolean,
   ): void {
     if (!nextEdges || nextEdges === options.edges.value) return
-    if (!edgesApplied && plan.hasEdgeChanges) {
+    if (!isEdgesApplied && plan.hasEdgeChanges) {
       // New nodes must be present before Vue Flow validates their edges.
       options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
     }
@@ -357,9 +360,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
         changedNodeIds,
         changedEdgeIds,
       )
-      const edgesApplied = applyProjectedEdgesFirst(plan, nextEdges)
+      const isEdgesApplied = applyProjectedEdgesFirst(plan, nextEdges)
       applyProjectedNodes(plan, nextNodes, changedNodeIds)
-      applyProjectedEdgesFinally(plan, nextEdges, changedEdgeIds, edgesApplied)
+      applyProjectedEdgesFinally(plan, nextEdges, changedEdgeIds, isEdgesApplied)
     })
   }
 
@@ -479,7 +482,7 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       return commandRunner.noOp('removeNodes', commandOptions)
     }
     const nextEdges =
-      commandOptions.removeConnectedEdges === true
+      commandOptions.shouldRemoveConnectedEdges === true
         ? options.edges.value.filter(
             (edge) => !targetIds.has(edge.source) && !targetIds.has(edge.target),
           )
@@ -491,8 +494,8 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
         projectGraph(nextNodes.length, nextEdges.length, () => {
           options.actions?.removeNodes?.(
             Array.from(targetIds),
-            commandOptions.removeConnectedEdges ?? false,
-            commandOptions.removeChildren,
+            commandOptions.shouldRemoveConnectedEdges ?? false,
+            commandOptions.shouldRemoveChildren,
           )
           syncNodes(nextNodes)
           if (nextEdges !== options.edges.value) syncEdges(nextEdges)
@@ -541,7 +544,7 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       return commandRunner.noOp('updateNode', commandOptions)
     }
     const patch = typeof update === 'function' ? update(currentNode) : update
-    const nextNode = commandOptions.replace
+    const nextNode = commandOptions.shouldReplace
       ? ({ id: currentNode.id, ...patch } as Node)
       : ({ ...currentNode, ...patch } as Node)
     const nextNodes = options.nodes.value.slice()
@@ -552,7 +555,7 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       commit: () =>
         projectGraph(nextNodes.length, options.edges.value.length, () => {
           options.actions?.updateNode?.(nodeId, update, {
-            replace: commandOptions.replace ?? false,
+            replace: commandOptions.shouldReplace ?? false,
           })
           syncNodes(nextNodes)
         }),

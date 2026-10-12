@@ -42,7 +42,7 @@ const OTHER_WORKSPACE_ID = 'ws_other999'
 class MockEventSource {
   static instances: MockEventSource[] = []
   onerror: ((event: Event) => void) | null = null
-  closed = false
+  isClosed = false
   readonly url: string
   private listeners: Record<string, EventListener[]> = {}
 
@@ -58,7 +58,7 @@ class MockEventSource {
   }
 
   close() {
-    this.closed = true
+    this.isClosed = true
   }
 
   emit(type: string, data: unknown) {
@@ -192,7 +192,7 @@ describe('board SSE mapping', () => {
       onGap: (info) => gaps.push(info),
     })
     MockEventSource.instances[0]?.emit('board.document_replaced', envelopeFixture())
-    MockEventSource.instances[0]?.emit('gap', { truncated: true })
+    MockEventSource.instances[0]?.emit('gap', { truncated: true } satisfies Record<string, boolean>)
     expect(gaps).toEqual([{ lastEventId: 'evt_abc123' }])
     stop()
   })
@@ -420,7 +420,7 @@ describe('board SSE mapping', () => {
         stops.push(
           subscribeBoardQueryInvalidation(client, WORKSPACE_ID, undefined, {
             requestCatalogHydrate: () =>
-              hydrateBoardsFromServer({ includeDocuments: false, force: true }),
+              hydrateBoardsFromServer({ shouldIncludeDocuments: false, shouldForce: true }),
           }),
         )
         emitShareRevoked()
@@ -442,7 +442,10 @@ describe('board SSE mapping', () => {
       const previous = client.getQueryData(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))
       connect()
       const write = vi.spyOn(client, 'setQueryData')
-      MockEventSource.instances[0]!.emit('gap', { truncated: true })
+      MockEventSource.instances[0]!.emit('gap', { truncated: true } satisfies Record<
+        string,
+        boolean
+      >)
       await vi.advanceTimersByTimeAsync(0)
 
       expect(client.getQueryState(boardQueryKeys.list(WORKSPACE_ID))?.isInvalidated).toBe(true)

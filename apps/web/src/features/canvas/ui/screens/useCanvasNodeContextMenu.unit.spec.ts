@@ -8,7 +8,7 @@ describe('useCanvasNodeContextMenu', () => {
     contextMenu.open({ x: 32, y: 44, flowX: 142, flowY: 264 })
 
     expect(contextMenu.nodeContextMenu.value).toEqual({
-      visible: true,
+      isVisible: true,
       x: 32,
       y: 44,
       flowX: 142,
@@ -24,7 +24,7 @@ describe('useCanvasNodeContextMenu', () => {
     contextMenu.createNode('prompt', createNodeAtPosition)
 
     expect(createNodeAtPosition).toHaveBeenCalledWith('prompt', 142, 264)
-    expect(contextMenu.nodeContextMenu.value.visible).toBe(false)
+    expect(contextMenu.nodeContextMenu.value.isVisible).toBe(false)
   })
 
   it('closes without discarding the last creation snapshot', () => {
@@ -34,7 +34,7 @@ describe('useCanvasNodeContextMenu', () => {
     contextMenu.close()
 
     expect(contextMenu.nodeContextMenu.value).toEqual({
-      visible: false,
+      isVisible: false,
       x: 32,
       y: 44,
       flowX: 142,

@@ -43,13 +43,13 @@ export type CanvasGraphNodeRecord = {
   id: CanvasGraphNodeId
   kind: CanvasGraphNodeKind
   snapshot: CanvasNodeItem
-  selected: boolean
+  isSelected: boolean
 }
 
 export type CanvasGraphEdgeRecord = {
   id: CanvasGraphEdgeId
   connection: CanvasConnection
-  selected: boolean
+  isSelected: boolean
 }
 
 export type CanvasGraphGroupRecord = {
@@ -87,12 +87,12 @@ export type CanvasGraphProjectionPatch = {
     added: CanvasGraphNodeRecord[]
     updated: CanvasGraphNodeRecord[]
     removedIds: CanvasGraphNodeId[]
-    selectionChanged: Array<{ id: CanvasGraphNodeId; selected: boolean }>
+    selectionChanged: Array<{ id: CanvasGraphNodeId; isSelected: boolean }>
   }
   edges: {
     added: CanvasGraphEdgeRecord[]
     removedIds: CanvasGraphEdgeId[]
-    selectionChanged: Array<{ id: CanvasGraphEdgeId; selected: boolean }>
+    selectionChanged: Array<{ id: CanvasGraphEdgeId; isSelected: boolean }>
   }
   groups: {
     added: CanvasGraphGroupRecord[]
@@ -143,8 +143,8 @@ export type CanvasGraphCommitEvent = Readonly<{
   summary: CanvasGraphTransactionSummary
   patch: CanvasGraphCommitPatch
   sideEffects: Readonly<{
-    recordHistory: boolean
-    markDirty: boolean
+    shouldRecordHistory: boolean
+    shouldMarkDirty: boolean
   }>
 }>
 
@@ -171,8 +171,8 @@ export type CanvasGraphTransactionSummary = {
 }
 
 export type CanvasGraphTransactionOptions = {
-  recordHistory?: boolean
-  markDirty?: boolean
+  shouldRecordHistory?: boolean
+  shouldMarkDirty?: boolean
 }
 
 export type CanvasGraphNodeUpdate =
@@ -182,7 +182,7 @@ export type CanvasGraphNodeUpdate =
   | ((node: CanvasNodeItem) => CanvasNodeItem)
 
 export type CanvasGraphRemoveNodeOptions = {
-  removeConnectedEdges?: boolean
+  shouldRemoveConnectedEdges?: boolean
 }
 
 export type CanvasGraphStoreState = {

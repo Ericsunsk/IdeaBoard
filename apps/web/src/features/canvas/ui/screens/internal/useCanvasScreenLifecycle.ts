@@ -25,7 +25,7 @@ export function useCanvasScreenLifecycle(options: {
   route: RouteLocationNormalizedLoaded
   persistence: CanvasWorkspaceRuntime['commands']['persistence']
   history: CanvasWorkspaceRuntime['viewModel']['persistence']['history']
-  duplicateModifierPressed: Ref<boolean>
+  isDuplicateModifierPressed: Ref<boolean>
   keyboard: {
     onDeleteInlineSelection: () => boolean
     isShortcutSuppressed: () => boolean
@@ -46,7 +46,7 @@ export function useCanvasScreenLifecycle(options: {
 
   useCanvasKeyboardShortcuts({
     onSave: () => {
-      void options.persistence.flushAutosave({ silent: false })
+      void options.persistence.flushAutosave({ isSilent: false })
     },
     onUndo: options.history.undo,
     onRedo: options.history.redo,
@@ -56,8 +56,8 @@ export function useCanvasScreenLifecycle(options: {
     onPanViewport: options.keyboard.onPanViewport,
     onToolSelect: () => options.keyboard.setActiveTool('select'),
     onToolHand: () => options.keyboard.setActiveTool('hand'),
-    onDuplicateModifierChange: (pressed) => {
-      options.duplicateModifierPressed.value = pressed
+    onDuplicateModifierChange: (isPressed) => {
+      options.isDuplicateModifierPressed.value = isPressed
     },
   })
 

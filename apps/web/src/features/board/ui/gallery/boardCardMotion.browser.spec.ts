@@ -86,19 +86,22 @@ function renderCard() {
 }
 
 /** Host exercising the gallery list boundary: appear + removal. */
-function renderListCard(initialShow = true) {
-  const show = ref(initialShow)
+function renderListCard(isInitialShow = true) {
+  const shouldShow = ref(isInitialShow)
   const Host = defineComponent({
     setup() {
       return () =>
         h(
           TransitionGroup,
           { name: 'board-card', appear: true, tag: 'div' },
-          { default: () => (show.value ? [h(BoardCard, { ...cardProps(), key: 'board-1' })] : []) },
+          {
+            default: () =>
+              shouldShow.value ? [h(BoardCard, { ...cardProps(), key: 'board-1' })] : [],
+          },
         )
     },
   })
-  return { show, ...mountApp(() => h(Host)) }
+  return { shouldShow, ...mountApp(() => h(Host)) }
 }
 
 describe('BoardCard motion browser contract', () => {
@@ -143,7 +146,7 @@ describe('BoardCard motion browser contract', () => {
   })
 
   it('animates card appearance and removal from the board list boundary', async () => {
-    const { show, article, unmount } = renderListCard()
+    const { shouldShow, article, unmount } = renderListCard()
     try {
       // Appear converges to the visible final state.
       await expect
@@ -157,7 +160,7 @@ describe('BoardCard motion browser contract', () => {
         })
         .toBe('1')
 
-      show.value = false
+      shouldShow.value = false
       await nextTick()
       // Removal runs through the leave transition at the boundary.
       await expect
@@ -200,7 +203,7 @@ describe('BoardCard motion browser contract', () => {
     // Under reduced motion Vue skips enter classes entirely (no transition
     // to run), so the reduced from/to rules are asserted by applying them
     // to the real card; removal is still exercised for real below.
-    const { article: listArticle, show, unmount: unmountList } = renderListCard()
+    const { article: listArticle, shouldShow, unmount: unmountList } = renderListCard()
     const probe = listArticle()
     try {
       expect(probe).not.toBeNull()
@@ -219,7 +222,7 @@ describe('BoardCard motion browser contract', () => {
 
       // Real removal completes without the 220ms exit transition.
       await expect.poll(() => styleOf(listArticle()!).opacity).toBe('1')
-      show.value = false
+      shouldShow.value = false
       await expect.poll(() => listArticle()).toBeNull()
     } finally {
       unmountList()

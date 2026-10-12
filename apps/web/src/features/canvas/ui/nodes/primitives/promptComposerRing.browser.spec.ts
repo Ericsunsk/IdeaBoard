@@ -52,10 +52,10 @@ function renderComposer() {
       textareaClass: 'prompt-input',
       actionsClass: 'prompt-actions',
       sendButtonClass: 'prompt-send',
-      showSubmit: false,
-      showOutputCount: false,
-      showOutputResolution: false,
-      showAspectRatio: false,
+      shouldShowSubmit: false,
+      shouldShowOutputCount: false,
+      shouldShowOutputResolution: false,
+      shouldShowAspectRatio: false,
     },
   })
 }

@@ -8,25 +8,25 @@ describe('useCanvasLibraryIsland', () => {
     const island = scope.run(useCanvasLibraryIsland)
     if (!island) throw new Error('Failed to create Canvas Library island')
 
-    expect(island.view.open.value).toBe(false)
-    expect(island.view.mounted.value).toBe(false)
+    expect(island.view.isOpen.value).toBe(false)
+    expect(island.view.isMounted.value).toBe(false)
 
     island.commands.toggle()
-    expect(island.view.open.value).toBe(true)
-    expect(island.view.mounted.value).toBe(true)
+    expect(island.view.isOpen.value).toBe(true)
+    expect(island.view.isMounted.value).toBe(true)
 
     island.commands.close()
-    expect(island.view.open.value).toBe(false)
-    expect(island.view.mounted.value).toBe(true)
+    expect(island.view.isOpen.value).toBe(false)
+    expect(island.view.isMounted.value).toBe(true)
 
     island.commands.setFocusWithin(true)
-    expect(island.view.focusWithin.value).toBe(true)
+    expect(island.view.isFocusWithin.value).toBe(true)
     island.commands.close()
-    expect(island.view.focusWithin.value).toBe(false)
+    expect(island.view.isFocusWithin.value).toBe(false)
 
     island.commands.toggle()
-    expect(island.view.open.value).toBe(true)
-    expect(island.view.mounted.value).toBe(true)
+    expect(island.view.isOpen.value).toBe(true)
+    expect(island.view.isMounted.value).toBe(true)
 
     scope.stop()
   })

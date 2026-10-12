@@ -51,7 +51,7 @@ export function useCanvasVueFlowHandleGeometryAdapter(): CanvasHandleProximityGe
   ): CanvasHandleProximityPoint | null {
     const origin = surfaceOrigin
     const metrics = rendererMetrics.readNodeMetrics(nodeId)
-    if (!origin || !metrics || !metrics.measured || !metrics.computedPosition) return null
+    if (!origin || !metrics || !metrics.isMeasured || !metrics.computedPosition) return null
 
     const { width, height } = metrics.dimensions
     const { x, y } = metrics.computedPosition

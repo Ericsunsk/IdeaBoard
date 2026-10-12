@@ -159,7 +159,7 @@ const contentClass = computed(() => contentLayoutClasses[props.contentLayout])
 const adminDialogSurfaceIntent = defineDialogSurfaceIntent()
 const { ariaBusy, canDismiss, completeClose, handleVisibilityChange, requestClose } =
   useOverlayInteractionLifecycle({
-    visible: () => props.visible,
+    isVisible: () => props.visible,
     busy: () => props.busy,
     surface: adminDialogSurfaceIntent,
     onReset: () => emit('reset'),

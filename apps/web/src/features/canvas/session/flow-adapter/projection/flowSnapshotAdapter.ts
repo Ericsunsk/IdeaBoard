@@ -1,3 +1,4 @@
+import type { Edge, GraphNode } from '@vue-flow/core'
 import { toRaw } from 'vue'
 import { i18n } from '../../../../../core/i18n'
 import {
@@ -21,7 +22,7 @@ import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export { resolveNextCanvasConnectionId } from './flowSnapshotConnectionMaterializer'
 
-export interface FlowAdapterNode {
+export interface FlowAdapterNode extends Partial<Pick<GraphNode, 'selected'>> {
   id: string
   type?: 'canvas' | string
   dragHandle?: string
@@ -30,13 +31,12 @@ export interface FlowAdapterNode {
   data?: unknown
 }
 
-export interface FlowAdapterEdge {
+export interface FlowAdapterEdge extends Partial<Pick<Edge, 'animated'>> {
   id: string
   source: string
   target: string
   sourceHandle?: string | null
   targetHandle?: string | null
-  animated?: boolean
   class?: string
   data?: unknown
 }
@@ -165,7 +165,7 @@ function toFlowDataFromCanvasNode(
 export function canvasNodeToFlowNode(
   nodeType: CanvasConnectionNodeKind,
   node: CanvasNodeItem,
-  selected = false,
+  isSelected = false,
 ): FlowAdapterNode {
   return {
     id: toFlowNodeId(nodeType, node.id),
@@ -174,7 +174,7 @@ export function canvasNodeToFlowNode(
     position: { x: node.x, y: node.y },
     dimensions: resolveCanvasGraphNodeDimensions(nodeType, node),
     data: toFlowDataFromCanvasNode(nodeType, node),
-    ...(selected ? { selected: true } : {}),
+    ...(isSelected ? ({ selected: true } satisfies Pick<GraphNode, 'selected'>) : {}),
   }
 }
 
