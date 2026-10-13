@@ -5,9 +5,7 @@ import { loadSeamInventory } from './seamInventory.ts'
 
 const seams = loadSeamInventory().seams
 const canonicalEntries = new Set(
-  seams
-    .filter((seam) => seam.kind === 'canonical' && seam.status === 'active')
-    .map((seam) => seam.path),
+  seams.filter((seam) => seam.kind === 'canonical').map((seam) => seam.path),
 )
 const baselinePath = new URL('./booleanNaming.baseline.json', import.meta.url)
 const baseline = new Set(JSON.parse(fs.readFileSync(baselinePath, 'utf8')).declarations)
@@ -34,7 +32,7 @@ export const noBarrelImportRule = {
     schema: [],
     messages: {
       cascading:
-        'Cascading barrel {{entry}} forwards another ownership layer; use its declared canonical entry or direct owned module during migration.',
+        'Cascading barrel {{entry}} forwards another ownership layer; use its declared canonical entry or direct owned module.',
     },
   },
   create(context) {

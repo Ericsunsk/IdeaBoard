@@ -123,14 +123,6 @@ func (s *Service) StagedEvents() []TaskEvent {
 	return staged
 }
 
-func (s *Service) stage(taskID, workspaceID string, status Status) {
-	s.stageWithToken(taskID, workspaceID, status, "")
-}
-
-func (s *Service) stageWithToken(taskID, workspaceID string, status Status, executionToken string) {
-	s.stageWithTokenAt(taskID, workspaceID, status, executionToken, s.clock())
-}
-
 func (s *Service) stageWithTokenAt(taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time) {
 	if occurredAt.IsZero() {
 		occurredAt = s.clock()

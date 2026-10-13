@@ -29,8 +29,3 @@ func validateImgproxyOrFatal(cfg *config.Config) error {
 	}
 	return imgproxyConfigFromApp(cfg).Validate()
 }
-
-// imgproxyTierConfig builds the signing config for delivery handlers.
-func imgproxyTierConfig(cfg *config.Config) imgproxy.Config {
-	return imgproxyConfigFromApp(cfg)
-}

@@ -55,15 +55,6 @@ func (q *RiverQueue) SetClient(client riverClient) {
 	q.client = client
 }
 
-func (q *RiverQueue) getClient() riverClient {
-	if q == nil {
-		return nil
-	}
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-	return q.client
-}
-
 func (q *RiverQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 	if q == nil || q.db == nil {
 		return 0, 0, nil

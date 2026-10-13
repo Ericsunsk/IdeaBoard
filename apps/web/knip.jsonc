@@ -1,9 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "project": ["src/**/*.{ts,vue,css}", "scripts/*.ts"],
-  // Public feature entrypoints (Feature Completion Contract). Their exports
-  // are the intended cross-feature seams even while consumers still migrate
-  // off deep imports, so they are audited as entry surface, not dead code.
+  // Public feature entrypoints are reviewed cross-feature seams and are
+  // audited as entry surface.
   "entry": [
     // Standalone node:test contract executed by web.yml's Anonymous smoke API contract step.
     "scripts/smokeSupport.contract.spec.ts",

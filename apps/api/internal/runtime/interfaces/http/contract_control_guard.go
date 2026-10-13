@@ -406,7 +406,6 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 		if route.Target != nil {
 			record.TargetType, record.TargetID = route.Target(c, body)
 		}
-		outcome := ControlAuditRead
 		if route.Mutation {
 			// runDetached/runAtomic/runIdempotent execute the handler,
 			// write the response, and emit the audit record itself
@@ -450,9 +449,8 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			return
 		}
 		handler(c, controlContext{Operator: p})
-		outcome = controlOutcomeFromStatus(c.Writer.Status())
 		record.Status = c.Writer.Status()
-		record.Outcome = outcome
+		record.Outcome = controlOutcomeFromStatus(record.Status)
 		emitControlAudit(c.Request.Context(), d.sink(), record)
 	}
 }

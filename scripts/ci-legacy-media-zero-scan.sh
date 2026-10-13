@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # ci-legacy-media-zero-scan.sh
 #
-# Issue #667 clean-break gate. It deliberately has no production
-# allowlist: shipping code and shipping frontend configuration must
-# contain none of the retired URL-shaped media contracts below.
+# Shipping code and frontend configuration must use typed Media contracts.
 
 set -euo pipefail
 
@@ -50,11 +48,10 @@ scan_source 'forbidden concrete media/storage dependency' 'ideaboard/api/interna
 if ((fail != 0)); then
   cat >&2 <<'EOF'
 
-legacy media cutover scan: FAIL
-Issue #667 is a clean break. Remove the retired production contract;
-do not add a compatibility allowlist. See docs/cutover/legacy-zero.md.
+media contract scan: FAIL
+Use typed Media contracts at the ownership boundary. See DESIGN.md §7.
 EOF
   exit 1
 fi
 
-echo 'legacy media cutover scan: OK'
+echo 'media contract scan: OK'

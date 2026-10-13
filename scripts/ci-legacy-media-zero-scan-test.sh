@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Self-test for the clean-break scan. It uses isolated trees so the test
-# remains meaningful while the repository is intentionally mid-cutover.
+# Self-test for the Media contract scan using isolated source trees.
 
 set -euo pipefail
 

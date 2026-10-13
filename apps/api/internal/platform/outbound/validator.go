@@ -4,16 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 )
-
-const mediaValidationTimeout = 1200 * time.Millisecond
 
 var policyProvider struct {
 	sync.RWMutex
@@ -58,12 +54,4 @@ func ValidateConfiguredEndpoint(raw string, allowHosts ...string) (string, error
 		return "", fmt.Errorf(msgValidateConfiguredEndpoint)
 	}
 	return strings.TrimRight(parsed.String(), "/"), nil
-}
-
-func ValidateMediaHTTPURL(raw string, allowHosts ...string) (*url.URL, error) {
-	parsed, err := safehttp.ValidateURLWithAllowHostsAndTimeout(strings.TrimSpace(raw), mediaValidationTimeout, allowHosts...)
-	if err != nil {
-		return nil, fmt.Errorf(msgValidateMediaHTTPURL)
-	}
-	return parsed, nil
 }

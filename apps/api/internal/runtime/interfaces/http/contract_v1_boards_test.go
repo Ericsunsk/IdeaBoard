@@ -63,18 +63,17 @@ func newV1BoardsTestEngine(store tenancy.Store, boardsStore boards.WorkspaceBoar
 }
 
 type v1BoardsFixture struct {
-	store      *tenancy.InMemoryStore
-	boards     *boards.InMemoryWorkspaceBoardStore
-	dir        *staticUserDirectory
-	engine     *gin.Engine
-	workspace  *tenancy.Workspace
-	boardID    string
-	owner      int64
-	editor     int64
-	viewer     int64
-	wsMember   int64
-	outsider   int64
-	shareToken string
+	store     *tenancy.InMemoryStore
+	boards    *boards.InMemoryWorkspaceBoardStore
+	dir       *staticUserDirectory
+	engine    *gin.Engine
+	workspace *tenancy.Workspace
+	boardID   string
+	owner     int64
+	editor    int64
+	viewer    int64
+	wsMember  int64
+	outsider  int64
 }
 
 func newV1BoardsFixture(t *testing.T) *v1BoardsFixture {
@@ -291,7 +290,7 @@ func TestV1BoardsACLMatrix(t *testing.T) {
 		if status != 404 || v1ErrorCode(t, payload) != string(contract.CodeWorkspaceNotFound) {
 			t.Fatalf("outsider = %d %v, want 404 workspace_not_found", status, payload)
 		}
-		status, _, payload = doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath(""), userID: f.outsider})
+		status, _, _ = doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath(""), userID: f.outsider})
 		if status != 404 {
 			t.Fatalf("outsider list = %d, want 404", status)
 		}

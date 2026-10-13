@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/media/imageformat"
-	"ideaboard/api/internal/platform/outbound"
 )
 
 var stringKeys = []string{"image_url", "mask_image_url"}
@@ -17,10 +16,6 @@ type DataImage struct {
 	MIMEType string
 	Ext      string
 	Data     []byte
-}
-
-func CanonicalListKeys() []string {
-	return append([]string(nil), listKeys...)
 }
 
 func ValidateUploadPath(raw string) (string, error) {
@@ -115,33 +110,6 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 		Ext:      ext,
 		Data:     decoded,
 	}, nil
-}
-
-func ValidateMediaRef(raw string, allowHosts []string, maxDataURLBytes int) error {
-	ref := strings.TrimSpace(raw)
-	if ref == "" {
-		return fmt.Errorf(msgValidateMediaRef)
-	}
-	lower := strings.ToLower(ref)
-	if strings.HasPrefix(lower, "//") {
-		return fmt.Errorf(msgValidateMediaRef2)
-	}
-	if strings.HasPrefix(lower, "data:image/") {
-		if maxDataURLBytes > 0 && len(ref) >= maxDataURLBytes {
-			return fmt.Errorf(msgParseDataImageURL3)
-		}
-		_, err := ParseDataImageURL(ref, maxDataURLBytes)
-		return err
-	}
-	if strings.HasPrefix(ref, "/") {
-		_, err := ValidateUploadPath(ref)
-		return err
-	}
-	if strings.Contains(ref, "://") {
-		_, err := outbound.ValidateMediaHTTPURL(ref, allowHosts...)
-		return err
-	}
-	return fmt.Errorf(msgValidateMediaRef3)
 }
 
 func ForEachParamMediaRef(params map[string]interface{}, onRef func(key string, ref string) error) error {

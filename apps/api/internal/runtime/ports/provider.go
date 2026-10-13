@@ -118,27 +118,6 @@ func (e *ProviderInvocationOutcomeUnknownError) Unwrap() error {
 	return e.Err
 }
 
-func MarkProviderInvocationOutcomeUnknown(err error) error {
-	if err == nil {
-		return nil
-	}
-	if _, ok := ProviderHTTPStatus(err); ok {
-		return err
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return &ProviderInvocationOutcomeUnknownError{Err: err}
-	}
-	var operationErr *net.OpError
-	if errors.As(err, &operationErr) && operationErr.Op == "dial" {
-		return err
-	}
-	var networkErr net.Error
-	if errors.As(err, &networkErr) {
-		return &ProviderInvocationOutcomeUnknownError{Err: err}
-	}
-	return err
-}
-
 type ExecutionFailureError struct {
 	Stage    string
 	Category string
@@ -203,11 +182,6 @@ func (e *ProviderOutputParseError) Unwrap() error {
 
 func NewProviderOutputParseError(err error) error {
 	return &ProviderOutputParseError{Err: err}
-}
-
-func IsProviderOutputParseError(err error) bool {
-	var parseErr *ProviderOutputParseError
-	return errors.As(err, &parseErr)
 }
 
 func ShouldFailoverProviderError(err error) bool {

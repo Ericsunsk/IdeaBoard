@@ -35,106 +35,6 @@ function cssDependencyCompiler(source: string): string {
   return [...imports].map((specifier) => `import ${JSON.stringify(specifier)};`).join('\n')
 }
 
-export function assertClientCompatibilityAlias(source: string): void {
-  const client = ts.createSourceFile('client.ts', source, ts.ScriptTarget.Latest, true)
-  const identities = new Map<string, string[]>()
-  const localAliases = new Map<string, string>()
-  for (const statement of client.statements)
-    if (ts.isVariableStatement(statement))
-      for (const declaration of statement.declarationList.declarations)
-        if (
-          ts.isIdentifier(declaration.name) &&
-          declaration.initializer &&
-          ts.isIdentifier(declaration.initializer)
-        )
-          localAliases.set(declaration.name.text, declaration.initializer.text)
-  const origin = (identity: string): string => {
-    const seen = new Set<string>()
-    while (localAliases.has(identity) && !seen.has(identity)) {
-      seen.add(identity)
-      identity = localAliases.get(identity)!
-    }
-    return identity
-  }
-  const record = (identity: string, exported: string) =>
-    identities.set(origin(identity), [...(identities.get(origin(identity)) ?? []), exported])
-  for (const statement of client.statements) {
-    if (ts.isExportAssignment(statement) && ts.isIdentifier(statement.expression))
-      record(statement.expression.text, 'default')
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause)
-    )
-      for (const element of statement.exportClause.elements)
-        record(
-          `${statement.moduleSpecifier?.getText(client) ?? ''}:${(element.propertyName ?? element.name).text}`.replace(
-            /^:/,
-            '',
-          ),
-          element.name.text,
-        )
-    if (
-      ts.canHaveModifiers(statement) &&
-      ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
-    ) {
-      if (ts.isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations)
-          if (ts.isIdentifier(declaration.name))
-            record(
-              ts.isIdentifier(declaration.initializer ?? declaration.name)
-                ? ((declaration.initializer as ts.Identifier | undefined)?.text ??
-                    declaration.name.text)
-                : declaration.name.text,
-              declaration.name.text,
-            )
-      } else if (
-        'name' in statement &&
-        statement.name &&
-        ts.isIdentifier(statement.name as ts.Node)
-      )
-        record((statement.name as ts.Identifier).text, (statement.name as ts.Identifier).text)
-    }
-  }
-  for (const [identity, exports] of identities)
-    if (
-      exports.length > 1 &&
-      !(
-        identity === 'api' &&
-        exports.length === 2 &&
-        exports.includes('api') &&
-        exports.includes('default')
-      )
-    )
-      throw new Error('Additional duplicate export contract is not approved.')
-  const aliases = client.statements.filter(ts.isExportAssignment)
-  if (
-    aliases.length !== 1 ||
-    aliases[0]!.isExportEquals ||
-    aliases[0]!.expression.getText(client) !== 'api'
-  )
-    throw new Error('Frozen api/default compatibility alias changed.')
-  for (const statement of client.statements) {
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause) &&
-      statement.exportClause.elements.some(
-        (element) => (element.propertyName ?? element.name).text === 'api',
-      )
-    )
-      throw new Error('Additional api compatibility alias is not approved.')
-    if (
-      ts.isVariableStatement(statement) &&
-      statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) &&
-      statement.declarationList.declarations.some(
-        (declaration) => declaration.initializer && ts.isIdentifier(declaration.initializer),
-      )
-    )
-      throw new Error('Additional exported identifier alias is not approved.')
-  }
-}
-
 /** Annotation exists only in Knip's analysis input; source bytes remain untouched. */
 export function annotateKnipPublic(
   source: string,
@@ -378,8 +278,7 @@ export function createGovernanceConfig(
     suppliedManifest ??
     JSON.parse(fs.readFileSync(new URL('./knipGovernanceManifest.json', import.meta.url), 'utf8'))
   let activeSeams: ReturnType<typeof loadSeamInventory>['seams'] | undefined
-  const getActiveSeams = () =>
-    (activeSeams ??= loadSeamInventory().seams.filter((seam) => seam.status === 'active'))
+  const getActiveSeams = () => (activeSeams ??= loadSeamInventory().seams)
   if (
     !suppliedManifest ||
     Object.keys(manifest.symbols).length > 0 ||
@@ -477,8 +376,6 @@ export function createGovernanceConfig(
       JSON.stringify(files.sort()) !== JSON.stringify(Object.keys(manifest.generated).sort())
     )
       throw new Error('Generated Knip contract file set changed.')
-    if (!suppliedManifest)
-      assertClientCompatibilityAlias(fs.readFileSync(path.join(root, 'src/api/client.ts'), 'utf8'))
   }
   // Frozen generated contracts fail before exemptions can conceal changed output.
   for (const [file, contract] of Object.entries(manifest.generated)) {
@@ -492,7 +389,6 @@ export function createGovernanceConfig(
     ...parsed.config,
     ignoreIssues: {
       ...parsed.config.ignoreIssues,
-      ...(!suppliedManifest ? { 'src/api/client.ts': ['duplicates'] } : {}),
       ...Object.fromEntries(
         Object.entries(manifest.files).map(([file, contract]) => {
           if (!contract.evidence.length) throw new Error(`Missing retained-file evidence: ${file}`)

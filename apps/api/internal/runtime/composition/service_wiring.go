@@ -31,7 +31,6 @@ import (
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	"ideaboard/api/internal/usage"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -220,10 +219,6 @@ func (r creditsUserResolver) ResolveID(ctx context.Context, id int64) (credithtt
 	return credithttp.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
 }
 
-type taskUserResolver struct {
-	repo identityports.UserRepository
-}
-
 type rewardIdentityProjector struct {
 	repo identityports.UserRepository
 }
@@ -252,20 +247,4 @@ func (r rewardIdentityProjector) ResolveIdentities(
 		identities[userID] = rewards.IdentityProjection{PublicID: user.PublicID, DisplayName: user.DisplayName}
 	}
 	return identities, nil
-}
-
-func (r taskUserResolver) ResolvePublicID(ctx context.Context, publicID string) (int64, error) {
-	user, err := r.repo.GetByPublicID(ctx, publicID)
-	if err != nil {
-		return 0, err
-	}
-	return user.ID, nil
-}
-
-func (r taskUserResolver) ResolveUser(ctx context.Context, userID int64) (uuid.UUID, string, error) {
-	user, err := r.repo.GetByID(ctx, userID)
-	if err != nil {
-		return uuid.Nil, "", err
-	}
-	return user.PublicID, user.DisplayName, nil
 }

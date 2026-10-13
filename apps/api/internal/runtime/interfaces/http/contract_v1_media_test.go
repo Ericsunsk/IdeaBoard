@@ -175,10 +175,6 @@ func v1NewUploadBody() string {
 	return fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, v1MediaTestChecksum)
 }
 
-func v1FinishUploadBody() string {
-	return fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":1024,"width":100,"height":80}}`, v1MediaTestChecksum)
-}
-
 func v1MediaUploadID(t *testing.T, data any) string {
 	t.Helper()
 	dto, ok := data.(map[string]any)

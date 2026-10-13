@@ -5,7 +5,7 @@ import (
 )
 
 // TaskEvent is emitted when a task's status changes.
-// It carries minimal data; consumers should call GetUserTask for the full safe view.
+// It carries minimal data; consumers should fetch the task for the full safe view.
 type TaskEvent struct {
 	TaskID string `json:"task_id"`
 	Status string `json:"status"`

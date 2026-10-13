@@ -11,7 +11,6 @@ import {
   isOwned,
   loadSeamInventory,
   measureSeam,
-  projectPlannedSeam,
   type CruiseModule,
   type SeamRecord,
 } from './seamInventory.ts'
@@ -20,20 +19,13 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 
 /** Default fan-in/out report path (overridable with `--report=<path>`). */
 const DEFAULT_REPORT_PATH = path.join(webRoot, 'seam-fan-report.json')
-const acceptancePhase = process.argv.find((argument) => argument.startsWith('--phase='))
-if (acceptancePhase !== undefined && acceptancePhase !== '--phase=P1') {
-  console.error(
-    'Supported dependency acceptance phase is P1; omit --phase to check all active Seams.',
-  )
-  process.exit(1)
-}
 
 function reportPathFromArgs(): string {
   const flag = process.argv.find((arg) => arg.startsWith('--report='))
   return flag ? path.resolve(webRoot, flag.slice('--report='.length)) : DEFAULT_REPORT_PATH
 }
 
-/** Checkpoint SHA recorded in the report (§6.7 phase-start evidence). */
+/** Current checkout SHA recorded in the report. */
 function checkpointSha(): string {
   const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: webRoot, encoding: 'utf8' })
   return result.status === 0 ? result.stdout.trim() : 'unknown'
@@ -558,15 +550,14 @@ function materializeFixture(workspace: string, file: FixtureFile): string {
 
 console.log('--- 1. Running dependency-cruiser on production codebase ---')
 
-let allSeams: SeamRecord[]
+let inventorySeams: SeamRecord[]
 try {
-  allSeams = loadSeamInventory().seams
+  inventorySeams = loadSeamInventory().seams
 } catch (error) {
   console.error('Seam inventory failed to load; fix docs/frontend-seam-inventory.md first.')
   console.error(error instanceof Error ? error.message : error)
   process.exit(1)
 }
-const inventorySeams = allSeams.filter((seam) => seam.status === 'active')
 
 const prodResult = runDepcruise(webRoot, [
   '--config',
@@ -613,12 +604,10 @@ async function writeFanReport(): Promise<void> {
     }
     seams[seam.path] = {
       ...measured,
-      activationPhase: seam.activationPhase,
       targetFanIn: seam.targetFanIn,
       targetFanOut: seam.targetFanOut,
       advisories,
       shimCount: shims.filter((shim) => isOwned(shim, seam.ownershipScope)).length,
-      scope: seam.scope,
       ownershipScope: seam.ownershipScope,
       impureRuntimePaths: seam.purity === 'pure' ? findImpureRuntimePaths(seam.path, edges) : [],
     }
@@ -629,7 +618,7 @@ async function writeFanReport(): Promise<void> {
     scanScope:
       'all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals',
     inventoryGate: process.argv.includes('--strict')
-      ? `strict ${acceptancePhase ? 'P1 current batch' : 'all active Seams'}; all cruiser/Board errors remain blocking`
+      ? 'strict all Seams; all cruiser/Board errors remain blocking'
       : 'inventory advisory; existing cruiser/Board errors remain blocking',
     cruiserConfig: '.dependency-cruiser.cjs',
     totals: {
@@ -646,17 +635,6 @@ async function writeFanReport(): Promise<void> {
       ...[...scannedBoardEdges].map((edge) => `${edge}#board-deep-import-scan`),
     ].sort(),
     seams,
-    plannedSeams: allSeams
-      .filter((seam) => seam.status === 'planned')
-      .map((seam) => ({
-        path: seam.path,
-        sourcePaths: seam.sourcePaths,
-        targetFanIn: seam.targetFanIn,
-        targetFanOut: seam.targetFanOut,
-        sourceOwnershipScope: seam.sourceOwnershipScope,
-        projection: projectPlannedSeam(seam, allSeams, edges),
-        accepted: false,
-      })),
   }
   const advisoryDeepEdges = new Set(
     Object.values(seams).flatMap((value) =>
@@ -681,16 +659,10 @@ async function writeFanReport(): Promise<void> {
   )
   if (impurePaths.length)
     console.warn(
-      `  P0 pure-entry advisory: ${impurePaths.length} forbidden runtime dependency path(s).`,
+      `  Pure-entry advisory: ${impurePaths.length} forbidden runtime dependency path(s).`,
     )
   if (process.argv.includes('--strict')) {
-    const acceptedRecords = inventorySeams
-      .filter((seam) => acceptancePhase === undefined || /^P1(?:a|b)?$/.test(seam.activationPhase))
-      .map((seam) => seams[seam.path])
-    const declaredShims = new Set(inventorySeams.flatMap((seam) => seam.shims))
-    const shimMismatch =
-      shims.some((shim) => !declaredShims.has(shim)) ||
-      [...declaredShims].some((shim) => !shims.includes(shim))
+    const acceptedRecords = Object.values(seams)
     const hasMismatch = acceptedRecords.some((value) => {
       const record = value as ReturnType<typeof measureSeam> & {
         advisories: {
@@ -713,9 +685,9 @@ async function writeFanReport(): Promise<void> {
     const hasImpurePath = acceptedRecords.some(
       (value) => (value as { impureRuntimePaths: string[][] }).impureRuntimePaths.length,
     )
-    if (hasMismatch || hasImpurePath || shimMismatch) {
+    if (hasMismatch || hasImpurePath || shims.length > 0) {
       console.error(
-        'Strict Seam acceptance failed: frozen consumers/targets, purity, deep edges or shim inventory have not converged.',
+        'Strict Seam acceptance failed: frozen consumers/targets, purity, deep edges or shim inventory differ from the current contract.',
       )
       process.exit(1)
     }

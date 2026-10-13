@@ -272,99 +272,11 @@ func (s *Set) RefreshRiverQueue(ctx context.Context, queue string, stats RiverQu
 	s.SetRiverQueue(queue, depth, lag)
 }
 
-// Refresher periodically publishes River queue depth/lag gauges. It is a
-// runtime Runner owned by the composition root: scrape stays cheap (gauges
-// only) while freshness comes from the tick, not from blocking /metrics on
-// the database.
-type Refresher struct {
-	set      *Set
-	queue    string
-	stats    RiverQueueStats
-	interval time.Duration
-
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	done   chan struct{}
-}
-
-// NewRefresher builds the River queue metrics poller. Interval <= 0 keeps
-// DefaultRefreshInterval. Nil set or stats disables refresh (Start no-ops).
-func NewRefresher(set *Set, queue string, stats RiverQueueStats, interval time.Duration) *Refresher {
-	if interval <= 0 {
-		interval = DefaultRefreshInterval
-	}
-	return &Refresher{set: set, queue: queue, stats: stats, interval: interval}
-}
-
-// Name implements ports.Runner.
-func (r *Refresher) Name() string { return "river-queue-metrics" }
-
-// Kind implements ports.Runner.
-func (r *Refresher) Kind() domain.ComponentKind { return domain.ComponentKindRiver }
-
-// Start implements ports.Runner: it refreshes once, then ticks until Stop.
-func (r *Refresher) Start(ctx context.Context) error {
-	if r == nil || r.set == nil || r.stats == nil {
-		return nil
-	}
-	r.mu.Lock()
-	if r.done != nil {
-		r.mu.Unlock()
-		return nil
-	}
-	refreshCtx, cancel := context.WithCancel(context.Background())
-	r.cancel = cancel
-	r.done = make(chan struct{})
-	done := r.done
-	r.mu.Unlock()
-	go func() {
-		defer close(done)
-		r.set.RefreshRiverQueue(refreshCtx, r.queue, r.stats)
-		ticker := time.NewTicker(r.interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-refreshCtx.Done():
-				return
-			case <-ticker.C:
-				r.set.RefreshRiverQueue(refreshCtx, r.queue, r.stats)
-			}
-		}
-	}()
-	_ = ctx
-	return nil
-}
-
-// Stop implements ports.Runner.
-func (r *Refresher) Stop(ctx context.Context) error {
-	if r == nil {
-		return nil
-	}
-	r.mu.Lock()
-	cancel, done := r.cancel, r.done
-	r.cancel = nil
-	r.done = nil
-	r.mu.Unlock()
-	if cancel != nil {
-		cancel()
-	}
-	if done != nil {
-		select {
-		case <-done:
-		case <-ctx.Done():
-		}
-	}
-	return nil
-}
-
-var (
-	_ ports.Runner = (*Refresher)(nil)
-	_ ports.Runner = (*MultiRefresher)(nil)
-)
+var _ ports.Runner = (*MultiRefresher)(nil)
 
 // MultiRefresher periodically publishes River depth/lag gauges for every
-// known queue (see riverpolicy.RiverRetryMatrix). It shares the Refresher
-// semantics: one blocking-safe snapshot per queue per tick, failures keep
+// known queue (see riverpolicy.RiverRetryMatrix). It takes one blocking-safe
+// snapshot per queue per tick; failures keep
 // the last gauges and only log, and nil set/empty stats disables refresh.
 type MultiRefresher struct {
 	set      *Set

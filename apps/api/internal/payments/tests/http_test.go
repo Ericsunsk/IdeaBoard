@@ -4,7 +4,6 @@ import (
 	payments "ideaboard/api/internal/payments"
 
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -63,17 +62,4 @@ func performPaymentRequest(router http.Handler, method, target, body string, hea
 	}
 	router.ServeHTTP(recorder, request)
 	return recorder
-}
-
-func decodePaymentResponseData(t *testing.T, body []byte, destination any) {
-	t.Helper()
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(envelope.Data, destination); err != nil {
-		t.Fatal(err)
-	}
 }

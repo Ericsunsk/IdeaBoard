@@ -419,7 +419,3 @@ func (h *contractV1Handler) emitTaskBillingSettled(ctx context.Context, identity
 			SettlementState: state, HoldTransactionID: strings.TrimSpace(holdTransactionID),
 		})
 }
-
-func taskOutputsURI(workspaceID, taskID string) string {
-	return ContractV1GroupPath + "/workspaces/" + workspaceID + "/tasks/" + taskID + "/outputs"
-}

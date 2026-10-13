@@ -5,10 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import { generateMutator } from '@orval/core'
-import {
-  annotateKnipPublic,
-  assertClientCompatibilityAlias,
-} from '../../scripts/knipGovernanceConfig'
+import { annotateKnipPublic } from '../../scripts/knipGovernanceConfig'
 
 test('analysis annotation does not change unknown declarations', () => {
   const root = process.cwd()
@@ -38,28 +35,6 @@ test('Orval recognizes the retained ErrorType and BodyType generator protocol', 
   expect(mutator?.hasErrorType).toBe(true)
   expect(mutator?.bodyTypeName).toBe('BodyType')
 })
-
-test('the retained api/default alias cannot conceal new duplicate aliases', () => {
-  expect(() =>
-    assertClientCompatibilityAlias(
-      'export const api={}; export default api; const first=api; const second=first; export {second as third};',
-    ),
-  ).toThrow()
-  const run = (source: string) =>
-    spawnSync(
-      process.execPath,
-      [
-        '--experimental-strip-types',
-        '--input-type=module',
-        '-e',
-        `import { assertClientCompatibilityAlias } from ${JSON.stringify(path.join(process.cwd(), 'scripts/knipGovernanceConfig.ts'))}; assertClientCompatibilityAlias(${JSON.stringify(source)})`,
-      ],
-      { encoding: 'utf8', timeout: 10_000 },
-    )
-  expect(run('export const api = {}; export default api').status).toBe(0)
-  expect(run('export const api = {}; export default api; export { api as other }').status).toBe(1)
-  expect(run('export const api = {}; export default api; export const other = api').status).toBe(1)
-}, 45_000)
 
 test('exact analysis-only public symbols preserve Knip dependency, duplicate and orphan checks', () => {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'knip-governance-')))

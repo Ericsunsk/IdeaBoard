@@ -1,9 +1,5 @@
 package domain
 
-import (
-	"ideaboard/api/internal/platform/contract"
-)
-
 type TierPolicy struct {
 	Tier   string
 	Format string
@@ -18,10 +14,6 @@ var DefaultTierPolicies = []TierPolicy{
 var OnDemandTierPolicies = map[string]TierPolicy{
 	TierLargePreview:    {Tier: TierLargePreview, Format: FormatWebP},
 	TierProcessingInput: {Tier: TierProcessingInput, Format: FormatWebP},
-}
-
-func NewDerivativeID() (string, error) {
-	return contract.MintPublicID("derivative_", 12)
 }
 
 func DerivativeMimeType(format string) string {

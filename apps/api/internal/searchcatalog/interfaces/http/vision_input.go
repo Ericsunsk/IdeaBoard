@@ -32,14 +32,6 @@ type multipartVisionInputReader struct {
 	materializer visionReferenceMaterializer
 }
 
-func newMultipartVisionInputReader(libraryReader VisionLibraryAssetReader) VisionInputReader {
-	return multipartVisionInputReader{materializer: visionReferenceMaterializer{libraryReader: libraryReader}}
-}
-
-func NewVisionInputReader(libraryReader VisionLibraryAssetReader) VisionInputReader {
-	return newMultipartVisionInputReader(libraryReader)
-}
-
 func (r multipartVisionInputReader) Read(request *http.Request, ownerUserID int64) (domain.VisionInput, error) {
 	if request == nil {
 		return domain.VisionInput{}, domain.ErrVisionInput

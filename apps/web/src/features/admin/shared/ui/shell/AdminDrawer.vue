@@ -10,7 +10,7 @@
         :show-close="false"
         role="dialog"
         aria-modal="true"
-        :aria-busy="ariaBusy"
+        :aria-busy="hasAriaBusy"
         data-admin-drawer
         class="fixed inset-y-0 right-0 z-admin-dialog flex h-full w-admin-drawer flex-col border-l border-border bg-card shadow-admin-drawer transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
         @escape-key-down="handleEscape"
@@ -62,14 +62,8 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui'
-import {
-  defineDialogSurfaceIntent,
-  useOverlayInteractionLifecycle,
-} from '../../../../../core/composables/useOverlayInteractionLifecycle'
+import { useAdminDialogInteraction } from '../../session/overlay/useAdminDialogInteraction'
 
-// 右侧抽屉与居中弹窗是两种 overlay 形态（定位/滑入动画/chrome 不同），
-// 独立成组件而不是给 AdminDialogShell 加 drawer 变体，避免分叉其尺寸与
-// 布局契约；开关/遮罩/Escape/忙时锁定走同一 useOverlayInteractionLifecycle。
 const props = withDefaults(
   defineProps<{
     visible: boolean
@@ -92,65 +86,21 @@ const emit = defineEmits<{
   reset: []
 }>()
 
-const adminDrawerSurfaceIntent = defineDialogSurfaceIntent()
-const { ariaBusy, canDismiss, completeClose, handleVisibilityChange, requestClose } =
-  useOverlayInteractionLifecycle({
-    isVisible: () => props.visible,
-    busy: () => props.busy,
-    surface: adminDrawerSurfaceIntent,
-    onReset: () => emit('reset'),
-    onVisibilityChange: (visible) => {
-      emit('update:visible', visible)
-      if (!visible) {
-        emit('close')
-      }
-    },
-  })
-
-// Focus is restored on a macrotask so a reopen racing the close wins and
-// keeps focus inside the drawer instead of yanking it back to a stale trigger.
-let restoreTimer: ReturnType<typeof setTimeout> | undefined
-function scheduleFocusRestore() {
-  cancelScheduledFocusRestore()
-  restoreTimer = setTimeout(() => {
-    restoreTimer = undefined
-    completeClose()
-  }, 0)
-}
-function cancelScheduledFocusRestore() {
-  if (restoreTimer !== undefined) {
-    clearTimeout(restoreTimer)
-    restoreTimer = undefined
-  }
-}
-
-function handleOpenUpdate(open: boolean) {
-  if (open) {
-    cancelScheduledFocusRestore()
-    handleVisibilityChange(true)
-    return
-  }
-  if (handleVisibilityChange(false)) scheduleFocusRestore()
-}
-
-function handleEscape(event: KeyboardEvent) {
-  // Allowed Escape flows through reka's update:open above; only block it.
-  if (!canDismiss('escape')) event.preventDefault()
-}
-
-// Mask dismissal follows the unified dialog contract (close-control, Escape,
-// mask while idle; all paths locked while an irreversible commit is busy).
-// Reka's outside dismiss stays blocked so overlay clicks only reach the
-// explicit mask path gated by the lifecycle.
-function blockOutsideDismiss(event: Event) {
-  event.preventDefault()
-}
-
-function requestCloseFromMask() {
-  requestClose('mask')
-}
-
-function requestCloseFromControl() {
-  if (requestClose('close-control')) scheduleFocusRestore()
-}
+const {
+  hasAriaBusy,
+  canDismiss,
+  handleOpenUpdate,
+  handleEscape,
+  blockOutsideDismiss,
+  requestCloseFromMask,
+  requestCloseFromControl,
+} = useAdminDialogInteraction({
+  isVisible: () => props.visible,
+  isBusy: () => props.busy,
+  onReset: () => emit('reset'),
+  onVisibilityChange: (visible) => {
+    emit('update:visible', visible)
+    if (!visible) emit('close')
+  },
+})
 </script>

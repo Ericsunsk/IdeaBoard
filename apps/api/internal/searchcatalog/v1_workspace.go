@@ -66,11 +66,6 @@ func NewV1VisionQueryPublicID() (string, error) {
 	return contract.MintPublicID(V1VisionQueryPrefix, 12)
 }
 
-// IsV1VisionQueryID reports visq_ shape.
-func IsV1VisionQueryID(id string) bool {
-	return contract.IsValidPublicID(V1VisionQueryPrefix, id)
-}
-
 // V1SearchResult is one normalized v1 search hit: provider URL +
 // source metadata only, never bytes.
 type V1SearchResult struct {

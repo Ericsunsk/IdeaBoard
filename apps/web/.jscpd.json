@@ -8,8 +8,6 @@
     "src/**/*.spec.ts",
     "src/test/**",
     "src/**/testing/**",
-    "src/features/canvas/presentation/styles/canvas-range-input.css",
-    "src/features/canvas/tools/retouch/processing/engine.ts",
     "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
     "src/theme/atoms/round-control.css",
     "src/core/i18n/locales/en/index.ts",

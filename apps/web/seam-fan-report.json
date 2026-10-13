@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "checkpointSha": "901dd95289e1c82a33ba8b203f3b4fe58b37ea2d",
+  "checkpointSha": "2709113da3784d287022aa693e8847be11a267fc",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
-  "inventoryGate": "strict all active Seams; all cruiser/Board errors remain blocking",
+  "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
   "totals": { "seams": 277, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
@@ -80,7 +80,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 12,
       "targetFanOut": 4,
       "advisories": {
@@ -90,7 +89,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/client.ts"],
       "impureRuntimePaths": []
     },
@@ -311,7 +309,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 40,
       "targetFanOut": 2,
       "advisories": {
@@ -321,7 +318,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/contractKernel.ts"],
       "impureRuntimePaths": []
     },
@@ -386,7 +382,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -396,7 +391,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/control-billing/control-billing.ts"],
       "impureRuntimePaths": []
     },
@@ -466,7 +460,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
@@ -476,7 +469,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/control-credits/control-credits.ts"],
       "impureRuntimePaths": []
     },
@@ -541,7 +533,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -551,7 +542,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/control-payments/control-payments.ts"],
       "impureRuntimePaths": []
     },
@@ -671,7 +661,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 14,
       "targetFanOut": 4,
       "advisories": {
@@ -681,7 +670,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/control-platform/control-platform.ts"],
       "impureRuntimePaths": []
     },
@@ -741,7 +729,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -751,7 +738,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/control-tasks/control-tasks.ts"],
       "impureRuntimePaths": []
     },
@@ -821,7 +807,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
@@ -831,7 +816,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/control-users/control-users.ts"],
       "impureRuntimePaths": []
     },
@@ -888,7 +872,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 0,
       "targetFanOut": 7,
       "advisories": {
@@ -898,7 +881,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "generated",
       "ownershipScope": ["src/api/generated-query/control/index.ts"],
       "impureRuntimePaths": []
     },
@@ -922,7 +904,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -932,7 +913,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/model/controlMailConfigRequest.ts"],
       "impureRuntimePaths": []
     },
@@ -961,7 +941,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -971,7 +950,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/model/controlOAuthProviderSummary.ts"],
       "impureRuntimePaths": []
     },
@@ -995,7 +973,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -1005,7 +982,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": [
         "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts"
       ],
@@ -1031,7 +1007,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -1041,7 +1016,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/model/controlStripeConfigRequest.ts"],
       "impureRuntimePaths": []
     },
@@ -1071,7 +1045,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -1081,7 +1054,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/model/controlTaskEnvelope.ts"],
       "impureRuntimePaths": []
     },
@@ -2129,7 +2101,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 18,
       "targetFanOut": 157,
       "advisories": {
@@ -2139,7 +2110,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "generated",
       "ownershipScope": ["src/api/generated-query/control/model/index.ts"],
       "impureRuntimePaths": []
     },
@@ -2168,7 +2138,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -2178,7 +2147,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/model/supportChannelKind.ts"],
       "impureRuntimePaths": []
     },
@@ -2213,7 +2181,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -2223,7 +2190,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/control/model/supportChannelsSetting.ts"],
       "impureRuntimePaths": []
     },
@@ -2283,7 +2249,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -2293,7 +2258,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/boards/boards.ts"],
       "impureRuntimePaths": []
     },
@@ -2374,7 +2338,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 0,
       "targetFanOut": 11,
       "advisories": {
@@ -2384,7 +2347,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "generated",
       "ownershipScope": ["src/api/generated-query/public/index.ts"],
       "impureRuntimePaths": []
     },
@@ -2432,7 +2394,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 2,
       "advisories": {
@@ -2442,7 +2403,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/model/board.ts"],
       "impureRuntimePaths": []
     },
@@ -2485,7 +2445,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -2495,7 +2454,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/model/boardDocument.ts"],
       "impureRuntimePaths": []
     },
@@ -4022,7 +3980,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 19,
       "targetFanOut": 236,
       "advisories": {
@@ -4032,7 +3989,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "generated",
       "ownershipScope": ["src/api/generated-query/public/model/index.ts"],
       "impureRuntimePaths": []
     },
@@ -4102,7 +4058,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 4,
       "advisories": {
@@ -4112,7 +4067,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/user/user.ts"],
       "impureRuntimePaths": []
     },
@@ -4192,7 +4146,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 4,
       "advisories": {
@@ -4202,7 +4155,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/workspace-billing/workspace-billing.ts"],
       "impureRuntimePaths": []
     },
@@ -4267,7 +4219,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -4277,7 +4228,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/workspace-library/workspace-library.ts"],
       "impureRuntimePaths": []
     },
@@ -4337,7 +4287,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -4347,7 +4296,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/workspace-rewards/workspace-rewards.ts"],
       "impureRuntimePaths": []
     },
@@ -4412,7 +4360,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -4422,7 +4369,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/workspace-search/workspace-search.ts"],
       "impureRuntimePaths": []
     },
@@ -4482,7 +4428,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -4492,7 +4437,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/generated-query/public/workspaces/workspaces.ts"],
       "impureRuntimePaths": []
     },
@@ -4562,7 +4506,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 12,
       "targetFanOut": 0,
       "advisories": {
@@ -4572,7 +4515,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/idempotencyKey.ts"],
       "impureRuntimePaths": []
     },
@@ -4742,7 +4684,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 26,
       "targetFanOut": 4,
       "advisories": {
@@ -4752,7 +4693,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/mediaAssetDelivery.ts"],
       "impureRuntimePaths": []
     },
@@ -4796,7 +4736,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -4806,7 +4745,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/mediaWorkspaceScope.ts"],
       "impureRuntimePaths": []
     },
@@ -4890,7 +4828,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
@@ -4900,7 +4837,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/sessionUserType.ts"],
       "impureRuntimePaths": []
     },
@@ -4969,7 +4905,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
@@ -4979,7 +4914,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/stripUndefined.ts"],
       "impureRuntimePaths": []
     },
@@ -5063,7 +4997,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 10,
       "targetFanOut": 7,
       "advisories": {
@@ -5073,7 +5006,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/upload.ts"],
       "impureRuntimePaths": []
     },
@@ -5113,7 +5045,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -5123,7 +5054,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/userSession.ts"],
       "impureRuntimePaths": []
     },
@@ -5213,7 +5143,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 10,
       "targetFanOut": 4,
       "advisories": {
@@ -5223,7 +5152,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/workspaceEventStream.ts"],
       "impureRuntimePaths": []
     },
@@ -5273,7 +5201,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 2,
       "advisories": {
@@ -5283,7 +5210,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/workspaceTaskContract.ts"],
       "impureRuntimePaths": []
     },
@@ -5364,7 +5290,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 7,
       "targetFanOut": 5,
       "advisories": {
@@ -5374,7 +5299,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/workspaceTaskTransport.ts"],
       "impureRuntimePaths": []
     },
@@ -5430,7 +5354,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 5,
       "advisories": {
@@ -5440,7 +5363,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/workspaceTaskWaiter.ts"],
       "impureRuntimePaths": []
     },
@@ -5489,7 +5411,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -5499,7 +5420,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/api/workspaceTasks.ts"],
       "impureRuntimePaths": []
     },
@@ -5632,7 +5552,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 13,
       "advisories": {
@@ -5642,7 +5561,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "app",
       "ownershipScope": ["src/app/router/"],
       "impureRuntimePaths": []
     },
@@ -5716,7 +5634,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -5726,7 +5643,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/avatar/"],
       "impureRuntimePaths": []
     },
@@ -5775,7 +5691,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -5785,7 +5700,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/badge/"],
       "impureRuntimePaths": []
     },
@@ -5962,7 +5876,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 25,
       "targetFanOut": 6,
       "advisories": {
@@ -5972,7 +5885,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/button/"],
       "impureRuntimePaths": []
     },
@@ -6073,7 +5985,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -6083,7 +5994,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/card/"],
       "impureRuntimePaths": []
     },
@@ -6268,7 +6178,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 6,
       "targetFanOut": 4,
       "advisories": {
@@ -6278,7 +6187,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/dialog/"],
       "impureRuntimePaths": []
     },
@@ -6513,7 +6421,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
@@ -6523,7 +6430,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/dropdown-menu/"],
       "impureRuntimePaths": []
     },
@@ -6664,7 +6570,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 6,
       "targetFanOut": 5,
       "advisories": {
@@ -6674,7 +6579,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/form/"],
       "impureRuntimePaths": []
     },
@@ -6780,7 +6684,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 10,
       "targetFanOut": 5,
       "advisories": {
@@ -6790,7 +6693,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/input/"],
       "impureRuntimePaths": []
     },
@@ -6874,7 +6776,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -6884,7 +6785,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/popover/"],
       "impureRuntimePaths": []
     },
@@ -7111,7 +7011,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 6,
       "advisories": {
@@ -7121,7 +7020,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/select/"],
       "impureRuntimePaths": []
     },
@@ -7176,7 +7074,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -7186,7 +7083,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/skeleton/"],
       "impureRuntimePaths": []
     },
@@ -7251,7 +7147,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 8,
       "targetFanOut": 2,
       "advisories": {
@@ -7261,7 +7156,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/components/ui/spinner/"],
       "impureRuntimePaths": []
     },
@@ -7280,7 +7174,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 1,
       "targetFanOut": 0,
       "advisories": {
@@ -7290,7 +7183,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/auth/adminAccess.ts"],
       "impureRuntimePaths": []
     },
@@ -7336,7 +7228,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -7346,7 +7237,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/auth/client.ts"],
       "impureRuntimePaths": []
     },
@@ -7390,7 +7280,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -7400,7 +7289,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/auth/oauthProviders.ts"],
       "impureRuntimePaths": []
     },
@@ -7445,7 +7333,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -7455,7 +7342,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/auth/passwordPolicy.ts"],
       "impureRuntimePaths": []
     },
@@ -7489,7 +7375,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -7499,7 +7384,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/auth/routePolicy.ts"],
       "impureRuntimePaths": []
     },
@@ -7549,7 +7433,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -7559,7 +7442,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/auth/sessionPolicy.ts"],
       "impureRuntimePaths": []
     },
@@ -7754,7 +7636,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 31,
       "targetFanOut": 4,
       "advisories": {
@@ -7764,7 +7645,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/ActionButton.vue"],
       "impureRuntimePaths": []
     },
@@ -7799,7 +7679,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -7809,7 +7688,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/ChartCard.vue"],
       "impureRuntimePaths": []
     },
@@ -7844,7 +7722,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -7854,7 +7731,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/ChartPanel.vue"],
       "impureRuntimePaths": []
     },
@@ -7903,7 +7779,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -7913,7 +7788,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/ChartRenderer.vue"],
       "impureRuntimePaths": []
     },
@@ -7953,7 +7827,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 1,
       "advisories": {
@@ -7963,7 +7836,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/DataTableColumn.vue"],
       "impureRuntimePaths": []
     },
@@ -8017,7 +7889,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -8027,7 +7898,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/DataTableFrame.vue"],
       "impureRuntimePaths": []
     },
@@ -8086,7 +7956,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 3,
       "advisories": {
@@ -8096,7 +7965,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/IbFormField.vue"],
       "impureRuntimePaths": []
     },
@@ -8169,7 +8037,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 7,
       "advisories": {
@@ -8179,7 +8046,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/RangedLineChartCard.vue"],
       "impureRuntimePaths": []
     },
@@ -8208,7 +8074,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -8218,7 +8083,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/SiteBrandLogo.vue"],
       "impureRuntimePaths": []
     },
@@ -8272,7 +8136,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -8282,7 +8145,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/StatusBadge.vue"],
       "impureRuntimePaths": []
     },
@@ -8312,7 +8174,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -8322,7 +8183,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/StudioName.vue"],
       "impureRuntimePaths": []
     },
@@ -8383,7 +8243,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 5,
       "advisories": {
@@ -8393,7 +8252,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/UserConfirmDialog.vue"],
       "impureRuntimePaths": []
     },
@@ -8417,7 +8275,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -8427,7 +8284,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/components/formFieldContract.ts"],
       "impureRuntimePaths": []
     },
@@ -8466,7 +8322,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -8476,7 +8331,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useAppClipboard.ts"],
       "impureRuntimePaths": []
     },
@@ -8581,7 +8435,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 17,
       "targetFanOut": 1,
       "advisories": {
@@ -8591,7 +8444,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useAppToast.ts"],
       "impureRuntimePaths": []
     },
@@ -8691,7 +8543,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 16,
       "targetFanOut": 1,
       "advisories": {
@@ -8701,7 +8552,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useAsyncAction.ts"],
       "impureRuntimePaths": []
     },
@@ -8746,7 +8596,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -8756,7 +8605,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useLogoutRedirect.ts"],
       "impureRuntimePaths": []
     },
@@ -8781,7 +8629,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -8791,7 +8638,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/composables/useMenuTriggerFocusRestore.ts"],
       "impureRuntimePaths": []
     },
@@ -8813,12 +8659,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+          "from": "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -8848,7 +8689,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 10,
+      "fanIn": 9,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue/index.js"],
       "outboundEdges": [
@@ -8861,8 +8702,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
-      "targetFanIn": 10,
+      "targetFanIn": 9,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8871,7 +8711,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useOverlayInteractionLifecycle.ts"],
       "impureRuntimePaths": []
     },
@@ -8957,7 +8796,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 7,
       "targetFanOut": 5,
       "advisories": {
@@ -8967,7 +8805,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useSiteBranding.ts"],
       "impureRuntimePaths": []
     },
@@ -9064,7 +8901,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 9,
       "targetFanOut": 6,
       "advisories": {
@@ -9074,7 +8910,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useSupportChannels.ts"],
       "impureRuntimePaths": []
     },
@@ -9109,7 +8944,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -9119,7 +8953,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/composables/useUserConfirmDialog.ts"],
       "impureRuntimePaths": []
     },
@@ -9208,7 +9041,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 15,
       "targetFanOut": 0,
       "advisories": {
@@ -9218,7 +9050,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/config/pagination.ts"],
       "impureRuntimePaths": []
     },
@@ -9318,7 +9149,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 18,
       "targetFanOut": 0,
       "advisories": {
@@ -9328,7 +9158,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/config/runtimeUrls.ts"],
       "impureRuntimePaths": []
     },
@@ -9372,7 +9201,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -9382,7 +9210,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/config/timing.ts"],
       "impureRuntimePaths": []
     },
@@ -9421,7 +9248,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -9431,7 +9257,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/constants/media.ts"],
       "impureRuntimePaths": []
     },
@@ -9505,7 +9330,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 12,
       "targetFanOut": 0,
       "advisories": {
@@ -9515,7 +9339,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/contracts/externalImageProviders.ts"],
       "impureRuntimePaths": []
     },
@@ -9654,7 +9477,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 23,
       "targetFanOut": 0,
       "advisories": {
@@ -9664,7 +9486,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/contracts/generationContract.ts"],
       "impureRuntimePaths": []
     },
@@ -9823,7 +9644,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 29,
       "targetFanOut": 0,
       "advisories": {
@@ -9833,7 +9653,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/contracts/imageServices.ts"],
       "impureRuntimePaths": []
     },
@@ -10003,7 +9822,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 30,
       "targetFanOut": 1,
       "advisories": {
@@ -10013,7 +9831,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/errors/errorCatalog.ts"],
       "impureRuntimePaths": []
     },
@@ -10143,7 +9960,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 21,
       "targetFanOut": 2,
       "advisories": {
@@ -10153,7 +9969,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/i18n/formatters.ts"],
       "impureRuntimePaths": []
     },
@@ -10811,7 +10626,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 122,
       "targetFanOut": 5,
       "advisories": {
@@ -10821,7 +10635,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/i18n/"],
       "impureRuntimePaths": []
     },
@@ -10860,7 +10673,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -10870,7 +10682,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/i18n/localeCore.ts"],
       "impureRuntimePaths": []
     },
@@ -10941,7 +10752,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 5,
       "targetFanOut": 5,
       "advisories": {
@@ -10951,7 +10761,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/i18n/localeManifest.ts"],
       "impureRuntimePaths": []
     },
@@ -10980,7 +10789,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -10990,7 +10798,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/i18n/locales/en/"],
       "impureRuntimePaths": []
     },
@@ -11014,7 +10821,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -11024,7 +10830,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/i18n/locales/es/"],
       "impureRuntimePaths": []
     },
@@ -11048,7 +10853,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -11058,7 +10862,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/i18n/locales/ko/"],
       "impureRuntimePaths": []
     },
@@ -11082,7 +10885,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -11092,7 +10894,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/i18n/locales/zh-CN/"],
       "impureRuntimePaths": []
     },
@@ -11217,7 +11018,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 21,
       "targetFanOut": 1,
       "advisories": {
@@ -11227,7 +11027,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/i18n/userIdeaCurrency.ts"],
       "impureRuntimePaths": []
     },
@@ -11364,7 +11163,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 17,
       "targetFanOut": 6,
       "advisories": {
@@ -11374,7 +11172,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/i18n/userLocale.ts"],
       "impureRuntimePaths": []
     },
@@ -11433,7 +11230,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 9,
       "targetFanOut": 0,
       "advisories": {
@@ -11443,7 +11239,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/interaction/interactiveControlState.ts"],
       "impureRuntimePaths": []
     },
@@ -11467,7 +11262,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -11477,7 +11271,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/interaction/menuKeyboardNavigation.ts"],
       "impureRuntimePaths": []
     },
@@ -11506,7 +11299,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -11516,7 +11308,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/lib/brandMark.ts"],
       "impureRuntimePaths": []
     },
@@ -11610,7 +11401,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 12,
       "targetFanOut": 3,
       "advisories": {
@@ -11620,7 +11410,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/lib/chartPrimitives.ts"],
       "impureRuntimePaths": []
     },
@@ -11649,7 +11438,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -11659,7 +11447,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/lib/chartTimeRange.ts"],
       "impureRuntimePaths": []
     },
@@ -11688,7 +11475,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -11698,7 +11484,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/lib/pageChrome.ts"],
       "impureRuntimePaths": []
     },
@@ -11770,7 +11555,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 6,
       "advisories": {
@@ -11780,7 +11564,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/media/imageAssetPipeline.ts"],
       "impureRuntimePaths": []
     },
@@ -11814,7 +11597,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -11824,7 +11606,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/media/imageDimensions.ts"],
       "impureRuntimePaths": []
     },
@@ -11904,7 +11685,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 12,
       "targetFanOut": 1,
       "advisories": {
@@ -11914,7 +11694,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/media/mediaRef.ts"],
       "impureRuntimePaths": []
     },
@@ -11969,7 +11748,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -11979,7 +11757,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/media/visionIngressPolicy.ts"],
       "impureRuntimePaths": []
     },
@@ -12019,7 +11796,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -12029,7 +11805,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/motion/chartMotion.ts"],
       "impureRuntimePaths": []
     },
@@ -12054,7 +11829,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -12064,7 +11838,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/motion/dialogMotion.ts"],
       "impureRuntimePaths": []
     },
@@ -12103,7 +11876,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -12113,7 +11885,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/motion/motionPolicy.ts"],
       "impureRuntimePaths": []
     },
@@ -12168,7 +11939,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -12178,7 +11948,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/motion/popoverMotion.ts"],
       "impureRuntimePaths": []
     },
@@ -12269,7 +12038,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 15,
       "targetFanOut": 1,
       "advisories": {
@@ -12279,7 +12047,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/query/queryClient.ts"],
       "impureRuntimePaths": []
     },
@@ -12383,7 +12150,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 18,
       "targetFanOut": 0,
       "advisories": {
@@ -12393,7 +12159,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/query/queryDefaults.ts"],
       "impureRuntimePaths": []
     },
@@ -12453,7 +12218,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 8,
       "targetFanOut": 1,
       "advisories": {
@@ -12463,7 +12227,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/query/taskResult.ts"],
       "impureRuntimePaths": []
     },
@@ -12507,7 +12270,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -12517,7 +12279,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/query/userCreditsInvalidation.ts"],
       "impureRuntimePaths": []
     },
@@ -12602,7 +12363,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 13,
       "targetFanOut": 1,
       "advisories": {
@@ -12612,7 +12372,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/router/queryParams.ts"],
       "impureRuntimePaths": []
     },
@@ -12642,7 +12401,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -12652,7 +12410,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/seo/routeSeo.ts"],
       "impureRuntimePaths": []
     },
@@ -12677,7 +12434,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -12687,7 +12443,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/core/seo/seoStaticHtml.ts"],
       "impureRuntimePaths": []
     },
@@ -12849,7 +12604,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 25,
       "targetFanOut": 4,
       "advisories": {
@@ -12859,7 +12613,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/auth.ts"],
       "impureRuntimePaths": []
     },
@@ -12894,7 +12647,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -12904,7 +12656,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/currency.ts"],
       "impureRuntimePaths": []
     },
@@ -12959,7 +12710,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -12969,7 +12719,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/dateTime.ts"],
       "impureRuntimePaths": []
     },
@@ -13038,7 +12787,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
@@ -13048,7 +12796,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/errorMessages.ts"],
       "impureRuntimePaths": []
     },
@@ -13082,7 +12829,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -13092,7 +12838,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/formValidation.ts"],
       "impureRuntimePaths": []
     },
@@ -13161,7 +12906,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
@@ -13171,7 +12915,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/ids.ts"],
       "impureRuntimePaths": []
     },
@@ -13231,7 +12974,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 7,
       "targetFanOut": 2,
       "advisories": {
@@ -13241,7 +12983,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/imageUploadSupport.ts"],
       "impureRuntimePaths": []
     },
@@ -13330,7 +13071,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 15,
       "targetFanOut": 0,
       "advisories": {
@@ -13340,7 +13080,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/number.ts"],
       "impureRuntimePaths": []
     },
@@ -13390,7 +13129,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 8,
       "targetFanOut": 0,
       "advisories": {
@@ -13400,7 +13138,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/opaqueIds.ts"],
       "impureRuntimePaths": []
     },
@@ -13434,7 +13171,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -13444,7 +13180,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/polling.ts"],
       "impureRuntimePaths": []
     },
@@ -13520,7 +13255,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
@@ -13530,7 +13264,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/storage.ts"],
       "impureRuntimePaths": []
     },
@@ -13590,7 +13323,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 8,
       "targetFanOut": 1,
       "advisories": {
@@ -13600,7 +13332,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/core/utils/workspaceId.ts"],
       "impureRuntimePaths": []
     },
@@ -15329,7 +15060,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 78,
       "advisories": {
@@ -15339,7 +15069,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/account/"],
       "impureRuntimePaths": []
     },
@@ -15414,7 +15143,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 1,
       "targetFanOut": 9,
       "advisories": {
@@ -15424,7 +15152,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/account/ui/chrome/SupportChannelQr.vue"],
       "impureRuntimePaths": []
     },
@@ -15554,7 +15281,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 6,
       "targetFanOut": 14,
       "advisories": {
@@ -15564,7 +15290,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/account/ui/chrome/UserAccountMenu.vue"],
       "impureRuntimePaths": []
     },
@@ -15597,7 +15322,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -15607,7 +15331,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/account/ui/chrome/UserCreditBalanceButton.vue"],
       "impureRuntimePaths": []
     },
@@ -15651,7 +15374,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -15661,7 +15383,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/account/ui/chrome/userAccountMenu.types.ts"],
       "impureRuntimePaths": []
     },
@@ -15701,7 +15422,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -15711,7 +15431,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/admin/prompts/core/promptVariables.ts"],
       "impureRuntimePaths": []
     },
@@ -15801,7 +15520,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 14,
       "targetFanOut": 1,
       "advisories": {
@@ -15811,7 +15529,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/routePaths.ts"],
       "impureRuntimePaths": []
     },
@@ -15840,7 +15557,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -15850,7 +15566,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/cellClasses.ts"],
       "impureRuntimePaths": []
     },
@@ -15874,7 +15589,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -15884,7 +15598,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/cellPlaceholders.ts"],
       "impureRuntimePaths": []
     },
@@ -15919,7 +15632,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -15929,7 +15641,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/controlCopy.ts"],
       "impureRuntimePaths": []
     },
@@ -15963,7 +15674,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -15973,7 +15683,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/controlGuidance.ts"],
       "impureRuntimePaths": []
     },
@@ -16023,7 +15732,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -16033,7 +15741,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/controlMutation.ts"],
       "impureRuntimePaths": []
     },
@@ -16072,7 +15779,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 3,
       "advisories": {
@@ -16082,7 +15788,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/controlResource.ts"],
       "impureRuntimePaths": []
     },
@@ -16106,7 +15811,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -16116,7 +15820,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/reconcileStableRows.ts"],
       "impureRuntimePaths": []
     },
@@ -16146,7 +15849,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -16156,7 +15858,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/secretSchema.ts"],
       "impureRuntimePaths": []
     },
@@ -16181,7 +15882,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -16191,7 +15891,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/serviceAdminMeta.ts"],
       "impureRuntimePaths": []
     },
@@ -16215,7 +15914,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -16225,7 +15923,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/tableColumns.ts"],
       "impureRuntimePaths": []
     },
@@ -16260,7 +15957,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -16270,7 +15966,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/taskMetricTokens.ts"],
       "impureRuntimePaths": []
     },
@@ -16354,7 +16049,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
@@ -16364,7 +16058,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/core/uiClasses.ts"],
       "impureRuntimePaths": []
     },
@@ -17368,6 +17061,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts",
+          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/shared/session/timeRange.ts",
           "to": "src/core/lib/chartTimeRange.ts",
           "kind": "runtime"
@@ -17863,11 +17566,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/shell/AdminDrawer.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -17885,11 +17583,6 @@
         {
           "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
           "to": "node_modules/reka-ui/dist/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
         {
@@ -18281,7 +17974,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P4",
       "targetFanIn": 119,
       "targetFanOut": 46,
       "advisories": {
@@ -18291,7 +17983,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": [
         "src/features/admin/shared/core/",
         "src/features/admin/shared/index.ts",
@@ -18345,7 +18036,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -18355,7 +18045,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/anomalyRules.ts"],
       "impureRuntimePaths": []
     },
@@ -18485,7 +18174,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 6,
       "targetFanOut": 14,
       "advisories": {
@@ -18495,7 +18183,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/brand/brandLogos.ts"],
       "impureRuntimePaths": []
     },
@@ -18551,7 +18238,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -18561,7 +18247,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/brand/useBrandLogoOverrides.ts"],
       "impureRuntimePaths": []
     },
@@ -18605,7 +18290,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -18615,7 +18299,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/collection/useAdminCollectionQuery.ts"],
       "impureRuntimePaths": []
     },
@@ -18660,7 +18343,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 4,
       "advisories": {
@@ -18670,7 +18352,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": [
         "src/features/admin/shared/session/collection/useAdminCursorCollection.ts"
       ],
@@ -18702,7 +18383,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -18712,7 +18392,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/collection/useOptimisticToggle.ts"],
       "impureRuntimePaths": []
     },
@@ -18747,7 +18426,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -18757,7 +18435,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/collection/usePagePagination.ts"],
       "impureRuntimePaths": []
     },
@@ -18792,7 +18469,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -18802,7 +18478,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/collection/useQueryPolling.ts"],
       "impureRuntimePaths": []
     },
@@ -18827,7 +18502,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -18837,7 +18511,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/collection/useRefetchOnClose.ts"],
       "impureRuntimePaths": []
     },
@@ -18867,7 +18540,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -18877,7 +18549,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/feedback/confirmSettingsSave.ts"],
       "impureRuntimePaths": []
     },
@@ -18987,7 +18658,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 17,
       "targetFanOut": 2,
       "advisories": {
@@ -18997,7 +18667,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/feedback/toast.ts"],
       "impureRuntimePaths": []
     },
@@ -19047,7 +18716,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 6,
       "targetFanOut": 1,
       "advisories": {
@@ -19057,7 +18725,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/feedback/useAdminConfirm.ts"],
       "impureRuntimePaths": []
     },
@@ -19095,7 +18762,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -19105,7 +18771,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/timeRange.ts"],
       "impureRuntimePaths": []
     },
@@ -19156,7 +18821,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -19166,7 +18830,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/session/useAnomalyRadar.ts"],
       "impureRuntimePaths": []
     },
@@ -19210,7 +18873,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -19220,7 +18882,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/AdminBadge.vue"],
       "impureRuntimePaths": []
     },
@@ -19294,7 +18955,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 8,
       "targetFanOut": 3,
       "advisories": {
@@ -19304,7 +18964,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/AdminButton.vue"],
       "impureRuntimePaths": []
     },
@@ -19333,7 +18992,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -19343,7 +19001,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/AdminColumn.vue"],
       "impureRuntimePaths": []
     },
@@ -19387,7 +19044,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -19397,7 +19053,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/AdminMono.vue"],
       "impureRuntimePaths": []
     },
@@ -19437,7 +19092,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -19447,7 +19101,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/AdminSpinner.vue"],
       "impureRuntimePaths": []
     },
@@ -19477,7 +19130,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -19487,7 +19139,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/chart/AdminChartCard.vue"],
       "impureRuntimePaths": []
     },
@@ -19512,7 +19163,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -19522,7 +19172,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue"],
       "impureRuntimePaths": []
     },
@@ -19589,7 +19238,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 6,
       "advisories": {
@@ -19599,7 +19247,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/chart/chart.ts"],
       "impureRuntimePaths": []
     },
@@ -19634,7 +19281,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -19644,7 +19290,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/feedback/AdminAlert.vue"],
       "impureRuntimePaths": []
     },
@@ -19693,7 +19338,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -19703,7 +19347,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue"],
       "impureRuntimePaths": []
     },
@@ -19733,7 +19376,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -19743,7 +19385,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/feedback/AdminEmptyState.vue"],
       "impureRuntimePaths": []
     },
@@ -19778,7 +19419,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -19788,7 +19428,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/feedback/AdminStatusPill.vue"],
       "impureRuntimePaths": []
     },
@@ -19823,7 +19462,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -19833,7 +19471,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/AdminFormField.vue"],
       "impureRuntimePaths": []
     },
@@ -19899,7 +19536,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 5,
       "advisories": {
@@ -19909,7 +19545,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/AdminInput.vue"],
       "impureRuntimePaths": []
     },
@@ -19953,7 +19588,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -19963,7 +19597,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/AdminNumberInput.vue"],
       "impureRuntimePaths": []
     },
@@ -20019,7 +19652,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 5,
       "advisories": {
@@ -20029,7 +19661,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/AdminSelect.vue"],
       "impureRuntimePaths": []
     },
@@ -20083,7 +19714,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -20093,7 +19723,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/AdminSwitch.vue"],
       "impureRuntimePaths": []
     },
@@ -20137,7 +19766,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 3,
       "advisories": {
@@ -20147,7 +19775,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/AdminTextarea.vue"],
       "impureRuntimePaths": []
     },
@@ -20185,7 +19812,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -20195,7 +19821,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/form/SwitchRow.vue"],
       "impureRuntimePaths": []
     },
@@ -20257,7 +19882,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 6,
       "advisories": {
@@ -20267,7 +19891,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue"],
       "impureRuntimePaths": []
     },
@@ -20297,7 +19920,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -20307,7 +19929,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/popover/AdminPopover.vue"],
       "impureRuntimePaths": []
     },
@@ -20351,7 +19972,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -20361,7 +19981,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/popover/AdminPopoverContent.vue"],
       "impureRuntimePaths": []
     },
@@ -20391,7 +20010,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -20401,7 +20019,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue"],
       "impureRuntimePaths": []
     },
@@ -20455,7 +20072,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -20465,7 +20081,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/admin/shared/ui/serviceIcons.ts"],
       "impureRuntimePaths": []
     },
@@ -20498,7 +20113,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -20508,7 +20122,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue"],
       "impureRuntimePaths": []
     },
@@ -20546,7 +20159,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -20556,7 +20168,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminDialogActions.vue"],
       "impureRuntimePaths": []
     },
@@ -20589,8 +20200,8 @@
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/reka-ui/dist/index.cjs",
         "node_modules/vue/index.js",
-        "src/core/composables/useOverlayInteractionLifecycle.ts",
-        "src/features/admin/shared/core/uiClasses.ts"
+        "src/features/admin/shared/core/uiClasses.ts",
+        "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts"
       ],
       "outboundEdges": [
         {
@@ -20610,19 +20221,18 @@
         },
         {
           "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
-          "to": "src/features/admin/shared/core/uiClasses.ts",
+          "to": "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts",
           "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 5,
       "advisories": {
@@ -20632,7 +20242,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminDialogShell.vue"],
       "impureRuntimePaths": []
     },
@@ -20654,7 +20263,7 @@
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/reka-ui/dist/index.cjs",
-        "src/core/composables/useOverlayInteractionLifecycle.ts"
+        "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts"
       ],
       "outboundEdges": [
         {
@@ -20669,14 +20278,13 @@
         },
         {
           "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "to": "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts",
           "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -20686,7 +20294,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminDrawer.vue"],
       "impureRuntimePaths": []
     },
@@ -20716,7 +20323,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -20726,7 +20332,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminEditorActions.vue"],
       "impureRuntimePaths": []
     },
@@ -20795,7 +20400,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 8,
       "advisories": {
@@ -20805,7 +20409,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminLogoCropDialog.vue"],
       "impureRuntimePaths": []
     },
@@ -20856,7 +20459,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -20866,7 +20468,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminSettingsDialogFrame.vue"],
       "impureRuntimePaths": []
     },
@@ -20905,7 +20506,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 3,
       "advisories": {
@@ -20915,7 +20515,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminSubNavigationLayout.vue"],
       "impureRuntimePaths": []
     },
@@ -20934,7 +20533,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 0,
       "advisories": {
@@ -20944,7 +20542,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/shell/AdminSummaryCard.vue"],
       "impureRuntimePaths": []
     },
@@ -21048,7 +20645,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 13,
       "advisories": {
@@ -21058,7 +20654,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/table/AdminTable.vue"],
       "impureRuntimePaths": []
     },
@@ -21096,7 +20691,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -21106,7 +20700,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/table/AdminTablePanel.vue"],
       "impureRuntimePaths": []
     },
@@ -21157,7 +20750,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -21167,7 +20759,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminFilterPopover.vue"],
       "impureRuntimePaths": []
     },
@@ -21210,7 +20801,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -21220,7 +20810,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminOptionFilter.vue"],
       "impureRuntimePaths": []
     },
@@ -21264,7 +20853,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -21274,7 +20862,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminPagerControls.vue"],
       "impureRuntimePaths": []
     },
@@ -21304,7 +20891,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -21314,7 +20900,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue"],
       "impureRuntimePaths": []
     },
@@ -21344,7 +20929,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -21354,7 +20938,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue"],
       "impureRuntimePaths": []
     },
@@ -21389,7 +20972,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -21399,7 +20981,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue"],
       "impureRuntimePaths": []
     },
@@ -21443,7 +21024,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -21453,7 +21033,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue"],
       "impureRuntimePaths": []
     },
@@ -22306,7 +21885,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 28,
       "targetFanOut": 46,
       "advisories": {
@@ -22316,7 +21894,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/auth/"],
       "impureRuntimePaths": []
     },
@@ -23336,7 +22913,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 50,
       "targetFanOut": 49,
       "advisories": {
@@ -23346,7 +22922,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/board/"],
       "impureRuntimePaths": []
     },
@@ -24596,7 +24171,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 94,
       "targetFanOut": 49,
       "advisories": {
@@ -24606,7 +24180,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/board/"],
       "impureRuntimePaths": []
     },
@@ -24651,7 +24224,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -24661,7 +24233,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/board/ports/testing.ts"],
       "impureRuntimePaths": []
     },
@@ -24776,7 +24347,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 14,
       "targetFanOut": 4,
       "advisories": {
@@ -24786,7 +24356,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/board/testing/"],
       "impureRuntimePaths": []
     },
@@ -24829,7 +24398,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -24839,7 +24407,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/core/graph/canvasGraphStoreWriter.ts"],
       "impureRuntimePaths": []
     },
@@ -24863,7 +24430,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -24873,7 +24439,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/core/graph/canvasGraphValueEquality.ts"],
       "impureRuntimePaths": []
     },
@@ -24956,7 +24521,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 11,
       "targetFanOut": 2,
       "advisories": {
@@ -24966,7 +24530,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/core/graph/canvasGroupGeometry.ts"],
       "impureRuntimePaths": []
     },
@@ -25420,7 +24983,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 63,
       "targetFanOut": 3,
       "advisories": {
@@ -25430,7 +24992,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/core/graph/"],
       "impureRuntimePaths": []
     },
@@ -25485,7 +25046,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 7,
       "targetFanOut": 1,
       "advisories": {
@@ -25495,7 +25055,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/canvas/core/nodes/imageActions.ts"],
       "impureRuntimePaths": []
     },
@@ -25540,7 +25099,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -25550,7 +25108,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/canvas/core/nodes/serviceLabelKey.ts"],
       "impureRuntimePaths": []
     },
@@ -25849,7 +25406,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 9,
       "targetFanOut": 18,
       "advisories": {
@@ -25859,7 +25415,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/board-session/"],
       "impureRuntimePaths": []
     },
@@ -25938,7 +25493,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 13,
       "targetFanOut": 0,
       "advisories": {
@@ -25948,7 +25502,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/execution/board-attachment/"],
       "impureRuntimePaths": []
     },
@@ -27180,7 +26733,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 31,
       "targetFanOut": 46,
       "advisories": {
@@ -27190,7 +26742,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/execution/"],
       "impureRuntimePaths": []
     },
@@ -27318,7 +26869,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 14,
       "targetFanOut": 7,
       "advisories": {
@@ -27328,7 +26878,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/execution/pending-execution/core.ts"],
       "impureRuntimePaths": []
     },
@@ -27353,7 +26902,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -27363,7 +26911,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/execution/task-lifecycle/"],
       "impureRuntimePaths": []
     },
@@ -28657,7 +28204,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 61,
       "targetFanOut": 28,
       "advisories": {
@@ -28667,7 +28213,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/flow-adapter/"],
       "impureRuntimePaths": []
     },
@@ -28697,7 +28242,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -28707,7 +28251,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/graph-editing/groupContracts.ts"],
       "impureRuntimePaths": []
     },
@@ -29822,7 +29365,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 12,
       "targetFanOut": 34,
       "advisories": {
@@ -29832,7 +29374,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/graph-editing/"],
       "impureRuntimePaths": []
     },
@@ -30160,7 +29701,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 22,
       "advisories": {
@@ -30170,7 +29710,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/image-workflow/"],
       "impureRuntimePaths": []
     },
@@ -30194,7 +29733,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -30204,7 +29742,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/canvas/session/media/preloadImage.ts"],
       "impureRuntimePaths": []
     },
@@ -30248,7 +29785,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -30258,7 +29794,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/canvas/session/media/serviceImageActionText.ts"],
       "impureRuntimePaths": []
     },
@@ -30724,7 +30259,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 20,
       "advisories": {
@@ -30734,7 +30268,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/workspace/"],
       "impureRuntimePaths": []
     },
@@ -30809,7 +30342,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 10,
       "targetFanOut": 2,
       "advisories": {
@@ -30819,7 +30351,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/session/workspace/useCanvasFeedback.ts"],
       "impureRuntimePaths": []
     },
@@ -30844,7 +30375,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -30854,7 +30384,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/image-tools/core/index.ts"],
       "impureRuntimePaths": []
     },
@@ -31233,7 +30762,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 10,
       "targetFanOut": 18,
       "advisories": {
@@ -31243,7 +30771,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/image-tools/"],
       "impureRuntimePaths": []
     },
@@ -31273,7 +30800,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -31283,7 +30809,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/image-tools/ui/chrome.ts"],
       "impureRuntimePaths": []
     },
@@ -31308,7 +30833,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -31318,7 +30842,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/image-tools/ui/stage.ts"],
       "impureRuntimePaths": []
     },
@@ -31569,7 +31092,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 8,
       "targetFanOut": 15,
       "advisories": {
@@ -31579,7 +31101,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/inpaint/"],
       "impureRuntimePaths": []
     },
@@ -31671,7 +31192,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 6,
       "advisories": {
@@ -31681,7 +31201,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/inpaint/session/fabric/"],
       "impureRuntimePaths": []
     },
@@ -31706,7 +31225,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -31716,7 +31234,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "test-contract",
       "ownershipScope": ["src/features/canvas/tools/inpaint/testing/index.ts"],
       "impureRuntimePaths": []
     },
@@ -32702,7 +32219,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 16,
       "targetFanOut": 30,
       "advisories": {
@@ -32712,7 +32228,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/tools/retouch/"],
       "impureRuntimePaths": []
     },
@@ -32757,7 +32272,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 1,
       "targetFanOut": 4,
       "advisories": {
@@ -32767,7 +32281,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "test-contract",
       "ownershipScope": ["src/features/canvas/tools/retouch/testing/browser.ts"],
       "impureRuntimePaths": []
     },
@@ -32811,7 +32324,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -32821,7 +32333,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "test-contract",
       "ownershipScope": ["src/features/canvas/tools/retouch/testing/index.ts"],
       "impureRuntimePaths": []
     },
@@ -32929,7 +32440,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 12,
       "advisories": {
@@ -32939,7 +32449,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/chrome/components/"],
       "impureRuntimePaths": []
     },
@@ -33083,7 +32592,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 8,
       "advisories": {
@@ -33093,7 +32601,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/nodes/groups/"],
       "impureRuntimePaths": []
     },
@@ -34257,7 +33764,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 4,
       "targetFanOut": 38,
       "advisories": {
@@ -34267,7 +33773,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/nodes/"],
       "impureRuntimePaths": []
     },
@@ -34708,7 +34213,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 14,
       "targetFanOut": 20,
       "advisories": {
@@ -34718,7 +34222,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/nodes/primitives/"],
       "impureRuntimePaths": []
     },
@@ -34792,7 +34295,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 8,
       "advisories": {
@@ -34802,7 +34304,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/nodes/useFlowNodeUiState.ts"],
       "impureRuntimePaths": []
     },
@@ -35145,7 +34646,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 22,
       "advisories": {
@@ -35155,7 +34655,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/nodes/workflows/"],
       "impureRuntimePaths": []
     },
@@ -35375,7 +34874,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 9,
       "targetFanOut": 14,
       "advisories": {
@@ -35385,7 +34883,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/overlays/"],
       "impureRuntimePaths": []
     },
@@ -35476,7 +34973,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 10,
       "advisories": {
@@ -35486,7 +34982,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/canvas/ui/pages/CanvasLandingPage.vue"],
       "impureRuntimePaths": []
     },
@@ -35541,7 +35036,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -35551,7 +35045,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/canvas/ui/pages/CanvasPage.vue"],
       "impureRuntimePaths": []
     },
@@ -36195,7 +35688,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 1,
       "targetFanOut": 43,
       "advisories": {
@@ -36205,7 +35697,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/screens/"],
       "impureRuntimePaths": []
     },
@@ -36250,7 +35741,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -36260,7 +35750,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"],
       "impureRuntimePaths": []
     },
@@ -36300,7 +35789,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 4,
       "targetFanOut": 1,
       "advisories": {
@@ -36310,7 +35798,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "intra-feature",
       "ownershipScope": ["src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"],
       "impureRuntimePaths": []
     },
@@ -36334,7 +35821,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -36344,7 +35830,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/features/legal/contacts.ts"],
       "impureRuntimePaths": []
     },
@@ -36395,7 +35880,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 0,
       "targetFanOut": 6,
       "advisories": {
@@ -36405,7 +35889,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/legal/"],
       "impureRuntimePaths": []
     },
@@ -36440,7 +35923,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -36450,7 +35932,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "shared-runtime",
       "ownershipScope": ["src/features/legal/legalLinks.ts"],
       "impureRuntimePaths": []
     },
@@ -36488,7 +35969,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -36498,7 +35978,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "route",
       "ownershipScope": ["src/features/legal/pages/AcceptableUsePage.vue"],
       "impureRuntimePaths": []
     },
@@ -36536,7 +36015,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -36546,7 +36024,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "route",
       "ownershipScope": ["src/features/legal/pages/PrivacyPolicyPage.vue"],
       "impureRuntimePaths": []
     },
@@ -36584,7 +36061,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -36594,7 +36070,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "route",
       "ownershipScope": ["src/features/legal/pages/RefundPolicyPage.vue"],
       "impureRuntimePaths": []
     },
@@ -36637,7 +36112,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -36647,7 +36121,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "route",
       "ownershipScope": ["src/features/legal/pages/TermsPage.vue"],
       "impureRuntimePaths": []
     },
@@ -36681,7 +36154,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -36691,7 +36163,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/legal/routePaths.ts"],
       "impureRuntimePaths": []
     },
@@ -37250,7 +36721,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 22,
       "targetFanOut": 38,
       "advisories": {
@@ -37260,7 +36730,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/library/"],
       "impureRuntimePaths": []
     },
@@ -38011,7 +37480,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 2,
       "targetFanOut": 40,
       "advisories": {
@@ -38021,7 +37489,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/search/"],
       "impureRuntimePaths": []
     },
@@ -38692,7 +38159,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 20,
       "targetFanOut": 50,
       "advisories": {
@@ -38702,7 +38168,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/workspace/"],
       "impureRuntimePaths": []
     },
@@ -38882,7 +38347,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 32,
       "targetFanOut": 1,
       "advisories": {
@@ -38892,7 +38356,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/workspace/routePaths.ts"],
       "impureRuntimePaths": []
     },
@@ -39007,7 +38470,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 3,
       "targetFanOut": 14,
       "advisories": {
@@ -39017,7 +38479,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "app",
       "ownershipScope": ["src/features/workspace/routes/workspaceRoutes.ts"],
       "impureRuntimePaths": []
     },
@@ -39129,7 +38590,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "current",
       "targetFanIn": 5,
       "targetFanOut": 11,
       "advisories": {
@@ -39139,7 +38599,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/workspace/selection/workspaceContext.ts"],
       "impureRuntimePaths": []
     },
@@ -39188,7 +38647,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P2",
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -39198,7 +38656,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "cross-feature",
       "ownershipScope": ["src/features/workspace/selection/workspaceSelectionPort.ts"],
       "impureRuntimePaths": []
     },
@@ -39293,7 +38750,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
       "targetFanIn": 15,
       "targetFanOut": 1,
       "advisories": {
@@ -39303,7 +38759,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "test-only",
       "ownershipScope": ["src/test/factories/"],
       "impureRuntimePaths": []
     },
@@ -39347,7 +38802,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -39357,7 +38811,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/theme/appOverlayMenu.ts"],
       "impureRuntimePaths": []
     },
@@ -39387,7 +38840,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -39397,7 +38849,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/theme/composables/themeKeyboard.ts"],
       "impureRuntimePaths": []
     },
@@ -39431,7 +38882,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1b",
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -39441,7 +38891,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "P1 reviewed exact relocated legacy public subpath",
       "ownershipScope": ["src/theme/composables/themeMode.ts"],
       "impureRuntimePaths": []
     },
@@ -39511,7 +38960,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 8,
       "targetFanOut": 3,
       "advisories": {
@@ -39521,7 +38969,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/theme/composables/useTheme.ts"],
       "impureRuntimePaths": []
     },
@@ -39565,7 +39012,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -39575,7 +39021,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/theme/dialogMask.ts"],
       "impureRuntimePaths": []
     },
@@ -39639,7 +39084,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 10,
       "targetFanOut": 0,
       "advisories": {
@@ -39649,7 +39093,6 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/theme/formControls.ts"],
       "impureRuntimePaths": []
     },
@@ -39678,7 +39121,6 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "activationPhase": "P1",
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -39688,280 +39130,8 @@
         "missingFanOutTargets": []
       },
       "shimCount": 0,
-      "scope": "design-system",
       "ownershipScope": ["src/theme/lightboxScrim.ts"],
       "impureRuntimePaths": []
     }
-  },
-  "plannedSeams": [
-    {
-      "path": "src/features/account/ui/chrome/index.ts",
-      "sourcePaths": [
-        "src/features/account/ui/chrome/UserAccountMenu.vue",
-        "src/features/account/ui/chrome/userAccountMenu.types.ts"
-      ],
-      "targetFanIn": 8,
-      "targetFanOut": 13,
-      "sourceOwnershipScope": [
-        "src/features/account/ui/chrome/UserAccountMenu.vue",
-        "src/features/account/ui/chrome/userAccountMenu.types.ts"
-      ],
-      "projection": {
-        "consumerEdges": [
-          {
-            "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/features/admin/app/AdminHeaderBar.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/features/admin/app/AdminHeaderBar.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/features/canvas/ui/chrome/components/CanvasChrome.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/features/canvas/ui/chrome/components/types.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/features/workspace/shell/components/WorkspaceHeader.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/test/p1ThemeContracts.browser.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/test/userAccountMenu.browser.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          }
-        ],
-        "fanIn": 9,
-        "fanOut": 13,
-        "fanOutTargets": [
-          "node_modules/@iconoir/vue/dist/index.js",
-          "node_modules/vue-i18n/index.js",
-          "node_modules/vue/index.js",
-          "src/components/ui/dropdown-menu/index.ts",
-          "src/core/composables/useMenuTriggerFocusRestore.ts",
-          "src/core/composables/useSupportChannels.ts",
-          "src/core/i18n/localeManifest.ts",
-          "src/core/i18n/userLocale.ts",
-          "src/core/lib/pageChrome.ts",
-          "src/features/account/ui/chrome/SupportChannelQr.vue",
-          "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
-          "src/theme/appOverlayMenu.ts",
-          "src/theme/composables/useTheme.ts"
-        ],
-        "newConsumers": [
-          {
-            "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/features/account/ui/chrome/UserCreditBalanceButton.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/test/p1ThemeContracts.browser.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          }
-        ],
-        "missingConsumers": [
-          {
-            "from": "src/shared/components/UserAccountMenu.component.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/shared/components/UserAccountMenu.component.spec.ts",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          },
-          {
-            "from": "src/shared/components/UserCreditBalanceButton.vue",
-            "to": "src/features/account/ui/chrome/index.ts",
-            "kind": "type-only"
-          }
-        ],
-        "newFanOutTargets": [
-          "src/core/composables/useMenuTriggerFocusRestore.ts",
-          "src/core/i18n/localeManifest.ts",
-          "src/features/account/ui/chrome/SupportChannelQr.vue",
-          "src/features/account/ui/chrome/UserCreditBalanceButton.vue"
-        ],
-        "missingFanOutTargets": [
-          "src/shared/components/SupportChannelQr.vue",
-          "src/shared/components/UserCreditBalanceButton.vue",
-          "src/shared/composables/useMenuTriggerFocusRestore.ts",
-          "src/shared/i18n/localeManifest.ts"
-        ],
-        "splitSourcePaths": []
-      },
-      "accepted": false
-    },
-    {
-      "path": "src/features/canvas/index.ts",
-      "sourcePaths": [
-        "src/features/canvas/ui/pages/CanvasLandingPage.vue",
-        "src/features/canvas/ui/pages/CanvasPage.vue"
-      ],
-      "targetFanIn": 2,
-      "targetFanOut": 79,
-      "sourceOwnershipScope": ["src/features/canvas/"],
-      "projection": {
-        "consumerEdges": [
-          {
-            "from": "src/app/router/index.ts",
-            "to": "src/features/canvas/index.ts",
-            "kind": "runtime"
-          },
-          {
-            "from": "src/features/workspace/routes/workspaceRoutes.ts",
-            "to": "src/features/canvas/index.ts",
-            "kind": "runtime"
-          }
-        ],
-        "fanIn": 2,
-        "fanOut": 80,
-        "fanOutTargets": [
-          "fs",
-          "fs/promises",
-          "node_modules/@iconoir/vue/dist/index.js",
-          "node_modules/@testing-library/jest-dom/vitest.js",
-          "node_modules/@testing-library/vue/dist/index.js",
-          "node_modules/@types/node/index.d.ts",
-          "node_modules/@vue-flow/core/dist/style.css",
-          "node_modules/@vue-flow/core/dist/theme-default.css",
-          "node_modules/@vue-flow/core/dist/vue-flow-core.js",
-          "node_modules/@vue-flow/minimap/dist/vue-flow-minimap.js",
-          "node_modules/@vueuse/core/dist/index.js",
-          "node_modules/fabric/index.ts",
-          "node_modules/photoswipe/dist/photoswipe.esm.js",
-          "node_modules/vitest/dist/index.js",
-          "node_modules/vue-i18n/index.js",
-          "node_modules/vue-router/index.cjs",
-          "node_modules/vue/index.js",
-          "path",
-          "photoswipe/lightbox",
-          "photoswipe/style.css",
-          "src/api/client.ts",
-          "src/api/contractKernel.ts",
-          "src/api/idempotencyKey.ts",
-          "src/api/mediaAssetDelivery.ts",
-          "src/api/mediaWorkspaceScope.ts",
-          "src/api/upload.ts",
-          "src/api/workspaceTaskContract.ts",
-          "src/api/workspaceTaskTransport.ts",
-          "src/api/workspaceTaskWaiter.ts",
-          "src/app/style.css",
-          "src/core/components/StudioName.vue",
-          "src/core/composables/useAppToast.ts",
-          "src/core/composables/useLogoutRedirect.ts",
-          "src/core/composables/useOverlayInteractionLifecycle.ts",
-          "src/core/composables/useSiteBranding.ts",
-          "src/core/composables/useSupportChannels.ts",
-          "src/core/config/runtimeUrls.ts",
-          "src/core/constants/media.ts",
-          "src/core/contracts/generationContract.ts",
-          "src/core/contracts/imageServices.ts",
-          "src/core/errors/errorCatalog.ts",
-          "src/core/i18n/index.ts",
-          "src/core/i18n/userIdeaCurrency.ts",
-          "src/core/i18n/userLocale.ts",
-          "src/core/interaction/interactiveControlState.ts",
-          "src/core/interaction/menuKeyboardNavigation.ts",
-          "src/core/lib/pageChrome.ts",
-          "src/core/media/imageAssetPipeline.ts",
-          "src/core/media/imageDimensions.ts",
-          "src/core/media/mediaRef.ts",
-          "src/core/motion/motionPolicy.ts",
-          "src/core/motion/popoverMotion.ts",
-          "src/core/query/queryClient.ts",
-          "src/core/query/taskResult.ts",
-          "src/core/query/userCreditsInvalidation.ts",
-          "src/core/router/queryParams.ts",
-          "src/core/utils/auth.ts",
-          "src/core/utils/errorMessages.ts",
-          "src/core/utils/ids.ts",
-          "src/core/utils/imageUploadSupport.ts",
-          "src/core/utils/number.ts",
-          "src/core/utils/polling.ts",
-          "src/core/utils/storage.ts",
-          "src/core/utils/workspaceId.ts",
-          "src/features/account/ui/chrome/UserAccountMenu.vue",
-          "src/features/account/ui/chrome/userAccountMenu.types.ts",
-          "src/features/auth/index.ts",
-          "src/features/board/index.ts",
-          "src/features/board/ports/canvas.ts",
-          "src/features/board/ports/testing.ts",
-          "src/features/legal/legalLinks.ts",
-          "src/features/library/index.ts",
-          "src/features/workspace/index.ts",
-          "src/features/workspace/routePaths.ts",
-          "src/test/factories/index.ts",
-          "src/test/msw.ts",
-          "src/test/render.ts",
-          "src/theme/appOverlayMenu.ts",
-          "url",
-          "vitest/browser"
-        ],
-        "newConsumers": [],
-        "missingConsumers": [],
-        "newFanOutTargets": [
-          "node_modules/@testing-library/jest-dom/vitest.js",
-          "src/app/style.css",
-          "src/core/query/queryClient.ts",
-          "src/features/board/ports/testing.ts",
-          "src/features/legal/legalLinks.ts",
-          "src/features/workspace/routePaths.ts"
-        ],
-        "missingFanOutTargets": [
-          "src/core/constants/legalLinks.ts",
-          "src/features/admin/routePaths.ts",
-          "src/features/canvas/core/nodes/imageActions.ts",
-          "src/features/canvas/session/media/preloadImage.ts",
-          "src/shared/domain/serviceRegistry.ts"
-        ],
-        "splitSourcePaths": []
-      },
-      "accepted": false
-    }
-  ]
+  }
 }

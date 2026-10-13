@@ -11,7 +11,7 @@ npm run lint:knip
 npm run audit:knip-ledger
 ```
 
-`lint:knip:p0-subset` 是 focused diagnostic command。Public export、generated capability 或 named test consumer 变化时，manifest 与 source files 必须同步更新。Generated API wrappers 保持 generator-owned，不能 hand-edit。
+Public export、generated capability 或 named test consumer 变化时，manifest 与 source files 必须同步更新。Generated API wrappers 保持 generator-owned，不能 hand-edit。
 
 ## Current Result
 

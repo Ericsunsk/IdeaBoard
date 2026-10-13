@@ -4,8 +4,7 @@
     "ApiRequestConfig",
     "AuthFailureMode",
     "api",
-    "createApiError",
-    "default"
+    "createApiError"
   ],
   "src/api/contractKernel.ts": [
     "ContractErrorBody",

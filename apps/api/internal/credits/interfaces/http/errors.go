@@ -52,16 +52,15 @@ func writeCreditError(c *gin.Context, err error) {
 // sites reference these names so copy changes stay in one place.
 // Values are byte-identical to the previously inline literals.
 const (
-	msgServiceUnavailable = "Idea服务暂不可用"      // CodeServiceUnavailable
-	msgPackage            = "参数错误"            // Package @ errors.go
-	msgPackage2           = "幂等键已用于不同的Idea操作" // Package @ errors.go
-	msgPackage3           = "Idea钱包不存在"       // Package @ errors.go
-	msgPackage4           = "Idea钱包已冻结"       // Package @ errors.go
-	msgPackage5           = "Idea钱包当前受限"      // Package @ errors.go
-	msgPackage6           = "Idea不足"          // Package @ errors.go
-	msgPackage7           = "原扣款记录不存在"        // Package @ errors.go
-	msgPackage8           = "退款金额超过原扣款剩余额度"   // Package @ errors.go
-	msgPackage9           = "Idea对账任务不存在"     // Package @ errors.go
-	msgPackage10          = "Idea对账服务暂不可用"    // Package @ errors.go
-	msgWriteCreditError   = "Idea操作失败"        // WriteCreditError @ errors.go
+	msgPackage          = "参数错误"            // Package @ errors.go
+	msgPackage2         = "幂等键已用于不同的Idea操作" // Package @ errors.go
+	msgPackage3         = "Idea钱包不存在"       // Package @ errors.go
+	msgPackage4         = "Idea钱包已冻结"       // Package @ errors.go
+	msgPackage5         = "Idea钱包当前受限"      // Package @ errors.go
+	msgPackage6         = "Idea不足"          // Package @ errors.go
+	msgPackage7         = "原扣款记录不存在"        // Package @ errors.go
+	msgPackage8         = "退款金额超过原扣款剩余额度"   // Package @ errors.go
+	msgPackage9         = "Idea对账任务不存在"     // Package @ errors.go
+	msgPackage10        = "Idea对账服务暂不可用"    // Package @ errors.go
+	msgWriteCreditError = "Idea操作失败"        // WriteCreditError @ errors.go
 )

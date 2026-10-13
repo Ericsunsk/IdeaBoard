@@ -71,16 +71,6 @@ const (
 	maxLibraryMaterializations = int32(2000)
 )
 
-// Durable materialization status words (chk_library_materializations_
-// status). The public API exposes running; the table stores
-// processing. The store maps at the boundary in both directions.
-const (
-	libraryMaterializationDBPending    = "pending"
-	libraryMaterializationDBProcessing = "processing"
-	libraryMaterializationDBCompleted  = "completed"
-	libraryMaterializationDBFailed     = "failed"
-)
-
 // mintAttempts bounds public_id regeneration after a random collision.
 const mintAttempts = 3
 

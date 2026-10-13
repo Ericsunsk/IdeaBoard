@@ -18,13 +18,6 @@ func NormalizeFolderName(raw string) (string, error) {
 	return name, nil
 }
 
-func ValidateOwner(ownerUserID int64) error {
-	if ownerUserID <= 0 {
-		return ErrInvalidOwner
-	}
-	return nil
-}
-
 // NormalizeAndValidateAsset trims the provider reference and enforces the
 // provider-allowlisted https URL gate (never bytes).
 func NormalizeAndValidateAsset(input AssetInput) (AssetInput, error) {

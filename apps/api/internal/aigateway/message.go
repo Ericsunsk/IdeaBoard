@@ -29,8 +29,6 @@ const (
 	msgDescribeModelsDevFact         = "知识截止 "                                                     // DescribeModelsDevFact @ detect.go
 	msgSummarizeModelsDevModalities  = "输入："                                                       // SummarizeModelsDevModalities @ detect.go
 	msgSummarizeModelsDevModalities2 = "输出："                                                       // SummarizeModelsDevModalities @ detect.go
-	msgSplitGatewayModel             = "模型网关路径无效"                                                  // SplitGatewayModel @ gateway_contract.go
-	msgSplitGatewayModel2            = "模型必须是 provider/model 格式且不含空白"                              // SplitGatewayModel @ gateway_contract.go
 	msgGet                           = "网关配置服务暂不可用"                                                // Get @ handler.go
 	msgGet2                          = "读取网关配置失败"                                                  // Get @ handler.go
 	msgUpdate                        = "参数错误"                                                      // Update @ handler.go

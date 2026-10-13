@@ -88,12 +88,6 @@ func HashIdempotencyRequest(parts ...string) string {
 	return idempotency.HashRequest(parts...)
 }
 
-// TaskIdempotencyConflict classifies an Idempotency-Key reused with a
-// different task request: 409 with CodeTaskIdempotencyConflict.
-func TaskIdempotencyConflict(message string) *apperror.Error {
-	return apperror.Conflict(apperror.Code(CodeTaskIdempotencyConflict), message)
-}
-
 // IsIdempotencyConflict reports whether err is a key-reuse conflict
 // (generic or task-scoped), as opposed to missing/invalid keys.
 func IsIdempotencyConflict(err error) bool {

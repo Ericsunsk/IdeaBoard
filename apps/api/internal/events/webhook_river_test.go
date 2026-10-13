@@ -14,7 +14,6 @@ import (
 
 	"ideaboard/api/internal/platform/riverpolicy"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
@@ -194,16 +193,4 @@ func TestWebhookDispatchEnqueueFailureDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	store.Dispatch(context.Background(), testEnvelope(t))
-}
-
-func countWebhookDeliverJobs(t testing.TB, db interface {
-	QueryRow(context.Context, string, ...any) pgx.Row
-}) int64 {
-	t.Helper()
-	var count int64
-	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM river_job WHERE kind = $1`,
-		WebhookDeliveryJobKind).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	return count
 }

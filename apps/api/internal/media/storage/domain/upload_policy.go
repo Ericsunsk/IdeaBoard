@@ -88,13 +88,6 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	return path.Join("tasks", fmt.Sprintf("%d", userID), taskSegment), nil
 }
 
-func LibraryAssetUploadDirPrefix(userID, libraryAssetID int64) (string, error) {
-	if userID <= 0 || libraryAssetID <= 0 {
-		return "", fmt.Errorf(msgLibraryAssetUploadDirPrefix)
-	}
-	return path.Join("library", fmt.Sprintf("%d", userID), fmt.Sprintf("%d", libraryAssetID)), nil
-}
-
 func LibraryAssetUploadObjectPrefix(userID int64) (string, error) {
 	if userID <= 0 {
 		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)

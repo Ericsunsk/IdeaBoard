@@ -5,17 +5,8 @@ import (
 	"time"
 )
 
-// TestNATSJetStreamEventOrderingContract pins the bounded
-// stream configuration that issue #667 requires. The
-// runbook reads the same constants to assert the production
-// configuration is monotonic with the test contract. Any
-// regression here is a hard cutover blocker.
-//
-// The contract is documented in
-// docs/cutover/media.md#observability; a misconfiguration
-// (for example, MaxAckPending raised above 1024) breaks
-// the post-commit ordering guarantee and the runbook
-// treats the regression as P0.
+// TestNATSJetStreamEventOrderingContract bounds the deduplication window
+// and retains at least seven days of domain events.
 func TestNATSJetStreamEventOrderingContract(t *testing.T) {
 	if natsDuplicateWindow <= 0 {
 		t.Fatal("natsDuplicateWindow must be positive to keep duplicate-delivery dedup window finite")

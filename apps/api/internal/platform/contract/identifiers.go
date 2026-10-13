@@ -115,16 +115,8 @@ func IsEventID(id string) bool { return IsValidPublicID(PrefixEvent, id) }
 // IsBillingAccountID reports whether id is a well-formed ba_ identifier.
 func IsBillingAccountID(id string) bool { return IsValidPublicID(PrefixBillingAccount, id) }
 
-// IsLibraryFolderID reports whether id is a well-formed lfolder_ identifier.
-func IsLibraryFolderID(id string) bool { return IsValidPublicID(PrefixLibraryFolder, id) }
-
 // IsLibraryAssetID reports whether id is a well-formed lasset_ identifier.
 func IsLibraryAssetID(id string) bool { return IsValidPublicID(PrefixLibraryAsset, id) }
-
-// IsLibraryMaterializationID reports whether id is a well-formed lmat_ identifier.
-func IsLibraryMaterializationID(id string) bool {
-	return IsValidPublicID(PrefixLibraryMaterialization, id)
-}
 
 // IsRewardCodeID reports whether id is a well-formed rwd_ identifier.
 // Reserved for the rewards opaque-id migration; the current numeric

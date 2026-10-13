@@ -68,7 +68,6 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog"
-	searchapplication "ideaboard/api/internal/searchcatalog/application"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
@@ -198,8 +197,6 @@ func renderSearchError(c *gin.Context, err error) {
 		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchVisionProviderError, msgSearchVisionProviderError)
 	case errors.Is(err, errV1VisionNotConfigured):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchVisionNotConfigured, msgSearchVisionNotConfigured)
-	case errors.Is(err, errV1SearchUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchProviderUnavailable, msgSearchProviderUnavailable)
 	default:
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgSearchProviderUnavailable)
 	}
@@ -272,110 +269,10 @@ func (h *contractV1Handler) searchWorkspace(c *gin.Context) {
 	})
 }
 
-// SearchCatalogBackendAdapter binds the workspace search surface to the
-// existing searchcatalog provider seam (application.SearchService over
-// the configured supplier adapters). The service cursor is carried
-// inside the v1 opaque cursor together with the query + provider
-// binding, so replaying a cursor against a different query, filter set,
-// or page size fails closed with pagination_cursor_invalid. Provider
-// filtering post-fills bounded pages (at most 3 underlying fetches per
-// v1 page) because the service merges suppliers internally.
-type SearchCatalogBackendAdapter struct {
-	service *searchapplication.SearchService
-}
-
-// NewSearchCatalogBackendAdapter builds the production search backend
-// over the existing provider seam. A nil service fails every call
-// closed with errV1SearchUnavailable.
-func NewSearchCatalogBackendAdapter(service *searchapplication.SearchService) *SearchCatalogBackendAdapter {
-	return &SearchCatalogBackendAdapter{service: service}
-}
-
-type v1SearchBackendCursor struct {
-	Query     string   `json:"query"`
-	Providers []string `json:"providers"`
-	PageSize  int      `json:"page_size"`
-	Inner     string   `json:"inner"`
-}
-
-const v1SearchBackendMaxFillFetches = 3
-
-// Search implements V1SearchBackend.
-func (a *SearchCatalogBackendAdapter) Search(ctx context.Context, query string, providers []string, limit int, cursor string) ([]searchcatalog.V1SearchResult, string, bool, error) {
-	if a == nil || a.service == nil {
-		return nil, "", false, errV1SearchUnavailable
-	}
-	inner := ""
-	if strings.TrimSpace(cursor) != "" {
-		decoded, decodeErr := contract.DecodeCursor[v1SearchBackendCursor](cursor)
-		if decodeErr != nil || decoded == nil || decoded.Query != query ||
-			decoded.PageSize != limit || !equalV1ProviderSets(decoded.Providers, providers) {
-			return nil, "", false, errV1CursorInvalid
-		}
-		inner = decoded.Inner
-	}
-	items := make([]searchcatalog.V1SearchResult, 0, limit)
-	hasMore := false
-	for fetch := 0; fetch < v1SearchBackendMaxFillFetches && len(items) < limit; fetch++ {
-		response, searchErr := a.service.Search(ctx, query, inner, limit)
-		if searchErr != nil {
-			if len(items) > 0 {
-				break
-			}
-			return nil, "", false, errV1SearchUnavailable
-		}
-		for _, result := range response.Results {
-			if !v1ProviderSelected(providers, string(result.Provider)) {
-				continue
-			}
-			if len(items) >= limit {
-				break
-			}
-			items = append(items, searchcatalog.V1SearchResult{
-				Provider: string(result.Provider), SourceID: result.ID,
-				Title: result.Title, Author: result.Author,
-				SourceURL: result.SourceURL, PreviewURL: result.PreviewURL, OriginalURL: result.OriginalURL,
-				Width: result.Width, Height: result.Height,
-			})
-		}
-		hasMore = response.HasMore
-		inner = response.NextCursor
-		if !response.HasMore || response.NextCursor == "" {
-			break
-		}
-	}
-	next := ""
-	if hasMore && inner != "" {
-		encoded, encodeErr := contract.EncodeCursor(v1SearchBackendCursor{Query: query, Providers: providers, PageSize: limit, Inner: inner})
-		if encodeErr != nil {
-			return nil, "", false, encodeErr
-		}
-		next = encoded
-		hasMore = next != ""
-	}
-	return items, next, hasMore, nil
-}
-
 // errV1CursorInvalid classifies v1 search cursor binding failures
 // (wrong query/filter/page-size binding, malformed bytes) into
 // pagination_cursor_invalid at the handler.
 var errV1CursorInvalid = errors.New("v1 search cursor invalid")
-
-func equalV1ProviderSets(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	set := make(map[string]struct{}, len(a))
-	for _, provider := range a {
-		set[provider] = struct{}{}
-	}
-	for _, provider := range b {
-		if _, ok := set[provider]; !ok {
-			return false
-		}
-	}
-	return true
-}
 
 func v1ProviderSelected(providers []string, candidate string) bool {
 	for _, provider := range providers {

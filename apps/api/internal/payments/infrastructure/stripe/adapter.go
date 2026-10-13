@@ -11,7 +11,6 @@ import (
 	"time"
 
 	paymentports "ideaboard/api/internal/payments/ports"
-	"ideaboard/api/internal/platform/outboundhttp"
 
 	"github.com/stripe/stripe-go/v86"
 )
@@ -31,14 +30,6 @@ func New() *Adapter {
 		newClient: func(key string) *stripe.Client { return stripe.NewClient(key) },
 		recorder:  NewRecorder(),
 	}
-}
-
-// NewWithRecorder builds an Adapter writing Stripe RED to m (nil-safe).
-// Tests inject an isolated registry here; production uses New().
-func NewWithRecorder(m *outboundhttp.Metrics) *Adapter {
-	a := New()
-	a.recorder = NewRecorderWithMetrics(m)
-	return a
 }
 
 // observe records one finished SDK call in outbound RED. It stays nil-safe

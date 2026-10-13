@@ -140,10 +140,6 @@ func currentRiverSchema(ctx context.Context, dbPool *pgxpool.Pool) (string, erro
 	return schema, nil
 }
 
-func NewRiverPgxPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	return NewRiverPgxPoolWithConfig(ctx, dsn, config.PoolConfig{})
-}
-
 // NewRiverPgxPoolWithConfig opens the River pgxpool with deploy-level sizing
 // from PoolConfig (env-tunable). A zero PoolConfig keeps the historical
 // budget (10 max / 1 min) through the Effective* accessors: combined with the

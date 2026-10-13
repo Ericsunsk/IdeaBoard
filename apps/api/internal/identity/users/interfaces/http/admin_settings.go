@@ -25,26 +25,6 @@ func (h *AdminHandler) GetRegistrationSetting(c *gin.Context) {
 	response.SuccessDTO(c, setting)
 }
 
-// UpdateRegistrationSetting 更新注册开关状态
-func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	var req settings.RegistrationSetting
-	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
-		return
-	}
-
-	updated, err := runtimeSettings.UpdateRegistration(c.Request.Context(), req)
-	if h.respondRuntimeSettingsWriteError(c, err) {
-		return
-	}
-
-	response.SuccessDTO(c, updated)
-}
-
 // GetRateLimitSettings 获取频率限制设置
 func (h *AdminHandler) GetRateLimitSettings(c *gin.Context) {
 	runtimeSettings, ok := h.requireRuntimeSettings(c)
@@ -56,26 +36,6 @@ func (h *AdminHandler) GetRateLimitSettings(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, setting)
-}
-
-// UpdateRateLimitSettings 更新频率限制设置
-func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	var req settings.RateLimitSetting
-	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
-		return
-	}
-
-	updated, err := runtimeSettings.UpdateRateLimit(c.Request.Context(), req)
-	if h.respondRuntimeSettingsWriteError(c, err) {
-		return
-	}
-
-	response.SuccessDTO(c, updated)
 }
 
 // GetMediaUploadSettings 获取媒体上传设置

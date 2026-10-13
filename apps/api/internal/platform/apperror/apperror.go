@@ -118,24 +118,8 @@ func BadRequest(code Code, msg string) *Error {
 	return New(code, http.StatusBadRequest, BlameCaller, msg)
 }
 
-func Forbidden(code Code, msg string) *Error {
-	return New(code, http.StatusForbidden, BlameCaller, msg)
-}
-
-func NotFound(code Code, msg string) *Error {
-	return New(code, http.StatusNotFound, BlameCaller, msg)
-}
-
 func Conflict(code Code, msg string) *Error {
 	return New(code, http.StatusConflict, BlameCaller, msg)
-}
-
-func Locked(code Code, msg string) *Error {
-	return New(code, http.StatusLocked, BlameCaller, msg)
-}
-
-func Unprocessable(code Code, msg string) *Error {
-	return New(code, http.StatusUnprocessableEntity, BlameCaller, msg)
 }
 
 func ServiceUnavailable(code Code, blame Blame, msg string) *Error {

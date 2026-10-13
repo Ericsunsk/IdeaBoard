@@ -86,23 +86,6 @@ func Parse(raw string) (string, error) {
 	return key, nil
 }
 
-// RenderStatusOf returns the HTTP status a caller must render for err,
-// defaulting to 400 for unclassified failures.
-func RenderStatusOf(err error) int {
-	if status := apperror.HTTPStatusOf(err); status != 0 {
-		return status
-	}
-	return 400
-}
-
-// RenderCodeOf returns the wire code for err, defaulting to CodeRequired.
-func RenderCodeOf(err error) string {
-	if code := apperror.CodeOf(err); code != "" {
-		return string(code)
-	}
-	return string(CodeRequired)
-}
-
 // HashRequest derives the request fingerprint compared on key reuse. Only
 // the digest is persisted, never the raw fields (join tokens stay secret).
 func HashRequest(parts ...string) string {

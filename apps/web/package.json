@@ -34,8 +34,6 @@
     "lint:knip": "tsx scripts/checkKnipGate.ts",
     "lint:knip:normal": "knip --config knip.config.ts --no-progress",
     "lint:knip:production": "knip --config knip.production.config.ts --production --strict --no-progress",
-    "lint:knip:p0-subset": "knip --include files,duplicates,dependencies,exports",
-    "lint:p1": "tsx scripts/checkDependencyBoundaries.ts --strict --phase=P1 && npm run api:surface:check -- --strict && npm run lint:retirement-replacements && npm run lint:knip && npm run lint:locale-parity",
     "benchmark:canvas-interactions": "tsx scripts/canvasInteractionsBenchmark.ts",
     "preview": "vite preview",
     "smoke:user": "tsx scripts/userRouteSmoke.ts",

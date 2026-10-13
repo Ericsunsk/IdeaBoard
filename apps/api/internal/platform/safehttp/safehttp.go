@@ -42,14 +42,6 @@ func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, e
 	return policy.parsed, nil
 }
 
-func ValidateURLWithAllowHostsAndTimeout(rawURL string, timeout time.Duration, allowHosts ...string) (*url.URL, error) {
-	policy, err := resolvePolicyWithTimeout(context.Background(), rawURL, timeout, allowHosts...)
-	if err != nil {
-		return nil, err
-	}
-	return policy.parsed, nil
-}
-
 func resolvePolicy(ctx context.Context, rawURL string, allowHosts ...string) (*resolvedPolicy, error) {
 	return resolvePolicyWithTimeout(ctx, rawURL, defaultTimeout, allowHosts...)
 }

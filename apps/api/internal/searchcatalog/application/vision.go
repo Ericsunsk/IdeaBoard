@@ -16,10 +16,6 @@ type VisionSearchService struct {
 	client ports.VisionProviderClient
 }
 
-func NewVisionSearchService(config ports.VisionConfigReader, gateway ports.VisionGatewayClient) *VisionSearchService {
-	return newVisionSearchService(config, gatewayVisionProviderClient{gateway: gateway})
-}
-
 type gatewayVisionProviderClient struct {
 	gateway ports.VisionGatewayClient
 }

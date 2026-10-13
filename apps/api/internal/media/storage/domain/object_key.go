@@ -33,21 +33,6 @@ func BuildObjectKey(dirPrefix string, ext string) (string, error) {
 	return NormalizeUploadObjectKey(fmt.Sprintf("%s/%s/%d%s", baseDir, now.Format("2006/01/02"), now.UnixNano(), cleanExt))
 }
 
-func StableUploadObjectKey(dirPrefix, filename string) (string, error) {
-	base := path.Base(strings.TrimSpace(filename))
-	if base == "." || base == "" || base == ".." || strings.ContainsAny(base, `/\\`) {
-		return "", fmt.Errorf(msgStableUploadObjectKey)
-	}
-	baseDir := UploadObjectRoot
-	if strings.TrimSpace(dirPrefix) != "" {
-		prefix := strings.Trim(path.Clean(strings.TrimSpace(dirPrefix)), "/")
-		if prefix != "" && prefix != "." {
-			baseDir = path.Join(baseDir, prefix)
-		}
-	}
-	return NormalizeUploadObjectKey(path.Join(baseDir, base))
-}
-
 func CanonicalObjectKeyExtension(objectKey, ext string) string {
 	trimmed := strings.TrimSpace(objectKey)
 	if trimmed == "" || ext == "" {

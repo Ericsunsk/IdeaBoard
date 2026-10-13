@@ -6,12 +6,12 @@
 
 环境要求：
 
-| 组件       | 建议版本                                |
-| ---------- | --------------------------------------- |
-| Node.js    | 以根目录 `.node-version` 为准           |
+| 组件       | 建议版本                                    |
+| ---------- | ------------------------------------------- |
+| Node.js    | 以根目录 `.node-version` 为准               |
 | Go         | 以 `apps/api/go.mod` 的 `go` directive 为准 |
-| PostgreSQL | `17+`                                   |
-| Atlas CLI  | `1.3.2`                                 |
+| PostgreSQL | `17+`                                       |
+| Atlas CLI  | `1.3.2`                                     |
 
 启动本地依赖：
 
@@ -121,25 +121,25 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 日常小改优先跑最小相关检查；跨层 contract 改动同时验证前后端。
 
-| 场景                             | 命令                                                                                                                          |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Web unit/spec                    | `cd apps/web && npm run test:run`                                                                                             |
-| Web test typecheck               | `cd apps/web && npm run test:typecheck`                                                                                       |
-| Web browser-level spec           | `cd apps/web && npm run test:browser`                                                                                         |
-| Web build/type                   | `cd apps/web && npm run build`                                                                                                |
-| Web lint                         | `cd apps/web && npm run lint`                                                                                                 |
-| Web style lint                   | `cd apps/web && npm run lint:style`                                                                                           |
-| API tests                        | `cd apps/api && go test ./...`                                                                                                |
-| Test infrastructure modules      | `cd apps/api/internal/testdb && go test ./...` and `cd apps/api/internal/testsupport && go test ./...`                        |
-| API build                        | `cd apps/api && go build ./...`                                                                                               |
-| Production dead-code scan        | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode ./...`                            |
-| Test reachability dead-code scan | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode -test ./...`                      |
-| Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                |
-| Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease` |
-| sqlc regeneration                | `cd apps/api && go tool sqlc generate`                                                                                        |
-| Auth build                       | `cd apps/auth && npm run build`                                                                                               |
+| 场景                             | 命令                                                                                                                                                                             |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web unit/spec                    | `cd apps/web && npm run test:run`                                                                                                                                                |
+| Web test typecheck               | `cd apps/web && npm run test:typecheck`                                                                                                                                          |
+| Web browser-level spec           | `cd apps/web && npm run test:browser`                                                                                                                                            |
+| Web build/type                   | `cd apps/web && npm run build`                                                                                                                                                   |
+| Web lint                         | `cd apps/web && npm run lint`                                                                                                                                                    |
+| Web style lint                   | `cd apps/web && npm run lint:style`                                                                                                                                              |
+| API tests                        | `cd apps/api && go test ./...`                                                                                                                                                   |
+| Test infrastructure modules      | `cd apps/api/internal/testdb && go test ./...` and `cd apps/api/internal/testsupport && go test ./...`                                                                           |
+| API build                        | `cd apps/api && go build ./...`                                                                                                                                                  |
+| Production dead-code scan        | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode ./...`                                                                                     |
+| Test reachability dead-code scan | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode -test ./...`                                                                               |
+| Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                                                                    |
+| Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease`                                                     |
+| sqlc regeneration                | `cd apps/api && go tool sqlc generate`                                                                                                                                           |
+| Auth build                       | `cd apps/auth && npm run build`                                                                                                                                                  |
 | Credits million dataset          | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/credits/application/commands -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
-| Usage million dataset            | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`               |
+| Usage million dataset            | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`                         |
 
 ### Frontend 工具与治理规则
 
@@ -231,33 +231,32 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 
 ### Canvas workflow
 
-| 入口                                                                                                              | 用途                                |
-| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| [CanvasPage.vue](./apps/web/src/features/canvas/ui/pages/CanvasPage.vue)                                             | Canvas route page                   |
+| 入口                                                                                                         | 用途                                |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| [CanvasPage.vue](./apps/web/src/features/canvas/ui/pages/CanvasPage.vue)                                     | Canvas route page                   |
 | [executionContract.ts](./apps/web/src/features/canvas/core/execution/executionContract.ts)                   | 前端 workflow feature contract      |
-| [generationIntent.ts](./apps/web/src/features/canvas/session/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
+| [generationIntent.ts](./apps/web/src/features/canvas/session/image-workflow/generationIntent.ts)             | Prompt/node execution orchestration |
 | [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/session/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
-| [workspaceEventStream.ts](./apps/web/src/api/workspaceEventStream.ts)                                                          | Task SSE events                     |
-| [features.go](./apps/api/internal/workflow/features.go)                                                           | 后端 canonical feature contract     |
+| [workspaceEventStream.ts](./apps/web/src/api/workspaceEventStream.ts)                                        | Task SSE events                     |
+| [features.go](./apps/api/internal/workflow/features.go)                                                      | 后端 canonical feature contract     |
 
 ### Task runtime
 
-| 入口                                                                          | 用途                          |
-| ----------------------------------------------------------------------------- | ----------------------------- |
-| [service.go](./apps/api/internal/tasking/application/task/service.go)              | Task service                  |
-| [canonical_intake.go](./apps/api/internal/tasking/application/task/canonical_intake.go)               | Task submission intake |
-| [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)        | River enqueue adapter         |
-| [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)         | River worker adapter          |
-| [workspace_task_worker.go](./apps/api/internal/tasking/interfaces/worker/workspace_task_worker.go) | Worker task processing        |
-| [request.go](./apps/api/internal/runtime/interfaces/worker/providers/request.go) | Provider request shaping      |
+| 入口                                                                                               | 用途                     |
+| -------------------------------------------------------------------------------------------------- | ------------------------ |
+| [canonical_intake.go](./apps/api/internal/tasking/application/task/canonical_intake.go)            | Task submission intake   |
+| [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)                  | River enqueue adapter    |
+| [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)                         | River worker adapter     |
+| [workspace_task_worker.go](./apps/api/internal/tasking/interfaces/worker/workspace_task_worker.go) | Worker task processing   |
+| [request.go](./apps/api/internal/runtime/interfaces/worker/providers/request.go)                   | Provider request shaping |
 
 ### Prompt config
 
-| 入口                                                                                                     | 用途               |
-| -------------------------------------------------------------------------------------------------------- | ------------------ |
+| 入口                                                                                                  | 用途               |
+| ----------------------------------------------------------------------------------------------------- | ------------------ |
 | [AdminPromptConfigPage.vue](./apps/web/src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue) | Admin prompt UI    |
-| [engine.go](./apps/api/internal/prompts/engine.go)                                                       | Prompt rendering   |
-| [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)                                     | 运营模板和变量规则 |
+| [engine.go](./apps/api/internal/prompts/engine.go)                                                    | Prompt rendering   |
+| [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)                                  | 运营模板和变量规则 |
 
 ### Auth
 
@@ -266,55 +265,36 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [middleware.go](./apps/api/internal/identity/auth/middleware.go)         | API auth middleware        |
 | [service_client.go](./apps/api/internal/identity/auth/service_client.go) | Go -> Auth internal client |
 | [index.ts](./apps/auth/src/index.ts)                                     | Auth service routes        |
-| [client.ts](./apps/web/src/core/auth/client.ts)                        | Web auth client            |
+| [client.ts](./apps/web/src/core/auth/client.ts)                          | Web auth client            |
 | [userSession.ts](./apps/web/src/features/auth/session/userSession.ts)    | User session store         |
 | [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)   | Auth operation rules       |
 
 ### Credits
 
-| 入口                                                               | 用途                                                                                       |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| [composition.go](./apps/api/internal/credits/composition.go)               | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter         |
+| 入口                                                                            | 用途                                                                                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [composition.go](./apps/api/internal/credits/composition.go)                    | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter         |
 | [service.go](./apps/api/internal/credits/application/reconciliation/service.go) | 自动账本检查、Run history 与全局 Finding queue；Stale Hold 固定 24 小时且不接受 Admin 配置 |
-| [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md)               | Credits domain language 与 invariants                                                      |
-| [credits-million.md](./docs/benchmarks/credits-million.md)         | 显式百万流水 harness 与参考结果                                                            |
-| [web-performance.md](./docs/benchmarks/web-performance.md)         | Web bundle size guard 与 Canvas interaction benchmark                                      |
+| [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md)                            | Credits domain language 与 invariants                                                      |
+| [credits-million.md](./docs/benchmarks/credits-million.md)                      | 显式百万流水 harness 与参考结果                                                            |
+| [web-performance.md](./docs/benchmarks/web-performance.md)                      | Web bundle size guard 与 Canvas interaction benchmark                                      |
 
 ### Rewards
 
-| 入口                                                 | 用途                                                                    |
-| ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| 入口                                                                         | 用途                                                                    |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | [service.go](./apps/api/internal/rewards/application/redemptions/service.go) | RewardCode、Redemption create/list/redeem/history 与 Credits Grant 编排 |
-| [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md) | Rewards Domain Language 与 invariants                                   |
+| [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md)                         | Rewards Domain Language 与 invariants                                   |
 
 ### Billing
 
-| 入口                                                             | 用途                                                                                             |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [store.go](./apps/api/internal/billing/infrastructure/postgres/store.go)             | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
-| [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md)             | Billing domain language、SKU namespace 与 snapshot invariants                                    |
+| 入口                                                                     | 用途                                                                                             |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| [store.go](./apps/api/internal/billing/infrastructure/postgres/store.go) | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
+| [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md)                     | Billing domain language、SKU namespace 与 snapshot invariants                                    |
 | [service.go](./apps/api/internal/tasking/application/billing/service.go) | AI Image Workflow SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
 
-## Workflow Feature Contract
-
-| Feature      | 语义     |
-| ------------ | -------- |
-| `render`     | 草图成图 |
-| `variations` | 风格延展 |
-| `inpaint`    | 局部重绘 |
-| `cutout`     | 抠图     |
-| `fusion`     | 多图融合 |
-| `upscale`    | 放大     |
-| `outpaint`   | 扩图     |
-
-Rules:
-
-- `feature` 是顶层任务字段，由后端统一校验。
-- `image_urls` 是顶层媒体字段。
-- `params` 只承载 feature-specific structured parameters。
-- 工作流参数只接受 canonical key；前端 execution contract、OpenAPI 与 Go validation 必须保持同名同层级。
-- `use_mask`、`mask_image_url`、`mask_image_urls` 是 `inpaint` 运行时边界参数，不是 prompt 模板变量。
-- 新增或修改 feature 时同步前端 contract、后端 workflow helper、Admin prompt config 和 runbook。
+Workflow feature、Task payload 和媒体输入的 canonical contract 见 [DESIGN.md](./DESIGN.md) §2；新增或修改能力时同步前端 execution contract、OpenAPI、Go workflow validation、Admin prompt config 和 runbook。
 
 ## Generated Code
 
@@ -348,7 +328,7 @@ sqlc:
 | `APP_SECRETS_ENCRYPTION_KEY`                                  | API key 和 storage secret 静态加密主密钥                                                           |
 | `REWARDS_CODE_HMAC_KEYS`                                      | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
 | `BETTER_AUTH_SECRET`                                          | Better Auth 签名密钥，生产必须高熵                                                                 |
-| `PUBLIC_ORIGIN`                                               | Auth 对外基准 URL与 trusted origin                                                                  |
+| `PUBLIC_ORIGIN`                                               | Auth 对外基准 URL与 trusted origin                                                                 |
 
 Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
 

@@ -1,7 +1,6 @@
 package imageformat
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -176,10 +175,6 @@ func DetectImageExtensionFromBytes(data []byte) string {
 		}
 	}
 	return ""
-}
-
-func NormalizeImageExtFromFilename(filename string) (string, bool) {
-	return NormalizeImageExtension(filepath.Ext(strings.TrimSpace(filename)))
 }
 
 func imageSignaturesByExtension(ext string) []imageSignature {

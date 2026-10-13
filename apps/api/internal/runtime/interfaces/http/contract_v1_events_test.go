@@ -72,7 +72,6 @@ func (f *fakeEventSender) snapshot() (int, [][]byte, []map[string]string) {
 // the River worker, so contract tests keep asserting sends immediately
 // after the emitting call without running a River client.
 type inlineEventEnqueuer struct {
-	mu    sync.Mutex
 	store *events.WebhookStore
 }
 
@@ -498,7 +497,7 @@ func TestV1EventSubscriptionCRUD(t *testing.T) {
 		t.Fatalf("subscriptions = %d, want 2", len(items))
 	}
 	// Delete requires the key too; unknown ids converge to 404.
-	status, payload = eventIDEM(t, fx.engine, http.MethodDelete, fx.subscriptionsPath()+"/sub_doesnotexist00", 2, "", "", nil)
+	status, _ = eventIDEM(t, fx.engine, http.MethodDelete, fx.subscriptionsPath()+"/sub_doesnotexist00", 2, "", "", nil)
 	if status != http.StatusBadRequest {
 		t.Fatalf("delete without key = %d, want 400", status)
 	}

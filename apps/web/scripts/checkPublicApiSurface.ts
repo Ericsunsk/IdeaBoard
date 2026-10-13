@@ -11,9 +11,7 @@ import { listSurfaceEntrypoints, loadSeamInventory } from './seamInventory.ts'
  * Public API surface ratchet for declared feature entrypoints.
  *
  * Entrypoints come from the seam inventory (`docs/frontend-seam-inventory.md`,
- * `surfaceBaseline: true`); `knip.jsonc` `entry` is no longer read here, so
- * activation/retirement flips apply to the ratchet atomically with the
- * inventory. Those barrels use a mix of explicit `export { ... }`
+ * `surfaceBaseline: true`). Those barrels use a mix of explicit `export { ... }`
  * and `export *`, and an `export *` chain silently widens the public surface
  * whenever an internal module grows a new export — a leak that is invisible in
  * review and expensive to retract later (consumers start depending on it).
@@ -23,9 +21,8 @@ import { listSurfaceEntrypoints, loadSeamInventory } from './seamInventory.ts'
  * public symbol must therefore be a deliberate edit to the baseline, which is
  * what makes the surface reviewable in a diff.
  *
- * Every active canonical entry, including pure subpaths, has a baseline.
- * Existing cascading entry contracts remain covered. Newly covered surfaces
- * warn in P0; `--strict` activates the P1 gate. Missing active entries always fail.
+ * Every canonical entry, including pure subpaths, has a baseline.
+ * Cascading entry contracts are also covered. All surface drift fails the gate.
  *
  * ## Barrel presence
  *
@@ -318,7 +315,7 @@ function unresolvedProblems(unresolved: string[]): string[] {
 }
 
 /**
- * Positive/negative fixtures for the surface ratchet (P0 deliverable B).
+ * Positive/negative fixtures for the surface ratchet.
  *
  * Runs in a disposable temp workspace so the real baseline is untouched:
  * - positive: unchanged entry matches its baseline (valid public entry);
@@ -458,21 +455,6 @@ const { surface: current, unresolved: unresolvedStarExports } = collectSurfaceFo
   webRoot,
   listSurfaceEntrypoints(seams),
 )
-const planned = seams.filter((seam) => seam.status === 'planned')
-const sourceContracts = collectSurfaceFor(
-  webRoot,
-  [...new Set(planned.flatMap((seam) => seam.sourcePaths))].sort(),
-)
-unresolvedStarExports.push(...sourceContracts.unresolved)
-for (const seam of planned) {
-  for (const mapping of seam.exportMappings ?? []) {
-    if (!sourceContracts.surface[mapping.source]?.includes(mapping.name))
-      unresolvedStarExports.push(
-        `${seam.path}: source ${mapping.source} has no export ${mapping.name}`,
-      )
-  }
-}
-
 if (process.argv.includes('--update')) {
   if (unresolvedStarExports.length)
     throw new Error(unresolvedProblems(unresolvedStarExports).join('\n'))
@@ -498,24 +480,14 @@ if (!fs.existsSync(baselinePath)) {
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8')) as Record<string, string[]>
 const seamsByPath = new Map(seams.map((seam) => [seam.path, seam]))
-const differences = diffSurface(current, baseline)
+const problems = diffSurface(current, baseline)
 for (const [entry, names] of Object.entries(current)) {
   const declared = seamsByPath.get(entry)?.publicExports
   if (declared && JSON.stringify(names) !== JSON.stringify(declared))
-    differences.push(
+    problems.push(
       `Entrypoint "${entry}" differs from inventory publicExports; review the frozen contract.`,
     )
 }
-const warnings = differences.filter(
-  (problem) =>
-    !process.argv.includes('--strict') &&
-    [...seamsByPath.values()].some(
-      (seam) => seam.surfaceSeverity === 'warn' && problem.includes(`"${seam.path}"`),
-    ),
-)
-const problems = differences.filter((problem) => !warnings.includes(problem))
-for (const warning of warnings) console.warn(`  P0 surface advisory: ${warning}`)
-
 problems.push(...collectFeatureBarrelProblems())
 problems.push(...unresolvedProblems(unresolvedStarExports))
 

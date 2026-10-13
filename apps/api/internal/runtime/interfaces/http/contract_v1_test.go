@@ -430,7 +430,7 @@ func TestV1MemberAuthorizationAndTransitions(t *testing.T) {
 		if status != 404 || v1ErrorCode(t, payload) != string(contract.CodeWorkspaceMemberNotFound) {
 			t.Fatalf("unknown member = %d %v, want 404 member not found", status, payload)
 		}
-		status, _, payload = doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/nope", userID: owner})
+		status, _, _ = doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/nope", userID: owner})
 		if status != 404 {
 			t.Fatalf("malformed member = %d, want 404", status)
 		}

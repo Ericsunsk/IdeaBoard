@@ -61,17 +61,6 @@ func (s *PostgresTaskRuntimeStore) IsCancelled(ctx context.Context, taskID strin
 	return exists, err
 }
 
-func (s *PostgresTaskRuntimeStore) ClearCancelled(ctx context.Context, taskID string) error {
-	if strings.TrimSpace(taskID) == "" {
-		return nil
-	}
-	if s == nil || s.db == nil {
-		return fmt.Errorf("postgres task runtime store: db not configured")
-	}
-	_, err := s.db.Exec(ctx, `DELETE FROM task_cancellations WHERE task_id = $1`, taskID)
-	return err
-}
-
 func (s *PostgresTaskRuntimeStore) pruneExpiredTaskCancellations(ctx context.Context) error {
 	_, err := s.db.Exec(ctx, `DELETE FROM task_cancellations WHERE expires_at <= now()`)
 	return err

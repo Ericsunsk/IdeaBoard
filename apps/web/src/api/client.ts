@@ -176,5 +176,3 @@ async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T>
 export const api = {
   request: apiRequest,
 }
-
-export default api

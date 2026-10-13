@@ -54,19 +54,11 @@ type Row = {
 const rows: Row[] = []
 const summaries: Array<{ mode: string; exit: number | null; counts: Record<string, number> }> = []
 const owner = (file: string) =>
-  file.startsWith('src/features/admin/')
-    ? 'p4-lane'
-    : file.startsWith('src/features/canvas/tools/image-tools/')
-      ? 'p6-lane'
-      : file.startsWith('src/features/canvas/')
-        ? 'p5-lane'
-        : /^src\/features\/(account|board|search)\//.test(file)
-          ? 'p3-lane'
-          : /^src\/features\/(legal|auth|library|workspace)\//.test(file)
-            ? 'p2-lane'
-            : file.startsWith('src/components/')
-              ? 'design-system'
-              : 'p1-lane'
+  file.startsWith('src/features/')
+    ? file.split('/')[2]!
+    : file.startsWith('src/components/') || file.startsWith('src/theme/')
+      ? 'design-system'
+      : file.split('/')[1]!
 
 for (const [mode, args] of [
   ['normal', ['--config', 'knip.config.ts']],
@@ -115,14 +107,11 @@ for (const [mode, args] of [
           ? issue.map((entry) => entry.line ?? '').join(',')
           : String(issue.line ?? '')
         const seam = inventory.seams.find(
-          (entry) =>
-            entry.status === 'active' &&
-            entry.path === record.file &&
-            entry.publicExports.includes(symbol),
+          (entry) => entry.path === record.file && entry.publicExports.includes(symbol),
         )
         let disposition = 'retain-until-review'
         let reason = reachable.has(record.file)
-          ? `${mode}/${category} 尚未裁决此 symbol；所在 runtime module 迁移时复核 named consumers 与 scenario 后决定`
+          ? `${mode}/${category} 尚未裁决此 symbol；复核 named consumers 与 runtime scenario 后决定`
           : testConsumers.length
             ? `${mode}/${category} 尚未裁决此 symbol；保留 test/tool 场景至 owner 复核后决定`
             : `${mode}/${category} 尚未裁决此 symbol；无 runtime reachability 证明，owner 复核 config/dynamic entry 后决定`

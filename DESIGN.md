@@ -137,6 +137,8 @@ Media context 拥有 object storage provider/profile、upload serving、upload a
 
 上传结果、provider output 和用户素材都必须通过 Media/Storage 边界进入业务语义。不要让无关 feature 直接拼接 storage secret、bucket URL 或本地文件路径。
 
+Task input 使用不可变 `TaskInputManifest`；Browser 通过 typed、same-origin `MediaRef` 获取素材。Shipping API/Web source 不得包含 `original_image_url`，Web source/env 不得定义 `VITE_PUBLIC_ASSET_BASE_URL`，Web source 不得构造 `"/uploads/` URL，Workflow/Worker 不得直接导入 `internal/media/storage`。`scripts/ci-media-package-boundary.sh` 和 `scripts/ci-legacy-media-zero-scan.sh` 在 CI 检查这些边界；Tests 可组合 concrete adapters。
+
 ### 8. Admin 是 vertical contexts
 
 Admin route pages 不直接依赖 generated API。每个 Admin vertical context 自己拥有 resource access、view model、command sequencing、cache invalidation 和 side effect handling。垂直划分以 [navigationMeta.ts](./apps/web/src/features/admin/app/navigationMeta.ts) 的 navigation key 为准；`storage` 与 `payments` 作为独立 context 存在，分别内嵌在 `settings` 与 `credits` 布局下。
@@ -273,12 +275,12 @@ Vue UI -> application use case -> resource/adapter -> generated API
 - 绝不手工编辑生成的 API 代码。
 - 领域层代码严禁接触网络传输层 DTO。
 - 跨特性协作必须通过明确声明的 public entrypoint 或 public subpath（例如特性根目录 `index.ts` 或稳定的领域子路径）进行；禁止访问另一特性的 `internal`/private implementation。
-- `apps/web/src/core`、`api`、`theme`、`lib`、`components` 是 horizontal roots，严禁 runtime 或 type-only 反向依赖 concrete feature modules。`shared` 仅保留待清理资产、contract specs 和有明确 TTL 的兼容 shims。
+- `apps/web/src/core`、`api`、`theme`、`lib`、`components` 是 horizontal roots，严禁 runtime 或 type-only 反向依赖 concrete feature modules。
 - Canvas 内部子模块跨边界协作必须经由各自子目录的 `index.ts` public seam。
 
 ### 5. 特性重构完成标准 (Feature Completion Contract)
 
-当对一个高复杂度模块执行绞杀者迁移（Strangler Migration）时，只有满足以下条件才视作完成：
+复杂业务特性必须满足以下结构与验证要求：
 
 1. 复杂特性的 scope `core/` 零 Vue 响应式与网络传输依赖（`session/` 允许 Vue 响应式），且核心规则通过独立 Unit Tests 验证。
 2. `session/` 独立拥有用例编排与错误/加载态处理（lifecycle、轮询与缓存失效）。

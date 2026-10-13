@@ -165,20 +165,6 @@ func PublicContractChain() []gin.HandlerFunc {
 	}
 }
 
-// ControlContractChain is the separate Control Plane middleware chain
-// (issue #808): Request-Id bridging plus the dedicated control
-// rate-limit bucket. Capability auth (operator grant), tenant scope,
-// per-route audit, and header-only idempotency are wired by
-// RegisterContractControlRoutes so tests can inject principals and
-// sinks per engine.
-func ControlContractChain(limiter *ControlRateLimiter) []gin.HandlerFunc {
-	return []gin.HandlerFunc{
-		ContractRequestIDMiddleware(),
-		ControlRateLimitMiddleware(limiter),
-		ContractETagMiddleware(),
-	}
-}
-
 // registerContractV1RoutesOnEngine mounts the additive v1 group: real
 // handlers for the workspace/organization/member lifecycle (issue #801),
 // boards + collaboration (#802), uploads + media (#803) with the shared
@@ -190,9 +176,4 @@ func registerContractV1RoutesOnEngine(r *gin.Engine, authDeps AuthDeps, deps Con
 	v1 := r.Group(ContractV1GroupPath)
 	v1.Use(PublicContractChain()...)
 	RegisterContractV1Routes(v1, authDeps, deps)
-}
-
-func contractNotImplemented(c *gin.Context) {
-	contract.RenderError(c, http.StatusNotImplemented,
-		contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
 }

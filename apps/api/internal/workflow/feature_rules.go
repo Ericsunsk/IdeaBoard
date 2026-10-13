@@ -40,16 +40,3 @@ func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
 		return ProviderOpenAICompatible
 	}
 }
-
-func IsGoogleNativeAPIType(apiType string) bool {
-	switch strings.ToLower(strings.TrimSpace(apiType)) {
-	case ProviderGoogleAI, ProviderGoogleCloud:
-		return true
-	default:
-		return false
-	}
-}
-
-func IsGoogleCloudAPIType(apiType string) bool {
-	return strings.ToLower(strings.TrimSpace(apiType)) == ProviderGoogleCloud
-}

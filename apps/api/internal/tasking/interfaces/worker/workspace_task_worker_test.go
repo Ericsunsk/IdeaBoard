@@ -334,13 +334,12 @@ func TestWorkspaceTaskWorkerRetryBudgetExhaustionFails(t *testing.T) {
 		return nil, runtimeports.NewUpstreamHTTPError(503, "busy", 0)
 	}), nil)
 
-	args := workerJobFor(created)
 	for i := 0; i < workspacetasks.MaxProviderRequeues; i++ {
 		current, err := env.store.GetTask(ctx, "ws_test", created.ID)
 		if err != nil {
 			t.Fatalf("GetTask: %v", err)
 		}
-		args = workerJobFor(current)
+		args := workerJobFor(current)
 		if err := worker.Work(ctx, args); err != nil {
 			t.Fatalf("Work %d: %v", i, err)
 		}

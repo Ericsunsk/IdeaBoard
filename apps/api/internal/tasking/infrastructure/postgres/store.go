@@ -247,10 +247,6 @@ func loadOutputs(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, task
 	return outputs, nil
 }
 
-func (s *Store) mapRowWithOutputs(ctx context.Context, workspacePublicID string, row dbsqlc.Task) (*workspacetasks.WorkspaceTask, error) {
-	return s.mapRowWithOutputsWithQueries(ctx, s.dbWithContext(ctx).q, workspacePublicID, row)
-}
-
 func (s *Store) mapRowWithOutputsWithQueries(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string, row dbsqlc.Task) (*workspacetasks.WorkspaceTask, error) {
 	outputs, err := loadOutputs(ctx, q, workspacePublicID, row.PublicID)
 	if err != nil {

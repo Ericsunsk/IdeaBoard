@@ -20,7 +20,6 @@ import (
 	"ideaboard/api/internal/media/storage/infrastructure/s3"
 	"ideaboard/api/internal/media/storage/ports"
 	_ "ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -127,23 +126,6 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
 	}
 	return service, repo
-}
-
-func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *StorageProfileRepository) {
-	t.Helper()
-	secretstest.EnableEncryption(t)
-
-	db := testdb.Open(t)
-	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, "")
-	service.SetCapabilityProbe(func(context.Context, *S3CompatibleConfig) error { return nil })
-	return service, repo
-}
-
-type testStorageOutboundPolicyProvider struct{ hosts []string }
-
-func (p testStorageOutboundPolicyProvider) GetOutboundPolicy(context.Context) (settings.OutboundPolicySetting, error) {
-	return settings.OutboundPolicySetting{AllowHosts: p.hosts}, nil
 }
 
 func withTempWorkingDir(t *testing.T) {

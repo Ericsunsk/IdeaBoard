@@ -43,13 +43,7 @@ func TestNilSetObserversNeverCrash(t *testing.T) {
 		return 1, 0.5, nil
 	},
 	)
-	var refresher *Refresher
-	if err := refresher.Start(context.Background()); err != nil {
-		t.Fatalf("nil refresher Start = %v", err)
-	}
-	if err := refresher.Stop(context.Background()); err != nil {
-		t.Fatalf("nil refresher Stop = %v", err)
-	}
+
 }
 
 func TestGatewayCountersSplitByFeatureAndOutcome(t *testing.T) {
@@ -118,12 +112,14 @@ func TestRefreshRiverQueueKeepsLastGaugesOnError(t *testing.T) {
 	}
 }
 
-func TestRefresherTicksUntilStopped(t *testing.T) {
+func TestMultiRefresherTicksUntilStopped(t *testing.T) {
 	set := NewSet(prometheus.NewRegistry())
 	calls := 0
-	refresher := NewRefresher(set, "drawing_default", func(context.Context) (int64, float64, error) {
-		calls++
-		return int64(calls), float64(calls), nil
+	refresher := NewMultiRefresher(set, map[string]RiverQueueStats{
+		"drawing_default": func(context.Context) (int64, float64, error) {
+			calls++
+			return int64(calls), float64(calls), nil
+		},
 	}, 10*time.Millisecond)
 	if refresher.Name() == "" {
 		t.Fatal("refresher name must not be empty")
