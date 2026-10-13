@@ -37,10 +37,16 @@
  * Wiring (package scripts are defined in apps/web/package.json):
  *   "test:routes-visual": "tsx scripts/captureRouteScreenshots.ts"
  *   "test:routes-visual:check": "tsx scripts/captureRouteScreenshots.ts --check"
+ *   "test:visual-compare": "tsx scripts/captureRouteScreenshots.ts --compare <baselineDir> [--candidate <dir>]"
+ *
+ * `--compare` accepts only the complete, successful mounted-surface matrix
+ * supplied for manual visual review. Anonymous smoke captures cannot establish
+ * visual equivalence; their redirects remain diagnostic records only.
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { compareVisualCaptures } from './visualContract'
 import { chromium, type Page } from 'playwright'
 import {
   installAnonymousSmokeApi,
@@ -54,6 +60,7 @@ import {
 
 const NAVIGATION_TIMEOUT_MS = 15_000
 const SETTLE_DELAY_MS = 1_500
+const POST_FONT_SETTLE_DELAY_MS = 500
 
 const WEB_ROOT = join(import.meta.dirname, '..')
 const DEFAULT_OUT_DIR = join(WEB_ROOT, 'node_modules', '.cache', 'route-screenshots')
@@ -185,7 +192,13 @@ async function captureOne(
       throw new Error(`returned HTTP ${response?.status() ?? 'none'}`)
     }
     await delay(SETTLE_DELAY_MS)
-    await page.screenshot({ path: filePath })
+    // Deterministic paint: webfonts change glyph coverage pixel by pixel, and
+    // loaders/skeletons animate through the settle window. Freeze motion and
+    // wait for fonts before capturing so reruns are bit-identical.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.evaluate(() => document.fonts.ready.then(() => undefined))
+    await delay(POST_FONT_SETTLE_DELAY_MS)
+    await page.screenshot({ path: filePath, animations: 'disabled' })
     const finalUrl = page.url()
     const finalPath = new URL(finalUrl).pathname
     const expectedPath = new URL(`${baseUrl}${route.path}`).pathname
@@ -277,6 +290,28 @@ async function runCaptures(
 
 async function main(): Promise<void> {
   const outDir = readOutDir()
+  const compareIndex = process.argv.indexOf('--compare')
+  if (compareIndex >= 0) {
+    const args = process.argv.slice(compareIndex + 1)
+    const baselineDir = args[0]
+    const candidateDir = args.length === 3 && args[1] === '--candidate' ? args[2] : outDir
+    if (
+      !baselineDir ||
+      baselineDir.startsWith('--') ||
+      ![1, 3].includes(args.length) ||
+      (args.length === 3 &&
+        (args[1] !== '--candidate' || !candidateDir || candidateDir.startsWith('--')))
+    ) {
+      console.error('Usage: --compare <baseline> [--candidate <directory>]')
+      process.exitCode = 1
+      return
+    }
+    const issues = compareVisualCaptures(baselineDir, candidateDir!)
+    for (const issue of issues) console.error(issue)
+    if (issues.length === 0) console.log('Visual surface equivalence passed')
+    process.exitCode = issues.length ? 1 : 0
+    return
+  }
   const checkFailures = selfCheck(outDir)
   if (process.argv.includes('--check')) {
     if (checkFailures.length > 0) {

@@ -4,13 +4,13 @@
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
+          class="inline-flex min-h-8 items-center rounded-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
+          class="inline-flex min-h-8 items-center rounded-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
         >
           Back to home
         </RouterLink>
@@ -46,7 +46,7 @@
           v-for="link in legalLinks"
           :key="link.to"
           :to="link.to"
-          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
+          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
         >
           {{ link.label }}
         </RouterLink>
@@ -71,7 +71,7 @@ const legalLinks = PUBLIC_LEGAL_LINKS
 <style scoped>
 .legal-copy :slotted(h2) {
   margin: 1.75rem 0 0.5rem;
-  color: var(--color-foreground);
+  color: var(--foreground);
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.5;
@@ -87,7 +87,7 @@ const legalLinks = PUBLIC_LEGAL_LINKS
 }
 
 .legal-copy :slotted(a) {
-  color: var(--color-primary);
+  color: var(--primary);
   font-weight: 600;
   /* Slotted legal copy is prose; inline links must still clear a 32px tap target
      without loosening the surrounding line rhythm. */

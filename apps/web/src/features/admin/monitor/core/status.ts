@@ -11,13 +11,13 @@ export interface TaskStatusDefinition {
   dotClass: string
 }
 
-const DEFAULT_STATUS_COLOR = 'var(--color-muted-foreground)'
+const DEFAULT_STATUS_COLOR = 'var(--muted-foreground)'
 const DEFAULT_BANNER_CLASS =
   'bg-[linear-gradient(135deg,var(--color-admin-status-default-glow),var(--color-admin-status-wash))] before:bg-muted-foreground'
 const DEFAULT_DOT_CLASS = 'bg-muted-foreground shadow-admin-status-dot-default'
 
 // Pending 与 Events 表 metric 面板同为 info 系（taskMetricTokens），双源不再分叉。
-const PENDING_STATUS_COLOR = 'var(--color-info)'
+const PENDING_STATUS_COLOR = 'var(--info)'
 const PENDING_BANNER_CLASS =
   'bg-[linear-gradient(135deg,var(--color-admin-status-pending-glow),var(--color-admin-status-wash))] before:bg-info'
 const PENDING_DOT_CLASS = 'bg-info shadow-admin-status-dot-pending'
@@ -35,7 +35,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   [TaskStatus.running]: {
     variant: 'warning',
     text: '执行中',
-    color: 'var(--color-warning)',
+    color: 'var(--warning)',
     bannerClass:
       'bg-[linear-gradient(135deg,var(--color-admin-status-running-glow),var(--color-admin-status-wash))] before:bg-warning',
     dotClass: 'bg-warning shadow-admin-status-dot-running',
@@ -43,7 +43,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   [TaskStatus.completed]: {
     variant: 'success',
     text: '已完成',
-    color: 'var(--color-success)',
+    color: 'var(--success)',
     bannerClass:
       'bg-[linear-gradient(135deg,var(--color-admin-status-success-glow),var(--color-admin-status-wash))] before:bg-success',
     dotClass: 'bg-success shadow-admin-status-dot-success',
@@ -51,7 +51,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   [TaskStatus.failed]: {
     variant: 'danger',
     text: '失败',
-    color: 'var(--color-destructive)',
+    color: 'var(--destructive)',
     bannerClass:
       'bg-[linear-gradient(135deg,var(--color-admin-status-danger-glow),var(--color-admin-status-wash))] before:bg-destructive',
     dotClass: 'bg-destructive shadow-admin-status-dot-danger',

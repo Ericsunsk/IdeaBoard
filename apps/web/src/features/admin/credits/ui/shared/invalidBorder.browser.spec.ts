@@ -43,11 +43,11 @@ describe('Admin invalid border browser contract', () => {
       // hardcoded Admin-side value cannot satisfy this.
       const destructiveProbe = document.createElement('div')
       destructiveProbe.style.borderStyle = 'solid'
-      destructiveProbe.style.borderColor = 'var(--color-destructive)'
+      destructiveProbe.style.borderColor = 'var(--destructive)'
       document.body.append(destructiveProbe)
       const restProbe = document.createElement('div')
       restProbe.style.borderStyle = 'solid'
-      restProbe.style.borderColor = 'var(--color-input)'
+      restProbe.style.borderColor = 'var(--input)'
       document.body.append(restProbe)
       try {
         expect(styleOf(input).borderStyle).toBe('solid')
@@ -58,11 +58,11 @@ describe('Admin invalid border browser contract', () => {
         // Provenance: the invalid rule tracks the destructive token live —
         // moving the token moves the input paint, so a hardcoded invalid
         // value (or a dropped `!border-destructive` rule) cannot satisfy this.
-        document.documentElement.style.setProperty('--color-destructive', 'rgb(255, 0, 0)')
+        document.documentElement.style.setProperty('--destructive', 'rgb(255, 0, 0)')
         try {
           await expect.poll(() => styleOf(input).borderColor).toBe('rgb(255, 0, 0)')
         } finally {
-          document.documentElement.style.removeProperty('--color-destructive')
+          document.documentElement.style.removeProperty('--destructive')
         }
         await expect
           .poll(() => styleOf(input).borderColor)

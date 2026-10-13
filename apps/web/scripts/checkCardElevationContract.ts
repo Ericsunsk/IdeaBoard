@@ -70,14 +70,14 @@ function main(): void {
   }
 
   // 3. No shadow token may resolve to `none` outside the reviewed allowlist.
-  const styleSheet = readFileSync(join(SRC_ROOT, 'app/style.css'), 'utf8')
+  const styleSheet = readFileSync(join(SRC_ROOT, 'theme/theme.css'), 'utf8')
   const noneShadowTokens = [...styleSheet.matchAll(/--([a-z0-9-]*shadow[a-z0-9-]*):\s*none\s*;/g)]
     .map((match) => `--${match[1]}`)
     .filter((token) => !(ALLOWED_NONE_SHADOW_TOKENS as readonly string[]).includes(token))
 
   for (const token of noneShadowTokens) {
     violations.push(
-      `app/style.css: \`${token}\` resolves to \`none\`. A shadow token that is \`none\` only works as an override; use the \`elevated\` prop or give the token a real value.`,
+      `theme/theme.css: \`${token}\` resolves to \`none\`. A shadow token that is \`none\` only works as an override; use the \`elevated\` prop or give the token a real value.`,
     )
   }
 

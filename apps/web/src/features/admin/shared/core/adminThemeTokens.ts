@@ -1,4 +1,6 @@
-type ThemeCssVar = `--color-${string}`
+// Runtime roles (bare Tier 2 names such as `--success`) and domain roles
+// (`--color-*`) use the same bridge.
+type ThemeCssVar = `--${string}`
 
 function defineThemeToken<CssVar extends ThemeCssVar, Fallback extends string>(
   cssVar: CssVar,
@@ -11,8 +13,9 @@ function defineThemeToken<CssVar extends ThemeCssVar, Fallback extends string>(
   }
 }
 
-// CSS variables in app/style.css are the runtime source of truth; fallbacks keep
-// third-party adapters and canvas rendering stable when CSS vars cannot resolve.
+// Runtime roles in theme/theme.css and theme/tokens/semantic.css are the
+// source of truth; fallbacks keep third-party adapters and canvas rendering
+// stable when CSS vars cannot resolve.
 const adminThemeTokenBridge = {
   bg: defineThemeToken('--color-admin-bg', '#fbfbfb'),
   shell: defineThemeToken('--color-admin-shell', 'rgba(255, 255, 255, 0.62)'),
@@ -47,10 +50,10 @@ const adminThemeTokenBridge = {
   navActiveBgHover: defineThemeToken('--color-admin-nav-active-bg-hover', '#19243a'),
   previewBg: defineThemeToken('--color-admin-preview-bg', '#f5f5f5'),
   divider: defineThemeToken('--color-admin-divider', 'rgba(0, 0, 0, 0.08)'),
-  success: defineThemeToken('--color-success', '#16a34a'),
-  warning: defineThemeToken('--color-warning', '#d97706'),
-  danger: defineThemeToken('--color-destructive', '#ef4444'),
-  info: defineThemeToken('--color-info', '#0284c7'),
+  success: defineThemeToken('--success', '#16a34a'),
+  warning: defineThemeToken('--warning', '#d97706'),
+  danger: defineThemeToken('--destructive', '#ef4444'),
+  info: defineThemeToken('--info', '#0284c7'),
   modelIndigo: defineThemeToken('--color-admin-model-indigo', '#4f6f9f'),
   modelPurple: defineThemeToken('--color-admin-model-purple', '#9278e6'),
   modelCyan: defineThemeToken('--color-admin-model-cyan', '#3d8b9a'),

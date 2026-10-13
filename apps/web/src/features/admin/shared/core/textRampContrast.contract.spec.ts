@@ -11,44 +11,46 @@ import { adminThemeTokenFallbacks } from './adminThemeTokens'
  * standard: it pins the surface inventory per ramp, composites alpha values the
  * way a browser does, and fails loudly when a token edit drops a role below its
  * floor, collapses two rungs, or desynchronizes the theme-token bridge.
- *
- * Why a contract test rather than a review rule
- * ---------------------------------------------
- * The three ramps sit on 17+ distinct backgrounds (page, card, translucent
- * card/shell, control, muted and every alpha step of muted that components layer
- * over card). Re-auditing them by hand is not repeatable, and a well-meaning
- * token tweak silently pushes a caption below AA on a surface nobody re-checked.
- * Three real defects shipped that way before this test existed:
- *   - `--color-canvas-text-secondary` at 3.90:1 on the Canvas workspace
- *   - `--color-board-card-text` at 3.83:1 on card
- *   - `--color-admin-text-2` at 4.43:1 on `--color-admin-surface-muted`
  */
 
 type Rgb = readonly [number, number, number]
 
-const styleSheet = readFileSync(join(import.meta.dirname, '../../../../app/style.css'), 'utf8')
+/**
+ * Token sources of truth. Domain color roles live in the Tailwind entry
+ * (`theme/theme.css`); Tier 2 core roles live in `theme/tokens/semantic.css`.
+ * Chains are resolved across both files so a reference into either owner
+ * settles on its authored leaf.
+ */
+const themeSheet = readFileSync(join(import.meta.dirname, '../../../../theme/theme.css'), 'utf8')
+const semanticSheet = readFileSync(
+  join(import.meta.dirname, '../../../../theme/tokens/semantic.css'),
+  'utf8',
+)
+const tokenSources = [themeSheet, semanticSheet]
 
-/** Reads a solid hex token from the token source of truth. */
+/** Reads a token by following `var()` references across the token sources. */
 function readToken(name: string): string {
-  const match = styleSheet.match(new RegExp(`${name}:\\s*([^;]+);`))
-  if (!match?.[1]) throw new Error(`Token ${name} not found in app/style.css`)
-  const value = match[1].trim()
-  if (value.startsWith('#')) return value
-  const varMatch = value.match(/var\((--[a-z0-9-]+)\)/)
-  if (varMatch?.[1]) {
-    return readToken(varMatch[1])
+  for (const sheet of tokenSources) {
+    const match = sheet.match(new RegExp(`${name}:\\s*([^;]+);`))
+    if (!match?.[1]) continue
+    const value = match[1].trim()
+    const varMatch = value.match(/var\((--[a-z0-9-]+)\)/)
+    if (varMatch?.[1]) {
+      return readToken(varMatch[1])
+    }
+    return value
   }
-  return value
+  throw new Error(`Token ${name} not found in theme/theme.css or tokens/semantic.css`)
 }
 
 /** Reads a translucent token as [rgb, alpha] so the test can composite it like a browser does. */
 function readRgbaToken(name: string): { rgb: Rgb; alpha: number } {
-  const match = styleSheet.match(
+  const match = themeSheet.match(
     new RegExp(
       `${name}:\\s*rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\d.]+)\\s*\\)`,
     ),
   )
-  if (!match) throw new Error(`Translucent token ${name} not found in app/style.css`)
+  if (!match) throw new Error(`Translucent token ${name} not found in theme/theme.css`)
   return {
     rgb: [Number(match[1]), Number(match[2]), Number(match[3])] as const,
     alpha: Number(match[4]),

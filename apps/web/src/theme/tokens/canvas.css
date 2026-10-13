@@ -12,8 +12,8 @@
     --color-canvas-edge: rgba(0, 0, 0, 0.2);
     --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
     --color-canvas-edge-running: var(--color-canvas-edge-selected);
-    --color-canvas-accent: var(--color-primary);
-    --color-canvas-accent-hover: var(--color-primary-hover);
+    --color-canvas-accent: var(--primary);
+    --color-canvas-accent-hover: var(--primary-hover);
     --color-canvas-accent-pressed: var(--primitive-violet-700);
     --color-canvas-accent-soft: rgba(122, 107, 213, 0.08);
     --color-canvas-accent-border: rgba(122, 107, 213, 0.28);

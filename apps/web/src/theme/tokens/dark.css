@@ -1,7 +1,5 @@
 @layer base {
   html.dark {
-    color-scheme: dark;
-
     /* ── Primitive Dark Elevation Palette Scale (100% Pure Neutral True Black) ── */
     --palette-dark-0: #0f0f0f; /* Level 0: Global canvas & workspace base (R=15 G=15 B=15) */
     --palette-dark-1: #141414; /* Level 1: Deep card strong, dialog shell (R=20 G=20 B=20) */
@@ -58,9 +56,6 @@
     --color-admin-accent-softer: rgba(255, 255, 255, 0.06);
     --color-admin-focus-ring: rgba(255, 255, 255, 0.25);
     --color-admin-text-inverse: var(--palette-dark-0);
-
-    /* Destructive soft tint tracks the dark destructive (red-400) tier. */
-    --color-destructive-soft: rgb(248 113 113 / 15%);
 
     /* Provider hues step up to the 400 scale for dark-surface contrast. */
     --color-provider-purple: #c084fc;
@@ -124,8 +119,8 @@
     --color-board-create-icon: var(--palette-dark-border-hover);
     --color-board-create-title: var(--palette-dark-title);
     --color-board-loading-bg: rgba(24, 24, 24, 0.45);
-    --color-board-danger: var(--color-destructive);
-    --color-board-danger-hover: var(--color-destructive-hover);
+    --color-board-danger: var(--destructive);
+    --color-board-danger-hover: var(--destructive-hover);
     --color-board-dialog-title: var(--palette-dark-title);
     --color-board-dialog-description: var(--palette-dark-text-2);
     --shadow-board-dialog: 0 22px 58px rgba(0, 0, 0, 0.65);
@@ -224,7 +219,7 @@
   html.dark,
   html.dark body,
   html.dark #app {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--background);
+    color: var(--foreground);
   }
 }

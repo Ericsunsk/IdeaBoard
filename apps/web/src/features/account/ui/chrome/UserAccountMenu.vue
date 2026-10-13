@@ -96,7 +96,7 @@
                   appOverlayMenuItemClass,
                   props.menuItemClass,
                   item.isActive &&
-                    'bg-muted text-[var(--app-overlay-menu-item-hover-color,var(--color-foreground))] font-medium',
+                    'bg-muted text-[var(--app-overlay-menu-item-hover-color,var(--foreground))] font-medium',
                 ]"
                 :data-control-state="item.isActive ? 'active' : 'idle'"
                 :aria-current="item.isActive ? 'true' : undefined"
@@ -124,7 +124,7 @@
                   appOverlayMenuItemClass,
                   props.menuItemClass,
                   item.isActive &&
-                    'bg-muted text-[var(--app-overlay-menu-item-hover-color,var(--color-foreground))] font-medium',
+                    'bg-muted text-[var(--app-overlay-menu-item-hover-color,var(--foreground))] font-medium',
                 ]"
                 :data-control-state="item.isActive ? 'active' : 'idle'"
                 :aria-current="item.isActive ? 'true' : undefined"

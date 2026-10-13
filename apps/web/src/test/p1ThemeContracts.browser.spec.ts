@@ -241,7 +241,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
     expect(input.matches(':focus-visible')).toBe(true)
     await waitFor(() => expect(styleOf(input).borderColor).not.toBe(normalBorder))
     const probe = document.createElement('div')
-    probe.style.color = 'var(--color-destructive)'
+    probe.style.color = 'var(--destructive)'
     document.body.append(probe)
     await waitFor(() => expect(styleOf(input).borderColor).toBe(styleOf(probe).color))
     probe.remove()

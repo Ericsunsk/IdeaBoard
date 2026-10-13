@@ -1,0 +1,460 @@
+/*
+ * Theme entry: the sole Tailwind import, token imports in dependency order,
+ * the dark variant, and the Tailwind namespace bridge.
+ *
+ * Standard semantic color roles live in `@layer base` (tokens/semantic.css);
+ * `@theme inline` maps their `--color-*` utility keys to runtime roles so
+ * utilities resolve through the live
+ * variable (dark-mode and subtree aware) without a second runtime value.
+ * Domain utility values use plain `@theme`; Canvas and dark overrides are
+ * owned by tokens/canvas.css and tokens/dark.css.
+ */
+@import 'tailwindcss';
+@import './tokens/primitives.css';
+@import './tokens/semantic.css';
+@import './tokens/canvas.css';
+@import './tokens/dark.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ── Primitive Light Elevation Palette Scale (Linear/Vercel standard) ── */
+  --palette-light-0: #fbfbfb; /* Level 0: Global canvas & workspace base */
+  --palette-light-1: #ffffff; /* Level 1: Elevated card strong, dialog shell */
+  --palette-light-2: #f5f5f5; /* Level 2: Surface muted, secondary container */
+  --palette-light-3: #fafafa; /* Level 3: Inputs, controls, interactive elements */
+  --palette-light-hover: #f0f0f0; /* Level 3.5: Control hover state */
+  --palette-light-surface-pressed: #e5e5e5; /* Level 3.6: Control pressed state */
+  --palette-light-border: #e5e7eb; /* Base structural borders & dividers */
+  --palette-light-border-soft: #ececec; /* Softer structural borders */
+  --palette-light-border-hover: #d4d4d4; /* Interactive border hover state */
+  --palette-light-border-pressed: #bfbfbf; /* Border pressed state */
+
+  /* ── Primitive Light Typography Scale (WCAG AAA/AA monotonic ramp) ── */
+  --palette-light-title: #171717; /* High-emphasis titles */
+  --palette-light-text-1: #313131; /* Primary body text (AAA >= 7.0:1) */
+  --palette-light-text-label: #52525b; /* Section labels / legends */
+  --palette-light-text-2: #62626a; /* Secondary / muted text (AA >= 4.5:1) */
+  --palette-light-text-3: #696971; /* Tertiary / captions / icons */
+
+  --font-admin:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --color-admin-bg: var(--palette-light-0);
+  --color-admin-shell: rgba(255, 255, 255, 0.62);
+  --color-admin-card: rgba(255, 255, 255, 0.94);
+  --color-admin-card-strong: var(--palette-light-1);
+  --color-admin-border: var(--palette-light-border);
+  --color-admin-border-soft: var(--palette-light-border-soft);
+  --color-admin-border-hover: var(--palette-light-border-hover);
+  --color-admin-border-pressed: var(--palette-light-border-pressed);
+  --color-admin-text-1: var(--palette-light-text-1);
+  --color-admin-text-2: var(--palette-light-text-2);
+  /* `label` is the "group heading / fieldset legend" level: heavier than
+     `text-2` but lighter than `text-1`. */
+  --color-admin-text-label: var(--palette-light-text-label);
+  --color-admin-text-3: var(--palette-light-text-3);
+  --color-admin-text-disabled: var(--palette-light-border-hover);
+  --color-admin-text-inverse: var(--palette-light-1);
+  --color-admin-title-color: var(--palette-light-title);
+  --color-admin-subtitle-color: var(--color-admin-text-2);
+  --color-admin-accent: var(--color-brand-creative-accent);
+  --color-admin-accent-hover: var(--color-brand-creative-accent-hover);
+  --color-admin-accent-pressed: var(--color-brand-creative-accent-pressed);
+  --color-admin-accent-soft: rgba(146, 120, 230, 0.08);
+  --color-admin-accent-softer: rgba(146, 120, 230, 0.05);
+  --color-admin-focus-ring: rgba(146, 120, 230, 0.18);
+  /*
+   * Primary transparent tiers (accent-faint family). Derived from
+   * --primary via color-mix so they track the brand violet in light
+   * mode and the white accent in dark mode with no per-mode redeclaration.
+   * Covers the bg-primary/*, border-primary/*, and ring-primary/* carriers
+   * used across Admin surfaces.
+   */
+  --color-primary-faint: color-mix(in srgb, var(--primary) 10%, transparent);
+  --color-primary-faint-soft: color-mix(in srgb, var(--primary) 5%, transparent);
+  --color-primary-faint-strong: color-mix(in srgb, var(--primary) 15%, transparent);
+  --color-primary-faintest: color-mix(in srgb, var(--primary) 3%, transparent);
+  --color-primary-line: color-mix(in srgb, var(--primary) 20%, transparent);
+  --color-primary-line-strong: color-mix(in srgb, var(--primary) 40%, transparent);
+  --color-primary-line-emphasis: color-mix(in srgb, var(--primary) 50%, transparent);
+  --color-primary-line-bold: color-mix(in srgb, var(--primary) 60%, transparent);
+  /*
+   * Task status glow/bloom pair (monitor domain visual contract). The banner
+   * gradient start (glow) and end stop (wash) plus the dot halo rings live
+   * here so table and detail views share one source instead of raw rgba().
+   */
+  --color-admin-status-default-glow: rgba(152, 162, 179, 0.12);
+  --color-admin-status-pending-glow: rgba(71, 117, 168, 0.1);
+  --color-admin-status-running-glow: rgba(164, 105, 37, 0.1);
+  --color-admin-status-success-glow: rgba(40, 134, 97, 0.1);
+  --color-admin-status-danger-glow: rgba(201, 74, 86, 0.095);
+  --color-admin-status-wash: rgba(255, 255, 255, 0.74);
+  /*
+   * Provider brand hues (model catalog badges). Semantic success/info/warning
+   * cover openai/google/workers; the four hues below have no semantic
+   * equivalent, so each provider owns one token and derives soft/border
+   * carriers via opacity modifiers.
+   */
+  --color-provider-purple: #7e22bb;
+  --color-provider-orange: #c2410c;
+  --color-provider-blue: #1d4ed8;
+  --color-provider-rose: #be123c;
+  /* Overlay scrims (mobile drawer veil vs dialog/drawer veil). */
+  --color-scrim: rgba(0, 0, 0, 0.4);
+  --color-scrim-soft: rgba(0, 0, 0, 0.3);
+  /*
+   * Image overlay action fills (search result cards). Translucent black pills
+   * floating over imagery/scrims; distinct from the full-veil scrims above.
+   * Search keeps its overlay-btn aliases sourced from these two.
+   */
+  --color-overlay-btn-bg: rgba(0, 0, 0, 0.42);
+  --color-overlay-btn-bg-hover: rgba(0, 0, 0, 0.68);
+  --color-admin-surface-muted: var(--palette-light-2);
+  --color-admin-surface-hover: var(--palette-light-hover);
+  --color-admin-surface-pressed: var(--palette-light-surface-pressed);
+  --color-admin-surface-disabled: var(--color-admin-surface-muted);
+  --color-admin-control-bg: var(--palette-light-3);
+  --color-admin-control-bg-hover: var(--color-admin-surface-hover);
+  --color-admin-control-border: var(--color-admin-border);
+  --color-admin-control-border-hover: var(--color-admin-border-hover);
+  --color-admin-control-border-pressed: var(--color-admin-border-pressed);
+  --color-admin-nav-active-bg: #22304a;
+  --color-admin-nav-active-bg-hover: #19243a;
+  --color-admin-preview-bg: var(--color-admin-surface-muted);
+  --color-admin-divider: rgba(0, 0, 0, 0.08);
+  --color-admin-model-indigo: #4f6f9f;
+  --color-admin-model-purple: var(--color-brand-creative-accent);
+  --color-admin-model-cyan: #3d8b9a;
+  --color-admin-chart-tooltip-border: var(--color-admin-border);
+  --color-admin-chart-tooltip-text: #262626;
+  --color-admin-chart-axis-line: var(--color-admin-border);
+  --color-admin-chart-split-line: var(--color-admin-surface-hover);
+  --color-admin-chart-legend-text: var(--color-admin-text-2);
+  --color-admin-chart-mist: #8f8f8f;
+  --color-admin-chart-olive: #6f8b71;
+
+  --text-admin-micro: 10px;
+  --text-admin-caption: 11px;
+  --text-admin-meta: 12px;
+  --text-admin-body: 13px;
+  --text-admin-content: 14px;
+  --text-admin-title-sm: 15px;
+  --text-admin-title: 16px;
+  --text-admin-heading: 18px;
+  --text-admin-icon: 20px;
+  --text-admin-summary-value: 28px;
+  --text-admin-modal-title: 26px;
+  --text-admin-modal-title-mobile: 22px;
+
+  --radius-admin-dialog: 14px;
+
+  /* ── Canvas / node tokens ─────────────────────────────── */
+  --color-canvas-workspace-bg: #e7e7e7;
+  --color-canvas-surface-bg: #f7f7f7;
+  --color-canvas-neutral-line: rgb(177 177 183 / 65%);
+  --color-canvas-dot: #c9ced8;
+  --color-canvas-edge: rgba(0, 0, 0, 0.2);
+  --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
+  --color-canvas-edge-running: var(--color-canvas-edge-selected);
+  --color-canvas-accent: var(--color-brand-creative-accent);
+  --color-canvas-accent-hover: #7a6bd5;
+  --color-canvas-accent-pressed: #6d5fd0;
+  --color-canvas-accent-soft: var(--color-brand-creative-accent-soft);
+  /*
+   * Tonal-range wash (retouch/editing gradient end stop, segmented active
+   * fill). Pinned to the Tier-3 soft value so the surface-skin alias resolves
+   * identically with or without var() support.
+   */
+  --color-canvas-accent-wash: rgba(122, 107, 213, 0.08);
+  --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
+  --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
+  --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
+  --color-canvas-accent-shadow: rgba(146, 120, 230, 0.25);
+  --color-canvas-accent-shadow-hover: rgba(146, 120, 230, 0.35);
+  --color-canvas-accent-glow: rgba(146, 120, 230, 0.18);
+  --color-canvas-node-bg: var(--color-canvas-surface-bg);
+  --color-canvas-node-border: var(--palette-light-border);
+  --color-canvas-text-primary: var(--palette-light-title);
+  --color-canvas-text-secondary: var(--palette-light-text-label);
+  --color-canvas-text-muted: var(--palette-light-text-2);
+  --color-canvas-text-control: var(--color-canvas-text-secondary);
+  --color-canvas-text-option: var(--color-canvas-text-muted);
+  --color-canvas-text-inverse: var(--palette-light-1);
+  --color-canvas-tooltip-bg: rgba(24, 24, 27, 0.94);
+  --color-canvas-tooltip-text: #f4f4f5;
+  --color-canvas-running-from: #9278e6;
+  --color-canvas-running-to: #6dbef7;
+  --color-canvas-glass-bg: rgba(255, 255, 255, 0.85);
+  --color-canvas-minimap-node: rgba(0, 0, 0, 0.28);
+  --color-canvas-minimap-viewport: rgba(0, 0, 0, 0.38);
+  --color-canvas-minimap-mask: rgba(0, 0, 0, 0.08);
+
+  /* ── Page surface tokens ─────────────────────────────────── */
+  --color-page-dot: #e2e4e8;
+  --color-page-chrome-border: var(--color-board-card-border);
+  --color-page-chrome-border-hover: var(--color-board-card-border-hover);
+  --color-page-chrome-bg: var(--color-board-control-bg);
+  --color-page-chrome-bg-hover: var(--accent-hover);
+  --color-page-chrome-color: var(--color-board-card-action);
+  --color-page-chrome-color-hover: var(--color-board-card-action-hover);
+  --color-page-chrome-color-disabled: var(--color-board-card-text);
+  --color-page-chrome-focus-ring: var(--color-board-focus-ring);
+  --shadow-page-chrome: none;
+  --spacing-overlay-gutter: 10px;
+  --color-overlay-bg: rgba(255, 255, 255, 0.98);
+  --color-overlay-border: var(--palette-light-border);
+  --color-overlay-item: var(--palette-light-text-1);
+  --color-overlay-item-hover-bg: var(--palette-light-hover);
+  --color-overlay-danger: var(--destructive);
+  --color-overlay-danger-hover-bg: color-mix(in srgb, var(--color-overlay-danger) 10%, transparent);
+  --shadow-overlay-menu: none;
+  --spacing-page-dot: 12px;
+  --spacing-page-chrome-inset: 16px;
+  /* Touch-target floor. WCAG 2.2 AA asks 24px; this repo holds 32px. */
+  --spacing-touch-target-min: 32px;
+  /* AA floor, drag handles only (see touch-target.css). */
+  --spacing-touch-target-aa: 24px;
+
+  /* ── Marketing landing page tokens ───────────────────────── */
+  --color-home-hero-text: #202124;
+  --color-home-hero-subtle: #5f6368;
+  --color-home-note-bg: #e6ded5;
+  --color-home-note-border: transparent;
+  --color-home-note-text: var(--color-home-hero-text);
+
+  /* ── Global Glass & Frosted Surface tokens ────────────── */
+  --blur-glass: 12px;
+
+  /* ── Board-level tokens ────────────────────────────────── */
+  --color-board-page: var(--palette-light-0);
+  --color-board-page-text: var(--palette-light-title);
+  --color-board-page-text-muted: var(--palette-light-text-label);
+  --color-board-page-glow: rgba(146, 115, 235, 0.42);
+  --color-board-page-glow-clear: rgba(146, 115, 235, 0);
+  --color-board-primary: var(--color-brand-creative-accent-hover);
+  --color-board-primary-hover: var(--color-brand-creative-accent-pressed);
+  --color-board-focus-ring: rgba(122, 107, 213, 0.16);
+  --color-board-focus-ring-strong: rgba(122, 107, 213, 0.18);
+  --color-board-surface: rgba(255, 255, 255, 0.9);
+  --color-board-surface-strong: var(--card);
+  --color-board-control-bg: rgba(255, 255, 255, 0.85);
+  --color-board-control-text: var(--color-board-card-title);
+  --color-board-control-input-text: var(--color-board-card-title);
+  --color-board-control-icon: var(--palette-light-text-3);
+  --color-board-card-border: var(--palette-light-border);
+  --color-board-card-border-hover: var(--palette-light-border-hover);
+  --color-board-card-bg: var(--color-board-surface);
+  --color-board-card-preview-from: var(--palette-light-1);
+  --color-board-card-preview-to: #f8fafc;
+  --color-board-card-preview-fade: rgba(248, 250, 252, 0.92);
+  --color-board-card-preview-fade-clear: rgba(248, 250, 252, 0);
+  --color-board-card-preview-divider: var(--palette-light-border);
+  --color-board-card-input-border: var(--palette-light-border);
+  --color-board-card-input-bg: rgba(255, 255, 255, 0.9);
+  --color-board-card-title: var(--palette-light-title);
+  --color-board-card-text: var(--palette-light-text-2);
+  --color-board-card-action: var(--palette-light-text-label);
+  --color-board-card-action-hover: var(--palette-light-title);
+  --color-board-create-icon: var(--palette-light-border-hover);
+  --color-board-create-title: var(--color-board-card-title);
+  --color-board-loading-bg: rgba(0, 0, 0, 0.04);
+  --color-board-danger: var(--destructive);
+  --color-board-danger-hover: var(--destructive-hover);
+  --color-board-dialog-title: var(--color-board-control-input-text);
+  --color-board-dialog-description: var(--color-board-page-text-muted);
+  --radius-board-dialog: 20px;
+  --shadow-board-focus: 0 0 0 3px var(--color-board-focus-ring);
+  --shadow-board-focus-strong: 0 0 0 3px var(--color-board-focus-ring-strong);
+  --shadow-board-dialog: 0 22px 58px rgba(0, 0, 0, 0.12);
+
+  --color-brand-creative-accent: #9278e6;
+  --color-brand-creative-accent-hover: #725fd0;
+  --color-brand-creative-accent-pressed: #614ec2;
+  --color-brand-creative-accent-secondary: #c084fc;
+  --color-brand-creative-accent-soft: #f5f2ff;
+  --color-brand-creative-accent-ring: rgba(146, 120, 230, 0.1);
+  --color-brand-creative-focus-accent: var(--color-brand-creative-accent);
+  --color-dialog-mask: color-mix(in srgb, var(--foreground) 38%, transparent);
+  /*
+   * Auth modal aliases.
+   * These preserve the creative glass treatment while sourcing neutral values
+   * from app semantics and expressive values from creative accent tokens.
+   */
+  --color-auth-shell: color-mix(in srgb, var(--card) 80%, transparent);
+  --color-auth-shell-border: color-mix(in srgb, var(--card) 35%, transparent);
+  --color-auth-shell-glow: color-mix(in srgb, var(--color-brand-creative-accent) 18%, transparent);
+  --color-auth-shell-highlight: color-mix(in srgb, var(--card) 60%, transparent);
+  --color-auth-backdrop-from: color-mix(in srgb, var(--card) 30%, transparent);
+  --color-auth-backdrop-via: color-mix(in srgb, var(--card) 55%, transparent);
+  --color-auth-backdrop-to: color-mix(in srgb, var(--card) 80%, transparent);
+  --color-auth-text: var(--foreground);
+  --color-auth-title: var(--foreground);
+  --color-auth-muted: var(--muted-foreground);
+  --color-auth-subtle: var(--muted-foreground);
+  --color-auth-input: color-mix(in srgb, var(--card) 60%, transparent);
+  --color-auth-input-focus: var(--card);
+  --color-auth-input-border: var(--border);
+  --color-auth-input-border-hover: var(--border-hover);
+  --color-auth-input-placeholder: var(--muted-foreground);
+  --color-auth-input-icon: var(--muted-foreground);
+  --color-auth-focus: var(--color-brand-creative-accent);
+  --color-auth-focus-ring: color-mix(in srgb, var(--color-brand-creative-accent) 10%, transparent);
+  --color-auth-error: var(--destructive);
+  --color-auth-error-border: color-mix(in srgb, var(--destructive) 38%, var(--card));
+  --color-auth-error-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --color-auth-error-placeholder: color-mix(
+    in srgb,
+    var(--destructive) 75%,
+    var(--muted-foreground)
+  );
+  --color-auth-error-ring: color-mix(in srgb, var(--destructive) 10%, transparent);
+  --color-auth-primary-from: var(--color-brand-creative-accent);
+  --color-auth-primary-to: var(--color-brand-creative-accent-hover);
+  --color-auth-primary-text: var(--primary-foreground);
+  --color-auth-primary-shadow: color-mix(
+    in srgb,
+    var(--color-brand-creative-accent) 25%,
+    transparent
+  );
+  --color-auth-primary-shadow-hover: color-mix(
+    in srgb,
+    var(--color-brand-creative-accent) 35%,
+    transparent
+  );
+  --color-auth-link: var(--color-brand-creative-accent-hover);
+  --color-auth-link-hover: var(--color-brand-creative-accent-pressed);
+  --color-auth-close: var(--muted-foreground);
+  --color-auth-close-hover: var(--foreground);
+
+  /* ── Toast semantic tokens ── */
+  --color-toast-bg: rgba(255, 255, 255, 0.92);
+  --color-toast-border: var(--palette-light-border);
+  --color-toast-text: var(--palette-light-text-1);
+  --color-toast-muted: var(--palette-light-text-2);
+  --color-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+  --color-toast-highlight: rgba(38, 54, 79, 0.08);
+  --color-toast-button: var(--color-brand-creative-accent-hover);
+
+  /* ── shadcn-vue standard theme mappings ─────────────────── */
+
+  --radius-control: 10px;
+  --radius-panel: 14px;
+  --radius-overlay: 14px;
+  --radius-pill: 999px;
+  /* Admin chrome radius aliases (zero-delta: match the framework scale). */
+  --radius-admin-card: 12px;
+  --radius-admin-control: 8px;
+  --radius-admin-chip: 6px;
+
+  /* Admin layout spacing (shell/popover/drawer/empty-state/login widths). */
+  --spacing-admin-shell: 1600px;
+  --spacing-admin-popover: 340px;
+  --spacing-admin-drawer: min(38rem, calc(100vw - 1rem));
+  --spacing-admin-empty-state: 260px;
+  --spacing-admin-login-card: min(420px, 100%);
+
+  /* Admin display weights for optical one-offs between semibold and bold. */
+  --font-weight-admin-strong: 650;
+  --font-weight-admin-emphasis: 680;
+  --font-weight-admin-display: 760;
+
+  /* ── App stacking layers (ascending numeric order is the contract) ── */
+  --z-content: 1;
+  --z-admin-sticky: 10;
+  --z-admin-header: 30;
+  --z-admin-overlay: 40;
+  --z-admin-dialog: 50;
+  --z-popover: 80;
+  --z-banner: 1200;
+  --z-lightbox: 2000;
+
+  --size-scrollbar: 10px;
+  --size-scrollbar-thumb-inset: 3px;
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: color-mix(in srgb, var(--foreground) 58%, transparent);
+  --color-scrollbar-thumb-hover: color-mix(in srgb, var(--foreground) 72%, transparent);
+
+  --shadow-auth-shell:
+    0 24px 50px -15px var(--color-auth-shell-glow),
+    inset 0 1px 1px var(--color-auth-shell-highlight);
+  /* Neutral slate entry shadow for the Admin login card (kept distinct from
+     the brand-tinted auth shell glow). */
+  --shadow-login-card: 0 24px 70px rgba(45, 64, 89, 0.12);
+  /*
+   * Admin elevation tiers. Aliases of the framework shadow scale so overlay
+   * chrome (dialog/drawer/popover) and status dot halos resolve through
+   * named tokens instead of raw shadow-[...] values.
+   */
+  --shadow-admin-dialog: var(--shadow-xl);
+  --shadow-admin-drawer: var(--shadow-2xl);
+  --shadow-admin-popover: var(--shadow-lg);
+  --shadow-admin-status-dot-default: 0 0 0 4px rgba(152, 162, 179, 0.14);
+  --shadow-admin-status-dot-pending: 0 0 0 4px rgba(71, 117, 168, 0.15);
+  --shadow-admin-status-dot-running: 0 0 0 4px rgba(164, 105, 37, 0.15);
+  --shadow-admin-status-dot-success: 0 0 0 4px rgba(40, 134, 97, 0.14);
+  --shadow-admin-status-dot-danger: 0 0 0 4px rgba(201, 74, 86, 0.14);
+  --shadow-auth-input: inset 0 1px 2px color-mix(in srgb, var(--foreground) 2%, transparent);
+  --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
+  --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
+  --shadow-auth-focus: 0 0 0 3px var(--color-auth-focus-ring);
+
+  --motion-control-duration: 160ms;
+  --motion-control-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-enter-duration: 220ms;
+  --motion-enter-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-exit-duration: 220ms;
+  --motion-exit-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-feedback-duration: 160ms;
+  --motion-feedback-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --font-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
+  --font-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
+}
+
+/*
+ * Semantic runtime/utility bridge. Each key references its Tier 2 runtime
+ * role; utilities such as `bg-primary` emit `var(--primary)` and follow the
+ * effective base-layer value in both modes and in subtrees.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-hover: var(--success-hover);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-hover: var(--warning-hover);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-hover: var(--info-hover);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface-glass: var(--surface-glass);
+  --color-border-glass: var(--border-glass);
+}

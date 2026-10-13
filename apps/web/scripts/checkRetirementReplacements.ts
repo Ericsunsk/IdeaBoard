@@ -12,7 +12,14 @@ export type RetirementSources = Record<string, string>
 export type RetirementViolation = { rule: string; file: string; message: string }
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const app = 'src/app/style.css'
+const themeEntry = 'src/theme/theme.css'
 const tokens = 'src/theme/tokens/'
+const tokenOwners = [
+  app,
+  themeEntry,
+  'src/theme/base.css',
+  ...['semantic.css', 'canvas.css', 'primitives.css', 'dark.css'].map((file) => tokens + file),
+]
 const chrome = 'src/theme/atoms/page-chrome.css'
 const round = 'src/theme/atoms/round-control.css'
 const bridge = 'src/features/admin/shared/core/adminThemeTokens.ts'
@@ -168,19 +175,11 @@ const formFields = [
 
 export function loadRetirementSources(root = webRoot): RetirementSources {
   const files = [
-    app,
+    ...tokenOwners,
     chrome,
     round,
     bridge,
     'index.html',
-    ...[
-      'index.css',
-      'dark.css',
-      'semantic-light.css',
-      'semantic-dark.css',
-      'canvas.css',
-      'primitives.css',
-    ].map((file) => tokens + file),
     ...chromeConsumers,
     ...featureSkins,
     ...lightboxes,
@@ -319,7 +318,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     issues.push({ rule, file, message })
   }
   const css = (file: string) => postcss.parse(sources[file] ?? '', { from: file })
-  const baseRoot = css(app),
+  const baseRoot = css(themeEntry),
     base = declarations(baseRoot, () => true, 'theme'),
     darkRoot = css(tokens + 'dark.css'),
     dark = declarations(darkRoot, () => true, 'dark')
@@ -341,11 +340,11 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       if (normalize(values.get(name) ?? '') !== normalize(value))
         fail(rule, file, `${name} must resolve through ${value}`)
   }
-  requireKeys('token-closure', app, base, requiredTokens)
-  requireValues('scrollbar-role', app, base, {
-    '--color-scrollbar-thumb': 'color-mix(in srgb, var(--color-foreground) 58%, transparent)',
+  requireKeys('token-closure', themeEntry, base, requiredTokens)
+  requireValues('scrollbar-role', themeEntry, base, {
+    '--color-scrollbar-thumb': 'color-mix(in srgb, var(--foreground) 58%, transparent)',
   })
-  for (const file of [app, tokens + 'dark.css']) {
+  for (const file of tokenOwners) {
     css(file).walkDecls((decl) => {
       if (
         /^--(?:color-ib-|text-ib-|shadow-ib-(?:control|overlay|focus)|color-dialog-overlay)/.test(
@@ -357,13 +356,13 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
   }
   requireValues(
     'token-alias',
-    app,
+    themeEntry,
     base,
     Object.fromEntries(Object.entries(aliases).map(([name, target]) => [name, `var(${target})`])),
   )
   requireValues(
     'type-scale',
-    app,
+    themeEntry,
     base,
     Object.fromEntries(
       Object.entries(typeScale).map(([name, size]) => [`--text-admin-${name}`, `${size}px`]),
@@ -382,7 +381,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       (names.length !== allowedDuplicates[hex]?.length ||
         names.some((name) => !allowedDuplicates[hex]?.includes(name)))
     )
-      fail('literal-deduplication', app, `${hex} repeats in ${names.join(', ')}`)
+      fail('literal-deduplication', themeEntry, `${hex} repeats in ${names.join(', ')}`)
   const resolveToken = (name: string, seen = new Set<string>()): string | undefined => {
     if (seen.has(name)) return undefined
     seen.add(name)
@@ -483,18 +482,11 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     '--color-admin-chart-axis-line': 'var(--color-admin-border-hover)',
     '--color-admin-chart-split-line': 'var(--color-admin-border)',
   })
+  const semanticRoot = css(tokens + 'semantic.css')
   parity(
-    tokens + 'semantic-dark.css',
-    declarations(
-      css(tokens + 'semantic-light.css'),
-      (name) => /^--(?:color|blur)-/.test(name),
-      'root',
-    ),
-    declarations(
-      css(tokens + 'semantic-dark.css'),
-      (name) => /^--(?:color|blur)-/.test(name),
-      'dark',
-    ),
+    tokens + 'semantic.css',
+    declarations(semanticRoot, (name) => name.startsWith('--'), 'root'),
+    declarations(semanticRoot, (name) => name.startsWith('--'), 'dark'),
   )
   const canvas = css(tokens + 'canvas.css')
   parity(
@@ -509,20 +501,20 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     primitiveRequired,
   )
   const imports: string[] = []
-  css(tokens + 'index.css').walkAtRules('import', (rule) => {
+  css(themeEntry).walkAtRules('import', (rule) => {
     imports.push(rule.params.replace(/^['"]|['"]$/g, ''))
   })
   if (
     imports.join('|') !==
-    ['primitives', 'semantic-light', 'semantic-dark', 'canvas', 'light', 'dark']
-      .map((name) => `./${name}.css`)
-      .join('|')
+    [
+      'tailwindcss',
+      './tokens/primitives.css',
+      './tokens/semantic.css',
+      './tokens/canvas.css',
+      './tokens/dark.css',
+    ].join('|')
   )
-    fail(
-      'token-import-order',
-      tokens + 'index.css',
-      'Token layers must load in their declared order',
-    )
+    fail('token-import-order', themeEntry, 'Token layers must load in their declared order')
   const surface = new Map<string, string>()
   css(chrome).walkRules((rule) => {
     if (rule.selector === '.page-chrome-surface')
@@ -548,10 +540,10 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       })
   })
   requireValues('round-semantic', round, roundBase, {
-    '--round-control-border': 'var(--color-border)',
-    '--round-control-bg': 'var(--color-card)',
-    '--round-control-color': 'var(--color-muted-foreground)',
-    '--round-control-focus-ring': 'var(--color-ring)',
+    '--round-control-border': 'var(--border)',
+    '--round-control-bg': 'var(--card)',
+    '--round-control-color': 'var(--muted-foreground)',
+    '--round-control-focus-ring': 'var(--ring)',
     '--round-control-shadow': 'var(--primitive-shadow-sm)',
   })
   const roundAliases: Record<string, string> = {

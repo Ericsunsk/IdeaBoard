@@ -1,0 +1,81 @@
+/*
+ * Base layer: color-scheme, body, and border/ring binding.
+ * Imported by `app/style.css` after `theme/theme.css`.
+ */
+@layer base {
+  * {
+    box-sizing: border-box;
+    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+    scrollbar-width: thin;
+  }
+
+  html,
+  body {
+    height: 100%;
+    background: var(--background);
+    color: var(--foreground);
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #app {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  :root {
+    --control-icon: var(--muted-foreground);
+    --control-icon-hover: var(--color-brand-creative-focus-accent);
+    --control-bg-hover: var(--accent-hover);
+    --focus-outline-width: 2px;
+    --focus-outline-offset: 2px;
+    --focus-outline-color: var(--color-brand-creative-focus-accent);
+    --focus-border-color: var(--focus-outline-color);
+  }
+
+  /* 全局链接样式 */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Global scrollbar skin; app-scrollbar adds a stable gutter for layout-sensitive surfaces. */
+  ::-webkit-scrollbar {
+    width: var(--size-scrollbar);
+    height: var(--size-scrollbar);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: var(--size-scrollbar-thumb-inset) solid transparent;
+    border-radius: var(--radius-pill);
+    background-color: var(--color-scrollbar-thumb);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-scrollbar-thumb-hover);
+  }
+
+  /* 选中文字颜色 */
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand-creative-accent) 16%, transparent);
+    color: var(--foreground);
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html.dark,
+  .dark {
+    color-scheme: dark;
+  }
+}

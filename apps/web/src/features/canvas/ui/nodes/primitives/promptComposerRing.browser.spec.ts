@@ -16,7 +16,7 @@ import '@testing-library/jest-dom/vitest'
 // scenario "gives the canvas prompt textarea a visible focus ring", line 79):
 // - textarea ring (source-72d10c1416508e26-1): the borderless prompt textarea
 //   rests without a ring and focuses to the shared `ring-ring/20` paint; the
-//   paint tracks `--color-ring` live (moving it moves the ring, so a hardcoded
+//   paint tracks `--ring` live (moving it moves the ring, so a hardcoded
 //   textarea-side value cannot satisfy this). The ring is box-shadow only, so
 //   the border and the box never move. Reduced motion keeps the ring while the
 //   motion tokens collapse to 0ms.
@@ -97,12 +97,12 @@ describe('Canvas prompt textarea ring browser contract', () => {
       // moves the textarea paint, so a hardcoded textarea-side value (or a
       // dropped ring class) cannot satisfy this.
       const before = styleOf(textarea).boxShadow
-      document.documentElement.style.setProperty('--color-ring', 'rgb(255, 0, 0)')
+      document.documentElement.style.setProperty('--ring', 'rgb(255, 0, 0)')
       try {
         await expect.poll(() => styleOf(textarea).boxShadow).not.toBe(before)
         expect(styleOf(textarea).boxShadow).toContain('2px')
       } finally {
-        document.documentElement.style.removeProperty('--color-ring')
+        document.documentElement.style.removeProperty('--ring')
       }
       await expect.poll(() => styleOf(textarea).boxShadow).toBe(before)
     } finally {

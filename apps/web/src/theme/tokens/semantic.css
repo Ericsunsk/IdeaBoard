@@ -1,0 +1,112 @@
+/*
+ * Tier 2: Semantic Tokens (Light + Dark)
+ * Design semantics mapped to Tier 1 physical primitives. Runtime roles use
+ * bare names; the Tailwind utility namespace (--color-*) is bridged from
+ * these roles via `@theme inline` in `theme/theme.css`, so utilities resolve
+ * through the live variable (mode- and subtree-aware) with a single owner.
+ * Follows Tailwind v4 and shadcn-vue standard naming conventions.
+ *
+ * Colors use authored sRGB values to preserve rendering. Representation
+ * changes must satisfy the visual equivalence contract. See ADR-0015.
+ */
+
+@layer base {
+  :root {
+    /* ── Surface Semantics ── */
+    --background: var(--primitive-neutral-50);
+    --foreground: var(--primitive-neutral-900);
+    --card: var(--primitive-neutral-0);
+    --card-foreground: var(--primitive-neutral-850);
+    --popover: rgba(255, 255, 255, 0.95);
+    --popover-foreground: var(--primitive-neutral-850);
+
+    /* ── Action & Accent Semantics ── */
+    --primary: var(--primitive-violet-650);
+    --primary-hover: var(--primitive-violet-700);
+    --primary-foreground: #ffffff;
+    --secondary: var(--primitive-neutral-100);
+    --secondary-hover: var(--primitive-neutral-150);
+    --secondary-foreground: var(--primitive-neutral-900);
+    --muted: var(--primitive-neutral-100);
+    --muted-foreground: var(--primitive-neutral-500);
+    --accent: var(--primitive-neutral-100);
+    --accent-hover: var(--primitive-neutral-150);
+    --accent-foreground: var(--primitive-neutral-900);
+    --destructive: var(--primitive-red-500);
+    --destructive-hover: var(--primitive-red-600);
+    --destructive-foreground: #ffffff;
+    --destructive-soft: rgb(239 68 68 / 15%);
+    --success: #16a34a;
+    --success-hover: #15803d;
+    --success-foreground: #ffffff;
+    --success-soft: rgb(22 163 74 / 15%);
+    --warning: #d97706;
+    --warning-hover: #b45309;
+    --warning-foreground: #ffffff;
+    --warning-soft: rgb(217 119 6 / 15%);
+    --info: #0284c7;
+    --info-hover: #0369a1;
+    --info-foreground: #ffffff;
+    --info-soft: rgb(2 132 199 / 15%);
+
+    /* ── Structural Borders & Interactive Focus ── */
+    --border: #e4e4e7;
+    --border-hover: #d4d4d8;
+    --input: #e4e4e7;
+    --ring: rgba(122, 107, 213, 0.25);
+
+    /* ── Glassmorphism ── */
+    --surface-glass: rgba(255, 255, 255, 0.85);
+    --border-glass: rgba(255, 255, 255, 0.4);
+  }
+
+  html.dark,
+  .dark {
+    /* ── Surface Semantics ── */
+    --background: var(--primitive-neutral-950);
+    --foreground: var(--primitive-neutral-100);
+    --card: rgba(20, 20, 20, 0.85);
+    --card-foreground: var(--primitive-neutral-100);
+    --popover: rgba(20, 20, 20, 0.95);
+    --popover-foreground: var(--primitive-neutral-100);
+
+    /* ── Action & Accent Semantics ── */
+    --primary: #fcfcfc;
+    --primary-hover: #ebebeb;
+    --primary-foreground: #0d0d0d;
+    --secondary: rgba(255, 255, 255, 0.08);
+    --secondary-hover: rgba(255, 255, 255, 0.12);
+    --secondary-foreground: var(--primitive-neutral-100);
+    --muted: rgba(255, 255, 255, 0.05);
+    --muted-foreground: var(--primitive-neutral-400);
+    --accent: rgba(255, 255, 255, 0.1);
+    --accent-hover: rgba(255, 255, 255, 0.16);
+    --accent-foreground: #ffffff;
+    --destructive: var(--primitive-red-400);
+    --destructive-hover: var(--primitive-red-500);
+    --destructive-foreground: #0d0d0d;
+    --destructive-soft: rgb(248 113 113 / 15%);
+    --success: #34d399;
+    --success-hover: #10b981;
+    --success-foreground: #0d0d0d;
+    --success-soft: rgb(52 211 153 / 15%);
+    --warning: #fbbf24;
+    --warning-hover: #f59e0b;
+    --warning-foreground: #0d0d0d;
+    --warning-soft: rgb(251 191 36 / 15%);
+    --info: #60a5fa;
+    --info-hover: #3b82f6;
+    --info-foreground: #0d0d0d;
+    --info-soft: rgb(96 165 250 / 15%);
+
+    /* ── Structural Borders & Interactive Focus ── */
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.15);
+    --input: rgba(255, 255, 255, 0.12);
+    --ring: rgba(255, 255, 255, 0.25);
+
+    /* ── Glassmorphism ── */
+    --surface-glass: rgba(24, 24, 24, 0.78);
+    --border-glass: rgba(255, 255, 255, 0.12);
+  }
+}

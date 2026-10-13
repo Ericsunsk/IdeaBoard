@@ -87,6 +87,7 @@ export const GROUP_FRAME_RING_RULE = 'group-frame-ring'
 export const CANVAS_SCREEN_FILE = 'features/canvas/ui/screens/CanvasScreen.vue'
 export const SURFACE_SKIN_FILE = 'features/canvas/ui/styles/canvas-surface-skin.css'
 export const APP_STYLE_FILE = 'app/style.css'
+export const THEME_ENTRY_FILE = 'theme/theme.css'
 export const CHROME_SKIN_FILE = 'features/canvas/ui/styles/canvas-chrome.css'
 export const STYLE_CONTRACTS_FILE = 'features/canvas/ui/styles/canvas-style-contracts.css'
 export const TOOLTIP_SKIN_FILE = 'features/canvas/ui/styles/canvas-tool-tooltip.css'
@@ -558,14 +559,17 @@ export function checkCanvasUiStyleSources(
     SURFACE_SKIN_FILE,
     validateSurfaceTokenMapping(
       sources[SURFACE_SKIN_FILE] ?? '',
-      sources[APP_STYLE_FILE] ?? '',
+      `${sources[APP_STYLE_FILE] ?? ''}\n${sources[THEME_ENTRY_FILE] ?? ''}`,
       sources[HANDLE_RAIL_FILE] ?? '',
     ),
   )
   push(
     SURFACE_WASH_RULE,
     SURFACE_SKIN_FILE,
-    validateSurfaceWash(sources[SURFACE_SKIN_FILE] ?? '', sources[APP_STYLE_FILE] ?? ''),
+    validateSurfaceWash(
+      sources[SURFACE_SKIN_FILE] ?? '',
+      `${sources[APP_STYLE_FILE] ?? ''}\n${sources[THEME_ENTRY_FILE] ?? ''}`,
+    ),
   )
   for (const file of CONSUMER_FILES) {
     push(
@@ -1034,6 +1038,7 @@ const SOURCE_FILES = [
   CANVAS_SCREEN_FILE,
   SURFACE_SKIN_FILE,
   APP_STYLE_FILE,
+  THEME_ENTRY_FILE,
   CHROME_SKIN_FILE,
   STYLE_CONTRACTS_FILE,
   TOOLTIP_SKIN_FILE,

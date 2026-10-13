@@ -58,7 +58,7 @@
             :key="quantity"
             type="button"
             v-bind="packageControlState(quantity)"
-            class="flex min-h-[72px] min-w-0 flex-col items-start justify-center rounded-control border px-3 py-2 text-left transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex min-h-[72px] min-w-0 flex-col items-start justify-center rounded-control border px-3 py-2 text-left transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
             :class="
               quantity === selectedQuantity && selectionMode === 'package'
                 ? 'border-primary bg-primary/10 text-primary'
@@ -116,14 +116,14 @@
             :href="options.terms.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
+            class="rounded-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
             >{{ t('account.topUp.termsLink') }}</a
           >{{ t('account.topUp.termsAnd') }}
           <a
             :href="options.refund_policy.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
+            class="rounded-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
             >{{ t('account.topUp.refundLink') }}</a
           >
         </p>

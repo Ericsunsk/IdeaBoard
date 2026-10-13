@@ -17,8 +17,8 @@
   cursor: pointer;
   place-items: center;
   border-radius: var(--radius-pill);
-  background-color: var(--color-muted);
-  color: var(--color-muted-foreground);
+  background-color: var(--muted);
+  color: var(--muted-foreground);
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     color var(--motion-control-duration) var(--motion-control-easing),
@@ -26,8 +26,8 @@
 }
 
 .search-reference-control:hover {
-  background-color: var(--color-border);
-  color: var(--color-foreground);
+  background-color: var(--border);
+  color: var(--foreground);
   transform: scale(1.05);
 }
 
@@ -37,7 +37,7 @@
 
 .search-reference-control:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-ring);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
 /* Direction-aware anchor gap for Search popover. */

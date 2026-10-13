@@ -2,9 +2,9 @@
   .ib-brand-mark {
     --brand-mark-size: 40px;
     --brand-mark-radius: var(--radius-control);
-    --brand-mark-border: var(--color-border);
-    --brand-mark-bg: var(--color-card);
-    --brand-mark-color: var(--color-primary-hover);
+    --brand-mark-border: var(--border);
+    --brand-mark-bg: var(--card);
+    --brand-mark-color: var(--primary-hover);
     --brand-mark-shadow: none;
     display: inline-flex;
     align-items: center;
@@ -38,7 +38,7 @@
 
   .ib-brand-mark--account {
     --brand-mark-size: 2.7rem;
-    --brand-mark-bg: var(--color-card);
+    --brand-mark-bg: var(--card);
     --brand-mark-color: var(--color-brand-creative-accent-pressed);
   }
 
@@ -53,6 +53,6 @@
   }
 
   .ib-brand-mark--fallback-strong {
-    --brand-mark-border: var(--color-primary-hover);
+    --brand-mark-border: var(--primary-hover);
   }
 }

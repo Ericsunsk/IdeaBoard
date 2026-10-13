@@ -2,15 +2,15 @@
   .round-control {
     --round-control-size: 40px;
     --round-control-border-width: 1px;
-    --round-control-border: var(--color-border);
-    --round-control-border-hover: var(--color-border-hover);
-    --round-control-bg: var(--color-card);
-    --round-control-bg-hover: var(--color-accent-hover);
-    --round-control-bg-disabled: var(--color-muted);
-    --round-control-color: var(--color-muted-foreground);
-    --round-control-color-hover: var(--color-foreground);
-    --round-control-color-disabled: var(--color-muted-foreground);
-    --round-control-focus-ring: var(--color-ring);
+    --round-control-border: var(--border);
+    --round-control-border-hover: var(--border-hover);
+    --round-control-bg: var(--card);
+    --round-control-bg-hover: var(--accent-hover);
+    --round-control-bg-disabled: var(--muted);
+    --round-control-color: var(--muted-foreground);
+    --round-control-color-hover: var(--foreground);
+    --round-control-color-disabled: var(--muted-foreground);
+    --round-control-focus-ring: var(--ring);
     --round-control-shadow: var(--primitive-shadow-sm);
     display: inline-flex;
     align-items: center;

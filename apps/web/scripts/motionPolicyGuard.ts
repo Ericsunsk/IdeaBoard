@@ -201,7 +201,7 @@ function getUtilitySource(sourcePath: string, content: string) {
 
 function isAppMotionPolicyProperty(sourcePath: string, property: string) {
   return (
-    sourcePath === 'src/app/style.css' &&
+    (sourcePath === 'src/app/style.css' || sourcePath === 'src/theme/theme.css') &&
     /^--motion-(?:control|enter|exit|feedback)-(?:duration|easing)$/.test(property)
   )
 }

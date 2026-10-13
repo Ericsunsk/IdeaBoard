@@ -30,11 +30,12 @@ import { join } from 'node:path'
  * one of those two routes.
  */
 
-/** The floor, in px. Must track `--spacing-touch-target-min` in style.css. */
+/** The floor, in px. Must track `--spacing-touch-target-min` in theme.css. */
 const FLOOR_PX = 32
 
 const SRC_ROOT = join(import.meta.dirname, '..', 'src')
 const STYLE = join(SRC_ROOT, 'app/style.css')
+const THEME_ENTRY = join(SRC_ROOT, 'theme/theme.css')
 
 const OPT_IN = /hit-target-32(?:-inline)?\b|hit-target-drag\b/
 
@@ -342,19 +343,20 @@ function main(): void {
   const violations: string[] = []
 
   // 1. The floor token must exist and match FLOOR_PX.
-  const styles = readFileSync(STYLE, 'utf8')
-  const token = styles.match(/--spacing-touch-target-min:\s*(\d+)px/)
+  const themeEntry = readFileSync(THEME_ENTRY, 'utf8')
+  const token = themeEntry.match(/--spacing-touch-target-min:\s*(\d+)px/)
   if (!token) {
     violations.push(
-      'app/style.css: `--spacing-touch-target-min` is missing. The touch-target floor must be declared once, here.',
+      'theme/theme.css: `--spacing-touch-target-min` is missing. The touch-target floor must be declared once, here.',
     )
   } else if (Number(token[1]) !== FLOOR_PX) {
     violations.push(
-      `app/style.css: \`--spacing-touch-target-min\` is ${token[1]}px but the contract floor is ${FLOOR_PX}px. Update both together.`,
+      `theme/theme.css: \`--spacing-touch-target-min\` is ${token[1]}px but the contract floor is ${FLOOR_PX}px. Update both together.`,
     )
   }
 
   // 2. The hit-area utility must be imported, or no control can opt in.
+  const styles = readFileSync(STYLE, 'utf8')
   if (!styles.includes("@import '../theme/atoms/touch-target.css'")) {
     violations.push(
       'app/style.css: `touch-target.css` is not imported, so `.hit-target-32` does nothing.',

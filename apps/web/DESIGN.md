@@ -35,7 +35,13 @@ MUST choose the target surface before styling.
 
 ## Tokens
 
-`src/app/style.css` is the token source of truth. Do not duplicate token tables in docs or components.
+`src/theme/theme.css` is the token source of truth: the sole Tailwind import,
+token imports in dependency order, the dark variant, and the `@theme inline`
+bridge that maps standard semantic `--color-*` utility keys to runtime roles.
+`src/theme/tokens/semantic.css` owns the canonical Tier 2 runtime roles;
+`src/app/style.css` is the entry named by `components.json`; it imports
+theme, base, and atoms, and owns app-wide utilities, motion overrides, toast
+styling, and shell rules. Do not duplicate token tables in docs or components.
 
 - Use existing tokens before adding new ones.
 - Use semantic tokens, not raw color intent: prefer `--color-canvas-accent` over a hard-coded purple.
@@ -49,9 +55,11 @@ Token ownership:
 - `--color-admin-*`, `--text-admin-*`, `--leading-admin-*`: Admin.
 - `--color-canvas-*`: Canvas nodes, tools, overlays, image interactions.
 - `--color-board-*`: Boards.
-- Canonical semantic tokens (`--color-background`, `--color-card`,
-  `--color-foreground`, `--color-border`, `--color-primary`,
-  `--color-muted`, and their state variants): shared UI semantics.
+- Canonical semantic tokens (`--background`, `--card`,
+  `--foreground`, `--border`, `--primary`,
+  `--muted`, and their state variants): shared UI semantics. Bare names are
+  the runtime roles; the matching `--color-*` names exist only as
+  `@theme inline` utility keys (`bg-primary`, `text-foreground`, …).
 - `--color-auth-*`: Auth/User Shell.
 - `--color-page-chrome-*`: shared page navigation and account chrome.
 - `--color-overlay-*`: shared menus and contextual overlays.
@@ -78,16 +86,18 @@ Deliberately kept, not omissions:
   `RegisterAuthPanel.vue`), canvas chrome identity (`canvas-chrome.css`,
   pinned by `canvasSurfaceSkin.contract.spec.ts`), board thumbnail bake
   (`boardPreviewStyle.ts`, `BoardCard.vue` preview gradients).
-- Private resolution infrastructure: `--color-*` declarations in
-  `src/app/style.css` / `src/theme/tokens/dark.css` and the
+- Private resolution infrastructure: runtime role declarations in
+  `src/theme/tokens/semantic.css` / `src/theme/tokens/dark.css`, utility keys
+  in `src/theme/theme.css`, and the
   `adminThemeTokens.ts` / `taskMetricTokens.ts` bridges. Tier-3 standard
   tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`, …)
-  resolve directly from canonical semantic tokens; no product-prefixed alias
-  tier is permitted.
+  resolve through the bridge to the canonical semantic roles; no
+  product-prefixed alias tier is permitted.
 
 Type scale (`text-admin-*` sizes) is unaffected by the color-token freeze.
 Dark mode ships through token resolution (`html.dark` overrides in
-`src/theme/tokens/dark.css`); `dark:` overrides stay banned because
+`src/theme/tokens/semantic.css` and `src/theme/tokens/dark.css`);
+`dark:` overrides stay banned because
 semantic tokens already cover both modes.
 
 Out of freeze scope, by design:
@@ -95,14 +105,9 @@ Out of freeze scope, by design:
 - Elevation (`shadow-page-chrome-*`, `shadow-auth-*`, `shadow-board-*`):
   shadow tokens are elevation, not color. Components may keep domain-owned
   elevation tokens; generic `shadow-ib-*` aliases are forbidden.
-- Tier-3 dual source: `src/app/style.css` `@theme` and
-  `src/theme/tokens/semantic-light.css` (`@layer base` `:root`) both
-  declare standard names (`--color-primary`, `--color-foreground`, …), and the
-  same holds for canvas tokens (`@theme` vs `tokens/canvas.css`).
-  Verified against the built bundle: `@layer base` wins over `@layer theme`,
-  so the token files are the effective runtime values and `@theme` keeps the
-  keys for utility generation. Token edits must update both sides; collapsing
-  to a single tier is deferred cleanup, not a freeze violation.
+- Domain utility values use plain `@theme`; Canvas declarations and dark mode overrides live in
+  `tokens/canvas.css` and `tokens/dark.css`. Existing Canvas declarations
+  are pinned by `token-alias`/`dark-base-closure`; no new duplicates may be added.
 
 ### Text Color Ramp Standard
 
@@ -137,9 +142,9 @@ Rules:
   walks the full role × surface matrix, compositing alpha values the way the
   browser does.
 
-Enforcement: `src/features/admin/shared/lib/textRampContrast.contract.spec.ts`.
+Enforcement: `src/features/admin/shared/core/textRampContrast.contract.spec.ts`.
 A token edit that drops any role below its floor, collapses two rungs, breaks an
-alias, or desynchronizes `adminThemeTokenFallbacks` from `style.css` fails the
+alias, or desynchronizes `adminThemeTokenFallbacks` from `theme/theme.css` fails the
 web test lane.
 
 Current ramps, measured on each ramp's binding surface:

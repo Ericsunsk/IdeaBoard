@@ -12,6 +12,8 @@ import {
 
 const valid = loadRetirementSources()
 const app = 'src/app/style.css'
+const theme = 'src/theme/theme.css'
+const semantic = 'src/theme/tokens/semantic.css'
 const dark = 'src/theme/tokens/dark.css'
 const round = 'src/theme/atoms/round-control.css'
 const chrome = 'src/theme/atoms/page-chrome.css'
@@ -39,12 +41,10 @@ function changeDeclaration(
 type Fixture = { rule: string; invalidate: (sources: RetirementSources) => void }
 const fixtureCases: Fixture[] = [
   ...[
-    ['token-closure', app, '--color-destructive-soft'],
-    ['token-alias', app, '--color-canvas-text-control'],
+    ['token-closure', theme, '--color-destructive-soft'],
+    ['token-alias', theme, '--color-canvas-text-control'],
     ['dark-required', dark, '--color-home-hero-text'],
     ['dark-chart-alias', dark, '--color-admin-chart-axis-line'],
-    ['token-parity', 'src/theme/tokens/semantic-light.css', '--color-background'],
-    ['token-parity', 'src/theme/tokens/semantic-dark.css', '--color-background'],
     ['primitive-closure', 'src/theme/tokens/primitives.css', '--primitive-neutral-950'],
   ].map(([rule, file, name]): Fixture => ({
     rule: rule!,
@@ -85,11 +85,11 @@ const fixtureCases: Fixture[] = [
   })),
   {
     rule: 'token-closure',
-    invalidate: (s) => changeDeclaration(s, app, '--color-destructive-soft', null),
+    invalidate: (s) => changeDeclaration(s, theme, '--color-destructive-soft', null),
   },
   {
     rule: 'scrollbar-role',
-    invalidate: (s) => changeDeclaration(s, app, '--color-scrollbar-thumb', 'transparent'),
+    invalidate: (s) => changeDeclaration(s, theme, '--color-scrollbar-thumb', 'transparent'),
   },
   {
     rule: 'token-namespace',
@@ -99,13 +99,16 @@ const fixtureCases: Fixture[] = [
   },
   {
     rule: 'token-alias',
-    invalidate: (s) => changeDeclaration(s, app, '--color-canvas-text-control', '#62626a'),
+    invalidate: (s) => changeDeclaration(s, theme, '--color-canvas-text-control', '#62626a'),
   },
-  { rule: 'type-scale', invalidate: (s) => changeDeclaration(s, app, '--text-admin-body', '14px') },
+  {
+    rule: 'type-scale',
+    invalidate: (s) => changeDeclaration(s, theme, '--text-admin-body', '14px'),
+  },
   {
     rule: 'literal-deduplication',
     invalidate: (s) => {
-      s[app] += '\n@theme { --color-extra-copy: #9278e6; }'
+      s[theme] += '\n@theme { --color-extra-copy: #9278e6; }'
     },
   },
   {
@@ -141,8 +144,12 @@ const fixtureCases: Fixture[] = [
   },
   {
     rule: 'token-parity',
+    invalidate: (s) => changeDeclaration(s, semantic, '--background', null, ':root'),
+  },
+  {
+    rule: 'token-parity',
     invalidate: (s) => {
-      s['src/theme/tokens/semantic-dark.css'] += '\nhtml.dark { --color-new-only-dark: black; }'
+      s[semantic] += '\nhtml.dark { --color-new-only-dark: black; }'
     },
   },
   {
@@ -159,12 +166,15 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'token-import-order',
     invalidate: (s) => {
-      const file = 'src/theme/tokens/index.css'
-      const ast = postcss.parse(s[file]!)
-      const first = ast.first!
-      first.remove()
-      ast.append(first)
-      s[file] = ast.toString()
+      const ast = postcss.parse(s[theme]!)
+      const firstImport = ast.nodes.find(
+        (node): node is import('postcss').AtRule =>
+          node.type === 'atrule' && node.name === 'import',
+      )
+      if (!firstImport) throw new Error('Fixture import not found: theme entry')
+      firstImport.remove()
+      ast.append(firstImport)
+      s[theme] = ast.toString()
     },
   },
   {
@@ -292,6 +302,30 @@ describe('effective retirement lint policies', () => {
   test('accepts canonical declarations, runtime bridge values and executable class bindings', () => {
     expect(validateRetirementSources(valid)).toEqual([])
   })
+  test.each([
+    app,
+    theme,
+    'src/theme/base.css',
+    semantic,
+    'src/theme/tokens/canvas.css',
+    'src/theme/tokens/primitives.css',
+    dark,
+  ])('rejects retired namespace declarations in token owner %s', (file) => {
+    for (const name of [
+      '--color-ib-surface',
+      '--text-ib-caption',
+      '--shadow-ib-overlay',
+      '--color-dialog-overlay',
+    ]) {
+      const fixture = { ...valid }
+      fixture[file] += `\n@layer base { :root { ${name}: black; } }`
+      expect(validateRetirementSources(fixture)).toContainEqual({
+        rule: 'token-namespace',
+        file,
+        message: `Retired namespace ${name}`,
+      })
+    }
+  })
   test('accepts applied object and array classes when their constant predicates are true', () => {
     for (const expression of [
       '{ "page-chrome-surface": true }',
@@ -305,8 +339,8 @@ describe('effective retirement lint policies', () => {
   })
   test('accepts harmless comments, declaration formatting and CSS variable whitespace', () => {
     const fixture = { ...valid }
-    fixture[app] = postcss
-      .parse(fixture[app]!)
+    fixture[theme] = postcss
+      .parse(fixture[theme]!)
       .toString()
       .replace('var(--color-canvas-text-secondary)', 'var( --color-canvas-text-secondary )')
     fixture[app] += '\n/* --color-ib-scrollbar-x: black; missing fake tokens do not count */'
