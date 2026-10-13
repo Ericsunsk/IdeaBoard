@@ -3,6 +3,24 @@ import { renderWithUser, screen } from '../../../../../test/render'
 import NodeToolIconButton from './NodeToolIconButton.vue'
 
 describe('NodeToolIconButton', () => {
+  it('forwards surface classes, styles, and pointer handlers to the native button', async () => {
+    const onPointerdown = vi.fn()
+    const { user } = renderWithUser(NodeToolIconButton, {
+      props: { tooltip: '强度' },
+      attrs: {
+        class: 'image-action-icon-btn',
+        style: { '--node-tool-icon-button-size': '32px' },
+        onPointerdown,
+      },
+    })
+    const control = screen.getByRole('button', { name: '强度' })
+
+    expect(control).toHaveClass('image-action-icon-btn', 'node-tool-icon-button')
+    expect(control.style.getPropertyValue('--node-tool-icon-button-size')).toBe('32px')
+    await user.pointer({ target: control, keys: '[MouseLeft>]' })
+    expect(onPointerdown).toHaveBeenCalledOnce()
+  })
+
   it('supports pointer and keyboard activation through its accessible name', async () => {
     const onClick = vi.fn()
     const { user } = renderWithUser(NodeToolIconButton, {
@@ -33,6 +51,7 @@ describe('NodeToolIconButton', () => {
     const onClick = vi.fn()
     const { user } = renderWithUser(NodeToolIconButton, {
       props: { tooltip: '删除', isDisabled: true, onClick },
+      attrs: { disabled: false, 'data-control-state': 'idle' },
     })
     const control = screen.getByRole('button', { name: '删除' })
 

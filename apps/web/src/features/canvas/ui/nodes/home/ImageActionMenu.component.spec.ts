@@ -129,6 +129,9 @@ describe('HomeCanvasImageActionMenu', () => {
 
     expect(activeStyleRange).not.toHaveAttribute('aria-hidden')
     expect(findActionControl(activeStyleRange)).toHaveClass('is-strength-active')
+    expect(findActionControl(activeStyleRange).querySelector('button')).toHaveClass(
+      'image-action-icon-btn',
+    )
     expect(hiddenHdRange).toHaveAttribute('aria-hidden', 'true')
     expect(findActionControl(hiddenHdRange)).toHaveClass('is-strength-hidden')
 
@@ -145,6 +148,9 @@ describe('HomeCanvasImageActionMenu', () => {
     expect(activeHdRange).toHaveAttribute('max', '4')
     expect(activeHdRange).toHaveAttribute('step', '0.1')
     expect(findActionControl(activeHdRange)).toHaveClass('is-strength-active')
+    expect(findActionControl(activeHdRange).querySelector('button')).toHaveClass(
+      'image-action-icon-btn',
+    )
   })
 
   it('shows AI prices without disabling cached unavailable billing states, and keeps local editor price-free', () => {

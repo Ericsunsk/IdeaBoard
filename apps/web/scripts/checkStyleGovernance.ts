@@ -254,12 +254,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Outpaint handle fill is a canvas drawing constant.',
   },
-  'src/features/canvas/ui/nodes/home/ImageActionMenu.vue': {
-    counts: {
-      'hex-color': 1,
-    },
-    reason: 'Node tool icon color is a canvas drawing constant.',
-  },
   'src/features/canvas/ui/nodes/primitives/NodeActionButton.vue': {
     counts: {
       'hex-color': 1,

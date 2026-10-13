@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    v-bind="controlStateAttrs"
+    v-bind="{ ...$attrs, ...controlStateAttrs }"
     class="control-state node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none"
     :class="{
       isPrimary,

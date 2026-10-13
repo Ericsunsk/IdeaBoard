@@ -430,7 +430,11 @@ const vueFlowProps = computed(() => {
       isCanvasLocked || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
     edgesUpdatable: false,
     connectOnClick: false,
-    defaultEdgeOptions: { animated: false, updatable: false },
+    defaultEdgeOptions: {
+      animated: false,
+      updatable: false,
+      class: (edge) => (edge.sourceNode.selected ? 'is-source-selected' : undefined),
+    },
     applyDefault: false,
     minZoom: CANVAS_VIEWPORT_MIN_ZOOM,
     maxZoom: CANVAS_VIEWPORT_MAX_ZOOM,

@@ -45,7 +45,7 @@
   animation: none;
 }
 
-.canvas-flow-wrap .vue-flow__edge.selected .vue-flow__edge-path,
+.canvas-flow-wrap .vue-flow__edge:is(.selected, .is-source-selected) .vue-flow__edge-path,
 .canvas-flow-wrap .vue-flow__edge:focus-visible .vue-flow__edge-path {
   stroke: var(--flow-edge-selected-color);
 }
@@ -82,7 +82,7 @@
 
 .canvas-flow-wrap {
   --canvas-selection-active-surface: var(--canvas-accent-soft);
-  --canvas-selection-active-border: var(--canvas-accent);
+  --canvas-selection-active-border: var(--canvas-accent-border-soft);
   --canvas-selection-group-surface: var(--canvas-accent-soft);
   --canvas-selection-group-border: var(--canvas-accent);
   --canvas-selection-stroke-width: 1px;

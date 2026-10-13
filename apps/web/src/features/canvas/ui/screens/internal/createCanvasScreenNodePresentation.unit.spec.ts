@@ -1,5 +1,7 @@
 import { ref } from 'vue'
+import type { NodeProps } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
+import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import { createCanvasScreenNodePresentation } from './createCanvasScreenNodePresentation'
 
 function createPresentation(getFlowNodeUiStateCached: ReturnType<typeof vi.fn>) {
@@ -72,9 +74,9 @@ describe('createCanvasScreenNodePresentation node slot scope', () => {
     const props = presentation.nodePropsFor({
       id: 'prompt-1',
       data: { kind: 'prompt', snapshotNode: null },
-      isSelected: false,
-      isDragging: false,
-    } as never)
+      selected: false,
+      dragging: false,
+    } as NodeProps<FlowNodeData>)
 
     // The shared ui-state cache covers all nodes/edges: touching it here
     // would subscribe the CanvasScreen slot scope (all subtrees) to every
@@ -82,4 +84,27 @@ describe('createCanvasScreenNodePresentation node slot scope', () => {
     expect(getFlowNodeUiStateCached).not.toHaveBeenCalled()
     expect(props).not.toHaveProperty('uiState')
   })
+
+  it.each([
+    [false, false],
+    [true, false],
+    [true, true],
+    [false, true],
+  ])(
+    'forwards Vue Flow selection=%s and dragging=%s to the node component',
+    (isSelected, isDragging) => {
+      const presentation = createPresentation(vi.fn())
+      const node = {
+        id: 'prompt-1',
+        data: { kind: 'prompt', snapshotNode: null },
+        selected: isSelected,
+        dragging: isDragging,
+      } as NodeProps<FlowNodeData>
+
+      expect(presentation.nodePropsFor(node)).toMatchObject({
+        selected: isSelected,
+        dragging: isDragging,
+      } satisfies Pick<NodeProps, 'selected' | 'dragging'>)
+    },
+  )
 })

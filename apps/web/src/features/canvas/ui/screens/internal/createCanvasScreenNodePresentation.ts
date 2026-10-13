@@ -94,8 +94,8 @@ export function createCanvasScreenNodePresentation(options: {
     return {
       nodeId: node.id,
       data: node.data,
-      isSelected: node.selected,
-      isDragging: node.dragging,
+      selected: node.selected,
+      dragging: node.dragging,
       isCopyMode: options.isDuplicateModifierPressed.value,
       imagePresentation: imagePresentationFor(node.id),
       fusionPresentation: fusionPresentationFor(node.id),
@@ -105,7 +105,7 @@ export function createCanvasScreenNodePresentation(options: {
       isOutpaintModeActive: isOutpaintModeActive,
       outpaintOverlayStyle: isOutpaintModeActive ? outpaint.overlayStyle.value : null,
       outpaintHandleRadius: outpaint.handleRadius,
-    }
+    } satisfies Pick<NodeProps, 'selected' | 'dragging'> & Record<string, unknown>
   }
 
   return {

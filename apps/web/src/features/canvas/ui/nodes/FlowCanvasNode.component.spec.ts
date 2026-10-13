@@ -1,4 +1,5 @@
 import { fireEvent } from '@testing-library/vue'
+import type { NodeProps } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import FlowCanvasNode from './FlowCanvasNode.vue'
 import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../../board'
@@ -159,12 +160,19 @@ describe('FlowCanvasNode prompt rendering', () => {
     expect(view.getByLabelText('Send')).not.toBeDisabled()
   })
 
-  it('keeps the full prompt body for selected nodes at rest', () => {
+  it('shows the stage ring and title selection state, then clears both on deselection', async () => {
     const view = renderFlowCanvasNode({
       isSelected: true,
     })
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
+    expect(view.container.querySelector('.node-stage-frame.is-active')).not.toBeNull()
+    expect(view.container.querySelector('.workflow-node-header.is-active')).not.toBeNull()
+
+    await view.rerender({ selected: false } satisfies Pick<NodeProps, 'selected'>)
+
+    expect(view.container.querySelector('.node-stage-frame.is-active')).toBeNull()
+    expect(view.container.querySelector('.workflow-node-header.is-active')).toBeNull()
   })
 
   it('keeps the full prompt body while a selected node is dragging', () => {

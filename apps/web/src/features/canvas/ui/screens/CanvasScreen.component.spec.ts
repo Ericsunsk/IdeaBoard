@@ -1,4 +1,5 @@
-import { defineComponent, h, reactive, ref, type PropType } from 'vue'
+import { computed, defineComponent, h, reactive, ref, type PropType } from 'vue'
+import type { FlowProps, GraphEdge, GraphNode, NodeProps } from '@vue-flow/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { render } from '../../../../test/render'
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   selectionOnFlowNodeClick: vi.fn(),
   dragEvents: [] as string[],
   useCanvasWorkspaceRuntime: vi.fn(),
+  defaultEdgeOptions: undefined as FlowProps['defaultEdgeOptions'],
 }))
 
 vi.mock('../../session/workspace', () => ({
@@ -132,7 +134,8 @@ const ChromeStub = defineComponent({
 
 const VueFlowStub = defineComponent({
   emits: ['nodes-change', 'pane-click', 'pane-context-menu', 'node-drag-start', 'node-drag-stop'],
-  setup(_, { emit, slots }) {
+  setup(_, { emit, slots, attrs }) {
+    mocks.defaultEdgeOptions = attrs.defaultEdgeOptions as FlowProps['defaultEdgeOptions']
     return () =>
       h('section', { 'data-testid': 'flow-region' }, [
         h(
@@ -166,7 +169,12 @@ const VueFlowStub = defineComponent({
         ),
         h('button', { type: 'button', onClick: () => emit('node-drag-stop') }, '结束拖动节点'),
         slots['zoom-pane']?.(),
-        slots['node-canvas']?.({ id: 'node-a', data: {}, isSelected: false, isDragging: false }),
+        slots['node-canvas']?.({
+          id: 'node-a',
+          data: {},
+          selected: false,
+          dragging: false,
+        } satisfies Partial<NodeProps>),
         slots.default?.(),
       ])
   },
@@ -465,6 +473,47 @@ describe('CanvasScreen', () => {
     mocks.leaveGuardOptions = null
     mocks.groupOptions = null
     mocks.dragEvents.length = 0
+    mocks.defaultEdgeOptions = undefined
+  })
+
+  it('highlights outgoing edges as their source selection changes without selecting the edges', () => {
+    renderScreen()
+    const edgeClass = mocks.defaultEdgeOptions?.class
+    if (typeof edgeClass !== 'function') throw new Error('expected an edge class callback')
+    const source = reactive<Pick<GraphNode, 'id' | 'selected'>>({ id: 'node-a', selected: false })
+    const target = reactive<Pick<GraphNode, 'id' | 'selected'>>({ id: 'node-b', selected: false })
+    const outgoing = {
+      id: 'edge-a-b',
+      source: source.id,
+      target: target.id,
+      sourceNode: source,
+      targetNode: target,
+      selected: false,
+    } as GraphEdge
+    const incoming = {
+      ...outgoing,
+      id: 'edge-b-a',
+      source: target.id,
+      target: source.id,
+      sourceNode: target,
+      targetNode: source,
+    } as GraphEdge
+    const outgoingClass = computed(() => edgeClass(outgoing))
+    const incomingClass = computed(() => edgeClass(incoming))
+
+    expect(outgoingClass.value).toBeUndefined()
+    source.selected = true
+    expect(outgoingClass.value).toBe('is-source-selected')
+    expect(incomingClass.value).toBeUndefined()
+    target.selected = true
+    expect(incomingClass.value).toBe('is-source-selected')
+    source.selected = false
+    expect(outgoingClass.value).toBeUndefined()
+    expect(incomingClass.value).toBe('is-source-selected')
+    target.selected = false
+    expect(incomingClass.value).toBeUndefined()
+    expect(outgoing.selected).toBe(false)
+    expect(incoming.selected).toBe(false)
   })
 
   it('renders and forwards Canvas interactions through the public Screen seam', async () => {

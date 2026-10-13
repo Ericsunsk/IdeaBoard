@@ -132,4 +132,17 @@ defineExpose({ stageElement })
     0 0 30px var(--node-stage-frame-emphasis-shadow-primary),
     0 0 48px var(--node-stage-frame-emphasis-shadow-secondary);
 }
+
+.node-stage-frame.is-connection-drop-target {
+  --node-stage-frame-emphasis-shadow-primary: color-mix(
+    in srgb,
+    var(--canvas-accent) 45%,
+    transparent
+  );
+  --node-stage-frame-emphasis-shadow-secondary: color-mix(
+    in srgb,
+    var(--canvas-accent) 25%,
+    transparent
+  );
+}
 </style>

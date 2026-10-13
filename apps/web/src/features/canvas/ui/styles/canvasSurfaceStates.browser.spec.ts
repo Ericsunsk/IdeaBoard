@@ -325,15 +325,18 @@ describe('Canvas surface states browser contract', () => {
       const frames = nodes.queryAll('.node-stage-frame')
       expect(frames).toHaveLength(3)
       const [loading, dropTarget, active] = frames as HTMLElement[]
-      // Loading and connection-drop-target raise the emphasis glow, which
-      // resolves through the surface accent token (not a frame-local value).
+      // Loading keeps the resting shadow; connection targets use a stronger
+      // glow derived from the theme accent (violet in light, white in dark).
       const emphasisProbe = document.createElement('div')
       emphasisProbe.style.color = 'var(--canvas-accent-shadow)'
       nodes.root.append(emphasisProbe)
       try {
         const emphasis = styleOf(emphasisProbe).color
         expect(styleOf(loading!).boxShadow).toContain(emphasis)
-        expect(styleOf(dropTarget!).boxShadow).toContain(emphasis)
+        emphasisProbe.style.color = 'color-mix(in srgb, var(--canvas-accent) 45%, transparent)'
+        expect(styleOf(dropTarget!).boxShadow).toContain(styleOf(emphasisProbe).color)
+        emphasisProbe.style.color = 'color-mix(in srgb, var(--canvas-accent) 25%, transparent)'
+        expect(styleOf(dropTarget!).boxShadow).toContain(styleOf(emphasisProbe).color)
       } finally {
         emphasisProbe.remove()
       }
