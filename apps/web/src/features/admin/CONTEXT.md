@@ -1,7 +1,7 @@
 # Admin Context
 
 Admin Surface owns operator management of users, providers, ledger, orders, storage, and system settings under `/admin/*`.
-It has its own routes, layout shell, and feedback contract, separate from user-side Workspace.
+It has its own protected routes, layout shell, and feedback contract. Authentication belongs to Auth through `/user/login`; access requires the Admin role.
 It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledger is fact source), or cross-vertical workflows beyond five explicit exceptions.
 
 ## Domain Language
@@ -26,7 +26,7 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 
 - `app/routes.ts` — lazy admin route table referenced by the global router in `app`.
 - `app/navigation.ts` — `navigationByKey` / `groups` consumed by `AdminLayout` in `app` (`navigationItems` is an internal intermediate, not exported).
-- `pages` — thin login route assembly in `app/login/` plus per-vertical views under `<vertical>/ui/views/` or `<vertical>/ui/pages/` and settings cards under `settings/ui/cards/`; lazy-loaded by `app/routes.ts`; pages import sibling-domain workspace/context, never build their own transport.
+- `pages` — per-vertical views under `<vertical>/ui/views/` or `<vertical>/ui/pages/` and settings cards under `settings/ui/cards/`; lazy-loaded by `app/routes.ts`; pages import sibling-domain workspace/context, never build their own transport.
 - `shared` — sole Admin horizontal dependency via `shared/index.ts` (sole public entry): `shared/ui` holds the Dialog/Table/Toolbar/Pager kit, chart and logo pickers; `shared/session` holds confirm/toast plus collection/pagination/polling primitives; `shared/core` holds validation, tokens and pure transport helpers. New code imports from the barrel.
 - `useAdminUsersResource` (`users/session/resource.ts`) — user search/role/ban/kick/impersonate transport.
 - `createOAuthProviderSettingsResource` (`settings/session/oauth/resource.ts`) — OAuth login settings transport; `settings/session/oauth` owns the dialog, provider logos, and operator copy.
@@ -47,6 +47,7 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 - Call chain is `generated-query -> *Api.ts/*ApiAdapter.ts -> *Resource.ts -> Workspace/Context -> Page.vue`; route pages never call the generated client directly.
 - No Pinia: state is TanStack Query (key generators owned by resource) plus local refs; cross-mutation invalidation is explicit `invalidateQueries`.
 - Dangerous actions (ban/delete/refund/cancel) require `useAdminConfirm` plus feedback dual-channel; never bare `mutate`.
+- Confirmation returns a boolean; mutation transport carries the request ID and idempotency key. Audit records retain the actor, operation, target, outcome and timestamp.
 - Only five known cross-vertical refs are allowed (wallets barrel, Stripe dialog, logo picker, storage full-page embedded in settings, shell anomaly-radar aggregating statistics); no new cross-vertical deep imports.
 - Collection load (TanStack Query): key change fetches (fetching without data is first-screen loading, failure is `initialError`); same-key `refetch` is background refresh (stale kept, failure is `backgroundError`); key isolation means late responses never overwrite the current page.
 - Settings lifecycle (`useSettingsLifecycle`): `hydrate(source)` to dirty (`isDirty`) to `validate` (`validationError`) to `save` to `hydrate + synchronizeCache`; skip source overwrite while `saving || isDirty`.

@@ -11,10 +11,6 @@ export type UseAdminStorageContextOptions = {
   resource?: AdminStorageResource
 }
 
-// Ownership split: the profile editor owns form/draft, saving, and
-// bucket-domain detection; the workspace owns apply/test/delete/enable
-// orchestration (confirmation, operator reason, pending state). Each key is
-// assigned exactly once — no spread-then-override of same-name commands.
 export function useStorageContext(options: UseAdminStorageContextOptions) {
   const { runAsyncAction } = useAsyncAction()
   const storageFeedback = options.feedback ?? useStorageFeedback()

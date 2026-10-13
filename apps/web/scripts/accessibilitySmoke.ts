@@ -58,7 +58,7 @@ const PUBLIC_PAGES: readonly PageCheck[] = [
 
 const AUTH_GUARDS: readonly { path: string; loginPath: string }[] = [
   { path: '/user/boards', loginPath: '/user/login' },
-  { path: '/admin/users', loginPath: '/admin/login' },
+  { path: '/admin/users', loginPath: '/user/login' },
 ]
 
 type A11yShapeReport = {

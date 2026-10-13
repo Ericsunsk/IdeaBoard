@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
 import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminGatewayConfigDialog from './AdminGatewayConfigDialog.vue'
-import { ADMIN_PROBE_OPERATOR_REASON } from '../../../shared'
 import type { AdminGatewayConnection, GatewayConnectionSummary } from '../../resource'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
@@ -89,15 +88,12 @@ describe('AdminGatewayConfigDialog', () => {
     const saveButton = screen.getByRole('button', { name: '添加网关' })
     await user.click(saveButton)
 
-    expect(mockResource.update).toHaveBeenCalledWith(
-      {
-        base_url: 'https://my-custom-gateway.company.com',
-        token: 'cf-secret-token-123',
-        account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
-        gateway_id: 'my-gateway',
-      },
-      { operatorReason: '' },
-    )
+    expect(mockResource.update).toHaveBeenCalledWith({
+      base_url: 'https://my-custom-gateway.company.com',
+      token: 'cf-secret-token-123',
+      account_id: '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c',
+      gateway_id: 'my-gateway',
+    })
 
     expect(toast.success).toHaveBeenCalledWith('AI 网关配置已保存')
     expect(onSaved).toHaveBeenCalledWith(
@@ -124,14 +120,11 @@ describe('AdminGatewayConfigDialog', () => {
     const saveButton = screen.getByRole('button', { name: '添加网关' })
     await user.click(saveButton)
 
-    expect(mockResource.update).toHaveBeenCalledWith(
-      {
-        base_url: 'https://my-custom-gateway.company.com',
-        account_id: '',
-        gateway_id: '',
-      },
-      { operatorReason: '' },
-    )
+    expect(mockResource.update).toHaveBeenCalledWith({
+      base_url: 'https://my-custom-gateway.company.com',
+      account_id: '',
+      gateway_id: '',
+    })
     expect(toast.success).toHaveBeenCalledWith('AI 网关配置已保存')
   })
 
@@ -171,7 +164,6 @@ describe('AdminGatewayConfigDialog', () => {
         base_url:
           'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2',
       }),
-      { operatorReason: '' },
     )
     const updateCall = vi.mocked(mockResource.update).mock.calls[0]?.[0]
     expect(updateCall?.token).toBeUndefined()
@@ -227,7 +219,6 @@ describe('AdminGatewayConfigDialog', () => {
         provider: 'openai',
         path: 'v1/models',
       }),
-      { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )
     expect(toast.success).toHaveBeenCalledWith('网关连接正常 (38ms)')
   })
@@ -315,7 +306,6 @@ describe('AdminGatewayConfigDialog', () => {
     await waitFor(() => {
       expect(mockResource.testConnection).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'openai', path: 'v1/models' }),
-        { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
       )
     })
     await waitFor(() => {

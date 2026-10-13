@@ -191,7 +191,7 @@ func TestDurableBanFreezesWalletAndConverges(t *testing.T) {
 	ctx := context.Background()
 	userID, publicID := f.seedUser(t, "durable-ban", "auth-durable-ban", "DBAN01", "user", StatusActive)
 
-	outcome, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "abuse", ExpiresInDays: 7})
+	outcome, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{ExpiresInDays: 7})
 	if err != nil {
 		t.Fatalf("ban: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestDurableCarrierRollbackIsAtomic(t *testing.T) {
 		t.Fatalf("begin carrier: %v", err)
 	}
 	carrierCtx := dbutil.ContextWithAmbientTx(ctx, tx)
-	outcome, err := f.commands.Ban(carrierCtx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "abuse"})
+	outcome, err := f.commands.Ban(carrierCtx, identityAdminActor(t), publicID, IdentityAdminBanInput{})
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("ban in carrier: %v", err)
@@ -318,7 +318,7 @@ func TestDurableCrashRecoveryConverges(t *testing.T) {
 	ctx := context.Background()
 	userID, publicID := f.seedUser(t, "durable-crash", "auth-durable-crash", "DCRS01", "user", StatusActive)
 
-	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "abuse"}); err != nil {
+	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{}); err != nil {
 		t.Fatalf("ban: %v", err)
 	}
 	// Simulate a crash: drop every in-memory handle, rebuild from the
@@ -447,7 +447,7 @@ func TestDurableStaleIntentNeverOverwritesNewState(t *testing.T) {
 
 	// Ban (v1 intent) then unban (v2 intent) before any sweep: the ban
 	// push must never run against the now-active business state.
-	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "abuse"}); err != nil {
+	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{}); err != nil {
 		t.Fatalf("ban: %v", err)
 	}
 	if _, err := f.commands.Unban(ctx, identityAdminActor(t), publicID); err != nil {
@@ -559,13 +559,13 @@ func TestDurableSameStateBanReportsPendingWithoutNewPush(t *testing.T) {
 	ctx := context.Background()
 	_, publicID := f.seedUser(t, "durable-noop", "auth-durable-noop", "DNOOP1", "user", StatusActive)
 
-	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "abuse"}); err != nil {
+	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{}); err != nil {
 		t.Fatalf("ban: %v", err)
 	}
 	// A repeated ban while the first intent is still pending reports
 	// pending honestly without fabricating a replacement push (which
-	// would clobber the stored reason/expiry).
-	second, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "different"})
+	// would clobber the stored expiry).
+	second, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{})
 	if err != nil {
 		t.Fatalf("repeated ban: %v", err)
 	}

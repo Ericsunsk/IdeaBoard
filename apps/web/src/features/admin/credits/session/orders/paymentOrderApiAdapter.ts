@@ -1,4 +1,4 @@
-import { buildControlMutationHeaders, requireOperatorReason } from '../../../shared'
+import { buildControlMutationHeaders } from '../../../shared'
 import {
   createControlPaymentRefund,
   getControlPaymentOrder,
@@ -126,17 +126,10 @@ export type AdminPaymentOrderApiAdapter = {
   get: (publicOrderNumber: string, signal?: AbortSignal) => Promise<PaymentOrderApiDetail>
   refund: (
     publicOrderNumber: string,
-    input: { idea_quantity: number; idempotency_key: string; operatorReason: string },
+    input: { idea_quantity: number; idempotency_key: string },
   ) => Promise<PaymentOrderApiRefund>
 }
 
-// Admin payment order transport (W2 transports). Reads and refunds go
-// through the Control Plane order operations with the contract envelope
-// (`{data}` over the same AdminService projections); refunds carry a
-// header-only Idempotency-Key plus an operator reason (mirrored into the
-// body `reason` field) and emit a control audit record. The deleted
-// `/api/admin/payments/orders*` routes are gone; this module is the single
-// transport.
 export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter {
   return {
     search: async ({
@@ -178,15 +171,13 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
       }
     },
     refund: async (publicOrderNumber, input) => {
-      const operatorReason = requireOperatorReason(input.operatorReason)
       try {
         const body = await createControlPaymentRefund(
           publicOrderNumber.trim().toUpperCase(),
-          { idea_quantity: input.idea_quantity, reason: operatorReason },
+          { idea_quantity: input.idea_quantity },
           {
             headers: buildControlMutationHeaders({
               idempotencyKey: input.idempotency_key,
-              operatorReason,
             }),
           },
         )

@@ -9,32 +9,30 @@ import (
 	"ideaboard/api/internal/testdb"
 )
 
-func TestControlSupportChannelsReasonAndIdempotency(t *testing.T) {
+func TestControlSupportChannelsIdempotency(t *testing.T) {
 	db := testdb.Open(t)
 	service := settings.NewRuntimeSettingsService(settings.NewSystemConfigRepository(db))
 	h := newControlHarness(t, func(d *ContractControlDeps) { d.Settings = service })
 	const path = "/api/control/v1/platform/settings/support-channels"
 	const body = `{"channels":[{"id":"discord","name":"Discord","kind":"discord","url":"https://discord.gg/example","enabled":true,"sort_order":0}]}`
 
-	// Routine config exemption: the reason is optional, so a key-only
-	// call succeeds and audits the empty reason as-is.
 	status, _, payload := h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: map[string]string{contract.IdempotencyKeyHeader: "support-settings-0"}})
 	if status != http.StatusOK {
-		t.Fatalf("key-only save = status %d payload %v, want 200 (reason optional)", status, payload)
+		t.Fatalf("key-only save = status %d payload %v, want 200", status, payload)
 	}
-	if last := h.sink.Records()[len(h.sink.Records())-1]; last.Reason != "" || last.Operation != "platform.update_support_channels" {
-		t.Fatalf("key-only audit = %+v, want empty reason", last)
+	if last := h.sink.Records()[len(h.sink.Records())-1]; last.Operation != "platform.update_support_channels" {
+		t.Fatalf("key-only audit = %+v, want the recorded operation", last)
 	}
-	// The idempotency key stays required even without a reason.
+	// The idempotency key stays required for mutations.
 	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body})
 	if status != http.StatusBadRequest || controlErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
 		t.Fatalf("missing idempotency key = status %d payload %v", status, payload)
 	}
-	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: map[string]string{OperatorReasonHeader: "configure support"}})
+	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: nil})
 	if status != http.StatusBadRequest || controlErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
 		t.Fatalf("missing idempotency key = status %d payload %v", status, payload)
 	}
-	call := controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: controlMutationHeaders("support-settings-1", "configure support")}
+	call := controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: controlMutationHeaders("support-settings-1")}
 	for i := 0; i < 2; i++ {
 		status, _, payload = h.serve(call)
 		if status != http.StatusOK {
@@ -44,7 +42,7 @@ func TestControlSupportChannelsReasonAndIdempotency(t *testing.T) {
 	}
 	records := h.sink.Records()
 	last := records[len(records)-1]
-	if last.Operation != "platform.update_support_channels" || last.Reason != "configure support" || last.IdempotencyKey != "support-settings-1" {
+	if last.Operation != "platform.update_support_channels" || last.IdempotencyKey != "support-settings-1" {
 		t.Fatalf("control audit = %+v", last)
 	}
 	call.body = `{"channels":[]}`

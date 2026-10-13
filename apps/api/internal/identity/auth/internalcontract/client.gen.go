@@ -405,7 +405,6 @@ type AuthUserRequest struct {
 type AuthUserState struct {
 	AuthUserID string     `json:"auth_user_id"`
 	BanExpires *time.Time `json:"ban_expires,omitempty"`
-	BanReason  *string    `json:"ban_reason,omitempty"`
 	Banned     bool       `json:"banned"`
 	Role       AuthRole   `json:"role"`
 }
@@ -431,9 +430,8 @@ type BanUserEnvelopeCode int
 
 // BanUserRequest defines model for BanUserRequest.
 type BanUserRequest struct {
-	BanExpiresIn *int    `json:"banExpiresIn,omitempty"`
-	BanReason    *string `json:"banReason,omitempty"`
-	UserID       string  `json:"userId"`
+	BanExpiresIn *int   `json:"banExpiresIn,omitempty"`
+	UserID       string `json:"userId"`
 }
 
 // DeleteUserData defines model for DeleteUserData.

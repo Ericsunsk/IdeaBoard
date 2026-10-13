@@ -25,7 +25,6 @@ describe('redirect safety policy', () => {
   it('rejects auth-loop and prefix-spoofed redirects', () => {
     expect(isSafeInternalRedirectPath('/user/login?redirect=/share?token=abc')).toBe(false)
     expect(isSafeInternalRedirectPath('/user/register#start')).toBe(false)
-    expect(isSafeInternalRedirectPath('/admin/login?redirect=/admin/users')).toBe(false)
     expect(isSafeInternalRedirectPath('/adminish/users')).toBe(false)
     expect(isSafeInternalRedirectPath('/shareevil?token=abc')).toBe(false)
   })
@@ -138,7 +137,7 @@ describe('resolveAuthFailureAction', () => {
       }),
     ).toEqual({
       kind: 'redirect-login',
-      targetPath: '/admin/login?redirect=%2Fadmin%2Fusers%3Fpage%3D1',
+      targetPath: '/user/login?redirect=%2Fadmin%2Fusers%3Fpage%3D1',
     })
   })
 

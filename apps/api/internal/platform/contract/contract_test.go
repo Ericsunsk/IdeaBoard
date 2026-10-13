@@ -498,8 +498,7 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 		CodeEventSubscriptionNotFound: http.StatusNotFound,
 		CodeEventSubscriptionConflict: http.StatusConflict,
 
-		CodeControlReasonRequired: http.StatusBadRequest,
-		CodeControlNotFound:       http.StatusNotFound,
+		CodeControlNotFound: http.StatusNotFound,
 
 		CodeTaskMonitorConcurrencyLimited: http.StatusTooManyRequests,
 		CodeTaskStatisticsRequestInvalid:  http.StatusBadRequest,

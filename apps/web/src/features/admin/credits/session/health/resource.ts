@@ -1,6 +1,6 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type { CreditHealth, CreditReconciliationRequest } from '../shared/api'
+import type { CreditHealth } from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import { adminPolling } from '../../../../../core/query/queryDefaults'
 
@@ -26,7 +26,7 @@ export function useAdminCreditHealthResource(
     ).refetchInterval,
   })
   const startMutation = useMutation({
-    mutationFn: (request: CreditReconciliationRequest) => api.startReconciliation(request),
+    mutationFn: () => api.startReconciliation(),
     onSuccess: (run) => {
       queryClient.setQueryData<CreditHealth>(adminCreditHealthQueryKey, (current) =>
         current ? { ...current, active_run: run } : current,
@@ -39,6 +39,6 @@ export function useAdminCreditHealthResource(
     query,
     health: computed(() => query.data.value),
     startPending: computed(() => startMutation.isPending.value),
-    start: (request: CreditReconciliationRequest) => startMutation.mutateAsync(request),
+    start: () => startMutation.mutateAsync(),
   }
 }

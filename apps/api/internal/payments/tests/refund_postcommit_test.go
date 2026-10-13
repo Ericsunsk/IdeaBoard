@@ -60,7 +60,7 @@ func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
 	syncSvc := newService(syncEvents, "re_postcommit_sync")
 	syncRefund, err := syncSvc.CreatePaymentRefund(t.Context(), paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
-		IdempotencyKey: "refund-postcommit-sync", Reason: "unused Ideas",
+		IdempotencyKey: "refund-postcommit-sync",
 	})
 	if err != nil || syncRefund.Status != paymentsdomain.PaymentRefundSucceeded {
 		t.Fatalf("sync CreatePaymentRefund() refund=%+v error=%v", syncRefund, err)
@@ -74,7 +74,7 @@ func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
 	carrier := dbutil.ContextWithAmbientPostCommit(t.Context())
 	deferredRefund, err := deferredSvc.CreatePaymentRefund(carrier, paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 50,
-		IdempotencyKey: "refund-postcommit-deferred", Reason: "unused Ideas",
+		IdempotencyKey: "refund-postcommit-deferred",
 	})
 	if err != nil {
 		// order already has 100 refunded from sync leg (500 total, 100 used),

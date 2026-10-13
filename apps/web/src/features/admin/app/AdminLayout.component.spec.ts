@@ -32,7 +32,6 @@ const routes = [
   { path: '/admin/models', component: { template: '<div>models</div>' } },
   { path: '/admin/feature-prompts', component: { template: '<div>prompts</div>' } },
   { path: '/admin/settings', component: { template: '<div>settings</div>' } },
-  { path: '/admin/login', component: { template: '<div>login</div>' } },
 ]
 
 async function renderLayout(path = '/admin/users') {

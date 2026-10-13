@@ -101,8 +101,7 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	if err != nil {
 		t.Fatalf("StartReconciliation() error = %v", err)
 	}
-	if run.Trigger != ports.ReconciliationTriggerManual || run.RequestedBy == nil || *run.RequestedBy != 1 ||
-		run.Reason != "integration reconciliation" {
+	if run.Trigger != ports.ReconciliationTriggerManual || run.RequestedBy == nil || *run.RequestedBy != 1 {
 		t.Fatalf("manual run audit = %+v", run)
 	}
 	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
@@ -606,19 +605,19 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	service := newReconciliationService(t, pool, enqueuer)
 	invalid := ports.StartManualReconciliationInput{}
 	if _, err := service.StartReconciliation(t.Context(), invalid); !errors.Is(err, domain.ErrInvalidCommand) {
-		t.Fatalf("StartReconciliation(blank reason) error = %v, want domain.ErrInvalidCommand", err)
+		t.Fatalf("StartReconciliation(missing actor) error = %v, want domain.ErrInvalidCommand", err)
 	}
 	first, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondAction := testsupport.AdminAction(t, 1, "second request must not overwrite active run reason")
-	secondInput := ports.StartManualReconciliationInput{ActorID: secondAction.ActorID(), Reason: secondAction.Reason()}
+	secondAction := testsupport.AdminAction(t, 1)
+	secondInput := ports.StartManualReconciliationInput{ActorID: secondAction.ActorID()}
 	second, err := service.StartReconciliation(t.Context(), secondInput)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.ID != second.ID || second.Reason != first.Reason {
+	if first.ID != second.ID {
 		t.Fatalf("concurrent active runs = %d and %d", first.ID, second.ID)
 	}
 	if len(enqueuer.calls) != 1 {
@@ -939,7 +938,7 @@ func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	var runID int64
-	if err := pool.QueryRow(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'hot row test', NULL, FALSE)`).Scan(&runID); err != nil {
+	if err := pool.QueryRow(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, NULL, FALSE)`).Scan(&runID); err != nil {
 		t.Fatal(err)
 	}
 	finished := make(chan error, 1)
@@ -1050,8 +1049,8 @@ func taskReconciliationMetadata(key, taskID string) domain.CommandMetadata {
 }
 
 func reconciliationStartInput(t testing.TB) ports.StartManualReconciliationInput {
-	action := testsupport.AdminAction(t, 1, "integration reconciliation")
-	return ports.StartManualReconciliationInput{ActorID: action.ActorID(), Reason: action.Reason()}
+	action := testsupport.AdminAction(t, 1)
+	return ports.StartManualReconciliationInput{ActorID: action.ActorID()}
 }
 
 func countRows(t testing.TB, db interface {

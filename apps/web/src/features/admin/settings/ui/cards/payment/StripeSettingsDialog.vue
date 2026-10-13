@@ -257,20 +257,15 @@ function clearError(field: 'apiKey' | 'paymentMethodConfigurationId' | 'productT
 
 const submit = form.handleSubmit(async (values) => {
   if (isBusy.value) return
-  // Routine config write (backend ReasonOptional): save directly without
-  // the confirm dialog; the audit records an empty reason.
-  const operatorReason = ''
+
   isSaving.value = true
   try {
-    const nextSummary = await activeResource().save(
-      {
-        ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
-        paymentMethodConfigurationId: values.paymentMethodConfigurationId.trim(),
-        productTaxCode: values.productTaxCode.trim(),
-        isPurchasesEnabled: values.purchasesEnabled,
-      },
-      { operatorReason },
-    )
+    const nextSummary = await activeResource().save({
+      ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
+      paymentMethodConfigurationId: values.paymentMethodConfigurationId.trim(),
+      productTaxCode: values.productTaxCode.trim(),
+      isPurchasesEnabled: values.purchasesEnabled,
+    })
     summary.value = nextSummary
     form.resetForm({
       apiKey: '',

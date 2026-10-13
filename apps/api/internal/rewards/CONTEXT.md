@@ -6,11 +6,11 @@ It does not own the Credits Ledger or Identity data; all ledger effects go throu
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| RewardCode | Single aggregate of display name, HMAC-only bearer Code, Credit award, optional total cap and expiry, and enabled intent |
-| Redemption | Immutable fact of one user's successful RewardCode claim |
-| Admin Action Journal | Append-only record inside the Rewards context of actor, action, time, and safe metadata |
+| Term                 | Meaning                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| RewardCode           | Single aggregate of display name, HMAC-only bearer Code, Credit award, optional total cap and expiry, and enabled intent |
+| Redemption           | Immutable fact of one user's successful RewardCode claim                                                                 |
+| Admin Action Journal | Append-only record inside the Rewards context of actor, action, time, and safe metadata                                  |
 
 ## Public Seams
 
@@ -42,7 +42,7 @@ Implementation note: hash normalization, HMAC candidates, row locking, persisten
 - User Redemption history reads only committed Redemptions and pages them isolated by `(user_id, id DESC)`; it joins or copies no Identity PII, Code digest, or plaintext.
 - The User Redeem response takes `user_public_id` and `display_name` only from the Auth middleware's verified request `Principal` snapshot; no fallible Identity read runs after commit.
 - Admin Redemption reads only committed facts by `(reward_code_id, id DESC)`; the summary carries no technical detail, detail must match both RewardCode ID and Redemption ID, and neither joins Identity, Journal, or Code digest and plaintext; HTTP presentation composes user fields through the Runtime Identity projection adapter with at most one bounded batch read per list page and one single read per detail, and missing or inconsistent Identity mappings fail closed, while authenticated Redemption history reads no Identity.
-- `reward_admin_actions` records actor, action, time, and safe metadata automatically with no hand-filled reason, and stays append-only by both database trigger and runtime privileges; the guard admits only FK referential nullification from `ON DELETE SET NULL`, where the parent must already be gone and every other Journal field unchanged, and Runtime holds no direct UPDATE or DELETE on RewardCode, Alias, or Journal and only runs transaction-bound Rewards command functions so the Journal cannot be bypassed.
+- `reward_admin_actions` records actor, action, time, and safe metadata automatically, and stays append-only by both database trigger and runtime privileges; the guard admits only FK referential nullification from `ON DELETE SET NULL`, where the parent must already be gone and every other Journal field unchanged, and Runtime holds no direct UPDATE or DELETE on RewardCode, Alias, or Journal and only runs transaction-bound Rewards command functions so the Journal cannot be bypassed.
 - `REWARDS_CODE_HMAC_KEYS` accepts only current plus optional previous; each base64 key decodes to at least 32 bytes, and startup fails closed on invalid config.
 - Code normalization applies a 128-byte raw bound before any Unicode normalization, then NFKC, uppercase, trim, and Unicode whitespace and hyphen removal; the final payload accepts only 8 to 32 `A-Z0-9` characters.
 - During HMAC rotation overlap, lookup verifies current and previous while new issuance uses current only; every persisted RewardCode (including disabled, expired, or unredeemed) still depends on its primary key version, so the previous key must not retire while records depending on the old version exist.

@@ -26,6 +26,6 @@ export interface AdminStripeSettingsResource {
   get: () => Promise<StripeConfigurationSummary>
   save: (
     input: SaveStripeConfigurationInput,
-    options: { operatorReason: string; idempotencyKey?: string | undefined },
+    options?: { idempotencyKey?: string | undefined },
   ) => Promise<StripeConfigurationSummary>
 }

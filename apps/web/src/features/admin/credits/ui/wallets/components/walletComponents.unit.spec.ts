@@ -37,9 +37,9 @@ describe('Wallet Subcomponents', () => {
         activeTab: 'grant',
         refundSource: null,
         amountCredits: 100,
-        reason: 'VIP bonus',
+
         showErrors: false,
-        validation: { valid: true, amountError: '', reasonError: '' },
+        validation: { amountError: '', valid: true },
         commandPending: false,
         onCancel,
         onSubmit,
@@ -64,9 +64,9 @@ describe('Wallet Subcomponents', () => {
         activeTab: tab,
         refundSource: null,
         amountCredits: null,
-        reason: '',
+
         showErrors: false,
-        validation: { valid: true, amountError: '', reasonError: '' },
+        validation: { amountError: '', valid: true },
         commandPending: false,
       },
     })
@@ -87,10 +87,11 @@ describe('Wallet Subcomponents', () => {
       command_type: 'capture',
       amount_credits: 50,
       available_credits_after: 450,
+      reason: 'AI Task deduction',
       reserved_credits_after: 0,
       business_reference: { type: 'task', id: 'task-1' },
       created_at: '2026-09-20T12:00:00Z',
-      reason: 'AI Task deduction',
+
       charge: {
         amount_credits: 50,
         refunded_credits: 0,

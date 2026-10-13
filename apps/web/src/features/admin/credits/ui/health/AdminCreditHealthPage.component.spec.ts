@@ -162,7 +162,7 @@ describe('AdminCreditHealthPage', () => {
     )
   })
 
-  it('starts a manual check with an automatic audited reason and refreshes health', async () => {
+  it('starts a manual check without a request body and refreshes health', async () => {
     let health = makeCreditHealth()
     const state = createCreditHealthMswState({
       getHealth: () => health,
@@ -175,7 +175,7 @@ describe('AdminCreditHealthPage', () => {
 
     await user.click(await screen.findByRole('button', { name: '重新检查' }))
 
-    await waitFor(() => expect(state.startRequests).toEqual([{ reason: '管理员手动触发账本检查' }]))
+    await waitFor(() => expect(state.startRequests).toEqual(['']))
     expect(await screen.findByText('检查进行中 · Run #14')).toBeVisible()
     expect(screen.getByRole('button', { name: '检查中' })).toBeDisabled()
     expect(toastMocks.success).toHaveBeenCalledWith('账本检查已启动')
@@ -198,7 +198,7 @@ describe('AdminCreditHealthPage', () => {
                   id: 21,
                   trigger: 'manual',
                   requested_by: 7,
-                  reason: '人工复核账本',
+
                   finding_count: 3,
                   critical_count: 1,
                   isolated_wallet_count: 1,
@@ -218,7 +218,7 @@ describe('AdminCreditHealthPage', () => {
             id: Number(params.runId),
             trigger: 'manual',
             requested_by: 7,
-            reason: '人工复核账本',
+
             finding_count: 3,
             critical_count: 1,
             isolated_wallet_count: 1,
@@ -246,7 +246,6 @@ describe('AdminCreditHealthPage', () => {
     await user.click(within(runRow).getByRole('button'))
     expect(await within(dialog).findByText('技术 ID')).toBeVisible()
     expect(within(dialog).getByText('Run #21')).toBeVisible()
-    expect(within(dialog).getByText('人工复核账本')).toBeVisible()
     expect(within(dialog).getByText('provider timeout')).toBeVisible()
     expect(within(dialog).getByText('2')).toBeVisible()
 
@@ -259,7 +258,6 @@ describe('AdminCreditHealthPage', () => {
         '0 检查发现（含业务追踪） · 0 严重 Finding · 0 Wallet 已受限',
       ),
     ).toBeVisible()
-    expect(within(dialog).queryByText('人工复核账本')).not.toBeInTheDocument()
   })
 
   it('shows a global open finding queue and opens complete diagnostics without manual resolution actions', async () => {

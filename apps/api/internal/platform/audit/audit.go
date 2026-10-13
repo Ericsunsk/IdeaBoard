@@ -27,7 +27,7 @@ import (
 //   - read: a guarded non-mutating observation (never persisted; the
 //     durable store maps it to success via MapOutcome).
 //   - success: the guarded call succeeded.
-//   - denied: the call was refused (authZ, missing reason/idempotency key).
+//   - denied: the call was refused (authZ, missing idempotency key).
 //   - failure: the guarded call failed (handler 4xx/5xx outcomes).
 //
 // Do not add spellings without coordinating openapi.control.yaml
@@ -56,7 +56,6 @@ type RecordParams struct {
 	// impersonation). Empty for operations without an Auth target; when
 	// set it is persisted inside metadata (never in error text).
 	AuthUserID     string
-	Reason         string
 	Outcome        Outcome
 	ErrorMessage   string
 	RequestID      string
@@ -167,7 +166,6 @@ func insertControlAuditRow(ctx context.Context, q *dbsqlc.Queries, params Record
 		Capability:           params.Capability,
 		TargetType:           params.TargetType,
 		TargetID:             params.TargetID,
-		Reason:               params.Reason,
 		Outcome:              MapOutcome(params.Outcome),
 		ErrorMessage:         params.ErrorMessage,
 		RequestCorrelationID: params.RequestID,

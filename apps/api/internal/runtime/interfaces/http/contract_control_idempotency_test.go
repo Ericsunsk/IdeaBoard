@@ -7,11 +7,10 @@ import (
 	"ideaboard/api/internal/identity/principal"
 )
 
-// Control durable request identity unit tests (#891, no database):
+// Control durable request identity unit tests:
 // the canonical hash pins method + route template + the real target +
 // body, so the same key against a different target or body is a
-// different request (409), while the operator reason stays audit
-// metadata outside the identity.
+// different request (409).
 
 func testDurablePrincipal(t *testing.T) principal.Principal {
 	t.Helper()
@@ -50,18 +49,14 @@ func TestControlDurableHashPinsTarget(t *testing.T) {
 	}
 }
 
-func TestControlDurableHashIgnoresReason(t *testing.T) {
+func TestControlDurableHashTracksBody(t *testing.T) {
 	p := testDurablePrincipal(t)
 	record := &ControlAuditRecord{TargetType: "user", TargetID: "usr_aaa"}
-	// The operator reason (header or body note) is audit metadata, not
-	// request identity: the claim builder takes no reason input, so the
-	// same business request retried with a new note replays instead of
-	// conflicting. Different bodies still hash differently.
 	body := []byte(`{"expires_in_days":7}`)
 	first := controlDurableClaim(p, "users.ban", "hash-key-2", record, http.MethodPost, "/api/control/v1/users/:user_id/ban", body)
 	again := controlDurableClaim(p, "users.ban", "hash-key-2", record, http.MethodPost, "/api/control/v1/users/:user_id/ban", body)
 	if again.RequestHash != first.RequestHash {
-		t.Fatal("identical requests must hash identically (no reason input exists)")
+		t.Fatal("identical requests must hash identically ")
 	}
 	changed := controlDurableClaim(p, "users.ban", "hash-key-2", record, http.MethodPost, "/api/control/v1/users/:user_id/ban", []byte(`{"expires_in_days":8}`))
 	if changed.RequestHash == first.RequestHash {

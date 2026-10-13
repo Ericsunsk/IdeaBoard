@@ -62,17 +62,14 @@ describe('credits/server boundary idempotency/expiry/403', () => {
     const resource = createAdminRewardCodeResource()
 
     await expect(
-      resource.create(
-        {
-          displayName: '夏日灵感奖励',
-          code: 'IDEA2026',
-          creditAmount: 80,
-          maxRedemptions: 100,
-          expiresAt: '2026-12-31T00:00:00Z',
-          idempotencyKey: '   ',
-        },
-        { operatorReason: '运营活动补码' },
-      ),
+      resource.create({
+        displayName: '夏日灵感奖励',
+        code: 'IDEA2026',
+        creditAmount: 80,
+        maxRedemptions: 100,
+        expiresAt: '2026-12-31T00:00:00Z',
+        idempotencyKey: '   ',
+      }),
     ).rejects.toMatchObject({ code: 'control_idempotency_required' })
     expect(transport.request).not.toHaveBeenCalled()
   })
@@ -88,17 +85,14 @@ describe('credits/server boundary idempotency/expiry/403', () => {
     const resource = createAdminRewardCodeResource()
 
     await expect(
-      resource.create(
-        {
-          displayName: '夏日灵感奖励',
-          code: 'IDEA2026',
-          creditAmount: 80,
-          maxRedemptions: 100,
-          expiresAt: '2000-01-01T00:00:00Z',
-          idempotencyKey: 'reward-create:expired-1',
-        },
-        { operatorReason: '运营活动补码' },
-      ),
+      resource.create({
+        displayName: '夏日灵感奖励',
+        code: 'IDEA2026',
+        creditAmount: 80,
+        maxRedemptions: 100,
+        expiresAt: '2000-01-01T00:00:00Z',
+        idempotencyKey: 'reward-create:expired-1',
+      }),
     ).rejects.toMatchObject({ code: 'control_expired_input' })
     expect(transport.request).not.toHaveBeenCalled()
   })
@@ -108,17 +102,14 @@ describe('credits/server boundary idempotency/expiry/403', () => {
     const resource = createAdminRewardCodeResource()
 
     const failure = await resource
-      .create(
-        {
-          displayName: '夏日灵感奖励',
-          code: 'IDEA2026',
-          creditAmount: 80,
-          maxRedemptions: 100,
-          expiresAt: '2026-12-31T00:00:00Z',
-          idempotencyKey: 'reward-create:403-1',
-        },
-        { operatorReason: '运营活动补码' },
-      )
+      .create({
+        displayName: '夏日灵感奖励',
+        code: 'IDEA2026',
+        creditAmount: 80,
+        maxRedemptions: 100,
+        expiresAt: '2026-12-31T00:00:00Z',
+        idempotencyKey: 'reward-create:403-1',
+      })
       .then(
         () => {
           throw new Error('expected create to reject on 403')
@@ -143,17 +134,14 @@ describe('credits/server boundary idempotency/expiry/403', () => {
     )
     const resource = createAdminRewardCodeResource()
 
-    const created = await resource.create(
-      {
-        displayName: '夏日灵感奖励',
-        code: 'IDEA2026',
-        creditAmount: 80,
-        maxRedemptions: 100,
-        expiresAt: '2026-12-31T00:00:00Z',
-        idempotencyKey: 'reward-create:seam-1',
-      },
-      { operatorReason: '运营活动补码' },
-    )
+    const created = await resource.create({
+      displayName: '夏日灵感奖励',
+      code: 'IDEA2026',
+      creditAmount: 80,
+      maxRedemptions: 100,
+      expiresAt: '2026-12-31T00:00:00Z',
+      idempotencyKey: 'reward-create:seam-1',
+    })
 
     expect(created.plaintext).toBe('IDEA2026')
     expect(transport.request).toHaveBeenCalledTimes(1)
@@ -163,7 +151,6 @@ describe('credits/server boundary idempotency/expiry/403', () => {
     ]
     expect(config.headers).toMatchObject({
       'Idempotency-Key': 'reward-create:seam-1',
-      'X-Operator-Reason': '运营活动补码',
     })
     expect(JSON.parse(config.body ?? '{}')).not.toHaveProperty('idempotency_key')
   })

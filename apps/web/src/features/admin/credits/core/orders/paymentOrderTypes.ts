@@ -124,6 +124,6 @@ export type AdminPaymentOrderResource = {
   get: (publicOrderNumber: string, signal?: AbortSignal) => Promise<AdminPaymentOrderDetail>
   refund: (
     publicOrderNumber: string,
-    input: { ideaQuantity: number; idempotencyKey: string; operatorReason: string },
+    input: { ideaQuantity: number; idempotencyKey: string },
   ) => Promise<AdminPaymentOrderDetail>
 }

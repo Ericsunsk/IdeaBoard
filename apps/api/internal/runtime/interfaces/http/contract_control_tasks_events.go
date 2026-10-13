@@ -1,31 +1,8 @@
 package httpapi
 
-// Control task status announcements (admin cancel dead-channel fix).
-//
-// WHY A NEUTRAL PORT INSTEAD OF IMPORTING THE EVENT LAYER
-// -------------------------------------------------------
-// The Control Plane is an administration surface: capability auth, an
-// operator reason, a mandatory audit record, and a settlement call. It
-// has no business knowing that announcements travel over a message
-// bus, are logged in a per-workspace hot window, or are signed and
-// POSTed to subscriber URLs. Naming any of those here would couple the
-// control handlers to event infrastructure, and TestControlNeverTouchesEventLayer
-// exists precisely to keep that coupling from creeping back in.
-//
-// So the Control Plane declares WHAT happened in its own vocabulary (one
-// committed task status transition) and composition decides HOW it is
-// delivered. The dependency arrow points inward: composition (the sole
-// assembly root) knows both the port and the delivery machinery, and the
-// handlers know only the port. That is also what makes the seam testable
-// without a bus: a fake port records announcements, so "admin cancel
-// announced task.cancelled exactly once" is assertable with a counter.
-//
-// The port is deliberately WIDE ENOUGH to carry what the delivery side
-// genuinely consumes (the workspace public id, the operator reason, and
-// the acting operator's public id) rather than a task-id/status pair that
-// the adapter would then have to re-derive. Narrowing it past that would
-// lose context the downstream envelope validation requires, not remove
-// coupling.
+// Control task status announcements use a transport-neutral port.
+// Handlers report committed transitions with workspace identity, cancellation
+// cause, and acting operator. Composition owns delivery infrastructure.
 
 import (
 	"context"
@@ -45,7 +22,7 @@ import (
 //     without it rather than emitting an unscoped envelope).
 //   - TaskID is the task_ public id that transitioned.
 //   - Status is the workspacetasks lifecycle word ("cancelled").
-//   - Reason is the operator-supplied cancel reason recorded by the
+//   - Reason is the system cancellation cause recorded by the
 //     settlement. It rides the task.cancelled payload.
 //   - ActorUserID is the acting operator's usr_ opaque public id, empty
 //     when the operator could not be resolved (the adapter then records

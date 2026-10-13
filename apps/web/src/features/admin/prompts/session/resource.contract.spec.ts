@@ -29,13 +29,10 @@ describe('feature prompt resource', () => {
 
     const resource = createAdminPromptConfigResource()
     const prompts = await resource.fetchPrompts()
-    const saved = await resource.savePrompt(
-      {
-        slug: featureSlug,
-        prompt: 'Saved prompt',
-      },
-      { operatorReason: 'prompt review' },
-    )
+    const saved = await resource.savePrompt({
+      slug: featureSlug,
+      prompt: 'Saved prompt',
+    })
 
     expect(prompts[0]?.prompt).toBe('Initial prompt')
     expect(requests).toEqual([

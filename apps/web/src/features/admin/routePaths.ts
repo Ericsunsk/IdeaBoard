@@ -1,4 +1,4 @@
-export { ADMIN_ROOT_PATH, ADMIN_LOGIN_PATH, isPathUnderRoute } from '../../core/auth/routePolicy'
+export { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../core/auth/routePolicy'
 export const ADMIN_STATISTICS_PATH = '/admin/statistics'
 export const ADMIN_USERS_PATH = '/admin/users'
 export const ADMIN_CREDITS_PATH = '/admin/credits'

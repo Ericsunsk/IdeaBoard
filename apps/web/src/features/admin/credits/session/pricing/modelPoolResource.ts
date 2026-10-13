@@ -4,7 +4,7 @@ import {
 } from '../../../../../api/generated-query/control/control-billing/control-billing'
 import { requireContractData } from '../../../../../api/contractKernel'
 import { createAdminGatewayResource } from '../../../models/resource'
-import { buildRoutineControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
+import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 import { withControlCopy } from '../../../shared'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
@@ -25,17 +25,6 @@ const MODEL_POOL_CONTROL_MESSAGES = {
   404: '功能不存在',
 } as const
 
-// Admin Service Model Pool boundary (#849). Reads and atomic replaces go
-// through the Control Plane billing pool operations with the contract
-// envelope (`{data}`); the PUT is a routine config write (backend
-// ReasonOptional): no confirm dialog, the audit records an empty reason
-// (mirrored into the body `reason` field), while the header-only
-// Idempotency-Key stays required. Pages and dialogs consume this module,
-// never generated clients directly.
-//
-// The add-from-catalog list reuses the existing Model catalog resource
-// (no second catalog): entries are matched by catalog id. The lister is
-// injectable so tests pass a fake without MSW.
 type ModelPoolMutationOptions = ControlMutationOptions
 
 type ModelPoolReplaceInput = {
@@ -50,7 +39,7 @@ export interface AdminModelPoolResource {
   replace: (
     sku: string,
     input: ModelPoolReplaceInput,
-    options: ModelPoolMutationOptions,
+    options?: ModelPoolMutationOptions,
   ) => Promise<AdminModelPoolSaveResult>
   listCatalogModels: () => Promise<AdminPoolCatalogModel[]>
 }
@@ -85,11 +74,8 @@ export async function fetchAdminModelPool(sku: string): Promise<AdminModelPool> 
 export async function replaceAdminModelPool(
   sku: string,
   input: ModelPoolReplaceInput,
-  options: ModelPoolMutationOptions,
+  options?: ModelPoolMutationOptions,
 ): Promise<AdminModelPoolSaveResult> {
-  // Routine config write (backend ReasonOptional): the reason may be empty
-  // (audit records it as-is) while Idempotency-Key stays required.
-  const operatorReason = options.operatorReason.trim()
   try {
     const body = await replaceControlCatalogModelPool(
       sku,
@@ -100,10 +86,9 @@ export async function replaceAdminModelPool(
           enabled: entry.enabled,
           resolutions: [...entry.resolutions],
         })),
-        reason: operatorReason,
       },
       {
-        headers: buildRoutineControlMutationHeaders(options),
+        headers: buildControlMutationHeaders(options),
       },
     )
     const data = requireContractData<AdminModelPoolSaveWire>(body, '保存模型池失败')

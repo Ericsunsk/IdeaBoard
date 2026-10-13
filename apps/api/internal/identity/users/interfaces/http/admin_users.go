@@ -1,8 +1,6 @@
 package http
 
 import (
-	"strings"
-
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/response"
@@ -86,7 +84,6 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 	}
 
 	outcome, err := commands.Ban(c.Request.Context(), actor, publicID, ports.IdentityAdminBanInput{
-		Reason:        strings.TrimSpace(req.Reason),
 		ExpiresInDays: req.ExpiresInDays,
 	})
 	if err != nil {

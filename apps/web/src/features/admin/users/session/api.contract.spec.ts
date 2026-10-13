@@ -3,28 +3,24 @@ import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import {
   banAdminUser,
   deleteAdminUser,
-  impersonateAdminUser,
   revokeAdminUserSessions,
   unbanAdminUser,
   updateAdminUserRole,
 } from './api'
 
-// Control client boundary contract (issue 808): every users mutation
-// hits /api/control/v1 with a header-only Idempotency-Key and an operator
-// reason, and speaks the contract envelope. Transport itself is owned by
-// the generated control client (controlMutator prefix); this spec pins
-// the adapter half: headers, bodies, and control error-code branches.
+// User mutations use Control routes, a header-only Idempotency-Key and
+// contract envelopes. Generated clients own transport; adapters own request
+// headers, bodies and error-code mapping.
 describe('admin users control api boundary', () => {
   const userId = 'usr_abc123'
 
-  it('sends ban with reason body plus idempotency and operator headers', async () => {
+  it('sends ban duration with idempotency headers', async () => {
     let seen: { headers: Record<string, string>; body: unknown } | undefined
     useMswHandlers(
       http.post('/api/control/v1/users/:userId/ban', async ({ request }) => {
         seen = {
           headers: {
             idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
-            operatorReason: request.headers.get('X-Operator-Reason') ?? '',
           },
           body: await request.json(),
         }
@@ -34,18 +30,17 @@ describe('admin users control api boundary', () => {
 
     await banAdminUser({
       publicId: userId,
-      reason: 'spam wave',
+
       expires_in_days: 7,
-      operatorReason: 'spam wave',
+
       idempotencyKey: 'control-ui:test-ban',
     })
 
-    expect(seen?.body).toEqual({ reason: 'spam wave', expires_in_days: 7 })
+    expect(seen?.body).toEqual({ expires_in_days: 7 })
     expect(seen?.headers.idempotencyKey).toBe('control-ui:test-ban')
-    expect(seen?.headers.operatorReason).toBe('spam wave')
   })
 
-  it('mints idempotency keys per attempt for reason-only mutations', async () => {
+  it('mints idempotency keys per attempt for user lifecycle mutations', async () => {
     const keys: Array<string | null> = []
     useMswHandlers(
       http.post('/api/control/v1/users/:userId/unban', ({ request }) => {
@@ -54,8 +49,8 @@ describe('admin users control api boundary', () => {
       }),
     )
 
-    await unbanAdminUser(userId, { operatorReason: 'appeal accepted' })
-    await unbanAdminUser(userId, { operatorReason: 'appeal accepted' })
+    await unbanAdminUser(userId)
+    await unbanAdminUser(userId)
 
     expect(keys).toHaveLength(2)
     expect(keys[0]).toMatch(/^control:users\.unban:/)
@@ -66,7 +61,7 @@ describe('admin users control api boundary', () => {
     useMswHandlers(
       http.post('/api/control/v1/users/:userId/unban', () =>
         HttpResponse.json(
-          { error: { code: 'control_reason_required', message: 'no reason', request_id: 'r' } },
+          { error: { code: 'control_not_found', message: 'missing', request_id: 'r' } },
           { status: 400 },
         ),
       ),
@@ -78,24 +73,8 @@ describe('admin users control api boundary', () => {
       ),
     )
 
-    await expect(unbanAdminUser(userId, { operatorReason: 'x' })).rejects.toThrow(
-      '需要填写操作原因',
-    )
-    await expect(deleteAdminUser(userId, { operatorReason: 'x' })).rejects.toThrow(
-      '操作已提交，请勿重复操作',
-    )
-  })
-
-  it('refuses to send mutations without an operator reason', async () => {
-    await expect(
-      updateAdminUserRole({ publicId: userId, role: 'admin', operatorReason: '   ' }),
-    ).rejects.toThrow('需要填写操作原因')
-    await expect(revokeAdminUserSessions(userId, { operatorReason: '' })).rejects.toThrow(
-      '需要填写操作原因',
-    )
-    await expect(impersonateAdminUser(userId, { operatorReason: '' })).rejects.toThrow(
-      '需要填写操作原因',
-    )
+    await expect(unbanAdminUser(userId)).rejects.toThrow('用户不存在')
+    await expect(deleteAdminUser(userId)).rejects.toThrow('操作已提交，请勿重复操作')
   })
 
   it('sends role updates and session revokes through control', async () => {
@@ -111,8 +90,8 @@ describe('admin users control api boundary', () => {
       }),
     )
 
-    await updateAdminUserRole({ publicId: userId, role: 'admin', operatorReason: 'promotion' })
-    await revokeAdminUserSessions(userId, { operatorReason: 'compromise' })
+    await updateAdminUserRole({ publicId: userId, role: 'admin' })
+    await revokeAdminUserSessions(userId)
 
     expect(calls).toHaveLength(2)
     expect(calls[0]).toMatchObject({ method: 'PUT', body: { role: 'admin' } })

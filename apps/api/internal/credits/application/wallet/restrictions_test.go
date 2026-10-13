@@ -83,11 +83,14 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 		Type:          "risk_control",
 		Source:        "identity_risk",
 		RelatedObject: domain.BusinessReference{Type: "review", ID: "review-91"},
-		Reason:        "manual risk review",
 		Actor:         domain.Actor{Type: domain.ActorAdmin, ID: "7"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet(independent) error = %v", err)
+	}
+	var adminReason string
+	if err := pool.QueryRow(ctx, `SELECT reason FROM credit_wallet_restrictions WHERE restriction_id = $1::uuid`, independent.RestrictionID).Scan(&adminReason); err != nil || adminReason != "" {
+		t.Fatalf("Admin restriction reason = %q, %v", adminReason, err)
 	}
 	if independent.RestrictionID == restrictionID || independent.Replayed {
 		t.Fatalf("independent restriction = %+v, first ID=%s", independent, restrictionID)
@@ -158,7 +161,6 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 
 	if _, err := service.ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
 		RestrictionID: independent.RestrictionID,
-		Reason:        "review completed",
 		Actor:         domain.Actor{Type: domain.ActorAdmin, ID: "7"},
 	}); err != nil {
 		t.Fatalf("ReleaseWalletRestriction(independent) error = %v", err)

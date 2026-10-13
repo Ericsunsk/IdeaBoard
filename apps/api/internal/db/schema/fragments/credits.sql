@@ -31,7 +31,7 @@ CREATE TABLE credit_wallet_restrictions (
   CONSTRAINT ck_credit_wallet_restrictions_related_object
     CHECK (btrim(related_object_type) <> '' AND btrim(related_object_id) <> ''),
   CONSTRAINT ck_credit_wallet_restrictions_reason
-    CHECK (length(btrim(reason)) BETWEEN 1 AND 1000),
+    CHECK (created_by_actor_type = 'admin' OR length(btrim(reason)) BETWEEN 1 AND 1000),
   CONSTRAINT ck_credit_wallet_restrictions_created_actor
     CHECK (
       created_by_actor_type IN ('admin', 'system', 'service')
@@ -46,7 +46,7 @@ CREATE TABLE credit_wallet_restrictions (
         AND released_at >= created_at
         AND released_by_actor_type IN ('admin', 'system', 'service')
         AND btrim(released_by_actor_id) <> ''
-        AND length(btrim(release_reason)) BETWEEN 1 AND 1000
+        AND (released_by_actor_type = 'admin' OR length(btrim(release_reason)) BETWEEN 1 AND 1000)
       )
     )
 );
@@ -122,7 +122,7 @@ CREATE TABLE credit_transactions (
   CONSTRAINT ck_credit_transactions_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ck_credit_transactions_actor CHECK (btrim(actor_type) <> '' AND btrim(actor_id) <> ''),
   CONSTRAINT ck_credit_transactions_source CHECK (btrim(source) <> ''),
-  CONSTRAINT ck_credit_transactions_reason CHECK (btrim(reason) <> ''),
+  CONSTRAINT ck_credit_transactions_reason CHECK (actor_type = 'admin' OR btrim(reason) <> ''),
   CONSTRAINT ck_credit_transactions_business_reference CHECK (btrim(business_reference_type) <> '' AND btrim(business_reference_id) <> ''),
   CONSTRAINT ck_credit_transactions_command_amount_positive CHECK (command_amount > 0),
   CONSTRAINT ck_credit_transactions_posting_count CHECK (posting_count >= 2),
@@ -211,7 +211,6 @@ CREATE TABLE credit_reconciliation_runs (
   status VARCHAR(16) NOT NULL DEFAULT 'queued',
   trigger_type VARCHAR(16) NOT NULL,
   requested_by BIGINT,
-  reason VARCHAR(1000),
   scheduled_for TIMESTAMPTZ(3),
   stale_hold_after INTERVAL NOT NULL DEFAULT INTERVAL '24 hours' CHECK (stale_hold_after > INTERVAL '0'),
   finding_count BIGINT NOT NULL DEFAULT 0 CHECK (finding_count >= 0),
@@ -228,16 +227,12 @@ CREATE TABLE credit_reconciliation_runs (
       trigger_type = 'manual'
       AND requested_by IS NOT NULL
       AND requested_by > 0
-      AND reason IS NOT NULL
-      AND reason = btrim(reason, E' \t\n\r\f')
-      AND char_length(reason) BETWEEN 1 AND 1000
       AND scheduled_for IS NULL
     )
     OR
     (
       trigger_type = 'scheduled'
       AND requested_by IS NULL
-      AND reason IS NULL
       AND scheduled_for IS NOT NULL
     )
   ),
@@ -325,13 +320,16 @@ BEGIN
   p_reason := btrim(p_reason);
   p_actor_type := btrim(p_actor_type);
   p_actor_id := btrim(p_actor_id);
+  IF p_actor_type = 'admin' THEN
+    p_reason := '';
+  END IF;
 
   IF p_user_id <= 0
      OR p_restriction_type = '' OR length(p_restriction_type) > 64
      OR p_source = '' OR length(p_source) > 64
      OR p_related_object_type = '' OR length(p_related_object_type) > 64
      OR p_related_object_id = '' OR length(p_related_object_id) > 160
-     OR p_reason = '' OR length(p_reason) > 1000
+     OR (p_actor_type <> 'admin' AND p_reason = '') OR length(p_reason) > 1000
      OR p_actor_type NOT IN ('admin', 'system', 'service')
      OR p_actor_id = '' OR length(p_actor_id) > 128 THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit wallet restriction';
@@ -405,12 +403,15 @@ BEGIN
   p_restriction_id := btrim(p_restriction_id);
   p_actor_type := btrim(p_actor_type);
   p_actor_id := btrim(p_actor_id);
+  IF p_actor_type = 'admin' THEN
+    p_reason := '';
+  END IF;
   p_reason := btrim(p_reason);
 
   IF p_restriction_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
      OR p_actor_type NOT IN ('admin', 'system', 'service')
      OR p_actor_id = '' OR length(p_actor_id) > 128
-     OR p_reason = '' OR length(p_reason) > 1000 THEN
+     OR (p_actor_type <> 'admin' AND p_reason = '') OR length(p_reason) > 1000 THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit wallet restriction release';
   END IF;
 
@@ -469,10 +470,13 @@ BEGIN
   p_command_type := btrim(p_command_type); p_related_transaction_id := btrim(COALESCE(p_related_transaction_id, ''));
   p_idempotency_key := btrim(p_idempotency_key); p_actor_type := btrim(p_actor_type); p_actor_id := btrim(p_actor_id);
   p_source := btrim(p_source); p_reason := btrim(p_reason); p_business_reference_type := btrim(p_business_reference_type);
+  IF p_actor_type = 'admin' THEN
+    p_reason := '';
+  END IF;
   p_business_reference_id := btrim(p_business_reference_id);
   IF p_user_id <= 0 OR p_command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction')
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160 OR p_actor_type NOT IN ('admin', 'system', 'service', 'user')
-     OR p_actor_id = '' OR length(p_actor_id) > 128 OR p_source = '' OR length(p_source) > 64 OR p_reason = ''
+     OR p_actor_id = '' OR length(p_actor_id) > 128 OR p_source = '' OR length(p_source) > 64 OR (p_actor_type <> 'admin' AND p_reason = '')
      OR p_business_reference_type = '' OR length(p_business_reference_type) > 64
      OR p_business_reference_id = '' OR length(p_business_reference_id) > 160
      OR (p_command_type IN ('deduction', 'correction') AND p_actor_type <> 'admin')
@@ -649,7 +653,6 @@ REVOKE ALL ON FUNCTION execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEX
 CREATE FUNCTION start_credit_reconciliation(
   p_trigger_type TEXT,
   p_requested_by BIGINT,
-  p_reason TEXT,
   p_scheduled_for TIMESTAMPTZ,
   p_only_if_overdue BOOLEAN
 )
@@ -659,14 +662,12 @@ DECLARE
   v_run_status VARCHAR(16);
 BEGIN
   p_trigger_type := btrim(p_trigger_type);
-  p_reason := NULLIF(btrim(p_reason, E' \t\n\r\f'), '');
   IF p_trigger_type IS NULL
      OR p_only_if_overdue IS NULL
      OR (
        p_trigger_type = 'manual'
        AND (
          p_requested_by IS NULL OR p_requested_by <= 0
-         OR p_reason IS NULL OR char_length(p_reason) > 1000
          OR p_scheduled_for IS NOT NULL
          OR p_only_if_overdue
        )
@@ -675,7 +676,6 @@ BEGIN
        p_trigger_type = 'scheduled'
        AND (
          p_requested_by IS NOT NULL
-         OR p_reason IS NOT NULL
          OR p_scheduled_for IS NULL
        )
      )
@@ -729,13 +729,11 @@ BEGIN
   INSERT INTO credit_reconciliation_runs (
     trigger_type,
     requested_by,
-    reason,
     scheduled_for
   )
   VALUES (
     p_trigger_type,
     p_requested_by,
-    p_reason,
     p_scheduled_for
   )
   RETURNING id INTO v_run_id;
@@ -1245,7 +1243,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 
-REVOKE ALL ON FUNCTION start_credit_reconciliation(TEXT, BIGINT, TEXT, TIMESTAMPTZ, BOOLEAN) FROM PUBLIC;
+REVOKE ALL ON FUNCTION start_credit_reconciliation(TEXT, BIGINT, TIMESTAMPTZ, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fail_credit_reconciliation(BIGINT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION execute_credit_reconciliation(BIGINT) FROM PUBLIC;
 

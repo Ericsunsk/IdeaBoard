@@ -1,17 +1,16 @@
 package httpapi
 
-// Control operation policy parity gate (issue #909).
+// Control operation policy parity gate.
 //
 // Compares the runtime guard policy (capability + Mutation/Detached in
 // contract_control_routes.go) against the spec policy (x-capability,
-// x-audit reason/outcome, Idempotency-Key/OperatorReason params in
+// x-audit outcome, Idempotency-Key params in
 // openapi.control.yaml). Mail test is the fixed reference: it stays a
 // detached mutation with header-only Idempotency-Key and audited
-// success outcome on both sides (routine probe, so the operator reason
-// is optional on both sides), and the runtime must stay detached (no
+// success outcome on both sides, and the runtime must stay detached (no
 // guard-owned DB transaction wraps the external Auth HTTP probe).
 // Detached mutations (mail test/update/delete, Stripe
-// config update) run the M1 durable winner election through short
+// config update) run durable winner election through short
 // independent transactions, so cross-process replay holds without a
 // long guard transaction. create_refund deliberately stays atomic:
 // its reservation/settlement already commit in their own transactions
@@ -24,8 +23,7 @@ package httpapi
 //   - testControlStorageProfile: storage connectivity probe.
 //   - testControlSearchProvider: search provider probe.
 //   - uploadControlBrandingLogo: multipart upload; the guard cannot
-//     buffer bodies, so reason/key/replay are enforced in-handler.
-// Mail test is deliberately NOT an exception after #909.
+//     buffer bodies, so key/replay are enforced in-handler.
 
 import (
 	"fmt"
@@ -42,32 +40,29 @@ type specPolicy struct {
 	path        string
 	capability  string
 	operator    bool
-	reason      bool
 	outcome     string
 	idempotency bool
-	reasonParam bool
 	hasConflict bool
 }
 
 type runtimePolicy struct {
-	operation      string
-	method         string
-	path           string
-	capability     string
-	mutation       bool
-	reasonOptional bool
-	detached       bool
-	viaProxy       bool
-	viaGuard       bool
+	operation  string
+	method     string
+	path       string
+	capability string
+	mutation   bool
+	detached   bool
+	viaProxy   bool
+	viaGuard   bool
 }
 
 // policyParityExceptions documents spec-mutation vs runtime-read drift
-// that #909 intentionally leaves in place. Keys are spec operationIds.
+// for POST read-guard operations. Keys are spec operationIds.
 var policyParityExceptions = map[string]string{
 	"testControlAIGatewayConnection": "gateway reachability probe stays a POST read-guard (no guard tx across probe)",
 	"testControlStorageProfile":      "storage connectivity probe stays a POST read-guard (no guard tx across probe)",
 	"testControlSearchProvider":      "search provider probe stays a POST read-guard (no guard tx across probe)",
-	"uploadControlBrandingLogo":      "multipart upload stays a POST read-guard with in-handler reason/key/replay (guard cannot buffer multipart)",
+	"uploadControlBrandingLogo":      "multipart upload stays a POST read-guard with in-handler key/replay (guard cannot buffer multipart)",
 }
 
 func loadSpecPolicies(t *testing.T) map[string]specPolicy {
@@ -134,9 +129,6 @@ func loadSpecPolicies(t *testing.T) map[string]specPolicy {
 		if strings.HasPrefix(trimmed, "x-capability:") {
 			current.capability = strings.TrimSpace(strings.TrimPrefix(trimmed, "x-capability:"))
 		}
-		if inAudit && trimmed == "reason: true" {
-			current.reason = true
-		}
 		if inAudit && trimmed == "operator: true" {
 			current.operator = true
 		}
@@ -145,9 +137,6 @@ func loadSpecPolicies(t *testing.T) map[string]specPolicy {
 		}
 		if inParameters && strings.Contains(trimmed, "#/components/parameters/IdempotencyKey") {
 			current.idempotency = true
-		}
-		if inParameters && strings.Contains(trimmed, "#/components/parameters/OperatorReason") {
-			current.reasonParam = true
 		}
 		if strings.HasPrefix(trimmed, "'409':") {
 			current.hasConflict = true
@@ -176,18 +165,11 @@ func compareControlPolicyMetadata(sp specPolicy, rp runtimePolicy, exception boo
 		return fmt.Errorf("explicit exception must stay a runtime read-guard")
 	}
 	wantMutation := rp.mutation || exception
-	// Routine config mutations stay mutations (key + audited success
-	// outcome) with an exempt reason: only x-audit reason flips false.
-	wantReason := wantMutation && !rp.reasonOptional
-	if sp.reason != wantReason {
-		return fmt.Errorf("x-audit reason = %v, want %v", sp.reason, wantReason)
-	}
 	for _, field := range []struct {
 		name string
 		got  bool
 	}{
 		{"IdempotencyKey parameter", sp.idempotency},
-		{"OperatorReason parameter", sp.reasonParam},
 	} {
 		if field.got != wantMutation {
 			return fmt.Errorf("%s = %v, want %v", field.name, field.got, wantMutation)
@@ -205,16 +187,14 @@ func compareControlPolicyMetadata(sp specPolicy, rp runtimePolicy, exception boo
 
 func TestControlPolicyMetadataRejectsIndividualFieldDrift(t *testing.T) {
 	validMutation := specPolicy{
-		operator: true, reason: true, idempotency: true, reasonParam: true, outcome: "success",
+		operator: true, idempotency: true, outcome: "success",
 	}
 	cases := []struct {
 		name   string
 		change func(*specPolicy)
 	}{
 		{"x-audit operator", func(p *specPolicy) { p.operator = false }},
-		{"x-audit reason", func(p *specPolicy) { p.reason = false }},
 		{"IdempotencyKey parameter", func(p *specPolicy) { p.idempotency = false }},
-		{"OperatorReason parameter", func(p *specPolicy) { p.reasonParam = false }},
 		{"x-audit outcome", func(p *specPolicy) { p.outcome = "" }},
 	}
 	for _, tc := range cases {
@@ -231,20 +211,6 @@ func TestControlPolicyMetadataRejectsIndividualFieldDrift(t *testing.T) {
 	}
 	if err := compareControlPolicyMetadata(validMutation, runtimePolicy{mutation: true}, false); err != nil {
 		t.Fatalf("valid mutation must pass: %v", err)
-	}
-	optionalMutation := specPolicy{
-		operator: true, reason: false, idempotency: true, reasonParam: true, outcome: "success",
-	}
-	if err := compareControlPolicyMetadata(optionalMutation, runtimePolicy{mutation: true, reasonOptional: true}, false); err != nil {
-		t.Fatalf("valid reason-optional mutation must pass: %v", err)
-	}
-	if err := compareControlPolicyMetadata(optionalMutation, runtimePolicy{mutation: true}, false); err == nil ||
-		!strings.Contains(err.Error(), "x-audit reason") {
-		t.Fatalf("optional spec against required runtime must fail on reason, got %v", err)
-	}
-	if err := compareControlPolicyMetadata(validMutation, runtimePolicy{mutation: true, reasonOptional: true}, false); err == nil ||
-		!strings.Contains(err.Error(), "x-audit reason") {
-		t.Fatalf("required spec against optional runtime must fail on reason, got %v", err)
 	}
 	if err := compareControlPolicyMetadata(validMutation, runtimePolicy{}, true); err != nil {
 		t.Fatalf("valid explicit exception must pass: %v", err)
@@ -310,15 +276,14 @@ func loadRuntimePolicies(t *testing.T) map[string]runtimePolicy {
 		viaProxy := strings.Contains(window[:400], "controlProxy(") || strings.Contains(window[:400], "controlProxyRaw(")
 		viaGuard := strings.Contains(window[:400], ".guard(")
 		p := runtimePolicy{
-			operation:      op,
-			method:         method,
-			path:           path,
-			capability:     "control:" + strings.ToLower(capShort),
-			mutation:       strings.Contains(routeLit, "Mutation: true"),
-			reasonOptional: strings.Contains(routeLit, "ReasonOptional: true"),
-			detached:       strings.Contains(routeLit, "Detached: true"),
-			viaProxy:       viaProxy,
-			viaGuard:       viaGuard,
+			operation:  op,
+			method:     method,
+			path:       path,
+			capability: "control:" + strings.ToLower(capShort),
+			mutation:   strings.Contains(routeLit, "Mutation: true"),
+			detached:   strings.Contains(routeLit, "Detached: true"),
+			viaProxy:   viaProxy,
+			viaGuard:   viaGuard,
 		}
 		// Capability short names map: Users->users, Workspaces->workspaces,
 		// Billing->billing, Credits->credits, Payments->payments,
@@ -335,7 +300,7 @@ func TestControlOperationPolicyParity(t *testing.T) {
 	spec := loadSpecPolicies(t)
 	runtime := loadRuntimePolicies(t)
 
-	t.Run("mail test stays detached with optional reason on both sides", func(t *testing.T) {
+	t.Run("mail test stays detached on both sides", func(t *testing.T) {
 		sp, ok := spec["testControlMailSetting"]
 		if !ok {
 			t.Fatal("spec missing testControlMailSetting")
@@ -343,14 +308,11 @@ func TestControlOperationPolicyParity(t *testing.T) {
 		if sp.capability != "control:platform" {
 			t.Fatalf("spec capability = %q, want control:platform", sp.capability)
 		}
-		if sp.reason {
-			t.Fatal("spec mail test must have x-audit reason: false (routine probe, reason optional)")
-		}
 		if sp.outcome != "success" {
 			t.Fatalf("spec outcome = %q, want success", sp.outcome)
 		}
-		if !sp.idempotency || !sp.reasonParam {
-			t.Fatalf("spec mail test must carry IdempotencyKey + OperatorReason params (idempotency=%v reasonParam=%v)", sp.idempotency, sp.reasonParam)
+		if !sp.idempotency {
+			t.Fatal("spec mail test must carry IdempotencyKey")
 		}
 		if !sp.hasConflict {
 			t.Fatal("spec mail test must document 409 IdempotencyConflict")
@@ -363,10 +325,7 @@ func TestControlOperationPolicyParity(t *testing.T) {
 			t.Fatalf("runtime capability = %q, want control:platform", rp.capability)
 		}
 		if !rp.mutation {
-			t.Fatal("runtime mail test must be Mutation:true (key enforced by the guard, reason optional)")
-		}
-		if !rp.reasonOptional {
-			t.Fatal("runtime mail test must be ReasonOptional:true (routine probe)")
+			t.Fatal("runtime mail test must be Mutation:true (key enforced by the guard)")
 		}
 		if !rp.detached {
 			t.Fatal("runtime mail test must be Detached:true (external Auth probe never runs inside the guard DB transaction)")

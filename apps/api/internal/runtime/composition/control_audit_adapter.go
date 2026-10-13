@@ -1,78 +1,9 @@
 package composition
 
-// Control Plane durable audit adapter (step 1: durable but non-atomic).
-//
-// This is the ONLY place where the Control Plane's neutral
-// httpapi.ControlAuditSink meets the durable control_audit_records store.
-// The Control Plane declares WHAT happened (one guarded call in its own
-// public-id vocabulary); this adapter decides HOW it is persisted, and
-// only this file may know that persistence means "resolve the operator's
-// public usr_ id to its internal numeric id, then INSERT into
-// control_audit_records".
-//
-// WHY THE ADAPTER LIVES IN COMPOSITION
-// Same reason as control_task_event_adapter.go: the control handlers must
-// stay free of durable infrastructure entirely, which is what
-// TestControlNeverTouchesEventLayer guards (the Control Plane must never
-// reach for the event layer directly; by the same token it must never
-// reach for the audit store directly). The sink keeps the dependency
-// arrow pointing inward (composition -> control handlers) instead of
-// outward (control handlers -> audit store).
-//
-// STEP 1 SCOPE (durable but NON-atomic)
-// This adapter dual-writes AFTER the guarded business operation commits,
-// in its own detached transaction owned by audit.Store. It is durable
-// (every emitted record eventually lands a row) but NOT atomic: a crash
-// between the business commit and this write leaves the business fact
-// without its audit row, and a business rollback after emission leaves
-// an audit row without its business fact. Closing that gap (passing the
-// business transaction through every control handler) is explicitly
-// step 2 and is NOT attempted here.
-//
-// PLACEHOLDER CONVENTIONS (architecture decision)
-// The durable table enforces two CHECK constraints the in-memory record
-// does not:
-//   - chk_control_audit_records_target requires non-empty target_type
-//     AND target_id, but most control routes carry no domain target
-//     (their controlRoute.Target is nil), and every fail-fast path
-//     (missing reason/idempotency key, oversized body, operator-grant
-//     denial in the middleware) emits BEFORE target extraction, so the
-//     target is unconditionally empty there.
-//   - chk_control_audit_records_capability requires capability LIKE
-//     'control:%', but the middleware operator-grant denial emits with
-//     an empty capability because the family label is only known inside
-//     the per-route guard, which the request never reaches.
-//
-// When the record carries no target, this adapter persists
-// target_type='route' and target_id=<route template> (falling back to
-// the operation name, then to 'unknown' when even the route is empty).
-// A route placeholder is deliberately conservative: it is the only
-// locator available at EVERY emission point, it keeps the row searchable
-// by the operator-facing route template, and it never fabricates a
-// domain identity (user/task/order/...) the call never named. Audit data
-// must stay conservative rather than invent semantics.
-//
-// When the record carries no usable capability, this adapter persists
-// capability='control:unknown'. The empty capability only occurs for
-// the pre-family grant denial, where the family genuinely is unknown;
-// claiming 'control:platform' (or any real family) would misattribute
-// the denial, while 'control:unknown' preserves the unknown-family fact
-// and still satisfies the CHECK constraint.
-//
-// OPERATOR MAPPING
-// ControlAuditRecord.OperatorID is public-only (usr_... for human
-// sessions, a service subject string otherwise) while RecordParams
-// needs the internal numeric FK. Each audit performs exactly one
-// public->internal lookup through the SAME request-scoped
-// V1UserDirectory the control handlers use (no cache, no new global
-// state). Service subjects without a users row resolve to nothing and
-// degrade to the slog trail only, matching audit.Store's skip for
-// non-positive operator ids.
-//
-// FAILURE MODE
-// The audit write is an observer, never a participant: persistence
-// failures are slog.Warn-logged and swallowed so the guarded business
-// operation can never fail because its audit trail did.
+// Control audit adapters resolve public operator IDs through the request-scoped
+// user directory and persist guarded calls through audit.Store. Records without
+// a domain target use the route template; unknown capabilities use control:unknown.
+// Best-effort writes log failures; transaction-bound writes propagate errors.
 
 import (
 	"context"
@@ -138,7 +69,6 @@ func controlAuditRecordParams(record httpapi.ControlAuditRecord, operatorID int6
 		Capability:     controlAuditCapability(record),
 		TargetType:     targetType,
 		TargetID:       targetID,
-		Reason:         record.Reason,
 		Outcome:        record.Outcome,
 		RequestID:      record.RequestID,
 		IdempotencyKey: record.IdempotencyKey,

@@ -128,7 +128,7 @@ func TestVisionSlugIsReservedForSearch(t *testing.T) {
 
 func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
 	repoRoot := findWorkflowRepoRoot(t)
-	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "imageServices.ts")
+	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "core", "contracts", "imageServices.ts")
 	raw, err := os.ReadFile(frontendPath)
 	if err != nil {
 		t.Fatalf("read frontend workflow features: %v", err)
@@ -142,17 +142,13 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 	if err != nil {
 		t.Fatalf("read PublicAPI: %v", err)
 	}
-	// Post-#809 the legacy openapi.yaml (WorkflowFeatureSlug +
-	// CanonicalWorkflowFeatureSlug) is deleted; #847 renames WorkflowKind
-	// to Service in the Public contract. The Service enum is the canonical
-	// slug registry (backend registry includes the `generation` slug,
-	// matched 1:1 here).
+	// The Public API Service enum matches the workflow slug registry.
 	assertSameFeatureSlugs(t, "PublicAPI Service", backendSlugs, extractPublicServiceSlugs(t, string(publicAPIRaw)))
 
 	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
 	for label, relativePath := range map[string]string{
-		"frontend execution": "apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts",
-		"Admin registry":     "apps/web/src/features/admin/shared/lib/serviceAdminMeta.ts",
+		"frontend execution": "apps/web/src/features/canvas/core/execution/executionContract.ts",
+		"Admin registry":     "apps/web/src/features/admin/shared/core/serviceAdminMeta.ts",
 	} {
 		contractRaw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relativePath)))
 		if err != nil {
@@ -207,7 +203,7 @@ func findWorkflowRepoRoot(t *testing.T) string {
 	dir := filepath.Dir(filename)
 	for {
 		if fileExists(filepath.Join(dir, "apps", "api", "internal", "workflow", "features.go")) &&
-			fileExists(filepath.Join(dir, "apps", "web", "src", "shared", "domain", "imageServices.ts")) {
+			fileExists(filepath.Join(dir, "apps", "web", "src", "core", "contracts", "imageServices.ts")) {
 			return dir
 		}
 		parent := filepath.Dir(dir)

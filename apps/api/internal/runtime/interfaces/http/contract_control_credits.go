@@ -1,15 +1,9 @@
 package httpapi
 
-// Control credits family (issue #808): financial operations behind
-// control:credits.
-//
-// Mutations go through the credits.Commands seam ONLY (Grant, Deduct,
-// Correct, Refund) — never direct ledger writes. The header
-// Idempotency-Key doubles as the durable ledger idempotency key, so the
-// HTTP replay cache and the ledger fact agree. The operator is recorded
-// explicitly as Actor{admin, usr_...} with a control_* source, distinct
-// from legacy admin_* provenance. Legacy /api/admin/credits/* routes are
-// untouched.
+// Control financial operations delegate to credits.Commands (Grant, Deduct,
+// Correct, Refund), never direct ledger writes. The header Idempotency-Key is
+// also the durable ledger key. Metadata records the admin actor's public ID
+// and a control_* source.
 
 import (
 	"errors"
@@ -20,7 +14,6 @@ import (
 
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	creditsports "ideaboard/api/internal/credits/ports"
-	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -78,7 +71,7 @@ func newControlCreditResult(result creditsports.CommandResult, userID uuid.UUID,
 }
 
 // writeControlCreditError maps credit domain failures to contract codes.
-// Financial denials reuse the frozen #804 codes so frontend branches on
+// Financial denials reuse the frozen billing codes so frontend branches on
 // billing_wallet_restricted and idempotency_conflict uniformly.
 func writeControlCreditError(c *gin.Context, err error) {
 	switch {
@@ -109,7 +102,6 @@ func writeControlCreditError(c *gin.Context, err error) {
 type controlCreditAmountRequest struct {
 	UserID              string `json:"user_id"`
 	AmountCredits       int64  `json:"amount_credits"`
-	Reason              string `json:"reason"`
 	BusinessReferenceID string `json:"business_reference_id"`
 }
 
@@ -143,12 +135,10 @@ func (d *ContractControlDeps) resolveControlCreditUser(c *gin.Context, rawUserID
 // source provenance.
 func controlCreditMetadata(ctx controlContext, source, businessReferenceID string) creditsdomain.CommandMetadata {
 	_, operatorID := controlOperatorIdentity(ctx.Operator)
-	reason := strings.TrimSpace(ctx.Reason)
 	return creditsdomain.CommandMetadata{
 		IdempotencyKey: ctx.IdemKey,
 		Actor:          creditsdomain.Actor{Type: creditsdomain.ActorAdmin, ID: operatorID},
 		Source:         source,
-		Reason:         reason,
 		BusinessReference: creditsdomain.BusinessReference{
 			Type: "control_adjustment",
 			ID:   strings.TrimSpace(businessReferenceID),
@@ -158,26 +148,24 @@ func controlCreditMetadata(ctx controlContext, source, businessReferenceID strin
 
 // prepareControlCreditCommand decodes and validates the shared credit
 // mutation body (header-only idempotency key; body carries no key).
-func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context, ctx controlContext, allowLink bool) (userID int64, publicID uuid.UUID, displayName string, amount creditsdomain.CreditAmount, chargeID, originalID, businessRefID, reason string, ok bool) {
+func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context) (userID int64, publicID uuid.UUID, displayName string, amount creditsdomain.CreditAmount, chargeID, originalID, businessRefID string, ok bool) {
 	var req controlCreditLinkRequest
 	if err := contract.BindStrictJSON(c, &req); err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
-		return 0, uuid.Nil, "", 0, "", "", "", "", false
+		return 0, uuid.Nil, "", 0, "", "", "", false
 	}
-	_ = allowLink
 	userID, publicID, displayName, ok = d.resolveControlCreditUser(c, req.UserID)
 	if !ok {
-		return 0, uuid.Nil, "", 0, "", "", "", "", false
+		return 0, uuid.Nil, "", 0, "", "", "", false
 	}
 	parsed, err := creditsdomain.NewCreditAmount(req.AmountCredits)
 	if err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest10)
-		return 0, uuid.Nil, "", 0, "", "", "", "", false
+		return 0, uuid.Nil, "", 0, "", "", "", false
 	}
-	reason = controlReasonOr(ctx, req.Reason)
 	return userID, publicID, displayName, parsed,
 		strings.TrimSpace(req.ChargeTransactionID), strings.TrimSpace(req.OriginalTransactionID),
-		strings.TrimSpace(req.BusinessReferenceID), reason, true
+		strings.TrimSpace(req.BusinessReferenceID), true
 }
 
 func (d *ContractControlDeps) grantControlCredits(c *gin.Context, ctx controlContext) {
@@ -185,7 +173,7 @@ func (d *ContractControlDeps) grantControlCredits(c *gin.Context, ctx controlCon
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, _, _, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, false)
+	userID, publicID, displayName, amount, _, _, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
@@ -205,7 +193,7 @@ func (d *ContractControlDeps) deductControlCredits(c *gin.Context, ctx controlCo
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, _, _, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, false)
+	userID, publicID, displayName, amount, _, _, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
@@ -225,7 +213,7 @@ func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlCo
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, chargeID, _, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, true)
+	userID, publicID, displayName, amount, chargeID, _, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
@@ -249,7 +237,7 @@ func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlC
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, _, originalID, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, true)
+	userID, publicID, displayName, amount, _, originalID, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
@@ -387,24 +375,8 @@ func (d *ContractControlDeps) startControlReconciliation(c *gin.Context, ctx con
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
-	var req struct {
-		Reason string `json:"reason"`
-	}
-	if len(ctx.Body) > 0 {
-		if err := contract.DecodeStrict(ctx.Body, &req); err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
-			return
-		}
-	}
-	reason := controlReasonOr(ctx, req.Reason)
-	action, err := adminaction.New(ctx.Operator.UserID(), reason)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest14)
-		return
-	}
 	run, err := d.Reconciliation.StartReconciliation(c.Request.Context(), creditsports.StartManualReconciliationInput{
-		ActorID: action.ActorID(),
-		Reason:  action.Reason(),
+		ActorID: ctx.Operator.UserID(),
 	})
 	if err != nil {
 		writeControlCreditError(c, err)
@@ -438,12 +410,8 @@ func (d *ContractControlDeps) getControlReconciliationRun(c *gin.Context, _ cont
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
-	// FORMAL EXCEPTION to the opaque-id policy (parent #809 S4): :run_id
-	// is the internal credit_reconciliation_runs bigint (no public_id
-	// column; rec_ reserved in the kernel for the migration). Reconciliation
-	// runs are operator-only control reads with no public enumeration
-	// surface; cursor pagination (before_id) stays numeric by the same
-	// exception. Migrate both when the public_id column lands.
+	// Reconciliation runs use bigint IDs and numeric before_id cursors.
+	// They are operator-only records with no public enumeration surface.
 	runID, err := strconv.ParseInt(strings.TrimSpace(c.Param("run_id")), 10, 64)
 	if err != nil || runID <= 0 {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest15)

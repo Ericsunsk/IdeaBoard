@@ -15,15 +15,15 @@ const insertControlAuditRecord = `-- name: InsertControlAuditRecord :one
 
 INSERT INTO control_audit_records (
   public_id, operator_user_id, operation_type, capability,
-  target_type, target_id, reason, outcome, error_message,
+  target_type, target_id, outcome, error_message,
   request_correlation_id, idempotency_key, metadata
 )
 VALUES (
   $1, $2, $3,
   $4, $5, $6,
-  $7, $8, $9,
-  $10, $11,
-  $12
+  $7, $8,
+  $9, $10,
+  $11
 )
 RETURNING internal_id, public_id, created_at
 `
@@ -35,7 +35,6 @@ type InsertControlAuditRecordParams struct {
 	Capability           string `json:"capability"`
 	TargetType           string `json:"target_type"`
 	TargetID             string `json:"target_id"`
-	Reason               string `json:"reason"`
 	Outcome              string `json:"outcome"`
 	ErrorMessage         string `json:"error_message"`
 	RequestCorrelationID string `json:"request_correlation_id"`
@@ -60,7 +59,6 @@ func (q *Queries) InsertControlAuditRecord(ctx context.Context, arg InsertContro
 		arg.Capability,
 		arg.TargetType,
 		arg.TargetID,
-		arg.Reason,
 		arg.Outcome,
 		arg.ErrorMessage,
 		arg.RequestCorrelationID,

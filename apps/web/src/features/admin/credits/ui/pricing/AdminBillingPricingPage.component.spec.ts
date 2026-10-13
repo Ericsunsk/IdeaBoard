@@ -11,7 +11,6 @@ import {
 } from '../../session/pricing/testing'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('pricing review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 const routerMocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string>, path: '/admin/credits/pricing' },
@@ -31,7 +30,6 @@ vi.mock('vue-router', async (importOriginal) => {
 vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
     confirm: confirmMock,
-    readReason: readReasonMock,
   }),
 }))
 
@@ -47,8 +45,6 @@ describe('AdminBillingPricingPage', () => {
     routerMocks.replace.mockReset()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
-    readReasonMock.mockReset()
-    readReasonMock.mockReturnValue('pricing review')
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
@@ -154,7 +150,7 @@ describe('AdminBillingPricingPage', () => {
     expect(await screen.findByText('inpaint')).toBeVisible()
   })
 
-  it('publishes an explicit zero price from the card dialog with an operator reason', async () => {
+  it('publishes an explicit zero price from the card dialog with idempotency headers', async () => {
     let publishRequests = 0
     useMswHandlers(
       ...createBillingCatalogHandlers(createBillingCatalogMswState()),
@@ -163,7 +159,6 @@ describe('AdminBillingPricingPage', () => {
         expect(params.sku).toBe('ai-image:inpaint')
         await expect(request.json()).resolves.toEqual({
           prices: { '1k': 0 },
-          reason: 'pricing review',
         })
         return HttpResponse.json({
           data: {

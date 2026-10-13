@@ -6,7 +6,7 @@ import {
   updateControlBrandingSetting,
 } from '../../../../../api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '../../../../../api/contractKernel'
-import { buildRoutineControlMutationHeaders } from '../../../shared/index'
+import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminBrandingSettingsFeedback } from '../useSettingsFeedback'
 import {
   DEFAULT_SITE_BRANDING_SETTING,
@@ -22,15 +22,6 @@ import { useSettingsLifecycle } from '../useSettingsLifecycle'
 import { adminControlUnavailable } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'
 
-// Admin branding boundary (W2 transports). Reads and writes go through the
-// Control Plane with the contract envelope (`{data}`); every mutation
-// carries a header-only Idempotency-Key and emits a control audit record.
-// Branding is a routine config write (backend ReasonOptional), so saves skip
-// the confirm dialog and audit an empty reason. The deleted
-// `/api/admin/settings/branding` route is gone; this module is the
-// single transport. Direct logo upload has no control equivalent
-// (`POST /api/admin/upload` is deleted), so it fails closed with guidance:
-// operators paste a Logo URL instead.
 const ADMIN_BRANDING_QUERY_KEY = ['admin', 'settings', 'branding'] as const
 
 export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFeedback }) {
@@ -67,8 +58,6 @@ export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFe
   })
 
   async function saveSetting(): Promise<boolean> {
-    // Routine config write (backend ReasonOptional): save directly without
-    // the confirm dialog; the audit records an empty reason.
     return lifecycle.save()
   }
 
@@ -131,10 +120,7 @@ async function saveBrandingSetting(draft: BrandingSetting): Promise<BrandingSett
     const body = await updateControlBrandingSetting(
       { project_name: draft.project_name, logo_url: draft.logo_url },
       {
-        // Routine config write (backend ReasonOptional): no operator-reason
-        // header, the audit records an empty reason. Idempotency-Key stays
-        // required on both tiers.
-        headers: buildRoutineControlMutationHeaders(),
+        headers: buildControlMutationHeaders(),
       },
     )
     return requireContractData<BrandingSetting>(body, '保存项目品牌失败')

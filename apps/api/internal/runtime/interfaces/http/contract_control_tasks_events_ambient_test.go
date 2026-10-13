@@ -1,28 +1,9 @@
 package httpapi
 
-// Control cancel post-commit publication over the guard-owned (ambient)
-// transaction (#889).
-//
-// The defect these pin: on the ambient path the settlement joins the
-// guard's transaction (which commits later, together with the audit
-// row), but the cancelled transition was announced inside the handler —
-// before the guard committed. An audit failure or a commit failure
-// rolled the flip back AFTER both delivery channels had already
-// announced a cancellation that never happened.
-//
-// The contract proven here, over the real settlement legs
-// (PostgreSQL; skipped without API_TEST_DATABASE_DSN):
-//   - adapter level: Cancel on a registry carrier settles silently
-//     (nothing published, row still pre-commit outside); the
-//     announcement appears only after carrier commit PLUS the
-//     post-commit hooks run; a rollback without hooks stays silent;
-//     a terminal replay registers nothing and stays silent.
-//   - guard level (full HTTP through runAtomic): success publishes
-//     exactly once per channel after commit; audit failure and commit
-//     failure render 503, roll the flip back, and publish nothing; an
-//     idempotent replay publishes nothing new.
-// No second publisher is introduced: the same ControlTaskEventPort and
-// the same two channels carry every announcement.
+// Control cancellation integration tests verify post-commit publication.
+// Success publishes exactly once after the guard transaction commits;
+// rollback and idempotent replay publish nothing. Tests require
+// API_TEST_DATABASE_DSN.
 
 import (
 	"context"
@@ -118,7 +99,7 @@ func assertControlPortSilent(t *testing.T, events *recordingControlTaskEvents) {
 	}
 }
 
-func assertControlPortAnnouncedOnce(t *testing.T, env *controlCancelEnv, events *recordingControlTaskEvents, taskID, reason, operator string) {
+func assertControlPortAnnouncedOnce(t *testing.T, env *controlCancelEnv, events *recordingControlTaskEvents, taskID, operator string) {
 	t.Helper()
 	statuses, envelopes := events.snapshot()
 	if len(statuses) != 1 {
@@ -134,8 +115,8 @@ func assertControlPortAnnouncedOnce(t *testing.T, env *controlCancelEnv, events 
 	if published.TaskID != taskID || published.WorkspaceID != env.workspace {
 		t.Fatalf("announcement scope = %s/%s, want %s/%s", published.WorkspaceID, published.TaskID, env.workspace, taskID)
 	}
-	if published.Reason != reason {
-		t.Fatalf("announcement reason = %q, want %q", published.Reason, reason)
+	if published.Reason != "cancelled" {
+		t.Fatalf("announcement reason = %q, want %q", published.Reason, "cancelled")
 	}
 	if published.ActorUserID != operator {
 		t.Fatalf("announcement actor = %q, want %q", published.ActorUserID, operator)
@@ -157,7 +138,6 @@ func TestControlAdminCancelAmbientSettlesSilentlyUntilPostCommit(t *testing.T) {
 	env := openControlCancelEnv(t)
 	creditService := env.creditServiceFor(t)
 	const taskID = "task_amb_defer1"
-	const reason = "ambient operator cancel"
 	env.seedPaidTask(t, creditService, taskID)
 
 	operatorPublicID := uuid.New()
@@ -170,7 +150,7 @@ func TestControlAdminCancelAmbientSettlesSilentlyUntilPostCommit(t *testing.T) {
 	)
 
 	tx, carrier := beginAmbientCarrier(t, env.pool)
-	if err := adapter.CancelAdminTask(carrier, taskID, env.userID, reason); err != nil {
+	if err := adapter.CancelAdminTask(carrier, taskID, env.userID); err != nil {
 		_ = tx.Rollback(context.Background())
 		t.Fatalf("CancelAdminTask on carrier: %v", err)
 	}
@@ -185,7 +165,7 @@ func TestControlAdminCancelAmbientSettlesSilentlyUntilPostCommit(t *testing.T) {
 		t.Fatalf("commit ambient carrier: %v", err)
 	}
 	dbutil.RunAmbientPostCommit(carrier)
-	assertControlPortAnnouncedOnce(t, env, events, taskID, reason, operator)
+	assertControlPortAnnouncedOnce(t, env, events, taskID, operator)
 	if got := env.taskStatus(t, taskID); got != "cancelled" {
 		t.Fatalf("task status after carrier commit = %q, want cancelled", got)
 	}
@@ -205,7 +185,7 @@ func TestControlAdminCancelAmbientRollbackAnnouncesNothing(t *testing.T) {
 	adapter := env.adapter(&controlTxHolder{credits: creditService}, nil, events)
 
 	tx, carrier := beginAmbientCarrier(t, env.pool)
-	if err := adapter.CancelAdminTask(carrier, taskID, env.userID, "should roll back"); err != nil {
+	if err := adapter.CancelAdminTask(carrier, taskID, env.userID); err != nil {
 		_ = tx.Rollback(context.Background())
 		t.Fatalf("CancelAdminTask on carrier: %v", err)
 	}
@@ -232,7 +212,7 @@ func TestControlAdminCancelAmbientReplayAnnouncesNothing(t *testing.T) {
 	adapter := env.adapter(&controlTxHolder{credits: creditService}, nil, events)
 
 	tx, carrier := beginAmbientCarrier(t, env.pool)
-	if err := adapter.CancelAdminTask(carrier, taskID, env.userID, "first"); err != nil {
+	if err := adapter.CancelAdminTask(carrier, taskID, env.userID); err != nil {
 		_ = tx.Rollback(context.Background())
 		t.Fatalf("first CancelAdminTask: %v", err)
 	}
@@ -247,7 +227,7 @@ func TestControlAdminCancelAmbientReplayAnnouncesNothing(t *testing.T) {
 
 	// The re-cancel hits an already-terminal row on a fresh carrier.
 	tx2, carrier2 := beginAmbientCarrier(t, env.pool)
-	if err := adapter.CancelAdminTask(carrier2, taskID, env.userID, "replay"); err != nil {
+	if err := adapter.CancelAdminTask(carrier2, taskID, env.userID); err != nil {
 		_ = tx2.Rollback(context.Background())
 		t.Fatalf("replayed CancelAdminTask: %v", err)
 	}
@@ -278,12 +258,12 @@ func ambientGuardHarness(t *testing.T, env *controlCancelEnv, creditService *cre
 	})
 }
 
-func serveAmbientCancel(t *testing.T, h *controlHarness, taskID, key, reason string) (int, map[string]any) {
+func serveAmbientCancel(t *testing.T, h *controlHarness, taskID, key string) (int, map[string]any) {
 	t.Helper()
 	status, _, payload := h.serve(controlCall{
 		method: http.MethodPost, path: "/api/control/v1/tasks/" + taskID + "/cancel",
 		userID: controlOperatorID, role: "admin",
-		headers: controlMutationHeaders(key, reason),
+		headers: controlMutationHeaders(key),
 	})
 	return status, payload
 }
@@ -295,7 +275,6 @@ func TestControlGuardCancelAmbientSuccessPublishesAfterCommit(t *testing.T) {
 	env := openControlCancelEnv(t)
 	creditService := env.creditServiceFor(t)
 	const taskID = "task_amb_guard_ok1"
-	const reason = "ambient guard cancel"
 	env.seedPaidTask(t, creditService, taskID)
 
 	operatorPublicID := uuid.New()
@@ -305,10 +284,10 @@ func TestControlGuardCancelAmbientSuccessPublishesAfterCommit(t *testing.T) {
 	audit := &stubControlTxAudit{durable: true}
 	h := ambientGuardHarness(t, env, creditService, scope, audit, events, operatorPublicID)
 
-	if status, payload := serveAmbientCancel(t, h, taskID, "amb-ok-1", reason); status != http.StatusOK {
+	if status, payload := serveAmbientCancel(t, h, taskID, "amb-ok-1"); status != http.StatusOK {
 		t.Fatalf("cancel status = %d, want 200: %v", status, payload)
 	}
-	assertControlPortAnnouncedOnce(t, env, events, taskID, reason, operator)
+	assertControlPortAnnouncedOnce(t, env, events, taskID, operator)
 	if got := env.taskStatus(t, taskID); got != "cancelled" {
 		t.Fatalf("task status = %q, want cancelled (business and audit committed together)", got)
 	}
@@ -334,7 +313,7 @@ func TestControlGuardCancelAmbientAuditFailureDiscards(t *testing.T) {
 	audit := &stubControlTxAudit{durable: true, err: errControlAtomicDown}
 	h := ambientGuardHarness(t, env, creditService, scope, audit, events, uuid.New())
 
-	if status, _ := serveAmbientCancel(t, h, taskID, "amb-audit-1", "audit is down"); status != http.StatusServiceUnavailable {
+	if status, _ := serveAmbientCancel(t, h, taskID, "amb-audit-1"); status != http.StatusServiceUnavailable {
 		t.Fatalf("cancel status = %d, want 503 (audit failure rolls the call back)", status)
 	}
 	assertControlPortSilent(t, events)
@@ -360,7 +339,7 @@ func TestControlGuardCancelAmbientCommitFailureDiscards(t *testing.T) {
 	audit := &stubControlTxAudit{durable: true}
 	h := ambientGuardHarness(t, env, creditService, scope, audit, events, uuid.New())
 
-	if status, _ := serveAmbientCancel(t, h, taskID, "amb-commit-1", "commit is down"); status != http.StatusServiceUnavailable {
+	if status, _ := serveAmbientCancel(t, h, taskID, "amb-commit-1"); status != http.StatusServiceUnavailable {
 		t.Fatalf("cancel status = %d, want 503 (commit failure fails the call)", status)
 	}
 	assertControlPortSilent(t, events)
@@ -376,7 +355,6 @@ func TestControlGuardCancelAmbientReplayStaysSilent(t *testing.T) {
 	env := openControlCancelEnv(t)
 	creditService := env.creditServiceFor(t)
 	const taskID = "task_amb_guard_replay1"
-	const reason = "ambient guard replay"
 	env.seedPaidTask(t, creditService, taskID)
 
 	operatorPublicID := uuid.New()
@@ -386,7 +364,7 @@ func TestControlGuardCancelAmbientReplayStaysSilent(t *testing.T) {
 	audit := &stubControlTxAudit{durable: true}
 	h := ambientGuardHarness(t, env, creditService, scope, audit, events, operatorPublicID)
 
-	if status, _ := serveAmbientCancel(t, h, taskID, "amb-replay-1", reason); status != http.StatusOK {
+	if status, _ := serveAmbientCancel(t, h, taskID, "amb-replay-1"); status != http.StatusOK {
 		t.Fatalf("first cancel status = %d, want 200", status)
 	}
 	statuses, envelopes := events.snapshot()
@@ -395,8 +373,8 @@ func TestControlGuardCancelAmbientReplayStaysSilent(t *testing.T) {
 	}
 	// Same key plus same body: the guard replays without running the
 	// handler, so the committed replay audit commits but no hooks run.
-	if status, _ := serveAmbientCancel(t, h, taskID, "amb-replay-1", reason); status != http.StatusOK {
+	if status, _ := serveAmbientCancel(t, h, taskID, "amb-replay-1"); status != http.StatusOK {
 		t.Fatalf("replay cancel status = %d, want 200", status)
 	}
-	assertControlPortAnnouncedOnce(t, env, events, taskID, reason, operator)
+	assertControlPortAnnouncedOnce(t, env, events, taskID, operator)
 }

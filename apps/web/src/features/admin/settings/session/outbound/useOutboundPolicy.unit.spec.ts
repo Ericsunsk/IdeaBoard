@@ -64,8 +64,7 @@ describe('useOutboundPolicy', () => {
 
       expect(state.updateRequests).toEqual([
         {
-          body: { allow_hosts: ['draft.internal'], reason: '' },
-          operatorReason: null,
+          body: { allow_hosts: ['draft.internal'] },
         },
       ])
       expect(harness.feedback.saved).not.toHaveBeenCalled()

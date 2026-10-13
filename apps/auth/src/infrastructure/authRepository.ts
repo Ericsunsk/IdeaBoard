@@ -34,7 +34,6 @@ export type AuthIdentityStore = {
       auth_user_id: string
       role: string
       banned: boolean
-      ban_reason: string | null
       ban_expires: string | null
     }>
   >
@@ -47,7 +46,6 @@ export type AuthIdentityStore = {
   updateAuthUserBanState(
     authUserID: string,
     banned: boolean,
-    banReason: string | null,
     banExpiresIn: number | null,
   ): Promise<boolean>
   deleteAuthUserSessions(authUserID: string): Promise<boolean>
@@ -117,7 +115,6 @@ GROUP BY users.id, users.email`,
 SELECT users.id,
        users.role,
        users.banned,
-       users."banReason" AS "banReason",
        users."banExpires" AS "banExpires"
 FROM "user" users
 WHERE users.id = ANY($1::text[])`,
@@ -126,7 +123,6 @@ WHERE users.id = ANY($1::text[])`,
       return result.rows.flatMap((row) => {
         const candidate = row as UserRow & {
           banned?: unknown
-          banReason?: unknown
           banExpires?: unknown
         }
         if (typeof candidate.id !== 'string' || candidate.id.length === 0) return []
@@ -146,7 +142,6 @@ WHERE users.id = ANY($1::text[])`,
             auth_user_id: candidate.id,
             role,
             banned: candidate.banned === true,
-            ban_reason: typeof candidate.banReason === 'string' ? candidate.banReason : null,
             ban_expires: banExpires,
           },
         ]
@@ -169,12 +164,11 @@ WHERE users.id = ANY($1::text[])`,
       return Number(result.rowCount || 0) > 0
     },
 
-    async updateAuthUserBanState(authUserID, banned, banReason, banExpiresIn) {
+    async updateAuthUserBanState(authUserID, banned, banExpiresIn) {
       const result = await database.query(
-        'UPDATE "user" SET "banned" = $1, "banReason" = $2, "banExpires" = CASE WHEN $1 AND "banned" = TRUE THEN "banExpires" ELSE $3 END, "updatedAt" = $4 WHERE id = $5',
+        'UPDATE "user" SET "banned" = $1, "banReason" = NULL, "banExpires" = CASE WHEN $1 AND "banned" = TRUE THEN "banExpires" ELSE $2 END, "updatedAt" = $3 WHERE id = $4',
         [
           banned,
-          banned ? banReason || 'No reason' : null,
           banned && banExpiresIn ? new Date(Date.now() + banExpiresIn * 1_000) : null,
           new Date(),
           authUserID,

@@ -10,7 +10,6 @@ export type AdminCreditCommandKind = 'grant' | 'deduction' | 'refund'
 
 type AdminCreditCommandDraft = {
   amountCredits: number | null
-  reason: string
 }
 
 export type AdminCreditCommandInput = AdminCreditCommandDraft & {
@@ -25,17 +24,13 @@ export type AdminCreditCommandInput = AdminCreditCommandDraft & {
 type AdminCreditCommandRequest =
   ControlCreditCommandRequest | ControlCreditRefundRequest | ControlCreditCorrectionRequest
 
-// Built control command: header-only idempotency key travels in transport
-// headers (never in the body); the body carries the operator reason.
 export type BuiltAdminCreditCommand = {
   body: AdminCreditCommandRequest
   idempotencyKey: string
-  operatorReason: string
 }
 
 export type CreditCommandValidation = {
   amountError: string
-  reasonError: string
   valid: boolean
 }
 
@@ -57,15 +52,11 @@ export function validateAdminCreditCommand(
     amountError = `退款不能超过可退余额 ${formatIdeaAmount(input.remainingRefundableCredits ?? 0)}`
   }
 
-  const reason = input.reason.trim()
-  const reasonError = reason ? '' : '请填写操作原因'
-  const hasRefundSource = input.kind !== 'refund' || Boolean(input.chargeTransactionId?.trim())
-
-  return {
-    amountError,
-    reasonError: hasRefundSource ? reasonError : '退款必须从原 Charge 流水发起',
-    valid: !amountError && !reasonError && hasRefundSource,
+  if (input.kind === 'refund' && !input.chargeTransactionId?.trim()) {
+    amountError = '退款必须从原 Charge 流水发起'
   }
+
+  return { amountError, valid: !amountError }
 }
 
 export function isRefundableCharge(transaction: {
@@ -84,19 +75,17 @@ export function buildAdminCreditCommandRequest(
 ): BuiltAdminCreditCommand {
   const validation = validateAdminCreditCommand(input)
   if (!validation.valid || input.amountCredits == null) {
-    throw new Error(validation.amountError || validation.reasonError || 'Idea操作参数无效')
+    throw new Error(validation.amountError || 'Idea操作参数无效')
   }
 
   const operationId = idFactory()
     .replace(/[^a-zA-Z0-9_-]/g, '')
     .slice(0, 96)
   if (!operationId) throw new Error('无法生成Idea操作标识')
-  const reason = input.reason.trim()
   const body: AdminCreditCommandRequest = {
     user_id: input.userPublicId,
     amount_credits: input.amountCredits,
     business_reference_id: `control-ui:${input.kind}:${operationId}`,
-    reason,
   }
 
   if (input.kind === 'refund') {
@@ -107,6 +96,5 @@ export function buildAdminCreditCommandRequest(
   return {
     body,
     idempotencyKey: `control-ui:${input.kind}:${operationId}`,
-    operatorReason: reason,
   }
 }

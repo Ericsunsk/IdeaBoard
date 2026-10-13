@@ -1,7 +1,7 @@
 package httpapi
 
-// Control tasks family (issue #808): scoped task read/ops behind
-// control:tasks — get/list/cancel with operator reason.
+// Control tasks family: scoped task read/ops behind
+// control:tasks — get/list/cancel.
 //
 // There is deliberately NO task creation path here: submission stays on
 // the Public Data Plane. Cancel reuses the task command seam with the
@@ -19,13 +19,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// controlTaskListCursor is the opaque cursor over the legacy page dialect.
+// controlTaskListCursor is the opaque cursor over page-number pagination.
 type controlTaskListCursor struct {
 	Page int `json:"page"`
 }
 
 // controlTaskListCountsMeta extends the cursor page meta with the
-// global status breakdown (#852): the monitor pills need per-status
+// global status breakdown: the monitor pills need per-status
 // totals that cursor pagination cannot derive from one page. Counts
 // honor the user/keyword filters but never the status filter (see
 // CountControlTasks), so pills keep their global breakdown while a
@@ -96,7 +96,7 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 		}
 		nextCursor = encoded
 	}
-	// The counts ride the list meta (#852) so monitor pills render
+	// The counts ride the list meta so monitor pills render
 	// without a second round trip. Shape stays the unified
 	// {data, meta} envelope; only this endpoint's meta carries counts.
 	contract.RenderPaginatedWithMeta(c, items, controlTaskListCountsMeta{
@@ -136,7 +136,7 @@ func (d *ContractControlDeps) cancelControlTask(c *gin.Context, ctx controlConte
 		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound8)
 		return
 	}
-	if err := d.Tasks.CancelAdminTask(c.Request.Context(), taskID, ctx.Operator.UserID(), ctx.Reason); err != nil {
+	if err := d.Tasks.CancelAdminTask(c.Request.Context(), taskID, ctx.Operator.UserID()); err != nil {
 		if isControlTaskNotFound(err) {
 			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound8)
 			return

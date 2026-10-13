@@ -1,16 +1,9 @@
 package httpapi
 
-// Control OAuth-provider family: social login channel reads and updates
-// behind control:users.
-//
-// Handlers delegate to the Auth-owned social-provider seam
-// (ControlOAuthService, the same *auth.ServiceClient instance serving the
-// legacy admin OAuth settings); the control guard adds capability auth,
-// the separate rate-limit bucket, header-only idempotency, the operator
-// reason, and the mandatory audit record. Client secrets never cross this
-// boundary (only client_secret_configured); provider allowlisting stays
-// inside Auth. Legacy /api/admin/users/oauth-providers/* routes are
-// untouched.
+// Control social login configuration delegates to Auth-owned ControlOAuthService.
+// The guard supplies authorization, rate limits, header-only idempotency, and
+// audit. Only client_secret_configured crosses this boundary; secrets and
+// provider allowlisting remain inside Auth.
 
 import (
 	"context"
@@ -42,7 +35,7 @@ func (d *ContractControlDeps) requireControlOAuth(c *gin.Context) (ControlOAuthS
 
 // parseControlOAuthProvider resolves a {provider} path param to the
 // allowlisted provider slug. Unknown or malformed slugs fail closed with
-// 404 (invisible, never 403), mirroring the legacy admin handler.
+// 404 (invisible, never 403).
 func parseControlOAuthProvider(c *gin.Context, svc ControlOAuthService) (string, bool) {
 	provider, ok := parseControlProviderSlug(c)
 	if !ok {
@@ -94,14 +87,10 @@ func (d *ContractControlDeps) updateControlOAuthProvider(c *gin.Context, _ contr
 	if !ok {
 		return
 	}
-	// reason/operator_note are tolerated so a body-carried operator note
-	// survives strict binding; the guard already enforced its presence.
 	var req struct {
 		Enabled      bool   `json:"enabled"`
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
-		Reason       string `json:"reason"`
-		OperatorNote string `json:"operator_note"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)

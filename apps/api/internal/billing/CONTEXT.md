@@ -4,20 +4,20 @@ Billing is the platform-level product identity and Credit pricing context. Users
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| SKU | Global immutable product code, `<namespace>:<local-key>`; canonicalization is trim + lowercase ASCII, max 128 chars |
-| Billable Item | A product-context capability registered for pricing; carries stable SKU, namespace, product kind, display copy and ordering, never a Provider Model |
-| Billable Item Registry | Billing-owned immutable registration seam; runtime composes product-context definitions, rejects duplicate SKUs, returns deterministic copies |
-| Catalog Read Model | Dynamically merges the current Registry with persisted SKU/current-price facts into Admin cards; needs no startup write or sync job |
-| SKU namespace | Product-owned 1–32 char lowercase ASCII namespace, may contain `-` |
-| local key | 1–95 char product key inside a namespace, may contain `.`, `_`, `-` |
-| Price Version | Append-only unit-price fact per SKU; `version` increases monotonically per SKU, `unit_credits` is an indivisible integer and may explicitly be 0 |
-| Current Price | The SKU's atomic pointer at the newest Price Version; creating a version and switching the pointer complete in one database command |
-| Archived | A persisted Catalog item no longer in the current Registry; cannot be Quoted or enabled, Price Versions survive until the whole aggregate is safely deleted |
-| Price Snapshot | The immutable value object returned by Quote and persisted by later Billing Commands |
-| Quote | The result of current Price Snapshot × positive integer quantity, computed server-side |
-| Admin Action | One Admin write against Catalog/Price; carries authenticated actor, target, old/new, outcome and time, persisted as append-only audit |
+| Term                   | Meaning                                                                                                                                                     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SKU                    | Global immutable product code, `<namespace>:<local-key>`; canonicalization is trim + lowercase ASCII, max 128 chars                                         |
+| Billable Item          | A product-context capability registered for pricing; carries stable SKU, namespace, product kind, display copy and ordering, never a Provider Model         |
+| Billable Item Registry | Billing-owned immutable registration seam; runtime composes product-context definitions, rejects duplicate SKUs, returns deterministic copies               |
+| Catalog Read Model     | Dynamically merges the current Registry with persisted SKU/current-price facts into Admin cards; needs no startup write or sync job                         |
+| SKU namespace          | Product-owned 1–32 char lowercase ASCII namespace, may contain `-`                                                                                          |
+| local key              | 1–95 char product key inside a namespace, may contain `.`, `_`, `-`                                                                                         |
+| Price Version          | Append-only unit-price fact per SKU; `version` increases monotonically per SKU, `unit_credits` is an indivisible integer and may explicitly be 0            |
+| Current Price          | The SKU's atomic pointer at the newest Price Version; creating a version and switching the pointer complete in one database command                         |
+| Archived               | A persisted Catalog item no longer in the current Registry; cannot be Quoted or enabled, Price Versions survive until the whole aggregate is safely deleted |
+| Price Snapshot         | The immutable value object returned by Quote and persisted by later Billing Commands                                                                        |
+| Quote                  | The result of current Price Snapshot × positive integer quantity, computed server-side                                                                      |
+| Admin Action           | One Admin write against Catalog/Price; carries authenticated actor, target, old/new, outcome and time, persisted as append-only audit                       |
 
 ## Public Seams
 
@@ -29,7 +29,7 @@ Billing is the platform-level product identity and Credit pricing context. Users
 - `BillableItemCatalog.QuoteAtResolution/QuoteAtResolutionInTx` is the Registry-aware runtime seam; `Unpriced`, `Disabled` and `Archived` all fail closed. Task submission uses `QuoteAtResolutionInTx` to keep Snapshot, Hold, Task and River enqueue inside one transaction boundary.
 - `PriceSnapshot` carries `sku`, `display_name`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`; later Hold/Charge must save and reuse the snapshot, never re-quote. `display_name` freezes at Quote time; later SKU renames must not rewrite historical task billing.
 - User-side Billing Records read only the frozen `display_name` from Task Billing Snapshots; they must not re-resolve current SKU display fields to rewrite historical names.
-- Admin feature pricing only publishes new immutable Price Versions; no Price Version enable/disable command and no Admin-typed reason required. Database commands record actor, target, old/new and outcome automatically.
+- Admin feature pricing only publishes new immutable Price Versions; no Price Version enable/disable command. Database commands record actor, target, old/new and outcome automatically.
 - `create_sku`, `update_sku`, `set_price_enabled` survive only as historical append-only Admin Audit vocabulary, not as runtime or Admin command contracts.
 - Registry SKU identity has no rename/delete contract; deactivation uses `enabled=false`. Only Archived aggregates whose Registry entry is gone and which hold no durable reference may be hard-deleted.
 - Admin Catalog, Quote and Task Billing uniformly use the Service-level identity `ai-image:<service>`. Provider Model belongs only to the execution/idempotency contract and never to user price identity; switching models never changes Service prices. Billing eligibility comes from the Workflow registry AI image product list, not from Provider Accounts.

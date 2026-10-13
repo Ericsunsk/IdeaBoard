@@ -32,9 +32,9 @@ describe('useLogoutRedirect', () => {
     const logout = vi.fn(async () => true)
     const { logoutAndRedirect } = useLogoutRedirect({ logout })
 
-    await expect(logoutAndRedirect('/admin/login', { replace: true })).resolves.toBe(true)
+    await expect(logoutAndRedirect('/user/login', { replace: true })).resolves.toBe(true)
 
-    expect(router.replace).toHaveBeenCalledWith('/admin/login')
+    expect(router.replace).toHaveBeenCalledWith('/user/login')
     expect(router.push).not.toHaveBeenCalled()
   })
 

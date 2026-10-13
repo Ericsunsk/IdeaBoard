@@ -81,9 +81,7 @@ describe('AdminImageProvidersTable', () => {
     await user.click(testButtons[0]!)
 
     await waitFor(() => {
-      expect(resource.test).toHaveBeenCalledWith('unsplash', {
-        operatorReason: '',
-      })
+      expect(resource.test).toHaveBeenCalledWith('unsplash')
       expect(onChange).toHaveBeenCalledTimes(1)
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('连接测试通过'))
     })
@@ -115,7 +113,7 @@ describe('AdminImageProvidersTable', () => {
 
     resolveTest({ provider: 'unsplash', test_state: 'passed', message: 'ok' })
     await waitFor(() => {
-      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: '' })
+      expect(resource.test).toHaveBeenCalledWith('unsplash')
     })
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
@@ -139,11 +137,10 @@ describe('AdminImageProvidersTable', () => {
     await user.click(saveButtons[1]!)
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'pexels',
-        { api_key: 'new-pexels-key-123', enabled: false },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('pexels', {
+        api_key: 'new-pexels-key-123',
+        enabled: false,
+      })
       expect(onChange).toHaveBeenCalledTimes(1)
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('API Key 已保存'))
     })
@@ -170,11 +167,7 @@ describe('AdminImageProvidersTable', () => {
     await user.click(toggle)
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
       expect(onChange).toHaveBeenCalledTimes(1)
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('已启用'))
     })
@@ -211,15 +204,11 @@ describe('AdminImageProvidersTable', () => {
     expect(tests[0]).toBeDisabled()
     expect(tests[1]).not.toBeDisabled()
     await user.click(tests[1]!)
-    expect(resource.test).toHaveBeenCalledWith('pexels', { operatorReason: '' })
+    expect(resource.test).toHaveBeenCalledWith('pexels')
 
     resolveToggle()
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
     })
   })
 
@@ -288,21 +277,16 @@ describe('AdminImageProvidersTable', () => {
 
     await user.click(screen.getByRole('switch', { name: 'Enable Unsplash' }))
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
     })
     await user.type(screen.getByLabelText('Unsplash API Key'), 'replacement-key')
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { api_key: 'replacement-key', enabled: false },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', {
+        api_key: 'replacement-key',
+        enabled: false,
+      })
       expect(screen.getByRole('switch', { name: 'Enable Unsplash' })).toHaveAttribute(
         'data-state',
         'unchecked',
@@ -313,7 +297,7 @@ describe('AdminImageProvidersTable', () => {
 
     await user.click(screen.getByRole('button', { name: '测试连接' }))
     await waitFor(() => {
-      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: '' })
+      expect(resource.test).toHaveBeenCalledWith('unsplash')
       expect(screen.getByRole('switch', { name: 'Enable Unsplash' })).not.toBeDisabled()
     })
   })
@@ -408,11 +392,7 @@ describe('AdminImageProvidersTable', () => {
     await user.click(toggle)
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: false },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: false })
     })
     expect(resource.update).toHaveBeenCalledTimes(1)
     expect(keyInput).toHaveValue('draft-key')
@@ -566,7 +546,7 @@ describe('AdminImageProvidersTable', () => {
     await user.click(testButtons[0]!)
 
     await waitFor(() => {
-      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: '' })
+      expect(resource.test).toHaveBeenCalledWith('unsplash')
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-test'))
     })
     expect(toast.success).not.toHaveBeenCalled()
@@ -586,11 +566,10 @@ describe('AdminImageProvidersTable', () => {
     await user.click(saveButtons[1]!)
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'pexels',
-        { api_key: 'new-pexels-key-123', enabled: false },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('pexels', {
+        api_key: 'new-pexels-key-123',
+        enabled: false,
+      })
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-save'))
     })
     expect(toast.success).not.toHaveBeenCalled()
@@ -615,11 +594,7 @@ describe('AdminImageProvidersTable', () => {
     await user.click(screen.getByRole('switch', { name: 'Enable Unsplash' }))
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-toggle'))
     })
     expect(toast.success).not.toHaveBeenCalled()
@@ -666,11 +641,7 @@ describe('AdminImageProvidersTable', () => {
 
     resolveUpdate()
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
     })
 
     // 模拟父级 emit('change') 后 refetch 整体替换 configs：同行 DOM 复用。
@@ -704,11 +675,7 @@ describe('AdminImageProvidersTable', () => {
     await user.click(toggle)
 
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
     })
     // 失败回滚：开关回到 unchecked，同行 DOM 不换。
     await waitFor(() => {
@@ -781,11 +748,7 @@ describe('AdminImageProvidersTable', () => {
 
     resolveUpdate()
     await waitFor(() => {
-      expect(resource.update).toHaveBeenCalledWith(
-        'unsplash',
-        { enabled: true },
-        { operatorReason: '' },
-      )
+      expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true })
     })
 
     // 父级回填：全新对象 + 后台 loading，不换行 DOM/关键 cell 引用，不挂 opacity。

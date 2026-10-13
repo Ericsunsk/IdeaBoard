@@ -31,8 +31,5 @@ export function withControlCopy(
       readControlRequestId(error),
     )
   }
-  if (code === 'control_reason_required') {
-    return createControlError(code, '需要填写操作原因', readControlRequestId(error))
-  }
   return mapControlError(error, fallback, domainMessages)
 }

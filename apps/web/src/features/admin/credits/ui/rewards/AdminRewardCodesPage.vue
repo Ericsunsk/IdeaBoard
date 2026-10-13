@@ -346,9 +346,6 @@ function openCreateDialog() {
 }
 
 async function confirmRewardCodeCreate(displayName: string) {
-  // Reward code create keeps its confirm dialog (required reason); update
-  // is a routine config write (backend ReasonOptional) and never calls
-  // this. Returns null only when the operator cancels.
   return confirmSettingsSave(confirm, {
     title: REWARD_CODES_MESSAGES.confirmCreateTitle,
     message: REWARD_CODES_MESSAGES.confirmCreateMessage(displayName),
@@ -356,29 +353,21 @@ async function confirmRewardCodeCreate(displayName: string) {
   })
 }
 
-async function persistRewardCode(
-  input: RewardCodeFormSubmit,
-  editing: RewardCode | null,
-  operatorReason: string,
-) {
+async function persistRewardCode(input: RewardCodeFormSubmit, editing: RewardCode | null) {
   if (!editing) {
-    const created = await resource.create(input, { operatorReason })
+    const created = await resource.create(input)
     createdPlaintext.value = created.plaintext || input.code
     plaintextHeader.value = REWARD_CODES_MESSAGES.plaintextHeader
     plaintextDialogVisible.value = true
     toast.success(REWARD_CODES_MESSAGES.created)
   } else {
-    const updated = await resource.update(
-      editing.id,
-      {
-        displayName: input.displayName,
-        creditAmount: input.creditAmount,
-        maxRedemptions: input.maxRedemptions,
-        expiresAt: input.expiresAt,
-        ...(input.code ? { code: input.code } : {}),
-      },
-      { operatorReason },
-    )
+    const updated = await resource.update(editing.id, {
+      displayName: input.displayName,
+      creditAmount: input.creditAmount,
+      maxRedemptions: input.maxRedemptions,
+      expiresAt: input.expiresAt,
+      ...(input.code ? { code: input.code } : {}),
+    })
     replaceRewardCode(updated.rewardCode)
     if (input.code) {
       createdPlaintext.value = updated.plaintext || input.code
@@ -394,18 +383,14 @@ async function persistRewardCode(
 async function saveRewardCode(input: RewardCodeFormSubmit) {
   if (saving.value) return
   const editing = editingRewardCode.value
-  // Reward code update is a routine config write (backend ReasonOptional):
-  // save directly with an empty reason. Create keeps its confirm dialog.
-  let operatorReason = ''
   if (!editing) {
-    const created = await confirmRewardCodeCreate(input.displayName)
-    if (!created) return
-    operatorReason = created
+    const isConfirmed = await confirmRewardCodeCreate(input.displayName)
+    if (!isConfirmed) return
   }
   saving.value = true
   saveError.value = ''
   try {
-    await persistRewardCode(input, editing, operatorReason)
+    await persistRewardCode(input, editing)
     createDialogVisible.value = false
     // Resetting the cursor reloads the first page via the key — unless
     // already there, in which case the key is unchanged and needs a refetch.

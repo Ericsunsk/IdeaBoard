@@ -3,6 +3,7 @@ import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { requireContractData } from '../../../api/contractKernel'
 import { getControlMonitor } from '../../../api/generated-query/control/control-platform/control-platform'
 import {
+  cancelControlTask,
   getControlTask,
   listControlTasks,
 } from '../../../api/generated-query/control/control-tasks/control-tasks'
@@ -14,23 +15,12 @@ import type {
   PaginatedControlTasks,
 } from '../../../api/generated-query/control/model'
 import type { ControlTaskEnvelope } from '../../../api/generated-query/control/model/controlTaskEnvelope'
-import { adminControlUnavailable } from '../shared/core/controlGuidance'
+import { buildControlMutationHeaders } from '../shared/core/controlMutation'
 import { keepPrevious } from '../../../core/query/queryDefaults'
 import type { TaskStatus } from '../shared/core/taskMetricTokens'
 
-// Admin monitor/task boundary (#852: task list/detail ride the live
-// Control task read model). The runtime snapshot rides the Control
-// Plane (`GET /api/control/v1/platform/monitor`, unified contract
-// envelope `{ data }` / `{ error: { code, message, request_id } }`)
-// through the generated `getControlMonitor` hook, with view types
-// untouched. The task list/detail transports call the generated
-// `listControlTasks` / `getControlTask` operations through the fetchers
-// below and normalize the Control payloads onto the view models in this
-// module; pages and dialogs consume this module, never generated
-// clients directly. Task cancellation still fails closed with guidance
-// (mutations need an operator reason the monitor UI does not collect).
-// The SSE monitor stream stays a raw protocol exception, never a JSON
-// envelope.
+// Monitor and task read models use Control API envelopes through this resource.
+// Pages consume normalized view models; the SSE monitor stream uses its raw protocol.
 export type ListAdminTasksParams = {
   status?: TaskStatus
   user_public_id?: string
@@ -582,8 +572,11 @@ export function useAdminMonitorResource(options?: NestedQueryOptions) {
   })
 }
 
-export async function cancelAdminTaskByID(_taskID: string): Promise<void> {
-  throw adminControlUnavailable('task-cancel')
+export async function cancelAdminTaskByID(taskID: string): Promise<void> {
+  requireContractData(
+    await cancelControlTask(taskID, { headers: buildControlMutationHeaders() }),
+    '取消任务失败',
+  )
 }
 
 export function useAdminTaskDetailResource(taskID: MaybeRef<string>, options?: NestedQueryOptions) {

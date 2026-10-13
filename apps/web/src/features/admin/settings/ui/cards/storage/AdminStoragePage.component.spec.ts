@@ -379,7 +379,6 @@ describe('AdminStoragePage', () => {
     await waitFor(() => expect(storageMocks.saveProfile).toHaveBeenCalledOnce())
     expect(storageMocks.saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'storage-2' }),
-      { operatorReason: '' },
     )
     // 乐观 intent 同 tick 翻转：同一节点即时 checked + disabled。
     const pending = screen.getByRole('switch', { name: 'Enable 备用 MinIO' })

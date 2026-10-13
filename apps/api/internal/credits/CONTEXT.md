@@ -21,25 +21,25 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| Credit | Indivisible integer currency unit; floating point is forbidden |
-| Credit Wallet | Account boundary of a single user inside the Credits context |
-| Wallet Restriction | Reason-coded spending limit, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source |
-| Credit Account | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Wallet |
-| Ledger Transaction | One immutable accounting fact with at least two Postings under the same asset |
-| Posting | Signed delta on one Credit Account; the sum within one Transaction must be 0 |
-| Balance Projection | O(1) cache of `credit_accounts.balance`, updated only by the Posting trigger, never an independent fact source |
-| Grant | System Issuance → User Available |
-| Hold | User Available → User Reserved |
-| Capture | User Reserved → System Revenue |
-| Release | User Reserved → User Available |
-| Refund | System Revenue → User Available; cumulative total must never exceed the original Charge |
-| Purchase Credit | `System Issuance → User Available` for verified external payment; called by Payments with a fixed actor/source/reference, never a discretionary Grant |
-| Purchase Refund | `User Reserved → System Issuance` for a verified Stripe Refund; must link the Refund Hold created by Payments, idempotent terminal settlement |
-| Reconciliation Run | Full consistency scan started by a `manual` or `scheduled` trigger and executed asynchronously by River; manual persists the real Admin/reason, scheduled persists the schedule slot without forging an actor |
-| Finding | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject |
-| Finding Type | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely |
+| Term               | Meaning                                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Credit             | Indivisible integer currency unit; floating point is forbidden                                                                                                                         |
+| Credit Wallet      | Account boundary of a single user inside the Credits context                                                                                                                           |
+| Wallet Restriction | Reason-coded spending limit, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source                                   |
+| Credit Account     | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Wallet                                                                                |
+| Ledger Transaction | One immutable accounting fact with at least two Postings under the same asset                                                                                                          |
+| Posting            | Signed delta on one Credit Account; the sum within one Transaction must be 0                                                                                                           |
+| Balance Projection | O(1) cache of `credit_accounts.balance`, updated only by the Posting trigger, never an independent fact source                                                                         |
+| Grant              | System Issuance → User Available                                                                                                                                                       |
+| Hold               | User Available → User Reserved                                                                                                                                                         |
+| Capture            | User Reserved → System Revenue                                                                                                                                                         |
+| Release            | User Reserved → User Available                                                                                                                                                         |
+| Refund             | System Revenue → User Available; cumulative total must never exceed the original Charge                                                                                                |
+| Purchase Credit    | `System Issuance → User Available` for verified external payment; called by Payments with a fixed actor/source/reference, never a discretionary Grant                                  |
+| Purchase Refund    | `User Reserved → System Issuance` for a verified Stripe Refund; must link the Refund Hold created by Payments, idempotent terminal settlement                                          |
+| Reconciliation Run | Full consistency scan started by a `manual` or `scheduled` trigger and executed asynchronously by River; manual persists the authenticated Admin, scheduled persists the schedule slot |
+| Finding            | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject                                                                                                |
+| Finding Type       | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely                                           |
 
 ## Public Seams
 
@@ -106,8 +106,8 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
   and must converge atomically with the Payments Payment Order terminal fact.
 - Task Holds use no Credits-owned TTL auto-release;
   only the Task terminal transition Captures or Releases in the same transaction.
-- actor, source, reason, and business reference are required
-  and written into the immutable Transaction.
+- Actor, source, and business reference are required and written into the immutable Transaction.
+  Service/system/user commands also require a business reason.
 - Deduction is an Admin-actor-only immutable `user_available → system_sink`
   transaction; it never touches reserved.
   Correction is authenticated-Admin-only and appends reverse Postings
@@ -150,8 +150,8 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
   snapshot/constraint as fact source;
   Admin API/UI accepts no threshold, and the public Run DTO exposes
   no such internal fixed value.
-- Manual Reconciliation requires the real Admin plus a trimmed 1–1000
-  character reason; scheduled Runs keep actor/reason empty.
+- Manual Reconciliation records the authenticated Admin; scheduled Runs
+  record the schedule slot.
   Daily schedule runs at 03:00 Asia/Shanghai;
   on River leader startup a catch-up fires when no successful Run
   exists in the last 24h.

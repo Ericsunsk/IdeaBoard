@@ -30,7 +30,7 @@ func TestBanExpiryConvergesWithControlledClock(t *testing.T) {
 	ctx := context.Background()
 	userID, publicID := f.seedUser(t, "ban-expiry", "auth-ban-expiry", "BEXP01", "user", StatusActive)
 
-	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "spam", ExpiresInDays: 7}); err != nil {
+	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{ExpiresInDays: 7}); err != nil {
 		t.Fatalf("ban: %v", err)
 	}
 	deadline := durableBanDeadline(t, f, userID)
@@ -84,7 +84,7 @@ func TestPermanentBanNeverExpires(t *testing.T) {
 	ctx := context.Background()
 	userID, publicID := f.seedUser(t, "ban-permanent", "auth-ban-perm", "BPRM01", "user", StatusActive)
 
-	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "severe"}); err != nil {
+	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{}); err != nil {
 		t.Fatalf("ban: %v", err)
 	}
 	if deadline := durableBanDeadline(t, f, userID); deadline != nil {
@@ -114,7 +114,7 @@ func TestRebanExtendsDeadlineAndOldSweepSkips(t *testing.T) {
 
 	// Half a day later the admin re-bans for 30 days: the deadline moves
 	// forward, the version advances, and a fresh ban intent covers it.
-	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{Reason: "repeat", ExpiresInDays: 30}); err != nil {
+	if _, err := f.commands.Ban(ctx, identityAdminActor(t), publicID, IdentityAdminBanInput{ExpiresInDays: 30}); err != nil {
 		t.Fatalf("re-ban: %v", err)
 	}
 	secondDeadline := durableBanDeadline(t, f, userID)

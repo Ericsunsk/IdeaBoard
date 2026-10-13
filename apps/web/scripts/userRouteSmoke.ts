@@ -255,7 +255,7 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
       ),
       () => checkSearchPage(page, baseUrl),
       () => checkAuthRedirect(page, baseUrl, '/user/boards', '/user/login'),
-      () => checkAuthRedirect(page, baseUrl, '/admin/users', '/admin/login'),
+      () => checkAuthRedirect(page, baseUrl, '/admin/users', '/user/login'),
     ]
     const labels = [
       ...PUBLIC_PAGES.map((check) => `page ${check.path}`),

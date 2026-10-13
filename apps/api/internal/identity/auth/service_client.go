@@ -556,10 +556,6 @@ func (c *ServiceClient) GetUserStates(ctx context.Context, authUserIDs []string)
 			return nil, fmt.Errorf("auth service get user states returned an invalid user state")
 		}
 		state := authidentity.AuthUserState{AuthUserID: id, Role: role, Banned: user.Banned}
-		if user.BanReason != nil {
-			reason := strings.TrimSpace(*user.BanReason)
-			state.BanReason = &reason
-		}
 		if user.BanExpires != nil {
 			expires := *user.BanExpires
 			state.BanExpiresAt = &expires
@@ -679,15 +675,12 @@ func (c *ServiceClient) SetUserRole(ctx context.Context, authUserID string, role
 	)
 }
 
-func (c *ServiceClient) BanUser(ctx context.Context, authUserID string, reason string, expiresInSeconds int) error {
+func (c *ServiceClient) BanUser(ctx context.Context, authUserID string, expiresInSeconds int) error {
 	client, normalizedID, err := c.managedUserClient(authUserID)
 	if err != nil {
 		return err
 	}
 	body := internalcontract.BanUserJSONRequestBody{UserID: normalizedID}
-	if reason := strings.TrimSpace(reason); reason != "" {
-		body.BanReason = &reason
-	}
 	if expiresInSeconds > 0 {
 		body.BanExpiresIn = &expiresInSeconds
 	}

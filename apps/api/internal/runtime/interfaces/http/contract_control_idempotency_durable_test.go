@@ -1,6 +1,6 @@
 package httpapi
 
-// Control Plane durable idempotency guard tests (#891), against real
+// Control Plane durable idempotency guard tests, against real
 // PostgreSQL with production-equivalent wiring pieces.
 //
 // Each harness wires the real guard transaction scope over the test
@@ -97,14 +97,14 @@ func newDurableControlHarness(t *testing.T, pool *pgxpool.Pool) *durableControlH
 	return &durableControlHarness{controlHarness: h, pool: pool, scope: scope, audit: txAudit}
 }
 
-func durableBanCall(targetUser, key, reason, body string) controlCall {
+func durableBanCall(targetUser, key, body string) controlCall {
 	if body == "" {
 		body = `{"expires_in_days":7}`
 	}
 	return controlCall{
 		method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/ban", targetUser),
 		body: body, userID: controlOperatorID, role: "admin",
-		headers: controlMutationHeaders(key, reason),
+		headers: controlMutationHeaders(key),
 	}
 }
 
@@ -158,7 +158,7 @@ func TestControlDurableConcurrentSameKeySingleWinner(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			status, body, err := serveConcurrent(h.engine, &controlRequestSeq, durableBanCall(targetUser, "durable-winner-1", "abuse", ""))
+			status, body, err := serveConcurrent(h.engine, &controlRequestSeq, durableBanCall(targetUser, "durable-winner-1", ""))
 			outcomes[i] = durableOutcome{status: status, body: body, err: err}
 		}(i)
 	}
@@ -193,7 +193,7 @@ func TestControlDurableReplayAcrossInstancesAndRestart(t *testing.T) {
 	targetUser := durableTargetUser(controlUserAID)
 
 	h1 := newDurableControlHarness(t, pool)
-	status, _, first := h1.serve(durableBanCall(targetUser, "durable-restart-1", "abuse", ""))
+	status, _, first := h1.serve(durableBanCall(targetUser, "durable-restart-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("first ban status = %d, want 200", status)
 	}
@@ -205,7 +205,7 @@ func TestControlDurableReplayAcrossInstancesAndRestart(t *testing.T) {
 	// process-local store starts empty, exactly like a restarted
 	// process. The retry must replay without executing.
 	h2 := newDurableControlHarness(t, pool)
-	status, _, second := h2.serve(durableBanCall(targetUser, "durable-restart-1", "abuse", ""))
+	status, _, second := h2.serve(durableBanCall(targetUser, "durable-restart-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("cross-instance replay status = %d, want 200", status)
 	}
@@ -216,13 +216,13 @@ func TestControlDurableReplayAcrossInstancesAndRestart(t *testing.T) {
 		t.Fatalf("replay data = %v, want %v (commit-after-response-loss retry replays)", second["data"], first["data"])
 	}
 	// The atomic path joins the replay audit into the participant sink,
-	// never the legacy detached sink (no double trail).
+	// never the detached sink (no double trail).
 	record, ok := h2.audit.last()
 	if !ok || !record.Replayed || record.Outcome != ControlAuditOK {
 		t.Fatalf("replay audit = %+v, want replayed success", record)
 	}
 	if len(h2.sink.Records()) != 0 {
-		t.Fatalf("legacy sink records = %d, want 0 (atomic path must not double-trail)", len(h2.sink.Records()))
+		t.Fatalf("detached sink records = %d, want 0 (atomic path must not double-trail)", len(h2.sink.Records()))
 	}
 }
 
@@ -232,14 +232,14 @@ func TestControlDurableTargetConflictBeforeSideEffect(t *testing.T) {
 	userA := durableTargetUser(controlUserAID)
 	userB := durableTargetUser(controlUserBID)
 
-	status, _, _ := h.serve(durableBanCall(userA, "durable-target-1", "abuse", ""))
+	status, _, _ := h.serve(durableBanCall(userA, "durable-target-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("first ban status = %d, want 200", status)
 	}
 	// Same key, same body, different target: the real target enters the
 	// request identity, so this is a different request and must 409
 	// before user B's ban ever runs.
-	status, _, payload := h.serve(durableBanCall(userB, "durable-target-1", "abuse", ""))
+	status, _, payload := h.serve(durableBanCall(userB, "durable-target-1", ""))
 	if status != http.StatusConflict {
 		t.Fatalf("target-conflict status = %d, want 409", status)
 	}
@@ -267,11 +267,11 @@ func TestControlDurableBodyConflictBeforeSideEffect(t *testing.T) {
 	h := newDurableControlHarness(t, pool)
 	targetUser := durableTargetUser(controlUserAID)
 
-	status, _, _ := h.serve(durableBanCall(targetUser, "durable-body-1", "abuse", `{"expires_in_days":7}`))
+	status, _, _ := h.serve(durableBanCall(targetUser, "durable-body-1", `{"expires_in_days":7}`))
 	if status != http.StatusOK {
 		t.Fatalf("first ban status = %d, want 200", status)
 	}
-	status, _, payload := h.serve(durableBanCall(targetUser, "durable-body-1", "abuse", `{"expires_in_days":30}`))
+	status, _, payload := h.serve(durableBanCall(targetUser, "durable-body-1", `{"expires_in_days":30}`))
 	if status != http.StatusConflict {
 		t.Fatalf("body-conflict status = %d, want 409", status)
 	}
@@ -298,12 +298,12 @@ func TestControlDurableBusinessFailureRetriesReExecute(t *testing.T) {
 	// Business 4xx outcomes are never retained: the claim is abandoned
 	// in the same transaction, so the retry re-executes.
 	h.identity.fail = errTestControlDurableBusiness
-	status, _, _ := h.serve(durableBanCall(targetUser, "durable-retry-1", "abuse", ""))
+	status, _, _ := h.serve(durableBanCall(targetUser, "durable-retry-1", ""))
 	if status != http.StatusBadRequest {
 		t.Fatalf("failing ban status = %d, want 400", status)
 	}
 	h.identity.fail = nil
-	status, _, _ = h.serve(durableBanCall(targetUser, "durable-retry-1", "abuse", ""))
+	status, _, _ = h.serve(durableBanCall(targetUser, "durable-retry-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("retry ban status = %d, want 200", status)
 	}
@@ -311,7 +311,7 @@ func TestControlDurableBusinessFailureRetriesReExecute(t *testing.T) {
 		t.Fatalf("ban calls = %d, want 2 (failure is not replayed)", got)
 	}
 	// The success is now retained: a third identical call replays.
-	status, _, _ = h.serve(durableBanCall(targetUser, "durable-retry-1", "abuse", ""))
+	status, _, _ = h.serve(durableBanCall(targetUser, "durable-retry-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("replay ban status = %d, want 200", status)
 	}
@@ -360,7 +360,7 @@ func TestControlDurableClaimFailureIsRetryable(t *testing.T) {
 		d.TxAudit = &stubControlTxAudit{durable: true}
 		d.IdempotencyDurable = &failingDurableControlStore{err: errTestControlDurableDown}
 	})
-	status, _, payload := broken.serve(durableBanCall(targetUser, "durable-down-1", "abuse", ""))
+	status, _, payload := broken.serve(durableBanCall(targetUser, "durable-down-1", ""))
 	if status != http.StatusServiceUnavailable {
 		t.Fatalf("claim-down status = %d, want 503 (retryable, never 409/200)", status)
 	}
@@ -374,7 +374,7 @@ func TestControlDurableClaimFailureIsRetryable(t *testing.T) {
 	// The key is not poisoned: the same request against the healthy
 	// durable authority executes exactly once.
 	h := newDurableControlHarness(t, pool)
-	status, _, _ = h.serve(durableBanCall(targetUser, "durable-down-1", "abuse", ""))
+	status, _, _ = h.serve(durableBanCall(targetUser, "durable-down-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("retry status = %d, want 200", status)
 	}

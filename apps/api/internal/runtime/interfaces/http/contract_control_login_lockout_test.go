@@ -9,7 +9,7 @@ import (
 	"ideaboard/api/internal/testdb"
 )
 
-func TestControlLoginLockoutReasonAndIdempotency(t *testing.T) {
+func TestControlLoginLockoutIdempotency(t *testing.T) {
 	db := testdb.Open(t)
 	service := settings.NewRuntimeSettingsService(settings.NewSystemConfigRepository(db))
 	h := newControlHarness(t, func(d *ContractControlDeps) { d.Settings = service })
@@ -28,24 +28,22 @@ func TestControlLoginLockoutReasonAndIdempotency(t *testing.T) {
 	}
 
 	const body = `{"threshold":5,"duration_seconds":300}`
-	// Routine config exemption: the reason is optional, so a key-only
-	// call succeeds and audits the empty reason as-is.
 	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: map[string]string{contract.IdempotencyKeyHeader: "login-lockout-0"}})
 	if status != http.StatusOK {
-		t.Fatalf("key-only save = status %d payload %v, want 200 (reason optional)", status, payload)
+		t.Fatalf("key-only save = status %d payload %v, want 200", status, payload)
 	}
-	if last := h.sink.Records()[len(h.sink.Records())-1]; last.Reason != "" || last.Operation != "platform.update_login_lockout" {
-		t.Fatalf("key-only audit = %+v, want empty reason", last)
+	if last := h.sink.Records()[len(h.sink.Records())-1]; last.Operation != "platform.update_login_lockout" {
+		t.Fatalf("key-only audit = %+v, want the recorded operation", last)
 	}
 	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body})
 	if status != http.StatusBadRequest || controlErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
 		t.Fatalf("missing idempotency key = status %d payload %v", status, payload)
 	}
-	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: map[string]string{OperatorReasonHeader: "harden login"}})
+	status, _, payload = h.serve(controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: nil})
 	if status != http.StatusBadRequest || controlErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
 		t.Fatalf("missing idempotency key = status %d payload %v", status, payload)
 	}
-	call := controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: controlMutationHeaders("login-lockout-1", "harden login")}
+	call := controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: body, headers: controlMutationHeaders("login-lockout-1")}
 	for i := 0; i < 2; i++ {
 		status, _, payload = h.serve(call)
 		if status != http.StatusOK {
@@ -55,7 +53,7 @@ func TestControlLoginLockoutReasonAndIdempotency(t *testing.T) {
 	}
 	records := h.sink.Records()
 	last := records[len(records)-1]
-	if last.Operation != "platform.update_login_lockout" || last.Reason != "harden login" || last.IdempotencyKey != "login-lockout-1" {
+	if last.Operation != "platform.update_login_lockout" || last.IdempotencyKey != "login-lockout-1" {
 		t.Fatalf("control audit = %+v", last)
 	}
 	call.body = `{"threshold":6,"duration_seconds":300}`
@@ -68,7 +66,7 @@ func TestControlLoginLockoutReasonAndIdempotency(t *testing.T) {
 		t.Fatalf("login lockout after conflicting request = %+v err=%v", got, err)
 	}
 
-	badCall := controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: `{"threshold":2,"duration_seconds":300}`, headers: controlMutationHeaders("login-lockout-2", "harden login")}
+	badCall := controlCall{method: http.MethodPut, path: path, userID: controlOperatorID, role: "admin", body: `{"threshold":2,"duration_seconds":300}`, headers: controlMutationHeaders("login-lockout-2")}
 	status, _, payload = h.serve(badCall)
 	if status != http.StatusUnprocessableEntity {
 		t.Fatalf("out-of-range threshold = status %d payload %v, want 422", status, payload)

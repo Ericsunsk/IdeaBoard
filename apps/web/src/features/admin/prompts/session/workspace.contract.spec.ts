@@ -61,13 +61,10 @@ describe('prompt config workspace facade', () => {
 
     await workspace.savePrompt(featureSlug)
 
-    expect(mockResource.savePrompt).toHaveBeenCalledWith(
-      {
-        slug: featureSlug,
-        prompt: '',
-      },
-      { operatorReason: '' },
-    )
+    expect(mockResource.savePrompt).toHaveBeenCalledWith({
+      slug: featureSlug,
+      prompt: '',
+    })
     expect(feedback.promptSaved).toHaveBeenCalledWith(featureTitle)
     expect(workspace.promptMap[featureSlug]).toBe('')
   })

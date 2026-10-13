@@ -1,20 +1,11 @@
 import { requireContractData } from '../../../../api/contractKernel'
-import { buildRoutineControlMutationHeaders } from '../../shared'
+import { buildControlMutationHeaders } from '../../shared'
 import {
   listControlFeaturePrompts,
   saveControlFeaturePrompt,
 } from '../../../../api/generated-query/control/control-platform/control-platform'
 import { withControlCopy } from '../../shared'
 
-// Admin feature prompt boundary (W2 transports). The list read rides the
-// Control Plane (`GET /api/control/v1/platform/feature-prompts`); the save
-// moved to the Control Plane (`saveControlFeaturePrompt`) as a routine
-// config write (backend ReasonOptional): no confirm dialog, the audit
-// records an empty reason, while the header-only Idempotency-Key stays
-// required. The unified contract envelope (`{ data }` success / `{ error:
-// { code, message, request_id } }` errors) applies. The deleted
-// `/api/admin/feature-prompts/*` routes are gone; this module is the single
-// transport.
 export type FeaturePrompt = {
   feature_slug: string
   prompt: string
@@ -30,7 +21,6 @@ export type SaveFeaturePromptInput = {
 } & SetAdminFeaturePromptBody
 
 export type SaveFeaturePromptOptions = {
-  operatorReason: string
   idempotencyKey?: string | undefined
 }
 
@@ -46,7 +36,7 @@ export async function fetchAdminFeaturePrompts(signal?: AbortSignal): Promise<Fe
 
 export async function saveAdminFeaturePrompt(
   input: SaveFeaturePromptInput,
-  options: SaveFeaturePromptOptions,
+  options?: SaveFeaturePromptOptions,
 ): Promise<FeaturePrompt> {
   const { slug, ...payload } = input
   try {
@@ -54,7 +44,7 @@ export async function saveAdminFeaturePrompt(
       slug,
       { ...payload },
       {
-        headers: buildRoutineControlMutationHeaders(options),
+        headers: buildControlMutationHeaders(options),
       },
     )
     return requireContractData<FeaturePrompt>(body, '保存提示词失败')

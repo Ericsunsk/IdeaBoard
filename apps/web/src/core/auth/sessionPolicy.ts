@@ -1,5 +1,4 @@
 import {
-  ADMIN_LOGIN_PATH,
   ADMIN_ROOT_PATH,
   isPathUnderRoute,
   HOME_PATH,
@@ -11,7 +10,7 @@ import {
 } from './routePolicy'
 
 const SAFE_REDIRECT_PREFIXES = [USER_ROOT_PATH, ADMIN_ROOT_PATH, SHARE_JOIN_PATH] as const
-const AUTH_REDIRECT_PATHS = [USER_LOGIN_PATH, USER_REGISTER_PATH, ADMIN_LOGIN_PATH] as const
+const AUTH_REDIRECT_PATHS = [USER_LOGIN_PATH, USER_REGISTER_PATH] as const
 const REDIRECT_BASE_URL = 'http://ideaboard.local'
 
 export type AuthFailureActionKind = 'ignore' | 'clear-only' | 'redirect-login' | 'redirect-home'
@@ -132,11 +131,10 @@ function isAdminApiRequest(requestUrl: string) {
 
 export function buildLoginRedirectPath(currentPathname: string, currentFullPath: string) {
   const isAdminPath = isPathUnderRoute(currentPathname, ADMIN_ROOT_PATH)
-  const loginPath = isAdminPath ? ADMIN_LOGIN_PATH : USER_LOGIN_PATH
   const postLoginPath =
     normalizeSafeInternalRedirectPath(currentFullPath)?.fullPath ??
     (isAdminPath ? ADMIN_ROOT_PATH : USER_BOARDS_PATH)
-  return loginPath + '?redirect=' + encodeURIComponent(postLoginPath)
+  return USER_LOGIN_PATH + '?redirect=' + encodeURIComponent(postLoginPath)
 }
 
 export function resolveAuthFailureAction(context: AuthFailureContext): AuthFailureAction {

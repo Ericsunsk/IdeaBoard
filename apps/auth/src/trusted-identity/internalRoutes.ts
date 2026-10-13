@@ -110,7 +110,6 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         reply,
         await options.commands.banIdentity({
           authUserID: request.body?.userId,
-          banReason: request.body?.banReason,
           banExpiresIn: request.body?.banExpiresIn,
         }),
       )

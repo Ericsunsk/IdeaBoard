@@ -1,6 +1,5 @@
 <template>
-  <router-view v-if="isLoginRoute" />
-  <div v-else class="flex min-h-screen bg-background text-foreground">
+  <div class="flex min-h-screen bg-background text-foreground">
     <button
       v-if="drawerOpen"
       type="button"
@@ -71,7 +70,7 @@ import {
   findAdminNavigationItemByPath,
   resolveAdminPageTitle,
 } from './navigation'
-import { ADMIN_CREDITS_PATH, ADMIN_LOGIN_PATH, isPathUnderRoute } from '../routePaths'
+import { ADMIN_CREDITS_PATH, isPathUnderRoute } from '../routePaths'
 import { useBrandLogoOverrides } from '../shared'
 import { useAdminStickyTitle } from './useAdminStickyTitle'
 
@@ -89,10 +88,7 @@ const pinStickyTitle = computed(
   () => Boolean(route.meta.hidePageHeader) || isPathUnderRoute(route.path, ADMIN_CREDITS_PATH),
 )
 const stickyTitleVisible = computed(() => pinStickyTitle.value || showStickyTitle.value)
-const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
-const isAdminShellRoute = computed(() => !isLoginRoute.value)
-
-useBrandLogoOverrides(isAdminShellRoute)
+useBrandLogoOverrides(true)
 
 const activeItem = computed(() => {
   return findAdminNavigationItemByPath(route.path) || adminNavigationByKey.statistics

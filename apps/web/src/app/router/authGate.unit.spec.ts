@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { adminRoutes } from '../../features/admin/app/routes'
 import { SESSION_TRUST_WINDOW_MS } from '../../features/auth'
 import { resolveAuthGateRedirect, resolveAuthSessionRefresh } from './authGate'
 
@@ -88,6 +90,23 @@ describe('resolveAuthSessionRefresh', () => {
 })
 
 describe('resolveAuthGateRedirect', () => {
+  it.each(['/admin', '/admin/credits/reward-codes'])(
+    'requires authentication for Admin routes without an explicit auth flag: %s',
+    (path) => {
+      const router = createRouter({ history: createMemoryHistory(), routes: adminRoutes })
+      const destination = router.resolve(path)
+
+      expect(
+        resolveAuthGateRedirect({
+          isAdminRoute: true,
+          user: null,
+          currentPath: destination.path,
+          currentFullPath: destination.fullPath,
+        }),
+      ).toBe('/user/login?redirect=' + encodeURIComponent(path))
+    },
+  )
+
   it('sends unauthenticated protected navigations to login with the destination preserved', () => {
     expect(
       resolveAuthGateRedirect({
@@ -100,7 +119,7 @@ describe('resolveAuthGateRedirect', () => {
     ).toBe('/user/login?redirect=%2Fuser%2Fcanvas%3FboardId%3Dboard-1')
   })
 
-  it('sends unauthenticated admin navigations to the admin login', () => {
+  it('sends unauthenticated admin navigations to login with the destination preserved', () => {
     expect(
       resolveAuthGateRedirect({
         isAdminRoute: true,
@@ -109,7 +128,7 @@ describe('resolveAuthGateRedirect', () => {
         currentPath: '/admin/users',
         currentFullPath: '/admin/users?page=1',
       }),
-    ).toBe('/admin/login?redirect=%2Fadmin%2Fusers%3Fpage%3D1')
+    ).toBe('/user/login?redirect=%2Fadmin%2Fusers%3Fpage%3D1')
   })
 
   it('redirects logged-in guests to the workspace default', () => {
@@ -124,26 +143,14 @@ describe('resolveAuthGateRedirect', () => {
     ).toBe('/user/boards')
   })
 
-  it('keeps admins on the admin default for admin guest routes', () => {
+  it('sends authenticated admins on guest routes to the workspace default', () => {
     expect(
       resolveAuthGateRedirect({
-        isAdminRoute: true,
+        isAdminRoute: false,
         guest: true,
         user: { role: 'admin' },
-        currentPath: '/admin/login',
-        currentFullPath: '/admin/login',
-      }),
-    ).toBe('/admin/statistics')
-  })
-
-  it('sends non-admin guests on admin routes to the workspace default', () => {
-    expect(
-      resolveAuthGateRedirect({
-        isAdminRoute: true,
-        guest: true,
-        user: { role: 'user' },
-        currentPath: '/admin/login',
-        currentFullPath: '/admin/login',
+        currentPath: '/user/login',
+        currentFullPath: '/user/login',
       }),
     ).toBe('/user/boards')
   })

@@ -33,7 +33,7 @@ func TestControlSupportChannelsRequiresExplicitFields(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status, _, payload := h.serve(controlCall{method: http.MethodPut, path: path, body: tt.body,
-				userID: controlOperatorID, role: "admin", headers: controlMutationHeaders(fmt.Sprintf("support-validation-%d", i), "configure support")})
+				userID: controlOperatorID, role: "admin", headers: controlMutationHeaders(fmt.Sprintf("support-validation-%d", i))})
 			if status != tt.want {
 				t.Fatalf("status = %d payload=%v, want %d", status, payload, tt.want)
 			}
@@ -52,7 +52,7 @@ func TestControlSupportChannelsDeniesUser(t *testing.T) {
 	h := newControlHarness(t, nil)
 	for _, method := range []string{http.MethodGet, http.MethodPut} {
 		status, _, payload := h.serve(controlCall{method: method, path: "/api/control/v1/platform/settings/support-channels",
-			userID: controlUserAID, role: "user", body: `{"channels":[]}`, headers: controlMutationHeaders("user-support-change", "configure support")})
+			userID: controlUserAID, role: "user", body: `{"channels":[]}`, headers: controlMutationHeaders("user-support-change")})
 		if status != http.StatusForbidden || controlErrorCode(t, payload) != string(contract.CodeForbidden) {
 			t.Fatalf("%s user access = status %d payload %v", method, status, payload)
 		}

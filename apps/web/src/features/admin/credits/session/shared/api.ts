@@ -76,7 +76,6 @@ export type CreditReconciliationRun = {
   trigger: CreditReconciliationRunTrigger
   requested_by_public_id?: string
   requested_by_display_name?: string
-  reason?: string
   scheduled_for?: string
   finding_count: number
   critical_count: number
@@ -164,10 +163,6 @@ export type CreditReconciliationFinding = {
   first_seen_at: string
   last_seen_at: string
   resolved_at?: string
-}
-
-export type CreditReconciliationRequest = {
-  reason: string
 }
 
 export type ListAdminCreditReconciliationRunsParams = {
@@ -294,21 +289,21 @@ async function listLedger(
   return view
 }
 
-async function grant(body: ControlCreditCommandRequest, options: ControlCreditMutationOptions) {
+async function grant(body: ControlCreditCommandRequest, options?: ControlCreditMutationOptions) {
   const response = await createControlCreditGrant(body, {
     headers: buildControlMutationHeaders(options),
   })
   return requireContractData<ControlCreditResult>(response, '赠送Idea失败')
 }
 
-async function deduct(body: ControlCreditCommandRequest, options: ControlCreditMutationOptions) {
+async function deduct(body: ControlCreditCommandRequest, options?: ControlCreditMutationOptions) {
   const response = await createControlCreditDeduction(body, {
     headers: buildControlMutationHeaders(options),
   })
   return requireContractData<ControlCreditResult>(response, '扣减Idea失败')
 }
 
-async function refund(body: ControlCreditRefundRequest, options: ControlCreditMutationOptions) {
+async function refund(body: ControlCreditRefundRequest, options?: ControlCreditMutationOptions) {
   const response = await createControlCreditRefund(body, {
     headers: buildControlMutationHeaders(options),
   })
@@ -321,17 +316,12 @@ async function getCreditHealth(options?: ControlRequestOptions): Promise<CreditH
 }
 
 async function startReconciliation(
-  request: CreditReconciliationRequest,
   options?: ControlRequestOptions,
 ): Promise<CreditReconciliationRun> {
-  const reason = request.reason?.trim() ? request.reason.trim() : 'manual reconciliation'
-  const envelope = await startControlReconciliation(
-    { reason },
-    {
-      ...toControlOptions(options),
-      headers: buildControlMutationHeaders({ operatorReason: reason }),
-    },
-  )
+  const envelope = await startControlReconciliation({
+    ...toControlOptions(options),
+    headers: buildControlMutationHeaders(),
+  })
   return requireContractData<CreditReconciliationRun>(envelope, '启动账本检查失败')
 }
 

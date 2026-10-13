@@ -82,7 +82,7 @@ func (fake *fakeIdentityAdminAuth) SetUserRole(_ context.Context, _ string, role
 	return popIdentityAdminError(&fake.roleErrors)
 }
 
-func (fake *fakeIdentityAdminAuth) BanUser(_ context.Context, _ string, _ string, _ int) error {
+func (fake *fakeIdentityAdminAuth) BanUser(_ context.Context, _ string, _ int) error {
 	appendIdentityAdminEvent(fake.events, "auth-ban")
 	return popIdentityAdminError(&fake.banErrors)
 }

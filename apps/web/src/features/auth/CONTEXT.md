@@ -31,6 +31,8 @@ Shape: flat feature (`components/` + `session/` + `pages/`, no `domain/`/`applic
 
 ## Invariants
 
+- `/user/login` is the authentication entry for every account. Protected Admin destinations retain their safe redirect intent; the router enforces the Admin role after authentication.
+
 - Panels and pages never call the generated client or Better Auth directly; chain is `Panel --runAsyncAction--> useUserStore --> authTransport --> authClient/fetch`.
 - Identity changes (login, identity switch, logout, 401/403) must update refs, write/clear the `localStorage` snapshot, and clear all auth-scoped Query cache (`clearAuthScopedQueryCache`).
 - `?redirect=` and post-auth path must pass `isSafeInternalRedirectPath` / `normalizeSafeInternalRedirectPath`; illegal values fall back to `USER_BOARDS_PATH`.

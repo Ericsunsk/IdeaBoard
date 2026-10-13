@@ -38,7 +38,6 @@ describe('AdminSupportChannelsEditor', () => {
       enabled: false,
       sort_order: 0,
     } satisfies Partial<SupportChannelsSetting['channels'][number]>)
-    expect(update.mock.calls[0]?.[1]).toBe('')
     expect(invalidate).toHaveBeenCalledWith({ queryKey: SUPPORT_CHANNELS_QUERY_KEY })
     expect(queryClient.getQueryData(['admin', 'settings', 'support'])).toMatchObject({
       channels: [{ url: 'https://discord.com/new' }],

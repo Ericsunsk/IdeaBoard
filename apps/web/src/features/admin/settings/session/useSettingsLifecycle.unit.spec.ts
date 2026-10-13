@@ -161,11 +161,9 @@ describe('Admin System Settings adapters', () => {
     const registrationRequests: unknown[] = []
     const rateLimitHeaders: Array<{
       idempotencyKey: string | null
-      operatorReason: string | null
     }> = []
     const registrationHeaders: Array<{
       idempotencyKey: string | null
-      operatorReason: string | null
     }> = []
     let registrationEnabled = false
     useMswHandlers(
@@ -177,7 +175,6 @@ describe('Admin System Settings adapters', () => {
         registrationRequests.push(body)
         registrationHeaders.push({
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         })
         registrationEnabled = body.enabled
         return HttpResponse.json({ data: body })
@@ -197,7 +194,6 @@ describe('Admin System Settings adapters', () => {
         rateLimitRequests.push(body)
         rateLimitHeaders.push({
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({ data: body })
       }),
@@ -220,13 +216,11 @@ describe('Admin System Settings adapters', () => {
       await expect(harness.value.saveRateLimit()).resolves.toBe(true)
       expect(rateLimitRequests).toEqual([{ window_seconds: 60, max_requests: 240 }])
       expect(rateLimitHeaders[0]?.idempotencyKey).toMatch(/.+/)
-      expect(rateLimitHeaders[0]?.operatorReason).toBeNull()
       expect(feedback.rateLimitSaved).toHaveBeenCalledOnce()
 
       await harness.value.handleToggleRegistration(true)
       expect(registrationRequests).toEqual([{ enabled: true }])
       expect(registrationHeaders[0]?.idempotencyKey).toMatch(/.+/)
-      expect(registrationHeaders[0]?.operatorReason).toBeNull()
       expect(harness.value.registrationEnabled.value).toBe(true)
       expect(feedback.registrationUpdated).toHaveBeenCalledWith(true)
     } finally {

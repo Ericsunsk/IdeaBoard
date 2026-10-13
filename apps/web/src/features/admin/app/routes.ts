@@ -22,12 +22,6 @@ export const adminRoutes: RouteRecordRaw[] = [
         path: '',
         redirect: ADMIN_DEFAULT_PATH,
       },
-      {
-        path: 'login',
-        name: 'AdminLogin',
-        component: () => import('./login/AdminLoginPage.vue'),
-        meta: { guest: true },
-      },
       ...adminNavigationRouteDefs
         .filter((item) => item.key !== 'credits' && item.key !== 'settings')
         .map((item) => ({

@@ -147,8 +147,7 @@ import { useAnomalyRadar } from '../shared'
 import { useAdminToast } from '../shared'
 import type { AdminAnomalyItem } from '../shared'
 import { adminAnomalyPopoverClass } from '../shared'
-import { ADMIN_LOGIN_PATH } from '../routePaths'
-import { USER_BOARDS_PATH } from '../../workspace/routePaths'
+import { USER_BOARDS_PATH, USER_LOGIN_PATH } from '../../workspace/routePaths'
 import UserAccountMenu from '../../account/ui/chrome/UserAccountMenu.vue'
 import type { UserAccountMenuItem } from '../../account/ui/chrome/userAccountMenu.types'
 
@@ -211,7 +210,7 @@ function handleUserAction(action: 'boards' | 'logout') {
     void router.push(USER_BOARDS_PATH)
     return
   }
-  void logoutAndRedirect(ADMIN_LOGIN_PATH, { replace: true })
+  void logoutAndRedirect(USER_LOGIN_PATH, { replace: true })
 }
 
 defineExpose({

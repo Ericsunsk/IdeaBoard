@@ -2,10 +2,9 @@ package httpapi
 
 // Control mail-setting tests: the mail handlers delegate to the
 // Auth-owned mail seam under the standard control guard (capability,
-// audit with operator reason, header-only idempotency, contract
+// audit with operator identity, header-only idempotency, contract
 // envelope), fail closed without the seam, and map Auth failures onto
-// stable control codes. Legacy /api/admin/settings/mail* routes are not
-// touched here.
+// stable control codes.
 
 import (
 	"context"
@@ -83,10 +82,9 @@ func newMailHarness(t *testing.T, mail *fakeControlMail) *controlHarness {
 	})
 }
 
-func mailMutationHeaders(key, reason string) map[string]string {
+func mailMutationHeaders(key string) map[string]string {
 	return map[string]string{
 		contract.IdempotencyKeyHeader: key,
-		OperatorReasonHeader:          reason,
 	}
 }
 
@@ -156,7 +154,7 @@ func TestControlMailSettingUpdate(t *testing.T) {
 				method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 				body:   `{"from_name":"IdeaBoard","from_email":"auth@example.com"` + tc.field + `}`,
 				userID: controlOperatorID, role: "admin",
-				headers: mailMutationHeaders("mail-enabled-"+tc.name, "update mail"),
+				headers: mailMutationHeaders("mail-enabled-" + tc.name),
 			})
 			if status != http.StatusOK {
 				t.Fatalf("status = %d, want 200 (%v)", status, payload)
@@ -177,14 +175,14 @@ func TestControlMailSettingUpdate(t *testing.T) {
 		})
 	}
 
-	t.Run("update delegates with the operator as actor and audits the reason", func(t *testing.T) {
+	t.Run("update delegates with the operator as actor and audits the outcome", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 			body:   `{"from_name":"IdeaBoard Ops","from_email":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-put-1", "rotate sender"),
+			headers: mailMutationHeaders("mail-put-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d, want 200 (%v)", status, payload)
@@ -209,30 +207,14 @@ func TestControlMailSettingUpdate(t *testing.T) {
 		if last.Capability != ControlCapabilityPlatform || last.Operation != "platform.update_mail_setting" {
 			t.Fatalf("audit = %+v, want control:platform platform.update_mail_setting", last)
 		}
-		if last.Reason != "rotate sender" || last.Outcome != ControlAuditOK {
-			t.Fatalf("audit reason/outcome = %+v", last)
+		if last.Outcome != ControlAuditOK {
+			t.Fatalf("audit outcome = %+v", last)
 		}
 	})
 
-	t.Run("body reason satisfies the requirement", func(t *testing.T) {
+	t.Run("idempotency key is required", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
-		status, _, payload := h.serve(controlCall{
-			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
-			body:   `{"from_name":"IdeaBoard","from_email":"noreply@example.com","reason":"body reason"}`,
-			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-put-2"},
-		})
-		if status != http.StatusOK {
-			t.Fatalf("status = %d, want 200 (%v)", status, payload)
-		}
-	})
-
-	t.Run("reason is optional but the idempotency key stays required", func(t *testing.T) {
-		mail := newFakeControlMail()
-		h := newMailHarness(t, mail)
-		// Routine config exemption: key without reason succeeds and
-		// audits the empty reason as-is.
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 			body:   `{"from_name":"IdeaBoard","from_email":"noreply@example.com"}`,
@@ -242,14 +224,13 @@ func TestControlMailSettingUpdate(t *testing.T) {
 		if status != http.StatusOK {
 			t.Fatalf("key-only status = %d, want 200 (%v)", status, payload)
 		}
-		if last := h.sink.Records()[len(h.sink.Records())-1]; last.Reason != "" || last.Operation != "platform.update_mail_setting" {
-			t.Fatalf("key-only audit = %+v, want empty reason", last)
+		if last := h.sink.Records()[len(h.sink.Records())-1]; last.Operation != "platform.update_mail_setting" {
+			t.Fatalf("key-only audit = %+v, want the recorded operation", last)
 		}
 		status, _, payload = h.serve(controlCall{
 			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 			body:   `{"from_name":"IdeaBoard","from_email":"noreply@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{OperatorReasonHeader: "has reason"},
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", status)
@@ -271,7 +252,7 @@ func TestControlMailSettingUpdate(t *testing.T) {
 			method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 			body:   `{"from_name":"IdeaBoard","from_email":"noreply@example.com","bogus":1}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-put-4", "reason"),
+			headers: mailMutationHeaders("mail-put-4"),
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400 (%v)", status, payload)
@@ -301,7 +282,7 @@ func TestControlMailSettingUpdate(t *testing.T) {
 					method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 					body:   `{"from_name":"IdeaBoard","from_email":"noreply@example.com"}`,
 					userID: controlOperatorID, role: "admin",
-					headers: mailMutationHeaders("mail-put-err-"+tc.name, "reason"),
+					headers: mailMutationHeaders("mail-put-err-" + tc.name),
 				})
 				if status != tc.status {
 					t.Fatalf("status = %d, want %d (%v)", status, tc.status, payload)
@@ -321,7 +302,7 @@ func TestControlMailSettingDelete(t *testing.T) {
 	status, _, payload := h.serve(controlCall{
 		method: http.MethodDelete, path: "/api/control/v1/platform/settings/mail",
 		userID: controlOperatorID, role: "admin",
-		headers: mailMutationHeaders("mail-del-1", "decommission mail"),
+		headers: mailMutationHeaders("mail-del-1"),
 	})
 	if status != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (%v)", status, payload)
@@ -341,14 +322,14 @@ func TestControlMailSettingDelete(t *testing.T) {
 }
 
 func TestControlMailSettingTest(t *testing.T) {
-	t.Run("test sends and acks with reason, key, and audit", func(t *testing.T) {
+	t.Run("test sends and acks with key and audit", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-1", "verify sender"),
+			headers: mailMutationHeaders("mail-test-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d, want 200 (%v)", status, payload)
@@ -369,47 +350,30 @@ func TestControlMailSettingTest(t *testing.T) {
 		if last.Capability != ControlCapabilityPlatform || last.Operation != "platform.test_mail_setting" {
 			t.Fatalf("audit = %+v, want control:platform platform.test_mail_setting", last)
 		}
-		if last.Reason != "verify sender" || last.IdempotencyKey != "mail-test-1" || last.Outcome != ControlAuditOK {
-			t.Fatalf("audit reason/key/outcome = %+v", last)
+		if last.IdempotencyKey != "mail-test-1" || last.Outcome != ControlAuditOK {
+			t.Fatalf("audit key/outcome = %+v", last)
 		}
 	})
 
-	t.Run("body reason satisfies the requirement", func(t *testing.T) {
+	t.Run("idempotency key is required", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)
-		status, _, payload := h.serve(controlCall{
-			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
-			body:   `{"recipient":"ops@example.com","reason":"body reason"}`,
-			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-test-body-reason"},
-		})
-		if status != http.StatusOK {
-			t.Fatalf("status = %d, want 200 (%v)", status, payload)
-		}
-	})
-
-	t.Run("reason is optional but the idempotency key stays required", func(t *testing.T) {
-		mail := newFakeControlMail()
-		h := newMailHarness(t, mail)
-		// Routine probe exemption: key without reason still sends and
-		// audits the empty reason as-is.
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-test-no-reason"},
+			headers: map[string]string{contract.IdempotencyKeyHeader: "mail-test-key"},
 		})
 		if status != http.StatusOK {
 			t.Fatalf("key-only status = %d, want 200 (%v)", status, payload)
 		}
-		if last := h.sink.Records()[len(h.sink.Records())-1]; last.Reason != "" || last.Operation != "platform.test_mail_setting" {
-			t.Fatalf("key-only audit = %+v, want empty reason", last)
+		if last := h.sink.Records()[len(h.sink.Records())-1]; last.Operation != "platform.test_mail_setting" {
+			t.Fatalf("key-only audit = %+v, want the recorded operation", last)
 		}
 		status, _, payload = h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{OperatorReasonHeader: "has reason"},
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", status)
@@ -430,7 +394,7 @@ func TestControlMailSettingTest(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:    `{"recipient":"ops@example.com"}`,
-			headers: mailMutationHeaders("mail-test-cap-1", "reason"),
+			headers: mailMutationHeaders("mail-test-cap-1"),
 		})
 		if status != http.StatusUnauthorized {
 			t.Fatalf("anon status = %d, want 401", status)
@@ -442,7 +406,7 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlUserAID, role: "user",
-			headers: mailMutationHeaders("mail-test-cap-2", "reason"),
+			headers: mailMutationHeaders("mail-test-cap-2"),
 		})
 		if status != http.StatusForbidden {
 			t.Fatalf("member status = %d, want 403", status)
@@ -462,7 +426,7 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   body,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-replay-1", "verify sender"),
+			headers: mailMutationHeaders("mail-test-replay-1"),
 		}
 		status, _, _ := h.serve(first)
 		if status != http.StatusOK {
@@ -475,7 +439,7 @@ func TestControlMailSettingTest(t *testing.T) {
 		}
 		mail.mu.Unlock()
 		second := first
-		second.headers = mailMutationHeaders("mail-test-replay-1", "verify sender")
+		second.headers = mailMutationHeaders("mail-test-replay-1")
 		status, _, payload := h.serve(second)
 		if status != http.StatusOK {
 			t.Fatalf("replay status = %d, want 200 (%v)", status, payload)
@@ -498,14 +462,14 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-conflict-1", "verify sender"),
+			headers: mailMutationHeaders("mail-test-conflict-1"),
 		}
 		if status, _, _ := h.serve(first); status != http.StatusOK {
 			t.Fatalf("first status = %d, want 200", status)
 		}
 		divergent := first
 		divergent.body = `{"recipient":"other@example.com"}`
-		divergent.headers = mailMutationHeaders("mail-test-conflict-1", "verify sender")
+		divergent.headers = mailMutationHeaders("mail-test-conflict-1")
 		status, _, payload := h.serve(divergent)
 		if status != http.StatusConflict {
 			t.Fatalf("divergent status = %d, want 409", status)
@@ -527,7 +491,7 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"  "}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-2", "reason"),
+			headers: mailMutationHeaders("mail-test-2"),
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400 (%v)", status, payload)
@@ -550,7 +514,7 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-3", "reason"),
+			headers: mailMutationHeaders("mail-test-3"),
 		})
 		if status != http.StatusConflict {
 			t.Fatalf("status = %d, want 409 (%v)", status, payload)
@@ -568,7 +532,7 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-fail-1", "verify sender"),
+			headers: mailMutationHeaders("mail-test-fail-1"),
 		}
 		status, _, payload := h.serve(call)
 		if status != http.StatusServiceUnavailable {
@@ -613,7 +577,7 @@ func TestControlMailSettingTest(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 			body:   `{"recipient":"ops@example.com"}`,
 			userID: controlOperatorID, role: "admin",
-			headers: mailMutationHeaders("mail-test-fail-2", "verify sender"),
+			headers: mailMutationHeaders("mail-test-fail-2"),
 		}
 		status, _, payload := h.serve(call)
 		if status != http.StatusServiceUnavailable {

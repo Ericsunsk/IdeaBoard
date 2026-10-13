@@ -40,9 +40,6 @@ function formatCreditsBillingError(error: unknown, fallback: string) {
     if (candidate.code === 'billing_wallet_restricted') {
       return '账户当前受限，暂时无法操作。请先处理账户限制。'
     }
-    if (candidate.code === 'control_reason_required') {
-      return '需要填写操作原因后重试。'
-    }
   }
   return formatAdminApiError(error, fallback)
 }

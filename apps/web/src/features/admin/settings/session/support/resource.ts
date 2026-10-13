@@ -5,7 +5,7 @@ import {
 import { SupportChannelKind } from '../../../../../api/generated-query/control/model/supportChannelKind'
 import type { SupportChannelsSetting } from '../../../../../api/generated-query/control/model/supportChannelsSetting'
 import { requireContractData } from '../../../../../api/contractKernel'
-import { buildRoutineControlMutationHeaders } from '../../../shared/index'
+import { buildControlMutationHeaders } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'
 export type { SupportChannelsSetting } from '../../../../../api/generated-query/control/model/supportChannelsSetting'
@@ -14,7 +14,7 @@ export const supportChannelsQueryKey = ['admin', 'settings', 'support'] as const
 export const supportChannelKinds = Object.values(SupportChannelKind)
 export interface AdminSupportChannelsResource {
   get(): Promise<SupportChannelsSetting>
-  update(input: SupportChannelsSetting, operatorReason: string): Promise<SupportChannelsSetting>
+  update(input: SupportChannelsSetting): Promise<SupportChannelsSetting>
 }
 
 function toSetting(data: SupportChannelsSetting): SupportChannelsSetting {
@@ -31,15 +31,11 @@ async function getSupportChannels(): Promise<SupportChannelsSetting> {
 
 async function updateSupportChannels(
   input: SupportChannelsSetting,
-  operatorReason: string,
 ): Promise<SupportChannelsSetting> {
-  // Routine config write (backend ReasonOptional): the reason may be empty
-  // (audit records it as-is) while Idempotency-Key stays required.
-  const reason = operatorReason.trim()
   try {
     const data = requireContractData<SupportChannelsSetting>(
       await updateControlSupportChannels(input, {
-        headers: buildRoutineControlMutationHeaders({ operatorReason: reason }),
+        headers: buildControlMutationHeaders(),
       }),
       '读取客户支持失败',
     )

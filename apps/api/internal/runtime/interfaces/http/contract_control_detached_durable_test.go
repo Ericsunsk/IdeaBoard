@@ -45,14 +45,14 @@ func newDetachedStripeHarness(t *testing.T, pool *pgxpool.Pool, payments *fakeCo
 	})
 }
 
-func detachedMailTestCall(key, reason, body string) controlCall {
+func detachedMailTestCall(key, body string) controlCall {
 	if body == "" {
 		body = `{"recipient":"ops@example.com"}`
 	}
 	return controlCall{
 		method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
 		body: body, userID: controlOperatorID, role: "admin",
-		headers: mailMutationHeaders(key, reason),
+		headers: mailMutationHeaders(key),
 	}
 }
 
@@ -60,7 +60,7 @@ func TestControlDetachedMailProbeReplayAcrossInstances(t *testing.T) {
 	pool := testdb.Open(t)
 	mail1 := newFakeControlMail()
 	h1 := newDetachedMailHarness(t, pool, mail1)
-	status, _, _ := h1.serve(detachedMailTestCall("detached-mail-1", "verify", ""))
+	status, _, _ := h1.serve(detachedMailTestCall("detached-mail-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("first probe status = %d, want 200", status)
 	}
@@ -74,7 +74,7 @@ func TestControlDetachedMailProbeReplayAcrossInstances(t *testing.T) {
 	// Second instance: fresh L1, same DB. Must replay without resending.
 	mail2 := newFakeControlMail()
 	h2 := newDetachedMailHarness(t, pool, mail2)
-	status, _, _ = h2.serve(detachedMailTestCall("detached-mail-1", "verify", ""))
+	status, _, _ = h2.serve(detachedMailTestCall("detached-mail-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("cross-instance replay status = %d, want 200", status)
 	}
@@ -93,10 +93,10 @@ func TestControlDetachedMailProbeConflictBeforeSend(t *testing.T) {
 	pool := testdb.Open(t)
 	mail := newFakeControlMail()
 	h := newDetachedMailHarness(t, pool, mail)
-	if status, _, _ := h.serve(detachedMailTestCall("detached-mail-conflict-1", "verify", `{"recipient":"ops@example.com"}`)); status != http.StatusOK {
+	if status, _, _ := h.serve(detachedMailTestCall("detached-mail-conflict-1", `{"recipient":"ops@example.com"}`)); status != http.StatusOK {
 		t.Fatalf("first status = %d, want 200", status)
 	}
-	status, _, payload := h.serve(detachedMailTestCall("detached-mail-conflict-1", "verify", `{"recipient":"other@example.com"}`))
+	status, _, payload := h.serve(detachedMailTestCall("detached-mail-conflict-1", `{"recipient":"other@example.com"}`))
 	if status != http.StatusConflict {
 		t.Fatalf("divergent status = %d, want 409", status)
 	}
@@ -115,7 +115,7 @@ func TestControlDetachedMailProbeFailureReExecutes(t *testing.T) {
 	mail := newFakeControlMail()
 	mail.testErr = &fakeMailProbeError{status: http.StatusBadGateway}
 	h := newDetachedMailHarness(t, pool, mail)
-	call := detachedMailTestCall("detached-mail-fail-1", "verify", "")
+	call := detachedMailTestCall("detached-mail-fail-1", "")
 	if status, _, _ := h.serve(call); status != http.StatusServiceUnavailable {
 		t.Fatalf("failure status = %d, want 503", status)
 	}
@@ -144,7 +144,7 @@ func TestControlDetachedMailUpdateReplayAcrossInstances(t *testing.T) {
 		method: http.MethodPut, path: "/api/control/v1/platform/settings/mail",
 		body:   `{"from_name":"Ops","from_email":"ops@example.com"}`,
 		userID: controlOperatorID, role: "admin",
-		headers: mailMutationHeaders("detached-mail-put-1", "rotate"),
+		headers: mailMutationHeaders("detached-mail-put-1"),
 	}
 	if status, _, _ := h1.serve(call); status != http.StatusOK {
 		t.Fatalf("first update status = %d, want 200", status)
@@ -169,7 +169,7 @@ func TestControlDetachedStripeConfigReplayAcrossInstances(t *testing.T) {
 		method: http.MethodPut, path: "/api/control/v1/payments/providers/stripe",
 		body:   `{"purchases_enabled":true}`,
 		userID: controlOperatorID, role: "admin",
-		headers: controlMutationHeaders("detached-stripe-1", "rotate keys"),
+		headers: controlMutationHeaders("detached-stripe-1"),
 	}
 	if status, _, _ := h1.serve(call); status != http.StatusOK {
 		t.Fatalf("first stripe status = %d, want 200", status)
@@ -215,7 +215,7 @@ func TestControlDetachedInProgressIsRetryableAndStaleTakeover(t *testing.T) {
 		t.Fatalf("commit in-progress: %v", err)
 	}
 	// Fresh in-progress: concurrent same-key must 503 without sending.
-	status, _, _ := h.serve(detachedMailTestCall("detached-inprog-1", "verify", ""))
+	status, _, _ := h.serve(detachedMailTestCall("detached-inprog-1", ""))
 	if status != http.StatusServiceUnavailable {
 		t.Fatalf("in-progress status = %d, want 503 retryable", status)
 	}
@@ -232,7 +232,7 @@ func TestControlDetachedInProgressIsRetryableAndStaleTakeover(t *testing.T) {
 		durable.Operator, durable.Operation, durable.TargetType, durable.TargetID, durable.Key); err != nil {
 		t.Fatalf("age orphan: %v", err)
 	}
-	status, _, _ = h.serve(detachedMailTestCall("detached-inprog-1", "verify", ""))
+	status, _, _ = h.serve(detachedMailTestCall("detached-inprog-1", ""))
 	if status != http.StatusOK {
 		t.Fatalf("stale takeover status = %d, want 200", status)
 	}
@@ -253,7 +253,7 @@ func TestControlDetachedSettlementFailureNeverResends(t *testing.T) {
 			scope := &failedDetachedOutcomeScope{pgControlTxScope: pgControlTxScope{db: pool}, failure: failure, t: t}
 			mail := newFakeControlMail()
 			h := newControlHarness(t, func(d *ContractControlDeps) { d.Mail = mail; d.TxScope = scope; d.IdempotencyDurable = store })
-			call := detachedMailTestCall("detached-settlement-"+failure, "verify", "")
+			call := detachedMailTestCall("detached-settlement-"+failure, "")
 			status, _, payload := h.serve(call)
 			if status != http.StatusServiceUnavailable || controlErrorCode(t, payload) != string(contract.CodeServiceUnavailable) {
 				t.Fatalf("failed settlement: %d %+v", status, payload)

@@ -285,11 +285,14 @@ func NormalizeMetadata(metadata domain.CommandMetadata) (domain.CommandMetadata,
 	metadata.Actor.ID = strings.TrimSpace(metadata.Actor.ID)
 	metadata.Source = strings.TrimSpace(metadata.Source)
 	metadata.Reason = strings.TrimSpace(metadata.Reason)
+	if metadata.Actor.Type == domain.ActorAdmin {
+		metadata.Reason = ""
+	}
 	metadata.BusinessReference.Type = strings.TrimSpace(metadata.BusinessReference.Type)
 	metadata.BusinessReference.ID = strings.TrimSpace(metadata.BusinessReference.ID)
 	if metadata.IdempotencyKey == "" || len(metadata.IdempotencyKey) > 160 ||
 		metadata.Actor.Type == "" || metadata.Actor.ID == "" || len(metadata.Actor.ID) > 128 ||
-		metadata.Source == "" || len(metadata.Source) > 64 || metadata.Reason == "" ||
+		metadata.Source == "" || len(metadata.Source) > 64 || (metadata.Actor.Type != domain.ActorAdmin && metadata.Reason == "") ||
 		metadata.BusinessReference.Type == "" || len(metadata.BusinessReference.Type) > 64 ||
 		metadata.BusinessReference.ID == "" || len(metadata.BusinessReference.ID) > 160 {
 		return domain.CommandMetadata{}, domain.ErrInvalidCommand

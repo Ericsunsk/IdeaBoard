@@ -58,9 +58,7 @@ const requiredTokens = [
   ...['content', 'popover', 'banner', 'lightbox'].map((role) => `--z-index-${role}`),
   ...['strong', 'emphasis', 'display'].map((role) => `--font-weight-admin-${role}`),
   ...['card', 'control', 'chip'].map((role) => `--radius-admin-${role}`),
-  ...['shell', 'popover', 'drawer', 'empty-state', 'login-card'].map(
-    (role) => `--spacing-admin-${role}`,
-  ),
+  ...['shell', 'popover', 'drawer', 'empty-state'].map((role) => `--spacing-admin-${role}`),
   '--color-overlay-btn-bg',
   '--color-overlay-btn-bg-hover',
   '--color-canvas-accent-wash',

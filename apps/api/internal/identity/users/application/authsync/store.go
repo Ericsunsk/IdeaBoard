@@ -61,7 +61,6 @@ type Intent struct {
 	Op               string
 	DesiredRole      string
 	DesiredBanned    bool
-	Reason           string
 	ExpiresInSeconds int
 	BaseVersion      int64
 	Status           string
@@ -81,7 +80,6 @@ type InsertIntentParams struct {
 	Op               string
 	DesiredRole      string
 	DesiredBanned    bool
-	Reason           string
 	ExpiresInSeconds int
 	BaseVersion      int64
 }
@@ -355,12 +353,12 @@ func (s *Store) InsertIntent(ctx context.Context, params InsertIntentParams) (in
 	var id int64
 	if err := s.executor(ctx).QueryRow(ctx, `
 INSERT INTO identity_auth_sync_intents (
-  user_id, auth_user_id, op, desired_role, desired_banned, reason,
+  user_id, auth_user_id, op, desired_role, desired_banned,
   expires_in_seconds, base_version
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id`,
 		params.UserID, authUserID, op, role, params.DesiredBanned,
-		strings.TrimSpace(params.Reason), params.ExpiresInSeconds, params.BaseVersion,
+		params.ExpiresInSeconds, params.BaseVersion,
 	).Scan(&id); err != nil {
 		return 0, fmt.Errorf("identity auth sync: insert intent: %w", err)
 	}
@@ -393,7 +391,7 @@ func (s *Store) ReadIntent(ctx context.Context, intentID int64, forUpdate, tryLo
 		return Intent{}, false, fmt.Errorf("identity auth sync: invalid intent request")
 	}
 	query := `
-SELECT id, user_id, auth_user_id, op, desired_role, desired_banned, reason,
+SELECT id, user_id, auth_user_id, op, desired_role, desired_banned,
        expires_in_seconds, base_version, status, attempts, last_error,
        next_attempt_at, claimed_at
 FROM identity_auth_sync_intents WHERE id = $1`
@@ -405,7 +403,7 @@ FROM identity_auth_sync_intents WHERE id = $1`
 	}
 	err = s.executor(ctx).QueryRow(ctx, query, intentID).Scan(
 		&intent.ID, &intent.UserID, &intent.AuthUserID, &intent.Op, &intent.DesiredRole,
-		&intent.DesiredBanned, &intent.Reason, &intent.ExpiresInSeconds, &intent.BaseVersion,
+		&intent.DesiredBanned, &intent.ExpiresInSeconds, &intent.BaseVersion,
 		&intent.Status, &intent.Attempts, &intent.LastError, &intent.NextAttemptAt, &intent.ClaimedAt,
 	)
 	if err != nil {

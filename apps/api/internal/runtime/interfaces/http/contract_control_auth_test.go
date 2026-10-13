@@ -1,8 +1,8 @@
 package httpapi
 
-// Control Plane behavior tests (issue #808). The fakes live in
+// Control Plane behavior tests. The fakes live in
 // contract_control_test.go; this file holds the matrix, audit,
-// idempotency, reason, envelope, rate-limit, and scope tests.
+// idempotency, envelope, rate-limit, and scope tests.
 
 import (
 	"context"
@@ -81,10 +81,9 @@ func newControlHarness(t *testing.T, mutate func(*ContractControlDeps)) *control
 	return h
 }
 
-func controlMutationHeaders(key, reason string) map[string]string {
+func controlMutationHeaders(key string) map[string]string {
 	return map[string]string{
 		contract.IdempotencyKeyHeader: key,
-		OperatorReasonHeader:          reason,
 	}
 }
 
@@ -101,11 +100,11 @@ func TestControlAuthMatrix(t *testing.T) {
 	}
 	mutations := []controlCall{
 		{method: http.MethodPost, path: "/api/control/v1/credits/grants", body: grantBody,
-			headers: controlMutationHeaders("matrix-key-1", "matrix reason")},
+			headers: controlMutationHeaders("matrix-key-1")},
 		{method: http.MethodPost, path: "/api/control/v1/tasks/task_matrix123/cancel",
-			headers: controlMutationHeaders("matrix-key-2", "matrix reason")},
+			headers: controlMutationHeaders("matrix-key-2")},
 		{method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/impersonation", targetUser),
-			headers: controlMutationHeaders("matrix-key-3", "matrix reason")},
+			headers: controlMutationHeaders("matrix-key-3")},
 	}
 
 	t.Run("anonymous denied with 401", func(t *testing.T) {
@@ -149,7 +148,7 @@ func TestControlAuthMatrix(t *testing.T) {
 			call.userID = controlOperatorID
 			call.role = "admin"
 			call.caps = nil
-			call.headers = controlMutationHeaders(fmt.Sprintf("matrix-allow-%d", i), "matrix reason")
+			call.headers = controlMutationHeaders(fmt.Sprintf("matrix-allow-%d", i))
 			status, _, _ := h.serve(call)
 			if status == http.StatusUnauthorized || status == http.StatusForbidden {
 				t.Fatalf("%s %s admin status = %d, want allowed", call.method, call.path, status)
@@ -165,7 +164,7 @@ func TestControlAuthMatrix(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/credits/grants", body: grantBody,
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityCredits},
-			headers: controlMutationHeaders("matrix-scope-1", "scoped reason"),
+			headers: controlMutationHeaders("matrix-scope-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("scoped grant status = %d, want 200", status)
@@ -190,7 +189,7 @@ func TestControlAuditFields(t *testing.T) {
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/ban", targetUser),
 			body:   `{"expires_in_days":7}`,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("audit-key-1", "audit reason one"),
+			headers: controlMutationHeaders("audit-key-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("ban status = %d, body=%v", status, payload)
@@ -212,8 +211,8 @@ func TestControlAuditFields(t *testing.T) {
 		if record.RequestID == "" || !strings.HasPrefix(record.RequestID, "test-control-req-") {
 			t.Fatalf("request_id = %q", record.RequestID)
 		}
-		if record.IdempotencyKey != "audit-key-1" || record.Reason != "audit reason one" {
-			t.Fatalf("idempotency/reason = %q %q", record.IdempotencyKey, record.Reason)
+		if record.IdempotencyKey != "audit-key-1" {
+			t.Fatalf("idempotency = %q", record.IdempotencyKey)
 		}
 		if record.Outcome != ControlAuditOK || record.Status != http.StatusOK {
 			t.Fatalf("outcome/status = %q %d", record.Outcome, record.Status)
@@ -250,7 +249,7 @@ func TestControlAuditFields(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/tasks/task_boom123/cancel",
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("audit-key-2", "boom reason"),
+			headers: controlMutationHeaders("audit-key-2"),
 		})
 		h.tasks.failCancel = nil
 		if status != http.StatusInternalServerError {
@@ -266,7 +265,7 @@ func TestControlAuditFields(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/impersonation", targetUser),
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("audit-key-3", "support session"),
+			headers: controlMutationHeaders("audit-key-3"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("impersonation status = %d", status)
@@ -304,7 +303,7 @@ func TestControlIdempotencyReplayAndConflict(t *testing.T) {
 	body := fmt.Sprintf(`{"user_id":%q,"amount_credits":5,"business_reference_id":"idem-1"}`, targetUser)
 
 	t.Run("same key and body replays without re-executing", func(t *testing.T) {
-		headers := controlMutationHeaders("idem-key-1", "idem reason")
+		headers := controlMutationHeaders("idem-key-1")
 		status, _, first := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/credits/grants", body: body,
 			userID: controlOperatorID, role: "admin", headers: headers,
@@ -342,7 +341,7 @@ func TestControlIdempotencyReplayAndConflict(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/credits/grants", body: other,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("idem-key-1", "idem reason"),
+			headers: controlMutationHeaders("idem-key-1"),
 		})
 		if status != http.StatusConflict {
 			t.Fatalf("conflict status = %d, want 409", status)
@@ -353,32 +352,14 @@ func TestControlIdempotencyReplayAndConflict(t *testing.T) {
 	})
 }
 
-func TestControlReasonRequired(t *testing.T) {
+func TestControlMutationIdempotency(t *testing.T) {
 	h := newControlHarness(t, nil)
 	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
-
-	t.Run("mutation without reason is 400", func(t *testing.T) {
-		status, _, payload := h.serve(controlCall{
-			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/unban", targetUser),
-			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{contract.IdempotencyKeyHeader: "reason-key-1"},
-		})
-		if status != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", status)
-		}
-		if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
-			t.Fatalf("code = %q, want control_reason_required", code)
-		}
-		if h.identity.callCount("unban") != 0 {
-			t.Fatal("reasonless mutation must not reach the command seam")
-		}
-	})
 
 	t.Run("missing idempotency key is 400", func(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/unban", targetUser),
 			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{OperatorReasonHeader: "has reason"},
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", status)
@@ -388,12 +369,12 @@ func TestControlReasonRequired(t *testing.T) {
 		}
 	})
 
-	t.Run("body reason satisfies the requirement", func(t *testing.T) {
+	t.Run("mutation executes with a key", func(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/ban", targetUser),
-			body:   `{"reason":"body reason","expires_in_days":1}`,
+			body:   `{"expires_in_days":1}`,
 			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{contract.IdempotencyKeyHeader: "reason-key-2"},
+			headers: map[string]string{contract.IdempotencyKeyHeader: "mutation-key-2"},
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d, want 200", status)
@@ -467,7 +448,7 @@ func TestControlCreditsOperatorAndErrors(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/credits/grants", body: body,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("meta-key-1", "meta reason"),
+			headers: controlMutationHeaders("meta-key-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d, body=%v", status, payload)
@@ -481,9 +462,7 @@ func TestControlCreditsOperatorAndErrors(t *testing.T) {
 		if h.credits.lastMeta.Source != "control_grant" {
 			t.Fatalf("source = %q, want control_grant", h.credits.lastMeta.Source)
 		}
-		if h.credits.lastMeta.Reason != "meta reason" {
-			t.Fatalf("reason = %q", h.credits.lastMeta.Reason)
-		}
+
 		data := controlData(t, payload).(map[string]any)
 		wallet, _ := data["wallet"].(map[string]any)
 		if wallet["user_id"] != targetUser {
@@ -498,7 +477,7 @@ func TestControlCreditsOperatorAndErrors(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/credits/deductions", body: body,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("meta-key-2", "meta reason"),
+			headers: controlMutationHeaders("meta-key-2"),
 		})
 		if status != http.StatusForbidden {
 			t.Fatalf("status = %d, want 403", status)
@@ -519,7 +498,7 @@ func TestControlImpersonationGuards(t *testing.T) {
 		status, header, payload := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/impersonation", targetUser),
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("imp-key-1", "support"),
+			headers: controlMutationHeaders("imp-key-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d, body=%v", status, payload)
@@ -534,7 +513,7 @@ func TestControlImpersonationGuards(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/impersonation", operatorUser),
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("imp-key-2", "support"),
+			headers: controlMutationHeaders("imp-key-2"),
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", status)
@@ -545,7 +524,7 @@ func TestControlImpersonationGuards(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/impersonation", adminTarget),
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("imp-key-3", "support"),
+			headers: controlMutationHeaders("imp-key-3"),
 		})
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", status)
@@ -556,11 +535,11 @@ func TestControlImpersonationGuards(t *testing.T) {
 func TestControlTaskScope(t *testing.T) {
 	h := newControlHarness(t, nil)
 
-	t.Run("cancel records operator actor and reason", func(t *testing.T) {
+	t.Run("cancel records operator actor", func(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/tasks/task_cancel123/cancel",
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("cancel-key-1", "runaway task"),
+			headers: controlMutationHeaders("cancel-key-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d, body=%v", status, payload)
@@ -569,7 +548,7 @@ func TestControlTaskScope(t *testing.T) {
 			t.Fatalf("cancel = calls %d actor %d task %q", h.tasks.cancelCalls, h.tasks.cancelActor, h.tasks.cancelTaskID)
 		}
 		last := h.sink.Records()[len(h.sink.Records())-1]
-		if last.TargetID != "task_cancel123" || last.Reason != "runaway task" || last.Capability != ControlCapabilityTasks {
+		if last.TargetID != "task_cancel123" || last.Capability != ControlCapabilityTasks {
 			t.Fatalf("cancel audit = %+v", last)
 		}
 	})
@@ -594,7 +573,7 @@ func TestControlTaskScope(t *testing.T) {
 		req.Header.Set(contract.RequestIDHeader, "test-control-submit")
 		req.Header.Set("X-Test-User", "11")
 		req.Header.Set("X-Test-Role", "admin")
-		for key, value := range controlMutationHeaders("submit-key-1", "must not exist") {
+		for key, value := range controlMutationHeaders("submit-key-1") {
 			req.Header.Set(key, value)
 		}
 		recorder := httptest.NewRecorder()
@@ -614,7 +593,7 @@ func TestControlWorkspaceOverrides(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/workspaces/%s/members", h.ws.PublicID),
 			body: addBody, userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("ws-key-1", "support override"),
+			headers: controlMutationHeaders("ws-key-1"),
 		})
 		if status != http.StatusCreated {
 			t.Fatalf("add status = %d, body=%v", status, payload)
@@ -630,7 +609,7 @@ func TestControlWorkspaceOverrides(t *testing.T) {
 		status, _, _ = h.serve(controlCall{
 			method: http.MethodPatch, path: fmt.Sprintf("/api/control/v1/workspaces/%s/members/%s", h.ws.PublicID, memberUser),
 			body: updateBody, userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("ws-key-2", "promote member"),
+			headers: controlMutationHeaders("ws-key-2"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("update status = %d", status)
@@ -638,7 +617,7 @@ func TestControlWorkspaceOverrides(t *testing.T) {
 		status, _, _ = h.serve(controlCall{
 			method: http.MethodDelete, path: fmt.Sprintf("/api/control/v1/workspaces/%s/members/%s", h.ws.PublicID, memberUser),
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("ws-key-3", "remove member"),
+			headers: controlMutationHeaders("ws-key-3"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("remove status = %d", status)
@@ -679,7 +658,7 @@ func TestControlBillingAndPayments(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/billing/catalog/ai-image/prices",
 			body:   `{"prices":{"1k":10,"2k":20}}`,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("cat-key-1", "price update"),
+			headers: controlMutationHeaders("cat-key-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d", status)
@@ -689,24 +668,12 @@ func TestControlBillingAndPayments(t *testing.T) {
 		}
 	})
 
-	t.Run("catalog publish accepts body reason alongside header", func(t *testing.T) {
-		status, _, _ := h.serve(controlCall{
-			method: http.MethodPost, path: "/api/control/v1/billing/catalog/ai-image/prices",
-			body:   `{"prices":{"1k":10},"reason":"price update"}`,
-			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("cat-key-2", "price update"),
-		})
-		if status != http.StatusOK {
-			t.Fatalf("status = %d", status)
-		}
-	})
-
-	t.Run("payment refund carries header key and reason", func(t *testing.T) {
+	t.Run("payment refund carries header key and actor", func(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/payments/orders/ord_123/refunds",
 			body:   `{"idea_quantity":5}`,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("pay-key-1", "duplicate charge"),
+			headers: controlMutationHeaders("pay-key-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("status = %d", status)
@@ -715,7 +682,7 @@ func TestControlBillingAndPayments(t *testing.T) {
 			t.Fatalf("refund calls = %d", h.payments.refundCalls)
 		}
 		cmd := h.payments.refundCmd
-		if cmd.IdempotencyKey != "pay-key-1" || cmd.Reason != "duplicate charge" || cmd.ActorID != controlOperatorID {
+		if cmd.IdempotencyKey != "pay-key-1" || cmd.ActorID != controlOperatorID {
 			t.Fatalf("refund command = %+v", cmd)
 		}
 	})
@@ -761,7 +728,7 @@ func TestControlFailClosedWithoutDeps(t *testing.T) {
 	}
 	if status, payload := call(admin(controlCall{
 		method: http.MethodPut, path: "/api/control/v1/platform/settings/branding",
-		body: `{}`, headers: controlMutationHeaders("fc-1", "reason"),
+		body: `{}`, headers: controlMutationHeaders("fc-1"),
 	})); status != http.StatusServiceUnavailable {
 		t.Fatalf("unwired settings update = %d (%v), want 503", status, payload)
 	}
@@ -799,5 +766,34 @@ func TestControlNeverTouchesEventLayer(t *testing.T) {
 				t.Fatalf("%s must never touch the event layer (found %q)", name, banned)
 			}
 		}
+	}
+}
+
+func TestControlMutationRejectsUnknownFields(t *testing.T) {
+	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
+	for _, field := range []string{"reason", "operator_note"} {
+		t.Run(field, func(t *testing.T) {
+			h := newControlHarness(t, nil)
+			calls := []controlCall{
+				{method: http.MethodPost, path: "/api/control/v1/credits/grants",
+					body: fmt.Sprintf(`{"user_id":%q,"amount_credits":5,"business_reference_id":"unknown-field",%q:"text"}`, targetUser, field)},
+				{method: http.MethodPost, path: "/api/control/v1/payments/orders/ord_123/refunds",
+					body: fmt.Sprintf(`{"idea_quantity":5,%q:"text"}`, field)},
+				{method: http.MethodPost, path: "/api/control/v1/billing/catalog/ai-image/prices",
+					body: fmt.Sprintf(`{"prices":{"1k":10},%q:"text"}`, field)},
+			}
+			for i, call := range calls {
+				call.userID = controlOperatorID
+				call.role = "admin"
+				call.headers = controlMutationHeaders(fmt.Sprintf("unknown-field-%d", i))
+				status, _, payload := h.serve(call)
+				if status != http.StatusBadRequest || controlErrorCode(t, payload) != string(contract.CodeBadRequest) {
+					t.Fatalf("%s status = %d payload = %v, want bad_request", call.path, status, payload)
+				}
+			}
+			if h.credits.calls != 0 || h.payments.refundCalls != 0 || h.catalog.publishActor != 0 {
+				t.Fatal("rejected payloads must not reach command seams")
+			}
+		})
 	}
 }

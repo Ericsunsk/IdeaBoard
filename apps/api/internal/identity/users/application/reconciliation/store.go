@@ -27,7 +27,6 @@ type Run struct {
 	Status       string
 	Trigger      string
 	RequestedBy  *int64
-	Reason       string
 	ScheduledFor *time.Time
 	FindingCount int64
 	AttemptCount int
@@ -91,14 +90,14 @@ func (s *Store) dbWithContext(_ context.Context) *pgxpool.Pool {
 
 // startRunTx creates (or reuses) a run inside the caller's transaction so
 // run creation and execute-job enqueue commit atomically.
-func (s *Store) startRunTx(ctx context.Context, tx pgx.Tx, trigger string, requestedBy *int64, reason *string, scheduledFor *time.Time, onlyIfOverdue bool) (*int64, bool, error) {
+func (s *Store) startRunTx(ctx context.Context, tx pgx.Tx, trigger string, requestedBy *int64, scheduledFor *time.Time, onlyIfOverdue bool) (*int64, bool, error) {
 	if tx == nil {
 		return nil, false, errInvalidReconciliationCommand
 	}
 	var runID *int64
 	var enqueueRequired bool
-	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_identity_admin_reconciliation($1, $2, $3, $4, $5)`,
-		trigger, requestedBy, reason, scheduledFor, onlyIfOverdue,
+	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_identity_admin_reconciliation($1, $2, $3, $4)`,
+		trigger, requestedBy, scheduledFor, onlyIfOverdue,
 	).Scan(&runID, &enqueueRequired); err != nil {
 		return nil, false, fmt.Errorf("identity admin reconciliation: create run: %w", err)
 	}
@@ -112,7 +111,7 @@ func (s *Store) getRun(ctx context.Context, runID int64) (Run, error) {
 		return Run{}, errInvalidReconciliationCommand
 	}
 	row := pool.QueryRow(ctx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count,
+SELECT id, status, trigger_type, requested_by, scheduled_for, finding_count,
        attempt_count, error_message, requested_at, started_at, completed_at
 FROM identity_admin_reconciliation_runs WHERE id = $1`, runID)
 	run, err := scanRun(row)
@@ -312,13 +311,11 @@ type findingRows interface {
 
 func scanRun(scanner interface{ Scan(...any) error }) (Run, error) {
 	var run Run
-	var reason *string
 	if err := scanner.Scan(
 		&run.ID,
 		&run.Status,
 		&run.Trigger,
 		&run.RequestedBy,
-		&reason,
 		&run.ScheduledFor,
 		&run.FindingCount,
 		&run.AttemptCount,
@@ -328,9 +325,6 @@ func scanRun(scanner interface{ Scan(...any) error }) (Run, error) {
 		&run.CompletedAt,
 	); err != nil {
 		return Run{}, err
-	}
-	if reason != nil {
-		run.Reason = *reason
 	}
 	return run, nil
 }

@@ -16,22 +16,6 @@
           </AlertDialogDescription>
         </div>
 
-        <label
-          v-if="activeAdminConfirm?.reasonEnabled"
-          for="admin-confirm-reason-textarea"
-          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
-        >
-          <span>{{ activeAdminConfirm?.reasonLabel }}</span>
-          <textarea
-            id="admin-confirm-reason-textarea"
-            :value="activeAdminConfirm?.reason ?? ''"
-            :placeholder="activeAdminConfirm?.reasonPlaceholder"
-            rows="3"
-            class="w-full rounded-lg border border-input bg-background px-3 py-2 text-admin-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
-            @input="handleReasonInput"
-          />
-        </label>
-
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2 pt-2">
           <button
             type="button"
@@ -49,10 +33,7 @@
                 ? 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed'
                 : 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
             ]"
-            :disabled="
-              activeAdminConfirm?.loading ||
-              (activeAdminConfirm?.reasonRequired && !activeAdminConfirm?.reason.trim())
-            "
+            :disabled="activeAdminConfirm?.loading"
             @click="handleConfirm"
           >
             {{ activeAdminConfirm?.loading ? '处理中...' : activeAdminConfirm?.confirmLabel }}
@@ -76,11 +57,6 @@ import { activeAdminConfirm } from '../../session/feedback/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../session/feedback/toast'
 
 const toast = useAdminToast()
-
-function handleReasonInput(event: Event) {
-  const target = event.target as HTMLTextAreaElement | null
-  activeAdminConfirm.value?.setReason(target?.value ?? '')
-}
 
 async function handleConfirm() {
   try {

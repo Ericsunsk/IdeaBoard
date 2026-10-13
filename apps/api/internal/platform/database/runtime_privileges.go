@@ -252,7 +252,7 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 			{
 				Kind: dbprivileges.KindFunction,
 				Names: []string{
-					"start_identity_admin_reconciliation(text, bigint, text, timestamptz, boolean)",
+					"start_identity_admin_reconciliation(text, bigint, timestamptz, boolean)",
 					"fail_identity_admin_reconciliation(bigint, text)",
 				},
 				Required:        []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},

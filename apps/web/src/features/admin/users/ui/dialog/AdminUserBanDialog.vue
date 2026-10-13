@@ -33,20 +33,6 @@
         @update:model-value="handleExpiresInDaysUpdate"
       />
     </label>
-    <label
-      for="admin-ban-reason-textarea"
-      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-admin-strong text-muted-foreground"
-    >
-      <span>{{ USERS_MESSAGES.banReasonLabel }}</span>
-      <AdminTextarea
-        id="admin-ban-reason-textarea"
-        :model-value="reason"
-        :placeholder="USERS_MESSAGES.banReasonPlaceholder"
-        :rows="3"
-        class="w-full"
-        @update:model-value="handleReasonUpdate"
-      />
-    </label>
 
     <template #footer>
       <div class="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -73,7 +59,6 @@ import { AdminBadge } from '../../../shared'
 import { AdminDialogActions } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminSelect } from '../../../shared'
-import { AdminTextarea } from '../../../shared'
 import {
   adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,
@@ -91,7 +76,7 @@ withDefaults(
     visible: boolean
     description: string
     expiresInDays: number
-    reason: string
+
     durationOptions: BanDurationOption[]
     loading?: boolean
   }>(),
@@ -103,7 +88,6 @@ withDefaults(
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
   'update:expiresInDays': [expiresInDays: number]
-  'update:reason': [reason: string]
   cancel: []
   confirm: []
 }>()
@@ -114,9 +98,5 @@ function handleVisibleUpdate(visible: boolean) {
 
 function handleExpiresInDaysUpdate(value: number | null | undefined) {
   emit('update:expiresInDays', value ?? 0)
-}
-
-function handleReasonUpdate(value: string | undefined) {
-  emit('update:reason', value ?? '')
 }
 </script>

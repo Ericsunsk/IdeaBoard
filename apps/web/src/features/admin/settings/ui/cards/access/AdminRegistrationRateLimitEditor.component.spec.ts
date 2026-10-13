@@ -8,8 +8,8 @@ import AdminRegistrationRateLimitEditor from './AdminRegistrationRateLimitEditor
 vi.mock('../../../../../../core/composables/useAppToast')
 
 describe('AdminRegistrationRateLimitEditor', () => {
-  const registrationPuts: Array<{ body: unknown; operatorReason: string | null }> = []
-  const rateLimitPuts: Array<{ body: unknown; operatorReason: string | null }> = []
+  const registrationPuts: Array<{ body: unknown }> = []
+  const rateLimitPuts: Array<{ body: unknown }> = []
   let registrationEnabled = false
 
   function useAccessHandlers() {
@@ -21,7 +21,6 @@ describe('AdminRegistrationRateLimitEditor', () => {
         const body = await request.json()
         registrationPuts.push({
           body,
-          operatorReason: request.headers.get('X-Operator-Reason'),
         })
         registrationEnabled = (body as { enabled: boolean }).enabled
         return HttpResponse.json({ data: body })
@@ -33,7 +32,6 @@ describe('AdminRegistrationRateLimitEditor', () => {
         const body = await request.json()
         rateLimitPuts.push({
           body,
-          operatorReason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({ data: body })
       }),
@@ -89,7 +87,6 @@ describe('AdminRegistrationRateLimitEditor', () => {
 
     await waitFor(() => expect(registrationPuts).toHaveLength(1))
     expect(registrationPuts[0]?.body).toEqual({ enabled: true })
-    expect(registrationPuts[0]?.operatorReason).toBeNull()
     await waitFor(() => expect(toggle).toBeChecked())
   })
 
@@ -104,7 +101,6 @@ describe('AdminRegistrationRateLimitEditor', () => {
 
     await waitFor(() => expect(rateLimitPuts).toHaveLength(1))
     expect(rateLimitPuts[0]?.body).toEqual({ window_seconds: 60, max_requests: 240 })
-    expect(rateLimitPuts[0]?.operatorReason).toBeNull()
   })
 
   it('restores saved rate-limit values without network traffic (resetRateLimit)', async () => {

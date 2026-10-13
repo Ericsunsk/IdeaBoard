@@ -918,10 +918,6 @@
           "banned": {
             "type": "boolean"
           },
-          "ban_reason": {
-            "type": "string",
-            "nullable": true
-          },
           "ban_expires": {
             "type": "string",
             "format": "date-time",
@@ -981,10 +977,6 @@
           "userId": {
             "type": "string",
             "x-go-name": "UserID"
-          },
-          "banReason": {
-            "type": "string",
-            "maxLength": 500
           },
           "banExpiresIn": {
             "type": "integer",

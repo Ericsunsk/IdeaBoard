@@ -27,9 +27,7 @@ export function useOutboundPolicy(options: { feedback: AdminOutboundPolicyFeedba
   const loading = computed(() => resource.query.isLoading.value || resource.query.isFetching.value)
   const saveMutation = useMutation({
     mutationFn: (input: { draft: OutboundPolicyForm }) =>
-      resource.update(outboundPolicyFormToRequest(input.draft), {
-        operatorReason: '',
-      }),
+      resource.update(outboundPolicyFormToRequest(input.draft)),
     onSuccess: async (savedSetting) => {
       hydrate(savedSetting)
       writeOutboundPolicyQueryCache(queryClient, savedSetting)
@@ -58,8 +56,6 @@ export function useOutboundPolicy(options: { feedback: AdminOutboundPolicyFeedba
       return false
     }
 
-    // Routine config write (backend ReasonOptional): save directly
-    // without the confirm dialog; the audit records an empty reason.
     try {
       await saveMutation.mutateAsync({
         draft: normalizeOutboundPolicyFormValue(form.value),

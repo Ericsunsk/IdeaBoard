@@ -60,14 +60,6 @@ const styleCountRules = [
 type StyleCountRuleId = (typeof styleCountRules)[number]['id']
 
 const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
-  'src/features/admin/app/login/AdminLoginPage.vue': {
-    counts: {
-      'raw-color': 0,
-      'raw-shadow': 0,
-    },
-    reason:
-      'Cleared: the login card now uses --shadow-login-card and --radius-board-dialog. Allowance stays registered at zero so reintroduction is caught as an overage.',
-  },
   'src/features/admin/monitor/core/status.ts': {
     counts: {
       'raw-color': 0,

@@ -42,19 +42,17 @@ describe('AuthIdentityStore', () => {
               id: 'auth-user-1',
               role: 'user',
               banned: false,
-              banReason: null,
               banExpires: null,
             },
             {
               id: 'auth-user-2',
               role: 'admin',
               banned: true,
-              banReason: 'spam',
               banExpires: new Date('2026-10-11T03:00:00.000Z'),
             },
             // Rows without a usable identity are dropped, never fabricated.
-            { id: '', role: 'user', banned: false, banReason: null, banExpires: null },
-            { id: 'auth-user-3', role: '', banned: false, banReason: null, banExpires: null },
+            { id: '', role: 'user', banned: false, banExpires: null },
+            { id: 'auth-user-3', role: '', banned: false, banExpires: null },
           ],
           rowCount: 4,
         }
@@ -69,14 +67,12 @@ describe('AuthIdentityStore', () => {
         auth_user_id: 'auth-user-1',
         role: 'user',
         banned: false,
-        ban_reason: null,
         ban_expires: null,
       },
       {
         auth_user_id: 'auth-user-2',
         role: 'admin',
         banned: true,
-        ban_reason: 'spam',
         ban_expires: '2026-10-11T03:00:00.000Z',
       },
     ])
@@ -136,11 +132,11 @@ describe('AuthIdentityStore', () => {
       },
     })
 
-    await store.updateAuthUserBanState('auth-user-1', true, 'policy violation', 3_600)
+    await store.updateAuthUserBanState('auth-user-1', true, 3_600)
 
     assert.match(
       queries[0]?.text ?? '',
-      /CASE WHEN \$1 AND "banned" = TRUE THEN "banExpires" ELSE \$3 END/,
+      /CASE WHEN \$1 AND "banned" = TRUE THEN "banExpires" ELSE \$2 END/,
     )
   })
 

@@ -1,12 +1,7 @@
 package httpapi
 
-// Control payments family (issue #808): payment order reads, payment
-// refunds, and Stripe configuration behind control:payments.
-//
-// Reads and refunds delegate to the payments AdminService seam; refunds
-// carry the header Idempotency-Key plus operator reason into the
-// CreatePaymentRefundCommand. Legacy /api/admin/payments/* routes are
-// untouched.
+// Control payment order reads, refunds, and Stripe configuration delegate to
+// Payments seams. Refund commands carry the acting operator and idempotency key.
 
 import (
 	"errors"
@@ -112,17 +107,15 @@ func (d *ContractControlDeps) createControlPaymentRefund(c *gin.Context, ctx con
 		return
 	}
 	var req struct {
-		IdeaQuantity int64  `json:"idea_quantity"`
-		Reason       string `json:"reason"`
+		IdeaQuantity int64 `json:"idea_quantity"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest22)
 		return
 	}
-	reason := controlReasonOr(ctx, req.Reason)
 	refund, err := d.Payments.CreatePaymentRefund(c.Request.Context(), paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: ctx.Operator.UserID(), OrderNumber: strings.TrimSpace(c.Param("order_number")),
-		IdeaQuantity: req.IdeaQuantity, IdempotencyKey: ctx.IdemKey, Reason: reason,
+		IdeaQuantity: req.IdeaQuantity, IdempotencyKey: ctx.IdemKey,
 	})
 	if err != nil {
 		writeControlPaymentRefundError(c, err)

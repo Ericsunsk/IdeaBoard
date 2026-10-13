@@ -1,10 +1,10 @@
 package httpapi
 
-// Control Plane guard, rate limits, and route registration (issue #808).
+// Control Plane guard, rate limits, and route registration.
 //
 // The guard is the single choke point every /api/control/v1 route flows
 // through: capability check (never IsAdmin) -> Idempotency-Key enforcement
-// on mutations (plus reason enforcement unless the route is ReasonOptional)
+// on mutations
 // -> idempotent execution with response replay -> handler -> mandatory audit
 // record (success/read/denied/failure).
 // Denied and failed calls are audited too.
@@ -27,7 +27,6 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
-	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/contract"
@@ -78,13 +77,13 @@ type ControlCreditDirectory interface {
 }
 
 // ControlTaskAdmin is the scoped task read/ops seam for the Control
-// Plane: get/list/cancel with operator reason. There is deliberately NO
+// Plane: get/list/cancel. There is deliberately NO
 // task creation path here (no duplicate of the submit surface).
 type ControlTaskAdmin interface {
 	GetTask(ctx context.Context, taskID string) (*taskapp.AdminMonitorDetail, error)
 	ListTasks(ctx context.Context, req *tasksdomain.TaskListRequest) ([]taskapp.AdminMonitorListItem, tasksdomain.TaskListCounts, error)
 	ResolveAdminTaskUserID(ctx context.Context, rawPublicID string) (int64, error)
-	CancelAdminTask(ctx context.Context, taskID string, adminID int64, reason string) error
+	CancelAdminTask(ctx context.Context, taskID string, adminID int64) error
 }
 
 // ControlBillingAccountStore provisions the implicit per-workspace
@@ -99,7 +98,7 @@ type ControlBillingAccountStore interface {
 // Proxied platform-config handlers (AIGateway, Storage, SearchProviders,
 // FeaturePrompts, Monitor) keep their validation and side-effect logic
 // single-sourced; the control guard still enforces capability, audit,
-// idempotency, and reason (required unless the route sets ReasonOptional)
+// idempotency
 // uniformly around them.
 type ContractControlDeps struct {
 	Users           ControlUserService
@@ -114,7 +113,7 @@ type ContractControlDeps struct {
 	UserDirectory   V1UserDirectory
 	BillingAccounts ControlBillingAccountStore
 	Catalog         billinghttp.BillableCatalogService
-	// ModelPools is the Service Model Pool catalog seam (#849): Admin
+	// ModelPools is the Service Model Pool catalog seam: Admin
 	// pool reads and atomic replaces. *catalog.Repository is the
 	// production implementation; nil keeps the pool routes fail-closed
 	// with 501-style 503 (never a second model catalog).
@@ -150,32 +149,30 @@ type ContractControlDeps struct {
 	BrandingUpload ControlBrandingUploadService
 	Idempotency    *contract.IdempotencyStore
 	// IdempotencyDurable is the PostgreSQL authority behind Control
-	// mutation idempotency (#891): the guard claims the in-progress
+	// mutation idempotency: the guard claims the in-progress
 	// fact inside its guard-owned transaction before running the
 	// handler, so concurrent same-key claimants elect exactly one
 	// winner across processes and restarts, and retries replay the
 	// stored 2xx response. The process-local Idempotency store stays a
-	// same-process fast-path optimization only. Nil keeps the legacy
-	// L1-only path (tests and unwired deployments).
+	// same-process fast-path optimization only. Without this seam,
+	// replay is limited to the local process.
 	IdempotencyDurable ControlIdempotencyDurable
 	RateLimiter        *ControlRateLimiter
 	AuditSink          ControlAuditSink
 	// TxScope and TxAudit opt the guarded MUTATIONS into the atomic
-	// audit path (step 2): the guard begins one transaction per
+	// audit path: the guard begins one transaction per
 	// mutating call, the handler runs inside it, and the audit row
 	// joins it before commit, so an audit failure rolls the call back
 	// and a business failure still commits its failure audit row (the
 	// domain-owned business write already rolled back itself). Both
-	// nil keeps the legacy detached path (reads, fail-fast denials,
+	// nil selects the detached path (reads, fail-fast denials,
 	// and unwired deployments). Reads never set these: a read performs
 	// no business write, so there is nothing for its audit row to be
 	// atomic with.
 	TxScope ControlTxScope
 	TxAudit ControlAuditTxWriter
 	// Mail is the Auth-owned transactional mail seam behind the control
-	// mail-setting handlers (the same Auth-owned seam instance; the legacy
-	// admin mail routes were removed in #809); nil keeps the mail routes
-	// fail-closed with 503.
+	// mail-setting handlers; nil keeps these routes fail-closed with 503.
 	Mail ControlMailService
 }
 
@@ -349,14 +346,11 @@ type controlHandler func(c *gin.Context, ctx controlContext)
 // controlContext carries the guard-resolved request facts handlers need.
 type controlContext struct {
 	Operator principal.Principal
-	Reason   string
 	IdemKey  string
-	Body     []byte
 }
 
 // guard wraps a handler with admin-only auth, Idempotency-Key enforcement
-// on mutations (plus operator-reason enforcement unless the route sets
-// ReasonOptional), idempotent execution, and the mandatory
+// on mutations, idempotent execution, and the mandatory
 // audit record. It returns a gin handler. The capability argument is the
 // audit label only (family strings survive for the audit record and the
 // openapi x-capabilities mirror); authorization is the admin business
@@ -398,18 +392,6 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 				return
 			}
 			body = raw
-			record.Reason = extractControlReason(c, body)
-			// Empty optional reasons remain empty in the audit; supplied reasons are validated.
-			if record.Reason != "" || !route.ReasonOptional {
-				if _, err := adminaction.New(p.UserID(), record.Reason); err != nil {
-					record.Status = http.StatusBadRequest
-					record.Outcome = ControlAuditDenied
-					emitControlAudit(c.Request.Context(), d.sink(), record)
-					contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, msgControlReasonRequired)
-					c.Abort()
-					return
-				}
-			}
 			key, err := contract.IdempotencyKeyFromHeader(c)
 			if err != nil {
 				record.Status = http.StatusBadRequest
@@ -420,10 +402,6 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 				return
 			}
 			record.IdempotencyKey = key
-		} else if reason := extractControlReason(c, nil); reason != "" {
-			if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
-				record.Reason = reason
-			}
 		}
 		if route.Target != nil {
 			record.TargetType, record.TargetID = route.Target(c, body)
@@ -437,7 +415,7 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			// With TxScope+TxAudit wired the atomic variant runs
 			// for joined mutations: one guard-owned transaction
 			// carries the call and the audit row commits or rolls
-			// back with it (step 2).
+			// back with it.
 			// Detached mutations (external side effects that cannot
 			// join a database transaction by construction: Auth
 			// mail/storage/Stripe probes and pre-checked config
@@ -454,35 +432,24 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			if d.atomicAuditEnabled() && !route.Detached {
 				d.runAtomic(c, p, route.Operation, record.IdempotencyKey, body, &record, handler, controlContext{
 					Operator: p,
-					Reason:   record.Reason,
 					IdemKey:  record.IdempotencyKey,
-					Body:     body,
 				})
 				return
 			}
 			if route.Detached && d.detachedDurableEnabled() {
 				d.runDetached(c, p, route.Operation, record.IdempotencyKey, body, &record, handler, controlContext{
 					Operator: p,
-					Reason:   record.Reason,
 					IdemKey:  record.IdempotencyKey,
-					Body:     body,
 				})
 				return
 			}
 			d.runIdempotent(c, p, route.Operation, record.IdempotencyKey, body, &record, handler, controlContext{
 				Operator: p,
-				Reason:   record.Reason,
 				IdemKey:  record.IdempotencyKey,
-				Body:     body,
 			})
 			return
 		}
-		handler(c, controlContext{Operator: p, Reason: record.Reason, Body: body})
-		if reason := controlReasonFromContext(c); reason != "" {
-			if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
-				record.Reason = reason
-			}
-		}
+		handler(c, controlContext{Operator: p})
 		outcome = controlOutcomeFromStatus(c.Writer.Status())
 		record.Status = c.Writer.Status()
 		record.Outcome = outcome
@@ -561,11 +528,6 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 	c.Writer = capture
 	handler(c, ctx)
 	c.Writer = original
-	if reason := controlReasonFromContext(c); reason != "" {
-		if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
-			record.Reason = reason
-		}
-	}
 	status := capture.status
 	if status == 0 {
 		status = http.StatusOK
@@ -588,11 +550,11 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 }
 
 // detachedDurableEnabled reports whether detached mutations take the
-// durable winner-election path (M1). Short independent transactions
+// durable winner-election path. Short independent transactions
 // for the claim/outcome need the transaction scope plus the durable
 // authority; the participant audit writer is deliberately NOT required
-// (detached audit stays an observer). Nil keeps the legacy L1-only
-// path (tests and unwired deployments).
+// (detached audit stays an observer). Without these seams, replay is
+// limited to the local process.
 func (d *ContractControlDeps) detachedDurableEnabled() bool {
 	return d != nil && d.TxScope != nil && d.IdempotencyDurable != nil
 }
@@ -756,11 +718,6 @@ func (d *ContractControlDeps) executeDetachedWinner(c *gin.Context, p principal.
 	c.Writer = capture
 	handler(c, ctx)
 	c.Writer = original
-	if reason := controlReasonFromContext(c); reason != "" {
-		if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
-			record.Reason = reason
-		}
-	}
 	status := capture.status
 	if status == 0 {
 		status = http.StatusOK
@@ -849,9 +806,9 @@ func (d *ContractControlDeps) tryDetachedStaleTakeover(ctx context.Context, dura
 }
 
 // atomicAuditEnabled reports whether the guarded mutations take the
-// atomic path (step 2). Both seams are required: a transaction scope
+// atomic path. Both seams are required: a transaction scope
 // without a participant writer (or vice versa) is a wiring error, and
-// the guard fails safe back to the legacy detached path rather than
+// the guard uses the detached path rather than
 // half-joining a transaction.
 func (d *ContractControlDeps) atomicAuditEnabled() bool {
 	return d != nil && d.TxScope != nil && d.TxAudit != nil
@@ -983,7 +940,7 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 		return
 	}
-	// Post-commit announcements (#889): participants on the borrowed
+	// Post-commit announcements: participants on the borrowed
 	// transaction defer publication to hooks run after the commit below,
 	// so an audit or commit failure drops them instead of announcing a
 	// rolled-back fact. Replay/conflict paths above return before any
@@ -992,8 +949,8 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 	// Durable single-winner election: the in-progress fact lands in the
 	// guard transaction before the handler runs, so a concurrent
 	// same-key claimant blocks on the primary key until this
-	// transaction commits or rolls back. Nil keeps the legacy L1-only
-	// path (tests and unwired deployments).
+	// transaction commits or rolls back. Without durable storage, replay
+	// is limited to the local process.
 	durableWinner := false
 	if d.IdempotencyDurable != nil {
 		claimResult, claimErr := d.IdempotencyDurable.Claim(txCtx, controlTxOf(txCtx), durable)
@@ -1051,11 +1008,6 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 	c.Request = c.Request.WithContext(txCtx)
 	handler(c, ctx)
 	c.Writer = original
-	if reason := controlReasonFromContext(c); reason != "" {
-		if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
-			record.Reason = reason
-		}
-	}
 	status := capture.status
 	if status == 0 {
 		status = http.StatusOK
@@ -1104,7 +1056,7 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 		return
 	}
-	// #889: the guard-owned transaction (business plus audit) committed:
+	// The guard-owned transaction (business plus audit) committed:
 	// run deferred post-commit announcements now. Every failure path
 	// above returns before this line, so audit/commit failures drop
 	// their hooks with txCtx and publish nothing.

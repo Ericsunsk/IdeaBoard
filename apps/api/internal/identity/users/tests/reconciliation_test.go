@@ -39,14 +39,13 @@ func TestIdentityAdminReconciliationDriftMatrix(t *testing.T) {
 		storageUID: "RCNOLK", role: "user", status: StatusActive,
 	})
 
-	banReason := "spam"
 	banExpires := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
 	auth.states["auth-recon-role"] = reconAuthState("auth-recon-role", "admin", false)
 	// Ban drift: local active, Auth banned (with metadata the local
 	// row cannot store: alert-only, recorded in details).
 	auth.states["auth-recon-ban"] = authidentity.AuthUserState{
 		AuthUserID: "auth-recon-ban", Role: "user", Banned: true,
-		BanReason: &banReason, BanExpiresAt: &banExpires,
+		BanExpiresAt: &banExpires,
 	}
 	// "auth-recon-gone" is absent: Auth 404 while the local row links.
 	reconciler := newTestReconciler(pool, auth, false)
@@ -93,9 +92,7 @@ func TestIdentityAdminReconciliationDriftMatrix(t *testing.T) {
 	if byType["role_mismatch"]["remediation"] != "push_to_auth" {
 		t.Fatalf("role mismatch remediation = %v, want push_to_auth", byType["role_mismatch"]["remediation"])
 	}
-	if byType["ban_state_mismatch"]["auth_ban_reason"] != "spam" {
-		t.Fatalf("ban mismatch details = %v, want Auth ban reason recorded", byType["ban_state_mismatch"])
-	}
+
 	if byType["ban_state_mismatch"]["auth_ban_expires"] != "2026-10-11T03:00:00Z" {
 		t.Fatalf("ban mismatch details = %v, want Auth ban expiry recorded", byType["ban_state_mismatch"])
 	}
@@ -155,12 +152,11 @@ func TestIdentityAdminReconciliationNoDrift(t *testing.T) {
 		storageUID: "RCCLNB", role: "user", status: StatusBanned,
 	})
 
-	banReason := "No reason"
 	banExpires := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
 	auth.states["auth-recon-clean-admin"] = reconAuthState("auth-recon-clean-admin", "admin", false)
 	auth.states["auth-recon-clean-banned"] = authidentity.AuthUserState{
 		AuthUserID: "auth-recon-clean-banned", Role: "user", Banned: true,
-		BanReason: &banReason, BanExpiresAt: &banExpires,
+		BanExpiresAt: &banExpires,
 	}
 	reconciler := newTestReconciler(pool, auth, false)
 

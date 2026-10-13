@@ -84,12 +84,10 @@ export function useAdminCreditWalletResource(
     mutationFn: (
       input: { body: Parameters<AdminCreditsBillingApi['grant']>[0] } & {
         idempotencyKey: string
-        operatorReason: string
       },
     ) =>
       api.grant(input.body, {
         idempotencyKey: input.idempotencyKey,
-        operatorReason: input.operatorReason,
       }),
     onSuccess: invalidateWallet,
   })
@@ -97,12 +95,10 @@ export function useAdminCreditWalletResource(
     mutationFn: (
       input: { body: Parameters<AdminCreditsBillingApi['deduct']>[0] } & {
         idempotencyKey: string
-        operatorReason: string
       },
     ) =>
       api.deduct(input.body, {
         idempotencyKey: input.idempotencyKey,
-        operatorReason: input.operatorReason,
       }),
     onSuccess: invalidateWallet,
   })
@@ -110,19 +106,17 @@ export function useAdminCreditWalletResource(
     mutationFn: (
       input: { body: Parameters<AdminCreditsBillingApi['refund']>[0] } & {
         idempotencyKey: string
-        operatorReason: string
       },
     ) =>
       api.refund(input.body, {
         idempotencyKey: input.idempotencyKey,
-        operatorReason: input.operatorReason,
       }),
     onSuccess: invalidateWallet,
   })
 
   async function executeCommand(input: AdminCreditCommandInput): Promise<AdminCreditCommandResult> {
     const built = buildAdminCreditCommandRequest(input)
-    const options = { idempotencyKey: built.idempotencyKey, operatorReason: built.operatorReason }
+    const options = { idempotencyKey: built.idempotencyKey }
     if (input.kind === 'grant') {
       const result = await grantMutation.mutateAsync({
         body: built.body as Parameters<AdminCreditsBillingApi['grant']>[0],

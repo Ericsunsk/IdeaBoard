@@ -80,6 +80,7 @@ describe('AdminUsersPage', () => {
                 type: 'ledger_integrity',
                 source: 'reconciliation',
                 reason: '需要人工复核',
+
                 created_at: '2026-07-24T08:00:00Z',
                 created_by: { type: 'system' },
                 related_object: { type: 'run', id: 'run-1' },
@@ -104,7 +105,6 @@ describe('AdminUsersPage', () => {
         commandRequests.push({
           body: (await request.json()) as Record<string, unknown>,
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({
           data: {
@@ -181,7 +181,6 @@ describe('AdminUsersPage', () => {
 
     await user.click(within(dialog).getByRole('button', { name: '赠送' }))
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '20')
-    await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '运营补偿')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
     await waitFor(() =>
       expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认赠送Idea' })),
@@ -192,9 +191,7 @@ describe('AdminUsersPage', () => {
         body: {
           user_id: userPublicID,
           amount_credits: 20,
-          reason: '运营补偿',
         },
-        operatorReason: '运营补偿',
       }),
     )
     expect(commandRequests[0] as Record<string, unknown>).toMatchObject({
@@ -305,10 +302,8 @@ describe('AdminUsersPage', () => {
         expect(body).toMatchObject({
           user_id: userPublicID,
           amount_credits: 25,
-          reason: '运营扣减',
         })
         expect(request.headers.get('Idempotency-Key')).toMatch(/^control-ui:deduction:/)
-        expect(request.headers.get('X-Operator-Reason')).toBe('运营扣减')
         availableCredits = 100
         hasDeduction = true
         return HttpResponse.json({
@@ -335,7 +330,6 @@ describe('AdminUsersPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'admin_balance_user 的Idea账户' })
     await user.click(within(dialog).getByRole('button', { name: '扣减' }))
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '25')
-    await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '运营扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
     await waitFor(() =>
       expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认扣减Idea' })),
@@ -365,9 +359,7 @@ describe('AdminUsersPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'admin_balance_user 的Idea账户' })
     await user.click(within(dialog).getByRole('button', { name: '扣减' }))
     const amount = within(dialog).getByRole('spinbutton', { name: 'Idea数量' })
-    const reason = within(dialog).getByRole('textbox', { name: /操作原因/ })
     await user.type(amount, '25')
-    await user.type(reason, '受限账户扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
     await waitFor(() =>
       expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认扣减Idea' })),
@@ -375,7 +367,6 @@ describe('AdminUsersPage', () => {
 
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalled())
     expect(amount).toHaveValue('25')
-    expect(reason).toHaveValue('受限账户扣减')
     expect(within(dialog).getByText('125 Ideas')).toBeVisible()
     await user.click(within(dialog).getByRole('button', { name: '关闭' }))
     expect(
@@ -419,12 +410,10 @@ describe('AdminUsersPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'admin_balance_user 的Idea账户' })
     await user.click(within(dialog).getByRole('button', { name: '扣减' }))
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '25')
-    await user.type(within(dialog).getByRole('textbox', { name: /操作原因/ }), '等待扣减')
     await user.click(within(dialog).getByRole('button', { name: '核对操作' }))
 
     await waitFor(() => expect(deductionRequests).toBe(1))
     expect(within(dialog).getByRole('spinbutton', { name: 'Idea数量' })).toBeDisabled()
-    expect(within(dialog).getByRole('textbox', { name: /操作原因/ })).toBeDisabled()
     expect(within(dialog).getByRole('button', { name: '核对操作' })).toBeDisabled()
     expect(within(dialog).getByRole('button', { name: '赠送' })).toBeDisabled()
     expect(within(dialog).getByRole('button', { name: '扣减' })).toBeDisabled()
@@ -468,7 +457,6 @@ describe('AdminUsersPage', () => {
     await user.click(within(dialog).getByRole('button', { name: '退还 charge-eligible 的Idea' }))
     expect(within(dialog).getByText(/原 Charge：charge-eligible，剩余可退 5 Ideas/)).toBeVisible()
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '6')
-    await user.type(within(dialog).getByRole('textbox', { name: /退款原因/ }), '超额退款')
     await user.click(within(dialog).getByRole('button', { name: '核对退款' }))
     expect(within(dialog).getByText('退款不能超过可退余额 5 Ideas')).toBeVisible()
     expect(refundRequests).toBe(0)
@@ -513,10 +501,8 @@ describe('AdminUsersPage', () => {
           user_id: userPublicID,
           charge_transaction_id: 'charge-1',
           amount_credits: 10,
-          reason: '任务取消退款',
         })
         expect(request.headers.get('Idempotency-Key')).toMatch(/^control-ui:refund:/)
-        expect(request.headers.get('X-Operator-Reason')).toBe('任务取消退款')
         availableCredits = 135
         refunded = true
         return HttpResponse.json({
@@ -543,7 +529,6 @@ describe('AdminUsersPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'admin_balance_user 的Idea账户' })
     await user.click(await within(dialog).findByRole('button', { name: '退还 charge-1 的Idea' }))
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Idea数量' }), '10')
-    await user.type(within(dialog).getByRole('textbox', { name: /退款原因/ }), '任务取消退款')
     await user.click(within(dialog).getByRole('button', { name: '核对退款' }))
     await waitFor(() =>
       expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: '确认退款Idea' })),

@@ -121,7 +121,6 @@ import { AdminSwitch } from '../../../shared'
 import { AdminFilterPopover } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
 import { useAdminConfirm } from '../../../shared'
-import { requireDestructiveReason } from '../../../shared'
 import { formatAdminDisplayError } from '../../../shared'
 import { usePaymentOrdersFeedback } from '../../session/orders/usePaymentOrdersFeedback'
 import { adminFramedIconButtonClass } from '../../../shared'
@@ -285,8 +284,6 @@ function retryDetail() {
 async function requestRefund(ideaQuantity: number) {
   const publicOrderNumber = selectedOrderNumber.value
   if (!publicOrderNumber || refundLoading.value) return
-  // Control refunds require an operator reason (audit); a cancelled dialog
-  // aborts silently.
   const confirmed = await adminConfirm.confirm({
     title: PAYMENT_ORDERS_MESSAGES.refundTitle,
     message: PAYMENT_ORDERS_MESSAGES.refundMessage(
@@ -295,19 +292,13 @@ async function requestRefund(ideaQuantity: number) {
     ),
     confirmLabel: PAYMENT_ORDERS_MESSAGES.refundConfirm,
     intent: 'danger',
-    reason: { isRequired: true },
   })
   if (!confirmed) return
-  const operatorReason = requireDestructiveReason(adminConfirm)
-  if (!operatorReason) return
-  await executeRefund(publicOrderNumber, ideaQuantity, operatorReason)
+
+  await executeRefund(publicOrderNumber, ideaQuantity)
 }
 
-async function executeRefund(
-  publicOrderNumber: string,
-  ideaQuantity: number,
-  operatorReason: string,
-) {
+async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
   const key = `${publicOrderNumber}:${ideaQuantity}`
   let idempotencyKey = refundIdempotencyKeys.get(key)
   if (!idempotencyKey) {
@@ -320,7 +311,6 @@ async function executeRefund(
     detail.value = await resource.refund(publicOrderNumber, {
       ideaQuantity,
       idempotencyKey,
-      operatorReason,
     })
     refundIdempotencyKeys.delete(key)
     feedback.refundSubmitted()

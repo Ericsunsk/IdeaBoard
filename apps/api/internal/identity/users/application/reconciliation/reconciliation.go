@@ -1,25 +1,7 @@
-// Package reconciliation runs the Identity admin reconciliation job.
-//
-// Background: the admin commands in
-// internal/identity/users/application/administration apply Auth-then-local
-// without an automatic convergence mechanism. A crash between the two
-// writes (or a partially compensating rollback) leaves the local users row
-// and the Better Auth identity diverged, with no record and no sweep.
-//
-// This job closes the detection gap only. Every scheduled run pages the
-// local users table, batch-reads the Auth side through the read-only
-// AuthUserStateReader seam, and persists one finding per drift. The local
-// row always wins future repairs (recorded in finding details); the dry-run
-// phase never pushes anything anywhere.
-//
-// Deliberately out of scope for this phase:
-//   - banExpires/banReason comparison: the local users row has no such
-//     columns, so Auth-side ban metadata is alert-only (kept in details).
-//   - sessions: a deleted Auth session is unrecoverable, so sessions are
-//     never reconciled.
-//   - automatic remediation: ExecuteReconciliation fails closed when the
-//     auto-remediation opt-in is set; opening it needs a dedicated switch
-//     plus repair-path tests (see ErrAutoRemediationNotSupported).
+// Package reconciliation detects Identity authorization drift through scheduled,
+// read-only Auth comparisons and persisted findings. Business role/status facts
+// determine the reported repair intent; scans never mutate identities or sessions.
+// Auth ban expiry is reported as metadata. Automatic remediation remains disabled.
 package reconciliation
 
 import (
@@ -345,7 +327,7 @@ func (r *Reconciler) ScheduleReconciliation(ctx context.Context, dispatcher RunD
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
-	runID, enqueueRequired, err := r.store.startRunTx(ctx, tx, runTriggerScheduled, nil, nil, &slot, onlyIfOverdue)
+	runID, enqueueRequired, err := r.store.startRunTx(ctx, tx, runTriggerScheduled, nil, &slot, onlyIfOverdue)
 	if err != nil {
 		return nil, err
 	}
@@ -610,12 +592,7 @@ func classifyUserDrift(user *domain.User, state *authidentity.AuthUserState, has
 			"remediation":  action,
 			"applied":      false,
 			"dry_run":      true,
-			"note":         "ban-state drifted; local wins. Auth-side ban reason/expiry (if any) is alert-only: the local row has no ban columns, so a future ban push cannot restore the original reason/expiry",
-		}
-		if state.BanReason != nil {
-			details["auth_ban_reason"] = *state.BanReason
-		} else {
-			details["auth_ban_reason"] = nil
+			"note":         "ban-state drifted; business authorization wins. Auth-side expiry is reported for operator review.",
 		}
 		if state.BanExpiresAt != nil {
 			details["auth_ban_expires"] = state.BanExpiresAt.UTC().Format(time.RFC3339)

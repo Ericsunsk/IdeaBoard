@@ -9,7 +9,6 @@ import {
 } from '../../session/pricing/testing'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('pool review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 const routerMocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string>, path: '/admin/credits/pricing' },
@@ -29,7 +28,6 @@ vi.mock('vue-router', async (importOriginal) => {
 vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
     confirm: confirmMock,
-    readReason: readReasonMock,
   }),
 }))
 
@@ -90,8 +88,6 @@ describe('AdminBillingPricingPage model pools', () => {
     routerMocks.replace.mockReset()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
-    readReasonMock.mockReset()
-    readReasonMock.mockReturnValue('pool review')
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
@@ -153,10 +149,8 @@ describe('AdminBillingPricingPage model pools', () => {
         const body = (await request.json()) as {
           expected_version: number
           entries: unknown[]
-          reason: string
         }
         expect(body.expected_version).toBe(2)
-        expect(body.reason).toBe('')
         return HttpResponse.json({
           data: {
             service: 'cutout',
@@ -212,9 +206,8 @@ describe('AdminBillingPricingPage model pools', () => {
       http.post('/api/control/v1/billing/catalog/:sku/prices', async ({ request, params }) => {
         publishRequests += 1
         expect(params.sku).toBe('ai-image:cutout')
-        const body = (await request.json()) as { prices: Record<string, number>; reason: string }
+        const body = (await request.json()) as { prices: Record<string, number> }
         expect(body.prices['1k']).toBe(5)
-        expect(body.reason).toBe('pool review')
         return HttpResponse.json({
           data: {
             prices: {
@@ -235,10 +228,8 @@ describe('AdminBillingPricingPage model pools', () => {
         const body = (await request.json()) as {
           expected_version: number
           entries: unknown[]
-          reason: string
         }
         expect(body.expected_version).toBe(2)
-        expect(body.reason).toBe('pool review')
         return HttpResponse.json({
           data: {
             service: 'cutout',

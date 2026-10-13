@@ -2,7 +2,6 @@ import { computed, onUnmounted, ref } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared'
 import { useAdminConfirm } from '../../shared'
-import { requireDestructiveReason } from '../../shared'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
 import { useAppClipboard } from '../../../../core/composables/useAppClipboard'
 import { createAdminGatewayResource, type AdminGatewayCatalog } from '../resource'
@@ -58,8 +57,7 @@ export function useAdminModelCatalogWorkspace(
   }
 
   const saveCatalogMutation = useMutation({
-    mutationFn: (input: { items: AdminModelItem[]; operatorReason: string }) =>
-      resource.save(input.items, { operatorReason: input.operatorReason }),
+    mutationFn: (input: { items: AdminModelItem[] }) => resource.save(input.items),
     onSuccess: () => {
       void invalidateCatalog()
     },
@@ -173,10 +171,7 @@ export function useAdminModelCatalogWorkspace(
           return model
         })
         if (enrichedCount > 0) {
-          // Best-effort enrichment writes through control as a routine
-          // config write (backend ReasonOptional): no confirm dialog, the
-          // audit records an empty reason.
-          await resource.save(currentList, { operatorReason: '' })
+          await resource.save(currentList)
         }
       } catch {
         // 探测富化是 best-effort：网络异常不阻塞刷新，列表仍按服务端当前数据展示。
@@ -212,11 +207,8 @@ export function useAdminModelCatalogWorkspace(
         addDialogVisible.value = false
         return
       }
-      // Routine config write (backend ReasonOptional): import directly
-      // without the confirm dialog; the audit records an empty reason.
       await saveCatalogMutation.mutateAsync({
         items: [...toAdd, ...allModels.value],
-        operatorReason: '',
       })
       addDialogVisible.value = false
       feedback.imported(toAdd.length)
@@ -233,17 +225,15 @@ export function useAdminModelCatalogWorkspace(
   async function handleDeleteModel(model: AdminModelItem) {
     const confirmed = await adminConfirm.confirm({
       title: '删除模型',
-      message: `确定要从模型库中移除模型「${model.name} (${model.id})」吗？引用该模型的功能定价映射将一并移除，需重新指定模型。该操作将记录操作人与原因。`,
+      message: `确定要从模型库中移除模型「${model.name} (${model.id})」吗？引用该模型的功能定价映射将一并移除，需重新指定模型。该操作将记录操作人。`,
       confirmLabel: '确认删除',
       intent: 'danger',
-      reason: { isRequired: true },
     })
     if (!confirmed) return
-    const operatorReason = requireDestructiveReason(adminConfirm)
-    if (!operatorReason) return
+
     const nextList = allModels.value.filter((m) => m.id !== model.id)
     try {
-      await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason })
+      await saveCatalogMutation.mutateAsync({ items: nextList })
       feedback.deleted(model.name)
     } catch (caughtError) {
       feedback.deleteFailed(caughtError)
@@ -262,9 +252,7 @@ export function useAdminModelCatalogWorkspace(
         }
         nextList = [item, ...allModels.value]
       }
-      // Routine config write (backend ReasonOptional): save directly
-      // without the confirm dialog; the audit records an empty reason.
-      await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason: '' })
+      await saveCatalogMutation.mutateAsync({ items: nextList })
       editDialogVisible.value = false
       feedback.saved(editingModel.value != null)
       editingModel.value = null

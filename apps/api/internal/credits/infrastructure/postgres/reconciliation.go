@@ -21,7 +21,6 @@ func CreateReconciliationRun(
 	dispatcher ports.ReconciliationRunDispatcher,
 	trigger ports.ReconciliationTrigger,
 	requestedBy *int64,
-	reason *string,
 	scheduledFor *time.Time,
 	onlyIfOverdue bool,
 ) (*int64, bool, error) {
@@ -32,7 +31,7 @@ func CreateReconciliationRun(
 	// back. With no carrier the legacy owned-transaction path below
 	// runs unchanged.
 	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return createReconciliationRunTx(ctx, ambient, dispatcher, trigger, requestedBy, reason, scheduledFor, onlyIfOverdue)
+		return createReconciliationRunTx(ctx, ambient, dispatcher, trigger, requestedBy, scheduledFor, onlyIfOverdue)
 	}
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -45,7 +44,7 @@ func CreateReconciliationRun(
 			slog.Warn("failed to roll back Credits reconciliation transaction", "err", rollbackErr)
 		}
 	}()
-	runID, enqueueRequired, err := createReconciliationRunTx(ctx, tx, dispatcher, trigger, requestedBy, reason, scheduledFor, onlyIfOverdue)
+	runID, enqueueRequired, err := createReconciliationRunTx(ctx, tx, dispatcher, trigger, requestedBy, scheduledFor, onlyIfOverdue)
 	if err != nil {
 		return nil, false, err
 	}
@@ -63,14 +62,13 @@ func createReconciliationRunTx(
 	dispatcher ports.ReconciliationRunDispatcher,
 	trigger ports.ReconciliationTrigger,
 	requestedBy *int64,
-	reason *string,
 	scheduledFor *time.Time,
 	onlyIfOverdue bool,
 ) (*int64, bool, error) {
 	var runID *int64
 	var enqueueRequired bool
-	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_credit_reconciliation($1, $2, $3, $4, $5)`,
-		string(trigger), requestedBy, reason, scheduledFor, onlyIfOverdue,
+	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_credit_reconciliation($1, $2, $3, $4)`,
+		string(trigger), requestedBy, scheduledFor, onlyIfOverdue,
 	).Scan(&runID, &enqueueRequired); err != nil {
 		return nil, false, fmt.Errorf("credits reconciliation: create run: %w", err)
 	}
@@ -114,7 +112,7 @@ func GetReconciliationRun(ctx context.Context, pool *pgxpool.Pool, runID int64) 
 		return ports.ReconciliationRun{}, domain.ErrInvalidCommand
 	}
 	row := pool.QueryRow(ctx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE id = $1`, runID)
 	run, err := ScanReconciliationRun(row)
@@ -133,7 +131,7 @@ func ListReconciliationRuns(ctx context.Context, pool *pgxpool.Pool, input ports
 		return ports.ReconciliationRunPage{}, domain.ErrInvalidCommand
 	}
 	rows, err := pool.Query(ctx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DESC LIMIT $2`, input.BeforeID, limit+1)
 	if err != nil {
@@ -164,13 +162,11 @@ type reconciliationRunScanner interface {
 
 func ScanReconciliationRun(scanner reconciliationRunScanner) (ports.ReconciliationRun, error) {
 	var run ports.ReconciliationRun
-	var reason *string
 	if err := scanner.Scan(
 		&run.ID,
 		&run.Status,
 		&run.Trigger,
 		&run.RequestedBy,
-		&reason,
 		&run.ScheduledFor,
 		&run.FindingCount,
 		&run.CriticalCount,
@@ -182,9 +178,6 @@ func ScanReconciliationRun(scanner reconciliationRunScanner) (ports.Reconciliati
 		&run.CompletedAt,
 	); err != nil {
 		return ports.ReconciliationRun{}, err
-	}
-	if reason != nil {
-		run.Reason = *reason
 	}
 	return run, nil
 }

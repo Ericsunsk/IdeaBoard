@@ -155,7 +155,7 @@ import { formatAdminDisplayError, useAdminToast } from '../../../shared'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
 import { useAdminConfirm } from '../../../shared'
-import { confirmSettingsSave, requireDestructiveReason } from '../../../shared'
+import { confirmSettingsSave } from '../../../shared'
 import { createAdminBillableCatalogResource } from '../../session/pricing/billableCatalogResource'
 import { createAdminModelPoolResource } from '../../session/pricing/modelPoolResource'
 import { serviceOfSku } from '../../core/pricing/skuFeature'
@@ -433,11 +433,7 @@ function handlePoolSaveError(error: unknown) {
 async function savePool(entries: AdminModelPoolEntry[]) {
   const item = poolEditItem.value
   if (!item || poolSavePending.value || !poolEditReady.value) return
-  // Pool replace is a routine config write (backend ReasonOptional): no
-  // confirm dialog, the audit records an empty reason. The save replaces
-  // the complete Service pool atomically against the loaded version (409
-  // on concurrent edits).
-  const operatorReason = ''
+
   poolSavePending.value = true
   poolSaveError.value = ''
   poolSaveStale.value = false
@@ -455,11 +451,7 @@ async function savePool(entries: AdminModelPoolEntry[]) {
     return
   }
   try {
-    const saved = await poolResource.replace(
-      item.sku,
-      { version: poolEditVersion.value, entries },
-      { operatorReason },
-    )
+    const saved = await poolResource.replace(item.sku, { version: poolEditVersion.value, entries })
     applyPoolReplaceSuccess(item, saved)
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.poolSaved)
@@ -490,20 +482,18 @@ async function openPriceDialog(item: AdminBillableItemCard) {
 
 async function confirmArchivedDelete(item: AdminBillableItemCard) {
   if (item.status !== 'archived' || deletePending[item.sku]) return
-  const confirmed = await confirm.confirm({
+  const isConfirmed = await confirm.confirm({
     title: BILLING_PRICING_MESSAGES.deleteTitle,
     message: BILLING_PRICING_MESSAGES.deleteMessage(item.displayName),
     confirmLabel: BILLING_PRICING_MESSAGES.deleteConfirm,
     intent: 'danger',
-    reason: { isRequired: true },
   })
-  if (!confirmed) return
-  const operatorReason = requireDestructiveReason(confirm)
-  if (!operatorReason) return
-  await deleteArchived(item, operatorReason)
+  if (!isConfirmed) return
+
+  await deleteArchived(item)
 }
 
-async function deleteArchived(item: AdminBillableItemCard, operatorReason: string) {
+async function deleteArchived(item: AdminBillableItemCard) {
   if (deletePending[item.sku]) return
   deletePending[item.sku] = true
   if (isDemoMode.value) {
@@ -513,7 +503,7 @@ async function deleteArchived(item: AdminBillableItemCard, operatorReason: strin
     return
   }
   try {
-    await resource.deleteArchived(item.sku, { operatorReason })
+    await resource.deleteArchived(item.sku)
     items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
     toast.success(BILLING_PRICING_MESSAGES.deleted)
   } catch (error) {
@@ -536,14 +526,12 @@ function applyPricePublishSuccess(
 async function publishPrice(prices: Record<PricingVariant, number | undefined>) {
   const item = selectedItem.value
   if (!item || publishPending.value) return
-  // Control writes require an operator reason (audit); a cancelled dialog
-  // aborts silently.
-  const operatorReason = await confirmSettingsSave(confirm, {
+  const isConfirmed = await confirmSettingsSave(confirm, {
     title: BILLING_PRICING_MESSAGES.publishTitle,
     message: BILLING_PRICING_MESSAGES.publishMessage(item.displayName),
     confirmLabel: BILLING_PRICING_MESSAGES.publishConfirm,
   })
-  if (!operatorReason) return
+  if (!isConfirmed) return
   publishPending.value = true
   publishError.value = ''
   if (isDemoMode.value) {
@@ -555,7 +543,7 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
     return
   }
   try {
-    const published = await resource.publishPrices(item.sku, prices, { operatorReason })
+    const published = await resource.publishPrices(item.sku, prices)
     applyPricePublishSuccess(item, published)
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.published)
@@ -601,12 +589,12 @@ async function saveCombinedSettings(
   prices: Record<PricingVariant, number | undefined>,
   entries: AdminModelPoolEntry[],
 ) {
-  const operatorReason = await confirmSettingsSave(confirm, {
+  const isConfirmed = await confirmSettingsSave(confirm, {
     title: BILLING_PRICING_MESSAGES.saveAllTitle,
     message: BILLING_PRICING_MESSAGES.saveAllMessage(item.displayName),
     confirmLabel: BILLING_PRICING_MESSAGES.saveAllConfirm,
   })
-  if (!operatorReason) return
+  if (!isConfirmed) return
 
   publishPending.value = true
   poolSavePending.value = true
@@ -648,7 +636,7 @@ async function saveCombinedSettings(
     if (pricingChanged) {
       publishPending.value = true
       try {
-        const published = await resource.publishPrices(item.sku, prices, { operatorReason })
+        const published = await resource.publishPrices(item.sku, prices)
         applyPricePublishSuccess(item, published)
       } catch (error) {
         pricingFailed = true
@@ -662,11 +650,10 @@ async function saveCombinedSettings(
     if (poolChanged) {
       poolSavePending.value = true
       try {
-        const saved = await poolResource.replace(
-          item.sku,
-          { version: poolEditVersion.value, entries },
-          { operatorReason },
-        )
+        const saved = await poolResource.replace(item.sku, {
+          version: poolEditVersion.value,
+          entries,
+        })
         applyPoolReplaceSuccess(item, saved)
       } catch (error) {
         poolFailed = true
@@ -733,9 +720,7 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
   if (availabilityPending[item.sku] || item.status === 'unpriced' || item.status === 'archived') {
     return
   }
-  // Availability is a routine config write (backend ReasonOptional): no
-  // confirm dialog, the audit records an empty reason.
-  const operatorReason = ''
+
   availabilityPending[item.sku] = true
   if (isDemoMode.value) {
     item.status = enabled ? 'active' : 'disabled'
@@ -747,7 +732,7 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
     return
   }
   try {
-    const availability = await resource.setAvailability(item.sku, enabled, { operatorReason })
+    const availability = await resource.setAvailability(item.sku, enabled)
     item.status = availability.status
     item.updatedAt = availability.updatedAt
     toast.success(

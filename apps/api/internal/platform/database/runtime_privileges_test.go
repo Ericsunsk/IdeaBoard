@@ -57,7 +57,7 @@ func TestRuntimePrivilegePolicyCoversIdentityReconciliationWithLeastPrivilege(t 
 		}
 	}
 
-	functions := find(dbprivileges.KindFunction, "start_identity_admin_reconciliation(text, bigint, text, timestamptz, boolean)")
+	functions := find(dbprivileges.KindFunction, "start_identity_admin_reconciliation(text, bigint, timestamptz, boolean)")
 	assertPrivileges("function required", functions.Required, []dbprivileges.Privilege{dbprivileges.PrivilegeExecute})
 	assertPrivileges("function public forbidden", functions.PublicForbidden, []dbprivileges.Privilege{dbprivileges.PrivilegeExecute})
 }

@@ -42,8 +42,8 @@
     </div>
 
     <form class="flex flex-col gap-4" @submit.prevent="emit('submit')">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
-        <div class="sm:col-span-4">
+      <div class="flex flex-col gap-4">
+        <div>
           <AdminFormField
             v-slot="{ describedbyId, invalid }"
             :label="t('admin.wallet.amountLabel')"
@@ -63,22 +63,6 @@
               @update:model-value="onAmountChange"
             />
           </AdminFormField>
-        </div>
-
-        <div class="sm:col-span-8">
-          <AdminActionReasonField
-            :model-value="reason"
-            input-id="admin-user-wallet-command-reason"
-            :label="
-              activeTab === 'refund'
-                ? t('admin.wallet.refundReasonLabel')
-                : t('admin.wallet.reasonLabel')
-            "
-            :error="showErrors ? validation.reasonError : ''"
-            :disabled="commandPending"
-            :rows="1"
-            @update:model-value="onReasonChange"
-          />
         </div>
       </div>
 
@@ -111,7 +95,6 @@ import { useI18n } from 'vue-i18n'
 import ActionButton from '../../../../../../core/components/ActionButton.vue'
 import { AdminFormField } from '../../../../shared'
 import { AdminNumberInput } from '../../../../shared'
-import AdminActionReasonField from '../../shared/AdminActionReasonField.vue'
 import { formatIdeaAmount } from '../../../../../../core/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../../../session/wallets/resource'
 import type { CreditCommandValidation } from '../../../core/wallets/creditCommandContract'
@@ -120,7 +103,6 @@ defineProps<{
   activeTab: 'grant' | 'deduction' | 'refund'
   refundSource: AdminCreditLedgerTransaction | null
   amountCredits: number | null
-  reason: string
   showErrors: boolean
   validation: CreditCommandValidation
   commandPending: boolean
@@ -128,7 +110,6 @@ defineProps<{
 
 const emit = defineEmits<{
   'update:amountCredits': [value: number | null]
-  'update:reason': [value: string]
   'update:showErrors': [value: boolean]
   cancel: []
   submit: []
@@ -138,11 +119,6 @@ const { t } = useI18n()
 
 function onAmountChange(value: number | null) {
   emit('update:amountCredits', value)
-  emit('update:showErrors', false)
-}
-
-function onReasonChange(value: string) {
-  emit('update:reason', value)
   emit('update:showErrors', false)
 }
 </script>

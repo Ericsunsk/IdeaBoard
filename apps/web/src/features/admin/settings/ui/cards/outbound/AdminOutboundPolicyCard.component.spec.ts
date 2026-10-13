@@ -12,7 +12,7 @@ import AdminOutboundPolicyCard from './AdminOutboundPolicyCard.vue'
 vi.mock('../../../../../../core/composables/useAppToast')
 
 describe('AdminOutboundPolicyCard', () => {
-  let updateRequests: Array<{ body: unknown; operatorReason: string | null }>
+  let updateRequests: Array<{ body: unknown }>
   let allowHosts: string[]
 
   beforeEach(() => {
@@ -52,9 +52,7 @@ describe('AdminOutboundPolicyCard', () => {
         {
           body: {
             allow_hosts: ['models.internal', '10.0.0.8:8443'],
-            reason: '',
           },
-          operatorReason: null,
         },
       ])
     })

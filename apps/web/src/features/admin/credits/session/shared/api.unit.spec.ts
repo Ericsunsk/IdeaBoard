@@ -94,8 +94,8 @@ describe('credits billing API adapter', () => {
     )
   })
 
-  it('sends control commands with header-only idempotency keys and operator reasons', async () => {
-    const options = { idempotencyKey: 'control-ui:grant:op-1', operatorReason: '运营补偿' }
+  it('sends control commands with request and idempotency headers', async () => {
+    const options = { idempotencyKey: 'control-ui:grant:op-1' }
     const grant = await adminCreditsBillingApi.grant(
       { user_id: userId, amount_credits: 5, business_reference_id: 'control-ui:grant:op-1' },
       options,
@@ -125,7 +125,10 @@ describe('credits billing API adapter', () => {
       expect(mock).toHaveBeenCalledOnce()
       const headers = mock.mock.calls[0]?.[1]?.headers as Record<string, string>
       expect(headers['Idempotency-Key']).toMatch(/^control-ui:(grant|deduction|refund):/)
-      expect(headers['X-Operator-Reason']).toBe('运营补偿')
+      expect(headers).toEqual({
+        'Request-Id': expect.any(String),
+        'Idempotency-Key': expect.stringMatching(/^control-ui:(grant|deduction|refund):/),
+      })
     }
     // Bodies carry no idempotency key (header-only contract).
     expect(controlMocks.createControlCreditGrant.mock.calls[0]?.[0]).not.toHaveProperty(
@@ -134,9 +137,7 @@ describe('credits billing API adapter', () => {
   })
 
   it('reads reconciliation and health through the control adapter', async () => {
-    const startedRun = await adminCreditsBillingApi.startReconciliation({
-      reason: '运营例行检查',
-    })
+    const startedRun = await adminCreditsBillingApi.startReconciliation()
     const runs = await adminCreditsBillingApi.listReconciliationRuns({ limit: 20 })
     const run = await adminCreditsBillingApi.getReconciliationRun(7)
     const findingQueue = await adminCreditsBillingApi.listReconciliationFindingQueue({
@@ -155,26 +156,6 @@ describe('credits billing API adapter', () => {
     })
   })
 
-  it.each(['grant', 'deduct', 'refund'] as const)(
-    'requires an operator reason before sending %s',
-    async (command) => {
-      await expect(
-        adminCreditsBillingApi[command](
-          {
-            user_id: userId,
-            amount_credits: 5,
-            business_reference_id: `control-ui:${command}:op-1`,
-            charge_transaction_id: 'charge-1',
-          },
-          { idempotencyKey: 'test-key', operatorReason: '   ' },
-        ),
-      ).rejects.toMatchObject({ code: 'control_reason_required', message: '需要填写操作原因' })
-      expect(controlMocks.createControlCreditGrant).not.toHaveBeenCalled()
-      expect(controlMocks.createControlCreditDeduction).not.toHaveBeenCalled()
-      expect(controlMocks.createControlCreditRefund).not.toHaveBeenCalled()
-    },
-  )
-
   it('rejects control failures with domain fallbacks', async () => {
     controlMocks.getControlCreditWallet.mockResolvedValue({
       error: { code: 'control_not_found', message: 'missing', request_id: 'r1' },
@@ -190,7 +171,7 @@ describe('credits billing API adapter', () => {
     await expect(
       adminCreditsBillingApi.deduct(
         { user_id: userId, amount_credits: 1, business_reference_id: 'b1' },
-        { idempotencyKey: 'k1', operatorReason: 'r' },
+        { idempotencyKey: 'k1' },
       ),
     ).rejects.toMatchObject({ code: 'billing_wallet_restricted' })
   })

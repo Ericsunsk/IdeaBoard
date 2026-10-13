@@ -54,7 +54,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.Cre
 	if err != nil {
 		return domain.PaymentRefund{}, MapCredentialError(err)
 	}
-	refund, _, err := s.store.CreatePendingPaymentRefund(ctx, CreatePendingPaymentRefundInput{ActorID: command.ActorID, OrderNumber: command.OrderNumber, IdeaQuantity: command.IdeaQuantity, IdempotencyKey: command.IdempotencyKey, Reason: command.Reason, Now: s.now().UTC()})
+	refund, _, err := s.store.CreatePendingPaymentRefund(ctx, CreatePendingPaymentRefundInput{ActorID: command.ActorID, OrderNumber: command.OrderNumber, IdeaQuantity: command.IdeaQuantity, IdempotencyKey: command.IdempotencyKey, Now: s.now().UTC()})
 	if err != nil {
 		return domain.PaymentRefund{}, err
 	}

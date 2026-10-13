@@ -180,9 +180,6 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if !validPendingRefundRequest(r, input) {
 		return paymentsdomain.PaymentRefund{}, false, paymentcontracts.ErrRefundAmountInvalid
 	}
-	if strings.TrimSpace(input.Reason) == "" {
-		input.Reason = "Admin refund of unused Ideas"
-	}
 	// This reservation is the durable hand-off to Stripe. It must commit on
 	// its own connection before CreatePaymentRefund performs provider I/O;
 	// borrowing the Control guard transaction would leave the hold and phase
@@ -252,14 +249,14 @@ func (r *Repository) persistPendingRefund(ctx context.Context, tx pgx.Tx, order 
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundAmountInvalid
 	}
 	hold, err := commands.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
-		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: input.Reason,
+		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "Stripe refund hold",
 		BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	currency = strings.ToLower(currency)
-	if _, err := tx.Exec(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $12)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, currency, order.StripeChargeID, hold.TransactionID, input.ActorID, input.Reason, input.Now); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $11)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, currency, order.StripeChargeID, hold.TransactionID, input.ActorID, input.Now); err != nil {
 		return paymentsdomain.PaymentRefund{}, fmt.Errorf("insert payment refund: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3::uuid, 'idea_quantity', $4::bigint, 'amount_minor', $5::bigint, 'currency', $6::text))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, currency); err != nil {

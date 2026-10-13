@@ -191,7 +191,6 @@ import { CREDIT_HEALTH_MESSAGES } from './messages'
 const toast = useAdminToast()
 const resource = useAdminCreditHealthResource()
 const historyDialogVisible = ref(false)
-const manualReconciliationReason = CREDIT_HEALTH_MESSAGES.manualCheckReason
 const health = resource.health
 const showLoading = computed(() => resource.query.isLoading.value && !health.value)
 const loadError = computed(() => resource.query.isError.value && !health.value)
@@ -242,7 +241,7 @@ function formatRecentRunTime(run: AdminCreditRun): string {
 
 async function startReconciliation() {
   try {
-    await resource.start({ reason: manualReconciliationReason })
+    await resource.start()
     toast.success(CREDIT_HEALTH_MESSAGES.checkStarted)
   } catch (error) {
     toast.error(formatAdminDisplayError(error, CREDIT_HEALTH_MESSAGES.checkStartFailed))

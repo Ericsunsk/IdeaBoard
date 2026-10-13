@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "3524c5a9f1c3e346c78f3c7f2a673a12249aec17",
+  "checkpointSha": "901dd95289e1c82a33ba8b203f3b4fe58b37ea2d",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all active Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 278, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 277, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -1153,6 +1153,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/admin/monitor/resource.contract.spec.ts",
+          "to": "src/api/generated-query/control/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
@@ -1173,8 +1178,8 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 17,
-      "fanOut": 159,
+      "fanIn": 18,
+      "fanOut": 157,
       "fanOutTargets": [
         "src/api/generated-query/control/model/auditRecord.ts",
         "src/api/generated-query/control/model/auditRecordOperator.ts",
@@ -1240,7 +1245,6 @@
         "src/api/generated-query/control/model/controlPaymentRefundRequest.ts",
         "src/api/generated-query/control/model/controlPublishPricesRequest.ts",
         "src/api/generated-query/control/model/controlPublishPricesRequestPrices.ts",
-        "src/api/generated-query/control/model/controlReasonRequest.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolEnvelopeData.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts",
@@ -1306,7 +1310,6 @@
         "src/api/generated-query/control/model/listControlRewardRedemptionsParams.ts",
         "src/api/generated-query/control/model/listControlTasksParams.ts",
         "src/api/generated-query/control/model/listControlUsersParams.ts",
-        "src/api/generated-query/control/model/operatorReasonParameter.ts",
         "src/api/generated-query/control/model/pageSizeParameter.ts",
         "src/api/generated-query/control/model/paginatedControlBillingAccounts.ts",
         "src/api/generated-query/control/model/paginatedControlLedger.ts",
@@ -1659,11 +1662,6 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
-          "to": "src/api/generated-query/control/model/controlReasonRequest.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts",
           "kind": "runtime"
         },
@@ -1989,11 +1987,6 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
-          "to": "src/api/generated-query/control/model/operatorReasonParameter.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/pageSizeParameter.ts",
           "kind": "runtime"
         },
@@ -2137,8 +2130,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 17,
-      "targetFanOut": 159,
+      "targetFanIn": 18,
+      "targetFanOut": 157,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -5515,7 +5508,7 @@
         { "from": "src/app/main.ts", "to": "src/app/router/index.ts", "kind": "runtime" }
       ],
       "fanIn": 1,
-      "fanOut": 14,
+      "fanOut": 13,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-router/index.cjs",
@@ -5524,7 +5517,6 @@
         "src/core/i18n/index.ts",
         "src/core/seo/routeSeo.ts",
         "src/core/utils/storage.ts",
-        "src/features/admin/app/navigationMeta.ts",
         "src/features/admin/app/routes.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
@@ -5540,11 +5532,6 @@
         },
         {
           "from": "src/app/router/authGate.ts",
-          "to": "src/features/admin/app/navigationMeta.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/app/router/authGate.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -5556,6 +5543,16 @@
         {
           "from": "src/app/router/authGate.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/app/router/authGate.unit.spec.ts",
+          "to": "node_modules/vue-router/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/app/router/authGate.unit.spec.ts",
+          "to": "src/features/admin/app/routes.ts",
           "kind": "runtime"
         },
         {
@@ -5637,7 +5634,7 @@
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
       "targetFanIn": 1,
-      "targetFanOut": 14,
+      "targetFanOut": 13,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -7475,12 +7472,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/auth/components/UserAuthModals.vue",
+          "to": "src/core/auth/routePolicy.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/routePaths.ts",
           "to": "src/core/auth/routePolicy.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -7488,7 +7490,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1b",
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -7565,11 +7567,6 @@
       "consumerEdges": [
         {
           "from": "src/core/components/ActionButton.component.spec.ts",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
@@ -7724,7 +7721,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 32,
+      "fanIn": 31,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/clsx/dist/clsx.js",
@@ -7758,7 +7755,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 32,
+      "targetFanIn": 31,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8199,17 +8196,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/components/SiteBrandLogo.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/components/SiteBrandLogo.vue",
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 3,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -8217,7 +8209,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8731,11 +8723,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/composables/useLogoutRedirect.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/ui/pages/CanvasPage.vue",
           "to": "src/core/composables/useLogoutRedirect.ts",
           "kind": "runtime"
@@ -8746,7 +8733,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 5,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-router/index.cjs"],
       "outboundEdges": [
@@ -8760,7 +8747,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8911,11 +8898,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/composables/useSiteBranding.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/session/branding/useBrandingSettings.ts",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
@@ -8931,7 +8913,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 7,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -8976,7 +8958,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10309,11 +10291,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10765,7 +10742,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 123,
+      "fanIn": 122,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -10835,7 +10812,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 123,
+      "targetFanIn": 122,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11517,17 +11494,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/lib/brandMark.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/lib/brandMark.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 3,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -11535,7 +11507,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12562,11 +12534,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
@@ -12622,7 +12589,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 13,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-router/index.cjs"],
       "outboundEdges": [
@@ -12636,7 +12603,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 14,
+      "targetFanIn": 13,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12748,11 +12715,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/utils/auth.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
@@ -12853,7 +12815,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 26,
+      "fanIn": 25,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/sessionUserType.ts",
@@ -12888,7 +12850,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 26,
+      "targetFanIn": 25,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15766,17 +15728,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/app/AdminLayout.vue",
-          "to": "src/features/admin/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
@@ -15836,7 +15788,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 16,
+      "fanIn": 14,
       "fanOut": 1,
       "fanOutTargets": ["src/core/auth/routePolicy.ts"],
       "outboundEdges": [
@@ -15850,7 +15802,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1b",
-      "targetFanIn": 16,
+      "targetFanIn": 14,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15861,40 +15813,6 @@
       "shimCount": 0,
       "scope": "cross-feature",
       "ownershipScope": ["src/features/admin/routePaths.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/features/admin/shared/core/actionReasonContract.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/admin/shared/core/actionReasonContract.unit.spec.ts",
-          "to": "src/features/admin/shared/core/actionReasonContract.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/index.ts",
-          "to": "src/features/admin/shared/core/actionReasonContract.ts",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 2,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "activationPhase": "pre-P0",
-      "targetFanIn": 2,
-      "targetFanOut": 0,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "scope": "cross-feature",
-      "ownershipScope": ["src/features/admin/shared/core/actionReasonContract.ts"],
       "impureRuntimePaths": []
     },
     "src/features/admin/shared/core/cellClasses.ts": {
@@ -16018,11 +15936,6 @@
     "src/features/admin/shared/core/controlGuidance.ts": {
       "consumerEdges": [
         {
-          "from": "src/features/admin/monitor/resource.ts",
-          "to": "src/features/admin/shared/core/controlGuidance.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/index.ts",
           "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
@@ -16043,7 +15956,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 4,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -16051,7 +15964,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -16066,6 +15979,11 @@
     },
     "src/features/admin/shared/core/controlMutation.ts": {
       "consumerEdges": [
+        {
+          "from": "src/features/admin/monitor/resource.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/admin/shared/core/controlCopy.ts",
           "to": "src/features/admin/shared/core/controlMutation.ts",
@@ -16092,7 +16010,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 1,
       "fanOutTargets": ["src/api/contractKernel.ts"],
       "outboundEdges": [
@@ -16106,7 +16024,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -16468,16 +16386,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/useAdminLoginFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -16648,16 +16556,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/ui/shared/AdminActionReasonField.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/shared/invalidBorder.browser.spec.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -16713,11 +16611,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.component.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -16759,11 +16652,6 @@
         },
         {
           "from": "src/features/admin/monitor/core/status.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/resource.contract.spec.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -17110,11 +16998,6 @@
         {
           "from": "src/features/admin/users/session/commands.ts",
           "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/session/commands.ts",
-          "to": "src/features/admin/shared/index.ts",
           "kind": "type-only"
         },
         {
@@ -17129,11 +17012,6 @@
         },
         {
           "from": "src/features/admin/users/session/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/session/sessionCommands.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -17153,7 +17031,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 126,
+      "fanIn": 119,
       "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -17204,11 +17082,6 @@
         "src/theme/composables/useTheme.ts"
       ],
       "outboundEdges": [
-        {
-          "from": "src/features/admin/shared/core/actionReasonContract.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
         {
           "from": "src/features/admin/shared/core/adminSelectSkin.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
@@ -18409,7 +18282,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P4",
-      "targetFanIn": 126,
+      "targetFanIn": 119,
       "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -18982,22 +18855,9 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 2,
-      "fanOutTargets": [
-        "src/features/admin/shared/session/feedback/toast.ts",
-        "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
-      ],
+      "fanOut": 1,
+      "fanOutTargets": ["src/features/admin/shared/session/feedback/useAdminConfirm.ts"],
       "outboundEdges": [
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
         {
           "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
           "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
@@ -19009,7 +18869,7 @@
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
       "targetFanIn": 2,
-      "targetFanOut": 2,
+      "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -19094,11 +18954,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
@@ -19114,7 +18969,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 18,
+      "fanIn": 17,
       "fanOut": 2,
       "fanOutTargets": ["src/core/composables/useAppToast.ts", "src/core/utils/errorMessages.ts"],
       "outboundEdges": [
@@ -19133,7 +18988,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 18,
+      "targetFanIn": 17,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -19155,16 +19010,6 @@
         },
         {
           "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.unit.spec.ts",
           "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
           "kind": "type-only"
         },
@@ -19189,7 +19034,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 6,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue/index.js"],
       "outboundEdges": [
@@ -19203,7 +19048,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -21681,11 +21526,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/features/auth/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/users/session/sessionCommands.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
@@ -21756,7 +21596,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 29,
+      "fanIn": 28,
       "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -21779,6 +21619,7 @@
         "src/core/auth/client.ts",
         "src/core/auth/oauthProviders.ts",
         "src/core/auth/passwordPolicy.ts",
+        "src/core/auth/routePolicy.ts",
         "src/core/auth/sessionPolicy.ts",
         "src/core/components/IbFormField.vue",
         "src/core/composables/useAppToast.ts",
@@ -21794,7 +21635,6 @@
         "src/core/utils/auth.ts",
         "src/core/utils/formValidation.ts",
         "src/core/utils/storage.ts",
-        "src/features/admin/app/login/AdminLoginPage.vue",
         "src/features/legal/routePaths.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -21960,6 +21800,11 @@
         {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/UserAuthModals.vue",
+          "to": "src/core/auth/routePolicy.ts",
           "kind": "runtime"
         },
         {
@@ -22239,11 +22084,6 @@
         },
         {
           "from": "src/features/auth/pages/oauthFlow.component.spec.ts",
-          "to": "src/features/admin/app/login/AdminLoginPage.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/auth/pages/oauthFlow.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -22467,7 +22307,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "pre-P0",
-      "targetFanIn": 29,
+      "targetFanIn": 28,
       "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -33335,6 +33175,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/FlowCanvasNode.component.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/FlowCanvasNode.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -35768,6 +35613,11 @@
       "outboundEdges": [
         {
           "from": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -36068,6 +35918,11 @@
         },
         {
           "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -36075,6 +35930,11 @@
           "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.unit.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.unit.spec.ts",
+          "to": "src/features/canvas/core/nodes/flowTypes.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
@@ -38884,11 +38744,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/features/workspace/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/routePaths.unit.spec.ts",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
@@ -39014,7 +38869,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 33,
+      "fanIn": 32,
       "fanOut": 1,
       "fanOutTargets": ["src/core/auth/routePolicy.ts"],
       "outboundEdges": [
@@ -39028,7 +38883,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "activationPhase": "P1",
-      "targetFanIn": 33,
+      "targetFanIn": 32,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,

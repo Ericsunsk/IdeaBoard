@@ -2,7 +2,6 @@ import { computed, ref } from 'vue'
 import type { useAsyncAction } from '../../../../../core/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../../../shared/index'
 import { useOptimisticToggle } from '../../../shared/index'
-import { requireDestructiveReason } from '../../../shared/index'
 import {
   createAdminStorageResource,
   type AdminStorageResource,
@@ -98,16 +97,10 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     }
   }
 
-  // Workspace owns storage mutation orchestration and refresh-after-command.
-  // Save/apply are routine config writes (backend ReasonOptional): no
-  // confirm dialog, the audit records an empty reason. The profile editor
-  // only supplies form payloads through saveProfile; apply/test/delete/
-  // enable orchestration lives here. Delete stays a destructive confirm
-  // with a required reason.
   async function saveProfile(
     input: SaveStorageProfileInput,
   ): Promise<StorageProfileCommandResult | null> {
-    const response = await resource.saveProfile(input, { operatorReason: '' })
+    const response = await resource.saveProfile(input)
     await refreshAfterCommand()
     return response
   }
@@ -118,7 +111,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     await options.runAsyncAction(
       async () => {
-        const response = await resource.applyProfile(storage.id, { operatorReason: '' })
+        const response = await resource.applyProfile(storage.id)
         await refreshAfterCommand()
         options.feedback.applyCurrentSucceeded(response.message)
       },
@@ -141,20 +134,14 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     const storage = resolveStorageTarget(target)
     if (!storage || (!enabled && storageDisableReason(storage))) return
 
-    // Routine config write (backend ReasonOptional): no confirm dialog,
-    // the audit records an empty reason. 乐观翻转与 pending/回滚收口到共享
-    // composable，toast 仍走 saveDraft 通道。
     await toggle.toggle(
       storage.id,
       enabled,
       async (key, next) => {
-        const response = await resource.saveProfile(
-          {
-            id: key,
-            payload: buildPayload({ ...storage, enabled: next }, providerMap.value),
-          },
-          { operatorReason: '' },
-        )
+        const response = await resource.saveProfile({
+          id: key,
+          payload: buildPayload({ ...storage, enabled: next }, providerMap.value),
+        })
         const savedStorage = normalizeProfile(response.profile, providerMap.value)
         storages.value = storages.value.map((candidate) =>
           candidate.id === key ? savedStorage : candidate,
@@ -179,12 +166,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     await options.runAsyncAction(
       async () => {
-        // Connectivity probe is a POST read-guard (backend non-Mutation):
-        // no confirm dialog, the audit records an empty reason (routine
-        // 空 reason，与 mail/搜索探针对齐）。
-        const response = await resource.testProfile(storage.id, {
-          operatorReason: '',
-        })
+        const response = await resource.testProfile(storage.id)
         if (!response) return
         options.feedback.testConnectionSucceeded(response.message)
       },
@@ -212,16 +194,14 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     const confirmed = await options.confirm.confirm({
       title: '确认删除存储',
-      message: `确定删除存储「${storage.name}」吗？此操作不可恢复，且将记录操作人与原因。`,
+      message: `确定删除存储「${storage.name}」吗？此操作不可恢复，且将记录操作人。`,
       confirmLabel: '确定删除',
       intent: 'danger',
-      reason: { isRequired: true },
     })
     if (!confirmed) return
-    const operatorReason = requireDestructiveReason(options.confirm)
-    if (!operatorReason) return
+
     try {
-      const response = await resource.deleteProfile(storage.id, { operatorReason })
+      const response = await resource.deleteProfile(storage.id)
       options.feedback.profileDeleted(response.message)
       commandOptions.afterDeleted?.(storage.id)
       await refreshAfterCommand()

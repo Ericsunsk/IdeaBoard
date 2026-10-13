@@ -19,7 +19,6 @@ import storageMinioLogo from './ui/assets/storage-vendors/minio.svg'
 import storageTencentCloudLogo from './ui/assets/storage-vendors/tencentcloud.ico'
 
 // core — pure helpers, contracts, tokens (leaf, no framework imports)
-export * from './core/actionReasonContract'
 export * from './core/adminSelectSkin'
 export * from './core/adminThemeTokens'
 export * from './core/cellClasses'

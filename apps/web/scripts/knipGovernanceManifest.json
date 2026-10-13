@@ -1768,12 +1768,6 @@
       }
     },
     "src/core/auth/routePolicy.ts": {
-      "ADMIN_LOGIN_PATH": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/auth/routePolicy.ts#ADMIN_LOGIN_PATH"
-        ]
-      },
       "ADMIN_ROOT_PATH": {
         "kind": "canonical-public",
         "evidence": [
@@ -5280,12 +5274,6 @@
           "docs/frontend-seam-inventory.md: src/features/admin/routePaths.ts#ADMIN_FEATURE_PROMPTS_PATH"
         ]
       },
-      "ADMIN_LOGIN_PATH": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/routePaths.ts#ADMIN_LOGIN_PATH"
-        ]
-      },
       "ADMIN_MODELS_PATH": {
         "kind": "canonical-public",
         "evidence": [
@@ -5550,12 +5538,6 @@
           "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmPort"
         ]
       },
-      "AdminConfirmReasonSpec": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#AdminConfirmReasonSpec"
-        ]
-      },
       "AdminConfirmRequest": {
         "kind": "canonical-public",
         "evidence": [
@@ -5572,12 +5554,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#activeAdminConfirm"
-        ]
-      },
-      "readConfirmReason": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/useAdminConfirm.ts#readConfirmReason"
         ]
       },
       "useAdminConfirm": {
@@ -5812,46 +5788,10 @@
       }
     },
     "src/features/admin/shared/session/feedback/confirmSettingsSave.ts": {
-      "ADMIN_PROBE_OPERATOR_REASON": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#ADMIN_PROBE_OPERATOR_REASON"
-        ]
-      },
-      "ADMIN_REASON_REQUIRED_MESSAGE": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#ADMIN_REASON_REQUIRED_MESSAGE"
-        ]
-      },
-      "ADMIN_REVERSIBLE_DEFAULT_REASON": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#ADMIN_REVERSIBLE_DEFAULT_REASON"
-        ]
-      },
-      "AdminConfirmRisk": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#AdminConfirmRisk"
-        ]
-      },
       "confirmSettingsSave": {
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#confirmSettingsSave"
-        ]
-      },
-      "readReversibleReason": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#readReversibleReason"
-        ]
-      },
-      "requireDestructiveReason": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/feedback/confirmSettingsSave.ts#requireDestructiveReason"
         ]
       }
     },
@@ -5914,12 +5854,6 @@
           "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#buildControlMutationHeaders"
         ]
       },
-      "buildRoutineControlMutationHeaders": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#buildRoutineControlMutationHeaders"
-        ]
-      },
       "createControlError": {
         "kind": "canonical-public",
         "evidence": [
@@ -5942,12 +5876,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#readControlRequestId"
-        ]
-      },
-      "requireOperatorReason": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/controlMutation.ts#requireOperatorReason"
         ]
       }
     },
@@ -6470,26 +6398,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/serviceIcons.ts#getServiceIcon"
-        ]
-      }
-    },
-    "src/features/admin/shared/core/actionReasonContract.ts": {
-      "AdminActionReasonValidation": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/actionReasonContract.ts#AdminActionReasonValidation"
-        ]
-      },
-      "MAX_ADMIN_ACTION_REASON_LENGTH": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/actionReasonContract.ts#MAX_ADMIN_ACTION_REASON_LENGTH"
-        ]
-      },
-      "validateAdminActionReason": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/core/actionReasonContract.ts#validateAdminActionReason"
         ]
       }
     },
@@ -14502,7 +14410,7 @@
   },
   "generated": {
     "src/api/generated-query/control/control-billing/control-billing.ts": {
-      "sha256": "0f30091b92bd97f68fefcb514b553a8ead749c7750c62bf85d204b1a90e3cbc8",
+      "sha256": "91f0659042e1ee64855695e31c72ec9fe86e571df187777802a7747a3cb64ff7",
       "exports": [
         "DeleteControlCatalogItemMutationError",
         "DeleteControlCatalogItemMutationResult",
@@ -14563,7 +14471,7 @@
       ]
     },
     "src/api/generated-query/control/control-credits/control-credits.ts": {
-      "sha256": "2bd89bcf5b8a066c1c8b8164d6e76c11486a36249a1692a6a4f585ea9984d221",
+      "sha256": "1de057578cce37d665ec0d89e34fff2840f1d280a11e658009a41bd53f18b809",
       "exports": [
         "CreateControlCreditCorrectionMutationBody",
         "CreateControlCreditCorrectionMutationError",
@@ -14612,10 +14520,8 @@
         "SetControlRewardCodeEnabledMutationError",
         "SetControlRewardCodeEnabledMutationResult",
         "SetControlRewardCodeEnabledMutationVariables",
-        "StartControlReconciliationMutationBody",
         "StartControlReconciliationMutationError",
         "StartControlReconciliationMutationResult",
-        "StartControlReconciliationMutationVariables",
         "UpdateControlRewardCodeMutationBody",
         "UpdateControlRewardCodeMutationError",
         "UpdateControlRewardCodeMutationResult",
@@ -14713,7 +14619,7 @@
       ]
     },
     "src/api/generated-query/control/control-payments/control-payments.ts": {
-      "sha256": "e72ecdd2925f4b42d6ca67d495009b904ecc72e1255b6cc920c74ff19691e93b",
+      "sha256": "4d52fdfc0f506b3b38452a8322513e2b6fc64740aa803770478aedc53b8b0252",
       "exports": [
         "CreateControlPaymentRefundMutationBody",
         "CreateControlPaymentRefundMutationError",
@@ -14757,7 +14663,7 @@
       ]
     },
     "src/api/generated-query/control/control-platform/control-platform.ts": {
-      "sha256": "5e442d7fca692a81c0425d9746db1548cfe1be88b69abb9a13fd5f93766ba84d",
+      "sha256": "34e747c4f847fbead74c5b14c9f2257761f41e107c1db94856990eb2ca148004",
       "exports": [
         "ApplyControlStorageProfileMutationError",
         "ApplyControlStorageProfileMutationResult",
@@ -15164,7 +15070,7 @@
       ]
     },
     "src/api/generated-query/control/control-tasks/control-tasks.ts": {
-      "sha256": "c75c90e05dce30f24fab705c87ccc3c2d7d3cfdefb55441f4a8a9b516c514780",
+      "sha256": "b5c5aa9a4f423ccfaf1aa3bef523f5a3cdd15622cccd0f0d46ec9ecde8a707d7",
       "exports": [
         "CancelControlTaskMutationError",
         "CancelControlTaskMutationResult",
@@ -15191,7 +15097,7 @@
       ]
     },
     "src/api/generated-query/control/control-users/control-users.ts": {
-      "sha256": "451e5d953d85518076917beba67f88b0bda05cb69c8967f2f0431dc5e90ac5db",
+      "sha256": "3d322ab9e39fc4a35edba535ad06c97cb99c06efe7c81fb23631f4873b670cc7",
       "exports": [
         "BanControlUserMutationBody",
         "BanControlUserMutationError",
@@ -15276,7 +15182,7 @@
       ]
     },
     "src/api/generated-query/control/control-workspaces/control-workspaces.ts": {
-      "sha256": "0a6d9c1df807dc7e05dde83ddb04d8dd15ba4f564443f78a0f1be1d3ffb21d09",
+      "sha256": "fadd761f0fceddb5211242d35e43861e421d5b406df8fb0dac3cffa789b34b94",
       "exports": [
         "AddControlWorkspaceMemberMutationBody",
         "AddControlWorkspaceMemberMutationError",
@@ -15325,643 +15231,635 @@
       "exports": []
     },
     "src/api/generated-query/control/model/auditRecord.ts": {
-      "sha256": "af7c4c72042dabf5d992ef2d7d7b19718286ab97be16f33df05d9661e72c781e",
+      "sha256": "d3a874072d6d8698bea7cb07de978fe10728b534641cd5b6de9a73c2c031356b",
       "exports": ["AuditRecord"]
     },
     "src/api/generated-query/control/model/auditRecordOperator.ts": {
-      "sha256": "3a44e2986048f150b46b6c3b8120697d92802154da2e88c55ce5e4ce54ea8324",
+      "sha256": "46c8b284174168aba85043674165187676cdd27d23c9d15902af1ec11b65106b",
       "exports": ["AuditRecordOperator"]
     },
     "src/api/generated-query/control/model/auditRecordOperatorType.ts": {
-      "sha256": "53e763f53693ec03b0e6c72f5bbabc4ec225853b647e5e60be7f592705f32642",
+      "sha256": "fa087a7a1d1f317926fd73f74d164fce766df214ff72fd17619e715f5f91d92f",
       "exports": ["AuditRecordOperatorType"]
     },
     "src/api/generated-query/control/model/auditRecordOutcome.ts": {
-      "sha256": "292a262edf062369660b018c321f3e226880134158a0a396218ff66300fcf41c",
+      "sha256": "51b33054f697a3401117b4f7b779cdca72d46d58e5c447283999b54ec039e67c",
       "exports": ["AuditRecordOutcome"]
     },
     "src/api/generated-query/control/model/auditRecordTarget.ts": {
-      "sha256": "f390ac06b61d656b9165b347a2fcf04c712f9bdb43332d20f5c43a2bceb35d6f",
+      "sha256": "198b12f7faa2d4e8ae0a624cfc65b7d0fabbc9d9a69b7fc49086bfac7ad26662",
       "exports": ["AuditRecordTarget"]
     },
     "src/api/generated-query/control/model/backfillControlStatisticsBody.ts": {
-      "sha256": "2c1b7dcf903b390dc1e70bc0dd0c2aa281ecfe38f75e65872300a46e04466a5f",
+      "sha256": "420c2c1f634f215a37ceb6386cd07371be515d0993fcfdec3b1853202526b574",
       "exports": ["BackfillControlStatisticsBody"]
     },
     "src/api/generated-query/control/model/badRequestResponse.ts": {
-      "sha256": "25a0f63c9aa8ab28ce26931c3d7187b683c952534ff28f0d7c1dddd45dfb8942",
+      "sha256": "0a183efed2689813712aadd61680f89a7e3e9428a55f767e4078b8632eff2f60",
       "exports": ["BadRequestResponse"]
     },
     "src/api/generated-query/control/model/conflictResponse.ts": {
-      "sha256": "490df4ff2c31d1da00c0a2453e5db2671fc5e3086fbd3dab8828dc9b206a57a3",
+      "sha256": "8a97b9eb229f2ba2e31361b74824684e88e60c9208532d9511f29f3ec744ce96",
       "exports": ["ConflictResponse"]
     },
     "src/api/generated-query/control/model/controlAckEnvelope.ts": {
-      "sha256": "2b0be0721f977d0f7b77bc098ddf9ee909d3e5e325a4e4907c1eadfa0041c551",
+      "sha256": "29d3647ba7de72e250295bfa65f91f00dc33502a70e781f74138df53752a91b6",
       "exports": ["ControlAckEnvelope"]
     },
     "src/api/generated-query/control/model/controlAckEnvelopeData.ts": {
-      "sha256": "ac3d408f466392c1877ea26635fb9d0dd2f4034693ce79c3ccdd6120d0b35da9",
+      "sha256": "8e6f7351abcd686cb99baaeb2825cfaabfac4a00379b31395c2b162235e7b431",
       "exports": ["ControlAckEnvelopeData"]
     },
     "src/api/generated-query/control/model/controlAdminRedemption.ts": {
-      "sha256": "c5e6dc779b29f1a9d52220a147ec74204d572339bec61b2fe81a38f9cb840b9a",
+      "sha256": "57e98fad55e103407c6ecfc5fc2ade9f77222bd97497b99f30047e594a226e47",
       "exports": ["ControlAdminRedemption"]
     },
     "src/api/generated-query/control/model/controlAdminRedemptionDetail.ts": {
-      "sha256": "83214b4448f5509815822e7b8513bd7e9279935c415f0aeec860d64dd10fdfa9",
+      "sha256": "fb12e636bc7feb155c70f4d592257f412298fb01cafe08c7ec815feed6564fe8",
       "exports": ["ControlAdminRedemptionDetail"]
     },
     "src/api/generated-query/control/model/controlAdminRedemptionPage.ts": {
-      "sha256": "9ad34854c95512699906f64d6ba0438604a9c2f895bd3870204fc38f3b2b888d",
+      "sha256": "363cd7e07aefd4f54ef71db3bff3bc3c0de7a42c28a791b055c1ebc2bb34563f",
       "exports": ["ControlAdminRedemptionPage"]
     },
     "src/api/generated-query/control/model/controlBanRequest.ts": {
-      "sha256": "e81e09e80e833b65c4f9295455235ab292629fea9e9c4b15e7bed1737f091c11",
+      "sha256": "dffdc0c3c99ff1091acb824a662b0d5b9ab28560be0a09e2074e8478f8974f6e",
       "exports": ["ControlBanRequest"]
     },
     "src/api/generated-query/control/model/controlBeforeIdParameter.ts": {
-      "sha256": "e2d88bb8a0489880007d7049d9741f8a552d5ec8864c18fbb1d87f3594e01814",
+      "sha256": "a1ed33f998795b0d2d43aeefb21abd21eeabf856ddaeacb3d52c5a923240b668",
       "exports": ["ControlBeforeIdParameter"]
     },
     "src/api/generated-query/control/model/controlBillingAccount.ts": {
-      "sha256": "c42270bffaafc5318d08c55f03b942c1b4551456319a19202b887fc29cea800a",
+      "sha256": "f43b7c171f2d3bd2b7abfba72929a8eee4e6e390828a1e5c9c667a61ad5016dd",
       "exports": ["ControlBillingAccount"]
     },
-    "src/api/generated-query/control/model/controlBrandLogoOverride.ts": {
-      "sha256": "bb18ee2d08b25650fef84eaf927815baad887e4449780c66808dc6fa6b2d38dc",
-      "exports": ["ControlBrandLogoOverride"]
-    },
-    "src/api/generated-query/control/model/controlBrandLogoOverrideList.ts": {
-      "sha256": "0025bc9c7372bf4e98c585597ceb6ace697e813f294f65df1e902d504a950629",
-      "exports": ["ControlBrandLogoOverrideList"]
-    },
-    "src/api/generated-query/control/model/controlBrandLogoOverrideScope.ts": {
-      "sha256": "e8a1c80e71c66c1c4dbe3fcc37e0b5ee8afb7975917bb217ddedacecd390e270",
-      "exports": ["ControlBrandLogoOverrideScope"]
-    },
     "src/api/generated-query/control/model/controlBrandingLogoUpload.ts": {
-      "sha256": "4a133df7bf7199a5353fa1e0c1436decf40f7d22cc2c27ae7a10696354123d9d",
+      "sha256": "4a0cac2ce6b3e37e9929535a00a092ae87467d4b20d5cb1dfcf5c1fbf6c15da9",
       "exports": ["ControlBrandingLogoUpload"]
     },
     "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts": {
-      "sha256": "88d4bf269f32e5f5f071620def498daa0dfb0e048bd64a2ab906a4922df6b536",
+      "sha256": "92f06868726a7aa202449a0e5a07c9a97c765cec35606c47c2e4e10a4f638bd7",
       "exports": ["ControlBrandingLogoUploadEnvelope"]
     },
+    "src/api/generated-query/control/model/controlBrandLogoOverride.ts": {
+      "sha256": "6549b8b122a6240844d2ef153624605c740832df867719e92542b610ac469e09",
+      "exports": ["ControlBrandLogoOverride"]
+    },
+    "src/api/generated-query/control/model/controlBrandLogoOverrideList.ts": {
+      "sha256": "8c1f5d73a5013ca998e45ff303c410fe9b3fab933d2f3cd23cbc446549d034ae",
+      "exports": ["ControlBrandLogoOverrideList"]
+    },
+    "src/api/generated-query/control/model/controlBrandLogoOverrideScope.ts": {
+      "sha256": "7ca1dd5444ecebcd679b4d7de227dba781da7e1fdf9083633cf9c6072001e860",
+      "exports": ["ControlBrandLogoOverrideScope"]
+    },
     "src/api/generated-query/control/model/controlCatalogEnvelope.ts": {
-      "sha256": "5d4c2f4a996d98b4f34164770c82c24ed45c812e8c9fb133531f7678b94863a9",
+      "sha256": "9c76b7de33005665354275b20de4ca7535547866325b98681ca01847c2a3a534",
       "exports": ["ControlCatalogEnvelope"]
     },
     "src/api/generated-query/control/model/controlCatalogEnvelopeData.ts": {
-      "sha256": "02537cb77df8786aaab3379854cc6384d1beed38702e97817d9294d57792cf3e",
+      "sha256": "7d0675619f9d4e68190444741c50824a7ee57e3028e541b8eab45cccafca6ff2",
       "exports": ["ControlCatalogEnvelopeData"]
     },
     "src/api/generated-query/control/model/controlCatalogEnvelopeDataItemsItem.ts": {
-      "sha256": "f0d2fe6f829ccee04ce9d376e5de63b7d6e4d8e40ab40fa30e8c07d5df65a5e0",
+      "sha256": "b33afa6acfd7b677f257e136a533345567d4413efe90182aea154b3f45e7af3d",
       "exports": ["ControlCatalogEnvelopeDataItemsItem"]
     },
     "src/api/generated-query/control/model/controlCreatedRewardCode.ts": {
-      "sha256": "35adaf1d9493b2e535302a998ff97aaa96f34fe50d0127251c875786d69b4c8a",
+      "sha256": "6415219903d5acbbb14cff2600953d737c6046b80823bad51b424165dec335e3",
       "exports": ["ControlCreatedRewardCode"]
     },
     "src/api/generated-query/control/model/controlCreditCommandRequest.ts": {
-      "sha256": "a449affeb1dac52cf18385e5ac229a2527b4c891a9312efb436a936ee2f9ca3a",
+      "sha256": "977c697e6f89715f950f66d3eaa30760664909c801fcfd7ae86821f0c189568f",
       "exports": ["ControlCreditCommandRequest"]
     },
     "src/api/generated-query/control/model/controlCreditCorrectionRequest.ts": {
-      "sha256": "a08a529e3c06f9795d367a6eea35df3840495eb24faad51e4b6ab46a5152ebba",
+      "sha256": "60de5322bd6a72f975648ab8739343282e73ed1b7cbf72f7f40e15bc22c333f0",
       "exports": ["ControlCreditCorrectionRequest"]
     },
     "src/api/generated-query/control/model/controlCreditRefundRequest.ts": {
-      "sha256": "c0f5677281edcbde3c0b16d764e350fe3d41d77aac8e95b6d635b48b66e08039",
+      "sha256": "5289284309a581e3636eb64653767b489d94ad5ec347ddf058257b879a92f7c1",
       "exports": ["ControlCreditRefundRequest"]
     },
     "src/api/generated-query/control/model/controlCreditResult.ts": {
-      "sha256": "58a048eee312c5198244286216b8676768bbc93ffea402aac9ba1e672e9e2082",
+      "sha256": "960097eaa901d14310eceda12eda9d08441c3d187f0a112fcb8a29ce2591ff9e",
       "exports": ["ControlCreditResult"]
     },
     "src/api/generated-query/control/model/controlCreditResultEnvelope.ts": {
-      "sha256": "c9a622a690e88e485eb09a4286ff52b9bfa6495be47ee4f3bb96c22ece383efe",
+      "sha256": "3a238040934e382d1e4e3c1a551c8a6f0a35f4f50ce8eb656cd0aca01c1c57be",
       "exports": ["ControlCreditResultEnvelope"]
     },
     "src/api/generated-query/control/model/controlCreditWallet.ts": {
-      "sha256": "5bcccd22e994e8aaf766c2454bf315065c78da009eac937b37b8e46ae35e09ff",
+      "sha256": "8f84564569d148f864276abf417d37b2b4f0dda7dd9503abc81d6c85fdff54c2",
       "exports": ["ControlCreditWallet"]
     },
     "src/api/generated-query/control/model/controlCreditWalletEnvelope.ts": {
-      "sha256": "4524d68275b2c426c5b1b185884634645ee4bf2845b12cb6249aa708193c90ef",
+      "sha256": "6c2f5df72789af5b536b36d9a450e78c8f1f58527ad73c0c671c3df96c9a799d",
       "exports": ["ControlCreditWalletEnvelope"]
     },
     "src/api/generated-query/control/model/controlCreditWalletStatus.ts": {
-      "sha256": "6848903533e610ab8ff460f199a7f0baa307cb37c383520a9a9cb3f2659252fa",
+      "sha256": "9e98f7ed9652747ce92abe28be0caf3727603dad5cfd8bb18cf21c9ee04a4d97",
       "exports": ["ControlCreditWalletStatus"]
     },
     "src/api/generated-query/control/model/controlDeletedRewardCode.ts": {
-      "sha256": "f1f7fef9d5c7ebcc31928ff843d4dcb0bec7af5e8ed50a393eaea58c3b250f32",
+      "sha256": "da9183051112ed8fa938148d40637e294bec38ac8b5f8ba7a37343bc1be9862b",
       "exports": ["ControlDeletedRewardCode"]
     },
     "src/api/generated-query/control/model/controlErrorEnvelope.ts": {
-      "sha256": "922638880ce39ce10ccc1c16edd09c33995d01e63d7cd29c089d4f338aeabe03",
+      "sha256": "323697d065c18148f6d39503065da58c5cfcafbc6ca7b6e51ffe3600b26d7e50",
       "exports": ["ControlErrorEnvelope"]
     },
     "src/api/generated-query/control/model/controlErrorEnvelopeError.ts": {
-      "sha256": "ca328e7ecd13314a2bb0fb6f348f18fa0d408a2b42cec2ba7755a1eddce90b14",
+      "sha256": "3ef9d9b299b54dbfce3c63707b688c113ce1f5664ada6b6c47fcc6105608f9d7",
       "exports": ["ControlErrorEnvelopeError"]
     },
     "src/api/generated-query/control/model/controlErrorEnvelopeErrorDetails.ts": {
-      "sha256": "d265682314142eda10d2a98dc688a8d4c3ef821e6738c4d2300458ca5924be91",
+      "sha256": "473861bfaec0497bec1efad95626f5a91ed4df21bb65302645f835ea230a8718",
       "exports": ["ControlErrorEnvelopeErrorDetails"]
     },
     "src/api/generated-query/control/model/controlKeywordParameter.ts": {
-      "sha256": "e013c1450778daec0a76dcf5491fc96fdd7ceacb5f15ae7d1cfe2b0289ed7ea2",
+      "sha256": "aa4215296be2e47454160fffb3bee95d045dd262649917bf8ed963601e94d1cf",
       "exports": ["ControlKeywordParameter"]
     },
     "src/api/generated-query/control/model/controlLedgerTransaction.ts": {
-      "sha256": "2b6a39fa352323e99417c8307fb50fffcbefcb3d27159c21c9b8ff5c61d5423a",
+      "sha256": "283ad57c4c95b6b6f1373f033db71ac177363d6e5fccaeb9f310db853c78f06f",
       "exports": ["ControlLedgerTransaction"]
     },
     "src/api/generated-query/control/model/controlLedgerTransactionActor.ts": {
-      "sha256": "88f4273b2ce41111dfcfa1d3afe40b11047d66d82a95db9196f70a130b287d03",
+      "sha256": "fd68f288f6852c0887262b0d8a5b9ee340663f596beaeab06894c57f2f116364",
       "exports": ["ControlLedgerTransactionActor"]
     },
     "src/api/generated-query/control/model/controlLedgerTransactionBusinessReference.ts": {
-      "sha256": "57dea00901366460a28bd9ea2bc3005165c9fecbe99814f9983d4310ffbf04a5",
+      "sha256": "62cc64fc8a9ed41c4155f4932aa190261fe549c9dff46e80f1e72530d524a098",
       "exports": ["ControlLedgerTransactionBusinessReference"]
     },
     "src/api/generated-query/control/model/controlLedgerTransactionCharge.ts": {
-      "sha256": "42235ed35cfb601e942c67f11110a1b7ebbda6ad28be7d324c9ad2eddce8e5c5",
+      "sha256": "5dc6c66cdef7a869cf301081c35b0de32158c80023b0977c029c1cc20403b4e4",
       "exports": ["ControlLedgerTransactionCharge"]
     },
     "src/api/generated-query/control/model/controlLimitParameter.ts": {
-      "sha256": "f394cdfbd4bbc982244f78fc4d60f925add12b9ba1eeea19adff61151c6d1d86",
+      "sha256": "f1b5184a28be04cc98857e695efaa47c656c8cc597b9c7358a0b3005d4ade1e8",
       "exports": ["ControlLimitParameter"]
     },
     "src/api/generated-query/control/model/controlMailConfig.ts": {
-      "sha256": "dbf18d6a5f951965319bd362524b3e2d5189b0c43e2ba5b2596de9614fcd6d77",
+      "sha256": "c7f6ade7c73bae0ccc4b51042d74238ddbc857a2eba8bebda30327e36564052c",
       "exports": ["ControlMailConfig"]
     },
     "src/api/generated-query/control/model/controlMailConfigEnvelope.ts": {
-      "sha256": "c26ebfa04407f13d142dbeb3a81b14497a3ec5dc8f3c023c69b4774551971ca6",
+      "sha256": "0e25feded941b0e855953dc6323f1d90cb6c0eda2354dae89594aec640010864",
       "exports": ["ControlMailConfigEnvelope"]
     },
     "src/api/generated-query/control/model/controlMailConfigReadiness.ts": {
-      "sha256": "f4090ccc50179cb23fbb8baa78a80d3ab75f28a1253ab762381a76b5db069696",
+      "sha256": "e26cd598e5fae969128c2a19f3c0e96d11f999471a1c4eaa7a3bfb4846ad7e4e",
       "exports": ["ControlMailConfigReadiness"]
     },
     "src/api/generated-query/control/model/controlMailConfigRequest.ts": {
-      "sha256": "8c74d3c0d5b92ccf04418f9a0f53b5c5d62a4fdab3570cddcbf13746f2c4b260",
+      "sha256": "71fd69181f6b50c49e76dc460bdb3caca78b3fc6983f0b97f17676c68f6aa272",
       "exports": ["ControlMailConfigRequest"]
     },
     "src/api/generated-query/control/model/controlMailTestRequest.ts": {
-      "sha256": "776fd7192fd752fe9b45a539aa08f8652acd6bcb0158321dd666deb3bb25de6f",
+      "sha256": "652f00304c886c2cdc59a9ee66b1a32dcd645dedf96b000d4ec4753d6c174ff4",
       "exports": ["ControlMailTestRequest"]
     },
     "src/api/generated-query/control/model/controlModelPoolEntry.ts": {
-      "sha256": "cb8b56a06f80f185a594224e14e0701b92629ec1579fa479d978f275e24a0327",
+      "sha256": "3ce9c9581d72c4159d408cdca33b1ee9e2209d36b76e3b8da88f45ba1f4392a8",
       "exports": ["ControlModelPoolEntry"]
     },
     "src/api/generated-query/control/model/controlModelPoolEntryResolutionsItem.ts": {
-      "sha256": "e7bd2a50c56245331c938293c15443f30f0b7cb77ab41a0ab546eec6e823f2f8",
+      "sha256": "ac581252620478c9f1d6d8ad616b727f85418ccc873a28e837b35099d5aa1508",
       "exports": ["ControlModelPoolEntryResolutionsItem"]
     },
     "src/api/generated-query/control/model/controlModelPoolEnvelope.ts": {
-      "sha256": "c53becf4101e4ba46893280c0281ed55ff24fa4daa8d861eff6e07c724ab0ada",
+      "sha256": "64bc89fd5c6aa894bdfd9abbb681d6710071b9dee7c4ad17c8b34149179cafc1",
       "exports": ["ControlModelPoolEnvelope"]
     },
     "src/api/generated-query/control/model/controlModelPoolEnvelopeData.ts": {
-      "sha256": "2b4b3d560dd252388b9cf7775720a681626271d6af715ce2aa6564b24bdf05ea",
+      "sha256": "355333876b2ec875f5c7d375cd461a440bd618eebd58b43fec8af79513dfc7bf",
       "exports": ["ControlModelPoolEnvelopeData"]
     },
     "src/api/generated-query/control/model/controlNotFoundResponse.ts": {
-      "sha256": "26f49895d664a323d1ee79f869c50dc6aa6b84e1b6e5c2542d24cb7b0c640650",
+      "sha256": "cabf627715a7309aaf1b24267e86093f8b42f81e9cc53f95f78c8f96e0059fde",
       "exports": ["ControlNotFoundResponse"]
     },
     "src/api/generated-query/control/model/controlOAuthProviderEnvelope.ts": {
-      "sha256": "07efa76548a3137a24c4ba508d6eae8aba2b1334a7b33adb73d6f5dc11c055a0",
+      "sha256": "a011015e5f97bcb042018dae4bc576571a95ec594be1a10af7bad22449712d4d",
       "exports": ["ControlOAuthProviderEnvelope"]
     },
     "src/api/generated-query/control/model/controlOAuthProviderSummary.ts": {
-      "sha256": "734fe0640ecb7da63196ebbc4d26c963881c45d04b554b420b700d04fd933130",
+      "sha256": "02045544835fb1d9682e39a6057bee609e43f2f6864998c940c76fb9b22c1bdc",
       "exports": ["ControlOAuthProviderSummary"]
     },
     "src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts": {
-      "sha256": "879b1ff524c18a79a186ad45a732883d178d34f4d912f0125890a24402cb6584",
+      "sha256": "5c7e22c74ec73fc08a99f248842c9390439ac2166f76c939d4ef6d3e4b6ed8b2",
       "exports": ["ControlOAuthProviderUpdateRequest"]
     },
     "src/api/generated-query/control/model/controlObjectEnvelope.ts": {
-      "sha256": "0e459b0cbb76a162f88fc4fb6761fad7c0f79504141c7bec955aafc7003fe5cd",
+      "sha256": "cb5aa5d8cba40b94c8c4263360fd9920eaa38de660b1f23c0d60c749b68bebfb",
       "exports": ["ControlObjectEnvelope"]
     },
     "src/api/generated-query/control/model/controlObjectEnvelopeData.ts": {
-      "sha256": "a6f8ecadccb7576e98004d5a5176f06ae88232f57a9feb9084ebc8a348704c58",
+      "sha256": "1a4769a9f8bc040b4afbd2c56e1a8549a7896109c10f24f42817c8b640089004",
       "exports": ["ControlObjectEnvelopeData"]
     },
     "src/api/generated-query/control/model/controlOutboundPolicyRequest.ts": {
-      "sha256": "9b802c6e857176e5bd3f0699659db395a09d073db77baf5235e760743d197070",
+      "sha256": "d61ea95aa0cef5b08ce19cc4df03ab5b107955cd27dada010d5e0fa4880a49d0",
       "exports": ["ControlOutboundPolicyRequest"]
     },
     "src/api/generated-query/control/model/controlPaginationMeta.ts": {
-      "sha256": "187b525107df3777ef5b1df78da2379261bcbad9cffc72b4f670c8b5a8ea5ca6",
+      "sha256": "896e84f3a9d148ea70cf75dfff8f750ee0737e391e221cd7ffab833416f1fcbc",
       "exports": ["ControlPaginationMeta"]
     },
     "src/api/generated-query/control/model/controlPaymentOrderFiltersParameter.ts": {
-      "sha256": "7b9bbdc9f52e5e35df9dab801241a4da3b8d31844de92735afa3235859f2afdd",
+      "sha256": "e9719df2653ea3ef4b410da18f2f54caf020e668c4dc3c7686c48fbc5b597014",
       "exports": ["ControlPaymentOrderFiltersParameter"]
     },
     "src/api/generated-query/control/model/controlPaymentRefundRequest.ts": {
-      "sha256": "7684c3cabc27c7a8b80d126223fce6ca5cadfc53fb42f8c4a331369adfe17fc1",
+      "sha256": "d3d284518cb86fdb1961087d91df33837fe9c8b3e7aac576a8117e8bc5ef9c94",
       "exports": ["ControlPaymentRefundRequest"]
     },
     "src/api/generated-query/control/model/controlPublishPricesRequest.ts": {
-      "sha256": "b8cf4677fab8a44705004c90b6ae4a17b9386c5e75f04280f5e992725aa68e77",
+      "sha256": "f5ea0a2456a4c64bd579c4760be0322db29a629845bbe0d01426d5b16b6fa9bd",
       "exports": ["ControlPublishPricesRequest"]
     },
     "src/api/generated-query/control/model/controlPublishPricesRequestPrices.ts": {
-      "sha256": "a356b72b0ad205071d40ba233470b43bac583129ebd7013ed6e2aa100f3bdecb",
+      "sha256": "24d4ea68987de37a3fd94037e5027925248910ce75da57a2364de2f3cfbb80e7",
       "exports": ["ControlPublishPricesRequestPrices"]
     },
-    "src/api/generated-query/control/model/controlReasonRequest.ts": {
-      "sha256": "e267a41c910cdf94126ed8d315cdd1c64a012a5bd3824057e9d0f00b35338941",
-      "exports": ["ControlReasonRequest"]
-    },
     "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts": {
-      "sha256": "d6e130b54a99b8e7ec46db168bd4d95af630942946f57b21994b46160a46d58e",
+      "sha256": "ea556590b8622cc38d78299564e0e35092494a35edb2fb3ecb847132ceeb17a8",
       "exports": ["ControlReplaceModelPoolEnvelope"]
     },
     "src/api/generated-query/control/model/controlReplaceModelPoolEnvelopeData.ts": {
-      "sha256": "cd7f4d75d8c92c054a580d874f2dfa8ab2b5b66bf042ec599ef55ef637a92c1e",
+      "sha256": "2e421f2016897e4ef2ca12dc34f460845e33527a0e92998051515a7c7b00e49b",
       "exports": ["ControlReplaceModelPoolEnvelopeData"]
     },
     "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts": {
-      "sha256": "6720cdbc1dc4be6ec39b5c07b26f121570eaa35bbf85f1df37174962fe13cea3",
+      "sha256": "6f2b50d8712855b95b59d9f1cd97b36892d3677413aaf4e4236a21f301bcb6e6",
       "exports": ["ControlReplaceModelPoolRequest"]
     },
     "src/api/generated-query/control/model/controlRewardCode.ts": {
-      "sha256": "78eb9f753b9fbd635d9e444a9d114c3925c1b28f80bb177f94b2ba7beba15fb6",
+      "sha256": "e844529c88ca67ac14bec3ebbca8d59aa05e577d5b9ceb851a2d7f9409bd5db6",
       "exports": ["ControlRewardCode"]
     },
     "src/api/generated-query/control/model/controlRewardCodeCreateRequest.ts": {
-      "sha256": "c161ec657d3dfdde4e5df22b02edaadc88f96267344a778c6513cc437729b8d9",
+      "sha256": "3d678a91d0eaff0d3d596bd9327a274d286ef4e58d407746002311cbb85f8337",
       "exports": ["ControlRewardCodeCreateRequest"]
     },
     "src/api/generated-query/control/model/controlRewardCodeEnabledRequest.ts": {
-      "sha256": "37fde0f89b7ea4a847e81587a6aceb189d1acf5084150ec0f4220994ab4ff513",
+      "sha256": "a1ba032500218fbe0b767b413eb4e653afda79f69eaee6e1200ca10f5c6cb2ed",
       "exports": ["ControlRewardCodeEnabledRequest"]
     },
     "src/api/generated-query/control/model/controlRewardCodePage.ts": {
-      "sha256": "f482c23e3636a664727435f8ef89013ae7dcdaf4fa33cba0cee27258e248a889",
+      "sha256": "66dca2ef49b09d526418441d239c68880184d287f05479a3d708c44de3d1ff5e",
       "exports": ["ControlRewardCodePage"]
     },
     "src/api/generated-query/control/model/controlRewardCodeSearchRequest.ts": {
-      "sha256": "5d14692d2d7ed34a84e68f405a570ad0a7450cdc94efea492b438f2238784bef",
+      "sha256": "fa24ec9834e77a5eb8177e9b3f3281112b6946950dde052bc260f413b42bf3fb",
       "exports": ["ControlRewardCodeSearchRequest"]
     },
     "src/api/generated-query/control/model/controlRewardCodeSearchRequestStatus.ts": {
-      "sha256": "57ff9b724abd8ba2ae868957a282f3eb52c3b519fb0fb3c61d3a1d7efa4d969c",
+      "sha256": "63fbdfe6d351525702a2d759f52fafc2d6ca9d533b1d627efb72048f8ee02362",
       "exports": ["ControlRewardCodeSearchRequestStatus"]
     },
     "src/api/generated-query/control/model/controlRewardCodeStatus.ts": {
-      "sha256": "83eaeef773168f12167b5eaa40cf0888e755e56fc2bec7cf0d590eb16d28596d",
+      "sha256": "62778c7626ad25476e4fee882dbd97a4596e26acbba0913c4cdcf0653be092e4",
       "exports": ["ControlRewardCodeStatus"]
     },
     "src/api/generated-query/control/model/controlRewardCodeUpdateRequest.ts": {
-      "sha256": "d31aa7df637c3dcca00b16fdb6130af773184cd5bebd18d845e4670680c4b6ea",
+      "sha256": "796809358c39e0580f6c7597868bfc63d506bb99cb3851ca0f2f25d120df2768",
       "exports": ["ControlRewardCodeUpdateRequest"]
     },
     "src/api/generated-query/control/model/controlRoleParameter.ts": {
-      "sha256": "5709ef8d0a1b4e5017694fd0fc33fe40d349277741aa4bd1ad85d76262372dd7",
+      "sha256": "5ce4b531a41cd6f64d2f486a8b1db57e1b5b1442e26d82066f2e9f99ac790598",
       "exports": ["ControlRoleParameter"]
     },
     "src/api/generated-query/control/model/controlSetAvailabilityRequest.ts": {
-      "sha256": "e3a0dc8033c4cf826bcd8c4bb7b5e1c6f5bd3bcf9fe0e4dcd0f9233cb9604291",
+      "sha256": "ae1937e890857f15b764db452837f9b33f4ddba093e5ae8c508fce5e0d27a4d5",
       "exports": ["ControlSetAvailabilityRequest"]
     },
     "src/api/generated-query/control/model/controlSetRoleRequest.ts": {
-      "sha256": "cd0cb374b461433385449f3b97c4ec87e52063f012e40434c68df92e33cbfc0d",
+      "sha256": "3615482b79eac45ed26b29eacb6e5e0ccaa793b61b24fedb480f691725891c97",
       "exports": ["ControlSetRoleRequest"]
     },
     "src/api/generated-query/control/model/controlSetRoleRequestRole.ts": {
-      "sha256": "a9b40b4aa32055588eb82d77784f65e097cdd6ef2682a8c896e8d7e192dd700c",
+      "sha256": "b9454f9cd5d24bcc9133b933aa275e55e4c039e1a6ab3d37ced0c22d90031a8d",
       "exports": ["ControlSetRoleRequestRole"]
     },
     "src/api/generated-query/control/model/controlStatusParameter.ts": {
-      "sha256": "f8eaae79ae7455f25927f0dd5db42b75d7fc3a6e2570d10ee6f852c6bb94750a",
+      "sha256": "ab4bc64c860c4698ba20bfac5a8eaad038ec4da3c990f2cd8fa2e9a0a44c2e97",
       "exports": ["ControlStatusParameter"]
     },
     "src/api/generated-query/control/model/controlStripeConfigRequest.ts": {
-      "sha256": "268eb29b25e17cc194cb86af0057a88cfdf25258891d002dfd11e7bec33cd371",
+      "sha256": "105f3f63e0f979cd0c61d6fa923b471c97e6b85d6d350874c9b427e415cd2472",
       "exports": ["ControlStripeConfigRequest"]
     },
     "src/api/generated-query/control/model/controlTask.ts": {
-      "sha256": "9e5e7eb9d926920c66fa03aaabfaf676ca8857a462456aa926c541c6822854a8",
+      "sha256": "44edb30880309c05bc5afd06ffffa8c49597d840f54bb6d6e871aa768e91bbba",
       "exports": ["ControlTask"]
     },
     "src/api/generated-query/control/model/controlTaskAttempt.ts": {
-      "sha256": "ce05e5be0e588a39559862b391de05f60d20fd267bb7a74e7e4415a02cb97b3a",
+      "sha256": "ced75d631947bf0a56ed3caf1f2bd9db648c2f5869aedbf94b8d2d2be9f558ae",
       "exports": ["ControlTaskAttempt"]
     },
     "src/api/generated-query/control/model/controlTaskAttemptRetryLayer.ts": {
-      "sha256": "6bf719e05c2a3bf9cb00bf16443feebc11f316d6953641b7d4b9875cc3801cba",
+      "sha256": "12b6a69844c7418cc028a0eb7d109bc274da817c486cb77abde22a34e9ffd7e0",
       "exports": ["ControlTaskAttemptRetryLayer"]
     },
     "src/api/generated-query/control/model/controlTaskBilling.ts": {
-      "sha256": "9d2852e23a1007725676d1757bacfd196d69eb76edf825b386cdeb4ea4c49176",
+      "sha256": "f5563427cb81743d0502fcb2b2a2191814e5ed4d19f1b796e5efa63fa260cfc1",
       "exports": ["ControlTaskBilling"]
     },
     "src/api/generated-query/control/model/controlTaskEnvelope.ts": {
-      "sha256": "72fa4dda7c9803edd1232c8e048c445eca9ad3e9fe7912915c4a8d12f28fbea5",
+      "sha256": "ccdf6deb34d7d4a00a49227c985ba2c25d27e172d54c3202393643bd3bab3c66",
       "exports": ["ControlTaskEnvelope"]
     },
     "src/api/generated-query/control/model/controlTaskEnvelopeData.ts": {
-      "sha256": "9546d3282a297dfb13d6a7615e2c04b805a7738aa60db0cb5083d4b9645ecf46",
+      "sha256": "e8870a57e9661158fdf812b0e231008620f6c1cabc8406f6e1414d3f796a51b1",
       "exports": ["ControlTaskEnvelopeData"]
     },
     "src/api/generated-query/control/model/controlTaskExecutionMetrics.ts": {
-      "sha256": "eebddaded3add6d120bbd9de3c29c885e14d8d8f2e135dd9d0ac4f3346ca0483",
+      "sha256": "6e5bd248cfdbc90a5809efe03567e03c7cd4327f1d3cfadab375b2e19c11670e",
       "exports": ["ControlTaskExecutionMetrics"]
     },
     "src/api/generated-query/control/model/controlTaskExecutionSnapshot.ts": {
-      "sha256": "3a1ae1fc4a4665f0c1ef2b04bf13633b534a7de4aced9a54abbc62591b100890",
+      "sha256": "c9988d0fd841fa12de076380f11f02e3bee0a33c96d8a806e649d9950ee01470",
       "exports": ["ControlTaskExecutionSnapshot"]
     },
     "src/api/generated-query/control/model/controlTaskListCounts.ts": {
-      "sha256": "4ff0a43024e1079040d1c90ff0f44b3201347f97bd46f6477a62fd3375c52f88",
+      "sha256": "531f51efbd810a2a5d442af05ef1a275ecea53c0567382736b85326b50302bc8",
       "exports": ["ControlTaskListCounts"]
     },
     "src/api/generated-query/control/model/controlTaskListMeta.ts": {
-      "sha256": "2614e1b23eba79611406d9e72b10963a1892ee41d846425902abcf0599971752",
+      "sha256": "5eaa56ee65eae975e31960653bd05fa8d1494514afc759d7efd67cf1fffb74a4",
       "exports": ["ControlTaskListMeta"]
     },
     "src/api/generated-query/control/model/controlTaskOutputsItem.ts": {
-      "sha256": "90a256fd0f115224a842b65baae519e3b9d6dc3b5a39e596399ca4c50034e97e",
+      "sha256": "8fbba5259b1ffd8f9d68f73f2c324b080edf1389e727b2516ab8035dfab1c639",
       "exports": ["ControlTaskOutputsItem"]
     },
     "src/api/generated-query/control/model/controlTaskRoutingSnapshot.ts": {
-      "sha256": "38be7960fb5a38459c5b37595bece6ef39eeb0334449440d5e1a7cf90b86cdbb",
+      "sha256": "465bdd1869232afc5443602e91743dd5f04ab94303ddb50974000feb986fdc5c",
       "exports": ["ControlTaskRoutingSnapshot"]
     },
     "src/api/generated-query/control/model/controlTaskStatusParameter.ts": {
-      "sha256": "1568c07dc68e4c227e2ea5d38c6c22d6aa0d8e4050da32cba7ac2c88af36274c",
+      "sha256": "45aac3a84ed38bac4e588e0ad7c47855c123a4649da85ee15d4a51025fae3e1a",
       "exports": ["ControlTaskStatusParameter"]
     },
     "src/api/generated-query/control/model/controlTaskUserParameter.ts": {
-      "sha256": "2cee350ea30241ceaeea9e4ed1ee742008f5033e4cc8e12a6fd62a737e9ab961",
+      "sha256": "9c7bc6b72027349b478830fac2f95f1398bd5451c19f7b3e368eec28a1605392",
       "exports": ["ControlTaskUserParameter"]
     },
     "src/api/generated-query/control/model/controlUpdatedRewardCode.ts": {
-      "sha256": "7868bb45ddd6a0802ed1db33b248ef87735f85b84b2ef137962e98ec98f66f0f",
+      "sha256": "d123b515885262d7155439ddf578bdeb5986b6f5b16bd5185bd4522b988a6884",
       "exports": ["ControlUpdatedRewardCode"]
     },
     "src/api/generated-query/control/model/controlUser.ts": {
-      "sha256": "a6615cb89517c61e8a4f6fbcf4b0e856159332610a3871fc073edaf560150b37",
+      "sha256": "dba6f0eba989bbcfda339db1163de450b8b1efe677fa4e93f2fbb52202f771af",
       "exports": ["ControlUser"]
     },
     "src/api/generated-query/control/model/controlUserEnvelope.ts": {
-      "sha256": "5ba7887d32ebc23c5b439b84f7d9b5e8919420f2623a15c112af777e72cfbe42",
+      "sha256": "a59721da704933fa516d8e7ed4ced6d99d83e3dd55d834272a0e3f48e34feeb6",
       "exports": ["ControlUserEnvelope"]
     },
     "src/api/generated-query/control/model/controlUserRole.ts": {
-      "sha256": "6bcb1b9fa5581191b3be94842e1cb184cdcb03c0e6498e4b2859463325c4895d",
+      "sha256": "476c7309b0d50f142c53678a80031c79304ead9747d7bdd123bb977b6d46b63e",
       "exports": ["ControlUserRole"]
     },
     "src/api/generated-query/control/model/controlWalletRestriction.ts": {
-      "sha256": "6cc2eb3a45e178fbed5eef367e8b2fb4696511757f2aa52ca4e063ff505f7137",
+      "sha256": "d247860a1fba78c271607976f48715bff2f218fb60c4d3f8ff7d2eb271733fae",
       "exports": ["ControlWalletRestriction"]
     },
     "src/api/generated-query/control/model/controlWalletRestrictionCreatedBy.ts": {
-      "sha256": "8f9a975d5bbf5af6e960b08cde03e544c67722acfe409f639e0eb72ecdc1c50b",
+      "sha256": "14cdae0941d6bec9b98af959432adb8136da25aeb1144505c93aa9cdfd1d264e",
       "exports": ["ControlWalletRestrictionCreatedBy"]
     },
     "src/api/generated-query/control/model/controlWalletRestrictionRelatedObject.ts": {
-      "sha256": "012ff7aecd5180a15de187192905b77b1d46a04a9f447244c64dc53ad37565d6",
+      "sha256": "c0605a0fef383478b171602372ddc0ed58329fab0ef1f39973a165e2f63e46ef",
       "exports": ["ControlWalletRestrictionRelatedObject"]
     },
     "src/api/generated-query/control/model/controlWorkspace.ts": {
-      "sha256": "2b72e5e572f9db145736a655036d84946eec5ea8eccf17fb35d06bfcc2b44d61",
+      "sha256": "5dab1726881c98c7b451f791852de93dc6f666a2625506b100fc2bc7067d8107",
       "exports": ["ControlWorkspace"]
     },
     "src/api/generated-query/control/model/controlWorkspaceEnvelope.ts": {
-      "sha256": "6ebe546075cecc88b8f16cf7521fbc84e233c23a705a0716e108cd37550392a8",
+      "sha256": "03d3afbe38525c095f78fa944abdd967132a2a86c1b3340605d895f07c78947a",
       "exports": ["ControlWorkspaceEnvelope"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMember.ts": {
-      "sha256": "65f5cb3030a906d97624068c7715cb32e6547b570b6d288ac5db9b1ca702dd4d",
+      "sha256": "49a57c6f24714f4ae5460068fd4daf96d8796c56ffe080d106fbfd2e639b804a",
       "exports": ["ControlWorkspaceMember"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMemberEnvelope.ts": {
-      "sha256": "6816b77ab043ee7ed95c03a0084f9f2888bdd6ec52867e79ffce68cdc928a11d",
+      "sha256": "df3dfdc80015a24d206cf9bc7349241ced41de669c7b6b7bb65732abf7e30030",
       "exports": ["ControlWorkspaceMemberEnvelope"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMemberRequest.ts": {
-      "sha256": "f67587f5a9312ffa11cf9b54f32b2f5511e1debce492d263a87895b252c622ac",
+      "sha256": "6bc1576c9e3c2534ee8673a0bb63bb7bd0b9b58205d01a5db924fb5a7db9432f",
       "exports": ["ControlWorkspaceMemberRequest"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMemberRequestRole.ts": {
-      "sha256": "19d24abe936db413a54812ced077f4c7b8d86d6c6cba0daf813cc9c872f8fa42",
+      "sha256": "b1c0df0756149108456eec1548090c4b9676d1254c3998bf1e830d18b35b63be",
       "exports": ["ControlWorkspaceMemberRequestRole"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMemberRole.ts": {
-      "sha256": "40915361834813a706b41adff98780c655244569baa1846058fddd216e1c5a2a",
+      "sha256": "86952cd9bbec8e1e6f5ce88f03ec4846472c5567705fd0e24dfb77d2c599c503",
       "exports": ["ControlWorkspaceMemberRole"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMemberRoleRequest.ts": {
-      "sha256": "59d77a1eb4063210b6b48ebe902c74587668504d18541918a874dbcbd5d65e86",
+      "sha256": "b27798b992e67d0a42114ec445ad2aa01dabcbb958ed01c7e35b31684dad523f",
       "exports": ["ControlWorkspaceMemberRoleRequest"]
     },
     "src/api/generated-query/control/model/controlWorkspaceMemberRoleRequestRole.ts": {
-      "sha256": "e5b842f17b6a8bdf0b49e77e6a3170c593e81413673eb9a84eda0b259549df41",
+      "sha256": "2bf1519a2996a3f99d3752e0bf135883ee9452b13b0e1c447803221d235c6193",
       "exports": ["ControlWorkspaceMemberRoleRequestRole"]
     },
     "src/api/generated-query/control/model/createControlStorageProfileBody.ts": {
-      "sha256": "12d8355ad8f99d9614d1160165bd048750faa2cfb8b96769b8c4600394254f96",
+      "sha256": "cbfa1fcf13bb892133ba5455175746d978338f98b1c135b0c0c2b224b3a05e85",
       "exports": ["CreateControlStorageProfileBody"]
     },
     "src/api/generated-query/control/model/cursorParameter.ts": {
-      "sha256": "955666abe576550f58fa6a0580c6848d0dae7aef3617f0d741c4502b8a754698",
+      "sha256": "9255939846df25b259049e35ddd6e83e9924dd30c38e2a230845c9011c9dfea6",
       "exports": ["CursorParameter"]
     },
     "src/api/generated-query/control/model/detectControlAIGatewayModelsParams.ts": {
-      "sha256": "0ca9c533332a325f82a3d0091bc736e389e44638bfc8c65ba2036b81ee6aff26",
+      "sha256": "f4a1be471d0dd6da0363599d267c6734d22155002205ea4ad8eb8a5a5ec4be7d",
       "exports": ["DetectControlAIGatewayModelsParams"]
     },
     "src/api/generated-query/control/model/forbiddenResponse.ts": {
-      "sha256": "9f3947337a6a2a6cb508a6e4775e7976d9c4919e6928884bb5ed13dcf56087fb",
+      "sha256": "94c0f351271d76f312d6c0604cef48dfde2872eccb3f0384d45b5508e9c8bb77",
       "exports": ["ForbiddenResponse"]
     },
     "src/api/generated-query/control/model/getControlAIGatewayBrandLogoParams.ts": {
-      "sha256": "86a9637d5084ab84701c65da34e4e5e39b59eba65d09c5dfabd9dd0aaeb46a75",
+      "sha256": "b2fa0902f08bb5e93f0a95daf333a97dbda28a5d49b9f866b22e8ae73963370c",
       "exports": ["GetControlAIGatewayBrandLogoParams"]
     },
     "src/api/generated-query/control/model/getControlAIGatewayModelReferenceParams.ts": {
-      "sha256": "4d002b07a1ea5f1abf42bf9f95730817076248841003175a4d4901a9299e339c",
+      "sha256": "e33c86b3ddbca2fa80e9910cee0dd0ed99666a2402132dee418339ccd67c6d5d",
       "exports": ["GetControlAIGatewayModelReferenceParams"]
     },
     "src/api/generated-query/control/model/getControlStatisticsParams.ts": {
-      "sha256": "bdd49f163e4cdf4d97c2172317191645bc8e9dff80ee1ecbb9b48b04e98546b9",
+      "sha256": "a963bff1fca3d8f4e8dfa17e513600d98e5a86c7d3606c158d31fa740c989e6d",
       "exports": ["GetControlStatisticsParams"]
     },
     "src/api/generated-query/control/model/idempotencyConflictResponse.ts": {
-      "sha256": "57cc322b8f8562d1e2f20bfd1b72c87a79c8421816a3d4e5284f1d61c18fcc4c",
+      "sha256": "e869b30dbb060ab5cd5c162ce6f4951ab97ffe681b5690e03aa07facd922fc70",
       "exports": ["IdempotencyConflictResponse"]
     },
     "src/api/generated-query/control/model/idempotencyKeyParameter.ts": {
-      "sha256": "2845f9650791a136343833865627796949e7bae3c3aed0c565f0c67e908cf483",
+      "sha256": "d46e3212a2d0ba7562337ef3d0c469437cb4d3fa3f9f9e189ece5bf5583c7d31",
       "exports": ["IdempotencyKeyParameter"]
     },
     "src/api/generated-query/control/model/index.ts": {
-      "sha256": "79a3ca717a3423683e0aaf4d174f32ecf1b81e4e165a070226dcb8151705444b",
+      "sha256": "b21a9782628a4f9d7059431809e550f8020fc9110313187cdbd66eeb40b5bd64",
       "exports": []
     },
     "src/api/generated-query/control/model/listControlBillingAccountsParams.ts": {
-      "sha256": "20e8e71ff38e66fb070c43dbb799cad831c8d309735c8974a44855e5101fdcf5",
+      "sha256": "27eec608403cbc8c3305cf7043ab1d1d8d18ce04be5c9c446379f9ce65549593",
       "exports": ["ListControlBillingAccountsParams"]
     },
     "src/api/generated-query/control/model/listControlCreditLedgerParams.ts": {
-      "sha256": "7d7372c6eaa166e7be7d7c6ed8d43e6596bf4b83c4682707aabe542095d1820c",
+      "sha256": "121c6e02485c773bb5bd33520bdc5349a7d767f238857999243df94c2ff40662",
       "exports": ["ListControlCreditLedgerParams"]
     },
     "src/api/generated-query/control/model/listControlPaymentOrdersParams.ts": {
-      "sha256": "aa09b5f5549e3df5c34c6c69adcc6bae54e529172cec85d4a66f231ef128d71d",
+      "sha256": "85480c505889a49fd9b0dcb5a06683d0ca9b3743394f0501a6659f1b29b1da83",
       "exports": ["ListControlPaymentOrdersParams"]
     },
     "src/api/generated-query/control/model/listControlReconciliationFindingsParams.ts": {
-      "sha256": "09e6451af309545643cd41e092cadbf7bfbf32f4439eac2491f794c335cc7f4a",
+      "sha256": "58e972d1be92bf4b9b731078a53b4210edf063efc3edc696672d50d815a14af2",
       "exports": ["ListControlReconciliationFindingsParams"]
     },
     "src/api/generated-query/control/model/listControlReconciliationFindingsStatus.ts": {
-      "sha256": "919f5d45975a6c39a229e0dd3b98ef7b94b5d2d5f7bcfe6a4ff9097b198e4c5f",
+      "sha256": "1280a67adafc595da618925f4f0c8411b800a3599906f61c01e8731751c1f62b",
       "exports": ["ListControlReconciliationFindingsStatus"]
     },
     "src/api/generated-query/control/model/listControlReconciliationRunsParams.ts": {
-      "sha256": "2493c1ec26ff7ec816cdb8311d6e9949efb493f009e789121e2261f2cdeef5f4",
+      "sha256": "5f3a2a0c4ac3fa2110bb06834c63923e06de9bbcf2cfb4a64b6b9089d880d9ce",
       "exports": ["ListControlReconciliationRunsParams"]
     },
     "src/api/generated-query/control/model/listControlRewardRedemptionsParams.ts": {
-      "sha256": "ba3c6af8ce5fdc58af7ac2fffb3debce83c1e98af7bc39acd044496295a52c75",
+      "sha256": "d322ce547781478bb36aa730a76722e19f9b3de326e13af98478d8a8cd68ade2",
       "exports": ["ListControlRewardRedemptionsParams"]
     },
     "src/api/generated-query/control/model/listControlTasksParams.ts": {
-      "sha256": "ddc3e71a1061e9a23f7520ba5264d8306059f852c52e06a15d721c9628edd2fb",
+      "sha256": "28c2ea258181e867e738d167008bfc68361f9e0e172d13cd391b56f8f87997be",
       "exports": ["ListControlTasksParams"]
     },
     "src/api/generated-query/control/model/listControlUsersParams.ts": {
-      "sha256": "003333bab90b923772b7f540aaa2ea810febf473a9c99f3c44f46edf1c1269ea",
+      "sha256": "e2baafdfc86fb5cce0a3eacfa57392872eae8abc84d19cacf07f71d7a19a164d",
       "exports": ["ListControlUsersParams"]
     },
-    "src/api/generated-query/control/model/operatorReasonParameter.ts": {
-      "sha256": "c37811cf4f122f558bb90e1b4eecf05d11a75ee87b5856454e95bc9f62184255",
-      "exports": ["OperatorReasonParameter"]
-    },
     "src/api/generated-query/control/model/pageSizeParameter.ts": {
-      "sha256": "eda3f5bc6b2e58521e73d1ed013152944bf14a0162c56e07f22b04c5021213a6",
+      "sha256": "432acb6aa2bd7ad2aa26d30be46c606663a0bbff7717fc67ad379cc7bfe4972e",
       "exports": ["PageSizeParameter"]
     },
     "src/api/generated-query/control/model/paginatedControlBillingAccounts.ts": {
-      "sha256": "19f9d83721378ac431fd9632d99276d85f5c95dae5dac4879c63cb0d242b5f91",
+      "sha256": "e74c8fee03460209affd8a8f53f560f5c4b1f3a6c3ca1fa693218c5ad3b288ff",
       "exports": ["PaginatedControlBillingAccounts"]
     },
     "src/api/generated-query/control/model/paginatedControlLedger.ts": {
-      "sha256": "c1e22c389247f2ab6dd844649aef70f396de6d34990fe481d6f72ffc31e4c237",
+      "sha256": "429ffa1fd7ae9237f39791d7e97596c93c327fb0d17d59ade69056c7185b777d",
       "exports": ["PaginatedControlLedger"]
     },
     "src/api/generated-query/control/model/paginatedControlTasks.ts": {
-      "sha256": "88aafc6b9a4db7d6b16984212078ed2deab18f166373e599d5814c21221f6bef",
+      "sha256": "acf4a878850aa523a3405a4aec4c359dd70373aacf3a4d23a719d17c8a1a72ff",
       "exports": ["PaginatedControlTasks"]
     },
     "src/api/generated-query/control/model/paginatedControlUsers.ts": {
-      "sha256": "bda7e803b8cb27a407e0e87d9924a08a4e2cf1069aef0370e7a4048b60eae27e",
+      "sha256": "db7e35afeadc2f295ffa43dda81b9804ec5c71a70d3ca097f7e7cca7980792d1",
       "exports": ["PaginatedControlUsers"]
     },
     "src/api/generated-query/control/model/paginatedControlWorkspaceMembers.ts": {
-      "sha256": "99b03f8124c894ce1c1cbd9775998bc9289badc973c21382d73066eaa015ad5f",
+      "sha256": "5088b3678c7754083e7d7d05a6a81048793f7cbd5f271e9f3a5cb3faf3fb6315",
       "exports": ["PaginatedControlWorkspaceMembers"]
     },
     "src/api/generated-query/control/model/paginatedControlWorkspaces.ts": {
-      "sha256": "71760c41379a774b797e063c3594afef245ded83b8f93ed9011b4289c4ec463a",
+      "sha256": "4ad2b049be2bff43f482f97e230336bf14f3874e0db03c5df3c92ab56fd43110",
       "exports": ["PaginatedControlWorkspaces"]
     },
     "src/api/generated-query/control/model/previewControlAIGatewayRouteBody.ts": {
-      "sha256": "bd2235058d059126c29673b8b7934286534a1760f1bd2239a80a8584ccb9e614",
+      "sha256": "88654df820f6d3fea87d476da723026553f8883ac16440feb235f70742751e04",
       "exports": ["PreviewControlAIGatewayRouteBody"]
     },
     "src/api/generated-query/control/model/rateLimitedResponse.ts": {
-      "sha256": "7a8921bde8bbd9c9232462d0c7ccf69bef2543f0a5449c78ba3bebfec76791ee",
+      "sha256": "48ea6c2a8cbddf0d9378e4a9a8467310fd7f2263916a870759115ebaf120f34f",
       "exports": ["RateLimitedResponse"]
     },
     "src/api/generated-query/control/model/saveControlAIGatewayCatalogBody.ts": {
-      "sha256": "53221e26e677d801260623621543fef4a678fa4b44e029ac7ac3abcaeaec0620",
+      "sha256": "d75013ac75af0919405b51e9d63c2e947ac9f4de246282bd1d29436ac202b77b",
       "exports": ["SaveControlAIGatewayCatalogBody"]
     },
     "src/api/generated-query/control/model/saveControlBrandLogoOverrideBody.ts": {
-      "sha256": "a90110d256d980fc1c364aa5384cba4d64c39bb7fa1f17e1a90187afa2e78080",
+      "sha256": "89bdf54ffbd3f23572a66bed5c896eba229b480b890f23e26c31f2770389f7a7",
       "exports": ["SaveControlBrandLogoOverrideBody"]
     },
     "src/api/generated-query/control/model/saveControlFeaturePromptBody.ts": {
-      "sha256": "34b7959a7a7f64210a734e65e5167abb8eec1e15f4b57b1e1c81118a711ce1a4",
+      "sha256": "d5572a4678c62b29fca1a0ef1faa5b108c15f55c228126cb5352b32fac37a027",
       "exports": ["SaveControlFeaturePromptBody"]
     },
     "src/api/generated-query/control/model/supportChannel.ts": {
-      "sha256": "4b16a6c12cad8970e81e92df2e8785dd9e425bc17762924e5639d782191d6bfb",
+      "sha256": "927b6abc8115da7957c8e983d283f11387da1ba9a6ecf5c9398b9db5a7a9ad44",
       "exports": ["SupportChannel"]
     },
     "src/api/generated-query/control/model/supportChannelKind.ts": {
-      "sha256": "d7281bd1f1604c020974e39589657dc3fc5829af49834ed80f46a92755466a6b",
+      "sha256": "a8ae2bd45892c293f75bbf1a2a28f870825c50e4ed9e40d0a0364c1bcfa65ac2",
       "exports": ["SupportChannelKind"]
     },
     "src/api/generated-query/control/model/supportChannelsSetting.ts": {
-      "sha256": "a7bfbe63b1865c8077fc085c918d858b73a367c1ec376bb8f7837e186a4f364d",
+      "sha256": "28f4480747550cd8fc79a288cfa628e5d41358381ac766ed6b903979b10f058e",
       "exports": ["SupportChannelsSetting"]
     },
     "src/api/generated-query/control/model/supportChannelsSettingEnvelope.ts": {
-      "sha256": "f0ed7ab62a468fabadff1a3099a2c1d96ce0a6a0e73b4f2bc0d9f0db110aaa53",
+      "sha256": "ccfa36a84a8e8eab2d02601e280415350b896034c712fc5a5f10ced81d82c8d9",
       "exports": ["SupportChannelsSettingEnvelope"]
     },
     "src/api/generated-query/control/model/testControlAIGatewayConnectionBody.ts": {
-      "sha256": "927acd0ac3e7ddf05fcd255ce6b1c92834be2d4f727a95e159c3758b9c4283b3",
+      "sha256": "45fc1df33cbef2be0a876238ebb73ea79dd6d1246cd7e6044ac3804fabfb16ac",
       "exports": ["TestControlAIGatewayConnectionBody"]
     },
     "src/api/generated-query/control/model/unauthorizedResponse.ts": {
-      "sha256": "70dd46c47b3867d6c08cfbe27ac2a3d6acce69d8e91ec9263b535f702170854e",
+      "sha256": "8f35d886a698ab4b23e0032235e7bae04657dce77bff0b0171df67c278812966",
       "exports": ["UnauthorizedResponse"]
     },
     "src/api/generated-query/control/model/unprocessableEntityResponse.ts": {
-      "sha256": "0e43ad5de500e407d2d0d294175308bee306ae9437dbcd96c36b2dd8480f4555",
+      "sha256": "fb1e69ed938bf9644b19f0180756cf5d67438fb0570ae850d65114ccb9ae7db9",
       "exports": ["UnprocessableEntityResponse"]
     },
     "src/api/generated-query/control/model/updateControlAIGatewayBody.ts": {
-      "sha256": "b7a5c2b36d99c9512d5e9c15e47d7b507b1836ebe4e8cde8d51c05748b753b85",
+      "sha256": "51294d50034e3b586496a3641b4818b5f6de52721ead74b16648a696091d364f",
       "exports": ["UpdateControlAIGatewayBody"]
     },
     "src/api/generated-query/control/model/updateControlBrandingSettingBody.ts": {
-      "sha256": "4f1d013b8bac84289aff42a4b58d6b2418addeab2ff6ca3b8d8166c73b1440f8",
+      "sha256": "ed790b246d3969f2cb9bbe840db0609d9625c53bd7c8db129673d07ac7fbb85b",
       "exports": ["UpdateControlBrandingSettingBody"]
     },
     "src/api/generated-query/control/model/updateControlLoginLockoutSettingBody.ts": {
-      "sha256": "ae4abb9e7e04150d24c47cdab45418bc30848eb3c709d8e066061e067a4529ed",
+      "sha256": "7843f707fd8cea7f6c5fc59f5931efb542ae34613a640161d97b24d03707a02e",
       "exports": ["UpdateControlLoginLockoutSettingBody"]
     },
     "src/api/generated-query/control/model/updateControlMediaUploadSettingBody.ts": {
-      "sha256": "4fb97dcde2ab6889fec791999760ab31d0d2944a52265e3ec15dd3f369653e88",
+      "sha256": "004002844a122733095280beb0c75581d85bdf728437e18f2a1fc50307124dcd",
       "exports": ["UpdateControlMediaUploadSettingBody"]
     },
     "src/api/generated-query/control/model/updateControlRateLimitSettingBody.ts": {
-      "sha256": "924798ef65e71a4fa8016b35cfd1a05ab47f763f69e27845a765ff5e8784222e",
+      "sha256": "c9004d6120326676f6f27857b53d633c993ead8cfff214a98a1435bd427fc89a",
       "exports": ["UpdateControlRateLimitSettingBody"]
     },
     "src/api/generated-query/control/model/updateControlRegistrationSettingBody.ts": {
-      "sha256": "a28430bce3c06c5b69993bb0c699dbfeff1b9a7ba2b03f66a6081fee85a7abb5",
+      "sha256": "b7b758baa68cc8bee727172ce78225683bd23bbc297974df0040244857518a1d",
       "exports": ["UpdateControlRegistrationSettingBody"]
     },
     "src/api/generated-query/control/model/updateControlSearchProviderBody.ts": {
-      "sha256": "43edfeb51a14d4c4bf9a68dd0bd7bdfe2404ab0cf7cfaf5fff31ecc28fa83f12",
+      "sha256": "0d3203e2cd4bcdff94462c39448619f4dd9dd59022ccc871db70f2249fb339b9",
       "exports": ["UpdateControlSearchProviderBody"]
     },
     "src/api/generated-query/control/model/updateControlStorageProfileBody.ts": {
-      "sha256": "2f69e1d409fe061b23faa0a21d0491bc0b7e0d7ac10c353c8bbf730e4aa0367e",
+      "sha256": "74ffe900e12197461df70cddf820d06e2bb3c18ad474738254c44e6adccd1d01",
       "exports": ["UpdateControlStorageProfileBody"]
     },
     "src/api/generated-query/control/model/uploadControlBrandingLogoBody.ts": {
-      "sha256": "26a4d0a9fdf7c8fb04c363db12e0033971e8491c97a37aa57d6f8c2d7a4eff57",
+      "sha256": "6578ae638ad9a7b0e9604eb72f6cb3f586ce17328d780ccd15f7c65f33727c92",
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
@@ -16509,13 +16407,13 @@
       "sha256": "a541e001c7d33ebba3784fa313228645dc091d69135138d0d25c121f91178d4d",
       "exports": ["ListWorkspaceRewardRedemptionsParams"]
     },
-    "src/api/generated-query/public/model/listWorkspaceTasksParams.ts": {
-      "sha256": "958d265378f0f31e0449004ee8fe4e4a18e1f4b31e122e7a6ed92031fd55b775",
-      "exports": ["ListWorkspaceTasksParams"]
-    },
     "src/api/generated-query/public/model/listWorkspacesParams.ts": {
       "sha256": "c8bbd5977b1d545d637f386558207880c0db61b26c43f9b50de0726b38714256",
       "exports": ["ListWorkspacesParams"]
+    },
+    "src/api/generated-query/public/model/listWorkspaceTasksParams.ts": {
+      "sha256": "958d265378f0f31e0449004ee8fe4e4a18e1f4b31e122e7a6ed92031fd55b775",
+      "exports": ["ListWorkspaceTasksParams"]
     },
     "src/api/generated-query/public/model/mediaAsset.ts": {
       "sha256": "d381fa2858a5f25d3e13ea83a8ce8c3399516d86bb9bdf7801871926943f489e",
@@ -16621,6 +16519,10 @@
       "sha256": "a8e1279d3aca5eb29e69d9404fb629ba45d642f29705f2e84b2cc5e5832c4d13",
       "exports": ["PaginatedWorkspaceRewardRedemptions"]
     },
+    "src/api/generated-query/public/model/paginatedWorkspaces.ts": {
+      "sha256": "5d3580043d6b6ea82a47c6c00950fdcd9917dabbd59f94511e9d574e6440dced",
+      "exports": ["PaginatedWorkspaces"]
+    },
     "src/api/generated-query/public/model/paginatedWorkspaceSearchResults.ts": {
       "sha256": "fe61b402840788063e2d1d1e006c829bdac4d87a808cc5c8d1fb4b8b30d7109e",
       "exports": ["PaginatedWorkspaceSearchResults"]
@@ -16628,10 +16530,6 @@
     "src/api/generated-query/public/model/paginatedWorkspaceTasks.ts": {
       "sha256": "6fb9a22390d6456b6f9c92ee168df389c470b608c33df725322d6dbb6eb7ec81",
       "exports": ["PaginatedWorkspaceTasks"]
-    },
-    "src/api/generated-query/public/model/paginatedWorkspaces.ts": {
-      "sha256": "5d3580043d6b6ea82a47c6c00950fdcd9917dabbd59f94511e9d574e6440dced",
-      "exports": ["PaginatedWorkspaces"]
     },
     "src/api/generated-query/public/model/paginationMeta.ts": {
       "sha256": "4e7a8849d439699fafcb8b3f732ea0d3b8c321d72b4b28835390335b17c8d30b",
@@ -17725,10 +17623,6 @@
         "src/features/admin/credits/session/pricing/billableCatalogResource.contract.spec.ts"
       ]
     },
-    "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue": {
-      "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/credits/ui/shared/AdminActionReasonDialog.component.spec.ts"]
-    },
     "src/features/admin/settings/session/testing.ts": {
       "kind": "test-support",
       "evidence": [
@@ -17752,13 +17646,6 @@
     "src/features/admin/shared/ui/table/adminTableAtoms.ts": {
       "kind": "retained-public-or-test-support",
       "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
-    },
-    "src/features/admin/shared/core/actionReasonContract.ts": {
-      "kind": "retained-public-or-test-support",
-      "evidence": [
-        "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue",
-        "src/features/admin/shared/core/actionReasonContract.unit.spec.ts"
-      ]
     },
     "src/features/board/testing/factories.ts": {
       "kind": "test-support",
@@ -17932,7 +17819,6 @@
         "src/features/admin/credits/ui/rewards/RewardCodeFormDialog.component.spec.ts",
         "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.component.spec.ts",
         "src/features/admin/credits/ui/rewards/RewardCodeRedemptionsDialog.component.spec.ts",
-        "src/features/admin/credits/ui/shared/AdminActionReasonDialog.component.spec.ts",
         "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.component.spec.ts",
         "src/features/admin/credits/ui/wallets/components/walletComponents.unit.spec.ts",
         "src/features/admin/models/session/useAdminModelCatalogWorkspace.contract.spec.ts",

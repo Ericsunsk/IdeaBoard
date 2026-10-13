@@ -334,9 +334,7 @@ async function runTest(provider: SearchProviderId) {
   if (!config || isTestDisabled(config)) return
   testingState.value[provider] = true
   try {
-    // Routine probe (backend read-guard): no confirm dialog, no operator
-    // reason; the audit records an empty reason.
-    const result = await resource.value.test(provider, { operatorReason: '' })
+    const result = await resource.value.test(provider)
     if (keyTestStates.value.has(provider)) keyTestStates.value.set(provider, result.test_state)
     emit('change')
     feedback.testPassed(SEARCH_PROVIDER_LABELS[provider])
@@ -356,12 +354,10 @@ async function saveKey(provider: SearchProviderId) {
   if (!key || isRowBusy(provider)) return
 
   const providerLabel = SEARCH_PROVIDER_LABELS[provider]
-  // Routine config write (backend ReasonOptional): save directly without
-  // the confirm dialog; the audit records an empty reason.
   savingState.value[provider] = true
   try {
     const wasEnabled = tableRows.value.find((c) => c.provider === provider)?.enabled ?? false
-    await resource.value.update(provider, { api_key: key, enabled: false }, { operatorReason: '' })
+    await resource.value.update(provider, { api_key: key, enabled: false })
     apiKeyDrafts.value[provider] = ''
     // Key updates acknowledge disabled + unverified even before parent refetch.
     toggle.optimistic.value.set(provider, false)
@@ -382,13 +378,10 @@ async function toggleEnabled(provider: SearchProviderId, enabled: boolean) {
   if (!config || !canToggleEnable(config)) return
   const previousOverride = toggle.optimistic.value.get(provider)
   const providerLabel = SEARCH_PROVIDER_LABELS[provider]
-  // Routine config write (backend ReasonOptional): toggle directly without
-  // the confirm dialog; the audit records an empty reason. 乐观翻转与
-  // pending/回滚收口到共享 composable，失败 toast 由调用方 feedback 传入。
   await toggle.toggle(
     provider,
     enabled,
-    (key, next) => resource.value.update(key, { enabled: next }, { operatorReason: '' }),
+    (key, next) => resource.value.update(key, { enabled: next }),
     {
       onSuccess: (_, next) => {
         emit('change')

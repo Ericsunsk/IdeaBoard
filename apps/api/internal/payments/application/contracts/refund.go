@@ -6,5 +6,4 @@ type CreatePaymentRefundCommand struct {
 	OrderNumber    string
 	IdeaQuantity   int64
 	IdempotencyKey string
-	Reason         string
 }

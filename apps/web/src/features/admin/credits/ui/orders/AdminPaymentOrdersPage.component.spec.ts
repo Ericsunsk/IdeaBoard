@@ -11,7 +11,6 @@ const resource = vi.hoisted(() => ({
 }))
 const confirm = vi.hoisted(() => ({
   confirm: vi.fn().mockResolvedValue(true),
-  readReason: vi.fn().mockReturnValue('refund review'),
 }))
 
 let toast: AppToastMocks
@@ -213,7 +212,6 @@ describe('AdminPaymentOrdersPage', () => {
         expect.objectContaining({
           ideaQuantity: 200,
           idempotencyKey: expect.any(String),
-          operatorReason: 'refund review',
         }),
       ),
     )

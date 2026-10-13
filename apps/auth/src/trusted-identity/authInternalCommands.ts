@@ -13,7 +13,6 @@ import {
   normalizeAuthRole,
   normalizeDisplayName,
   normalizeOptionalPositiveInteger,
-  normalizeOptionalText,
 } from '../infrastructure/authUtils.js'
 import {
   type TrustedIdentityProvisioner,
@@ -33,7 +32,6 @@ export type AuthIdentityMutationStore = {
       auth_user_id: string
       role: string
       banned: boolean
-      ban_reason: string | null
       ban_expires: string | null
     }>
   >
@@ -42,7 +40,6 @@ export type AuthIdentityMutationStore = {
   updateAuthUserBanState(
     authUserID: string,
     banned: boolean,
-    banReason: string | null,
     banExpiresIn: number | null,
   ): Promise<boolean>
   deleteAuthUserSessions(authUserID: string): Promise<boolean>
@@ -83,7 +80,6 @@ export type GetUserStatesCommandInput = {
 }
 
 export type BanIdentityCommandInput = AuthUserIDCommandInput & {
-  banReason?: unknown
   banExpiresIn?: unknown
 }
 
@@ -223,7 +219,6 @@ async function banIdentity(
     const banned = await repository.updateAuthUserBanState(
       authUserID.value,
       true,
-      normalizeOptionalText(input.banReason, 500),
       normalizeOptionalPositiveInteger(input.banExpiresIn),
     )
     if (!banned) return commandFailure('not_found', 'auth user not found')
@@ -242,7 +237,7 @@ async function banIdentity(
 async function unbanIdentity(input: AuthUserIDCommandInput, repository: AuthIdentityMutationStore) {
   return runAuthUserMutation(
     input,
-    (authUserID) => repository.updateAuthUserBanState(authUserID, false, null, null),
+    (authUserID) => repository.updateAuthUserBanState(authUserID, false, null),
     'failed to unban auth user',
     (authUserID) => ({ auth_user_id: authUserID, banned: false as const }),
   )

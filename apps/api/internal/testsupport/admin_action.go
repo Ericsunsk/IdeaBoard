@@ -6,9 +6,9 @@ import (
 	"ideaboard/api/internal/platform/adminaction"
 )
 
-func AdminAction(t testing.TB, actorID int64, reason string) adminaction.Metadata {
+func AdminAction(t testing.TB, actorID int64) adminaction.Metadata {
 	t.Helper()
-	action, err := adminaction.New(actorID, reason)
+	action, err := adminaction.New(actorID)
 	if err != nil {
 		t.Fatalf("adminaction.New() error = %v", err)
 	}

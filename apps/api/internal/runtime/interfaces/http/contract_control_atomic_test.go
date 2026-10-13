@@ -1,6 +1,6 @@
 package httpapi
 
-// Control Plane atomic guard tests (step 2, no database).
+// Control Plane atomic guard tests without a database.
 //
 // These prove the guard's transaction discipline around the
 // participant writer with stub seams: success commits business plus
@@ -118,11 +118,11 @@ func newControlAtomicHarness(t *testing.T) *controlAtomicHarness {
 	return &controlAtomicHarness{controlHarness: h, scope: scope, audit: txAudit}
 }
 
-func (h *controlAtomicHarness) ban(targetUser, key, reason string) (int, map[string]any) {
+func (h *controlAtomicHarness) ban(targetUser, key string) (int, map[string]any) {
 	status, _, payload := h.serve(controlCall{
 		method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/ban", targetUser),
 		body: `{"expires_in_days":7}`, userID: controlOperatorID, role: "admin",
-		headers: controlMutationHeaders(key, reason),
+		headers: controlMutationHeaders(key),
 	})
 	return status, payload
 }
@@ -131,7 +131,7 @@ func TestControlAtomicSuccessCommits(t *testing.T) {
 	h := newControlAtomicHarness(t)
 	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
 
-	status, payload := h.ban(targetUser, "atomic-key-1", "abuse")
+	status, payload := h.ban(targetUser, "atomic-key-1")
 	if status != http.StatusOK {
 		t.Fatalf("ban status = %d, body=%v", status, payload)
 	}
@@ -152,7 +152,7 @@ func TestControlAtomicSuccessCommits(t *testing.T) {
 		t.Fatalf("atomic audit = %+v, want success users.ban 200", record)
 	}
 	if len(h.sink.Records()) != 0 {
-		t.Fatalf("legacy sink records = %d, want 0 (atomic path must not double-trail)", len(h.sink.Records()))
+		t.Fatalf("detached sink records = %d, want 0 (atomic path must not double-trail)", len(h.sink.Records()))
 	}
 }
 
@@ -161,7 +161,7 @@ func TestControlAtomicAuditFailureRollsBackBusiness(t *testing.T) {
 	h.audit.err = errControlAtomicDown
 	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
 
-	status, payload := h.ban(targetUser, "atomic-key-2", "abuse")
+	status, payload := h.ban(targetUser, "atomic-key-2")
 	if status != http.StatusServiceUnavailable {
 		t.Fatalf("ban with audit down = %d, want 503 (audit failure fails the call: semantic inversion vs step 1)", status)
 	}
@@ -188,7 +188,7 @@ func TestControlAtomicBusinessFailureStillAudits(t *testing.T) {
 	}
 	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
 
-	status, _ := h.ban(targetUser, "atomic-key-3", "abuse")
+	status, _ := h.ban(targetUser, "atomic-key-3")
 	if status != http.StatusBadRequest {
 		t.Fatalf("ban with failing business = %d, want the handler's 400 (not the atomic 503)", status)
 	}
@@ -215,7 +215,7 @@ func TestControlAtomicReplayAndConflict(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/ban", targetUser),
 			body: body, userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders(key, "abuse"),
+			headers: controlMutationHeaders(key),
 		})
 		return status, payload
 	}
@@ -241,7 +241,7 @@ func TestControlAtomicReplayAndConflict(t *testing.T) {
 		status, _, payload := h.serve(controlCall{
 			method: http.MethodPost, path: fmt.Sprintf("/api/control/v1/users/%s/ban", targetUser),
 			body: `{"expires_in_days":8}`, userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("atomic-key-4", "abuse"),
+			headers: controlMutationHeaders("atomic-key-4"),
 		})
 		return status, payload
 	}()
@@ -274,7 +274,7 @@ func TestControlAtomicBeginFailureFailsClosed(t *testing.T) {
 	h.scope.beginErr = errControlAtomicDown
 	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
 
-	status, _ := h.ban(targetUser, "atomic-key-5", "abuse")
+	status, _ := h.ban(targetUser, "atomic-key-5")
 	if status != http.StatusServiceUnavailable {
 		t.Fatalf("ban with scope down = %d, want 503", status)
 	}
@@ -292,7 +292,7 @@ func TestControlAtomicSlogOnlySkipStillCommits(t *testing.T) {
 	h.audit.durable = false // service subject shape: slog trail only
 	targetUser := tenancy.FormatUserPublicID(testUUIDForUser(controlUserAID))
 
-	status, _ := h.ban(targetUser, "atomic-key-6", "abuse")
+	status, _ := h.ban(targetUser, "atomic-key-6")
 	if status != http.StatusOK {
 		t.Fatalf("ban with slog-only audit = %d, want 200 (step-1 skip parity)", status)
 	}

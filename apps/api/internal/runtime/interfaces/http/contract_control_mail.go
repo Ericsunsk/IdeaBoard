@@ -1,15 +1,8 @@
 package httpapi
 
-// Control mail-setting family: transactional mail configuration reads,
-// updates, clears, and connection tests behind control:platform.
-//
-// Handlers delegate to the Auth-owned mail seam (ControlMailService, the
-// same *auth.ServiceClient instance serving the legacy admin mail
-// settings); the control guard adds capability auth, the separate
-// rate-limit bucket, header-only idempotency, the operator reason, and
-// the mandatory audit record. Secret and provider lifecycle stay inside
-// Auth; no mail tables are resurrected here. Legacy
-// /api/admin/settings/mail* routes are untouched.
+// Control transactional mail configuration delegates to the Auth-owned
+// ControlMailService. The guard supplies authorization, rate limits,
+// header-only idempotency, and audit; Auth owns secrets and provider lifecycle.
 
 import (
 	"context"
@@ -34,8 +27,8 @@ type ControlMailService interface {
 }
 
 // controlMailAck is the contract-envelope acknowledgement for mail
-// mutations without a resource body (clear/test). Wire shape keeps the
-// legacy {deleted:true}/{sent:true} flags inside {data}.
+// mutations without a resource body (clear/test). The data object contains
+// deleted or sent flags.
 type controlMailAck struct {
 	Deleted bool `json:"deleted,omitempty"`
 	Sent    bool `json:"sent,omitempty"`
@@ -67,16 +60,12 @@ func (d *ContractControlDeps) updateControlMailSetting(c *gin.Context, ctx contr
 	if !ok {
 		return
 	}
-	// reason/operator_note are tolerated so a body-carried operator note
-	// survives strict binding; the guard already enforced its presence.
 	var req struct {
-		APIKey       string `json:"api_key"`
-		FromName     string `json:"from_name"`
-		FromEmail    string `json:"from_email"`
-		ReplyTo      string `json:"reply_to"`
-		Enabled      *bool  `json:"enabled"`
-		Reason       string `json:"reason"`
-		OperatorNote string `json:"operator_note"`
+		APIKey    string `json:"api_key"`
+		FromName  string `json:"from_name"`
+		FromEmail string `json:"from_email"`
+		ReplyTo   string `json:"reply_to"`
+		Enabled   *bool  `json:"enabled"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
@@ -110,13 +99,9 @@ func (d *ContractControlDeps) testControlMailSetting(c *gin.Context, ctx control
 	if !ok {
 		return
 	}
-	// reason/operator_note are tolerated so a body-carried operator note
-	// survives strict binding; the guard already enforced its presence
-	// (detached mutation: reason + Idempotency-Key required).
+	// This detached mutation requires an Idempotency-Key.
 	var req struct {
-		Recipient    string `json:"recipient"`
-		Reason       string `json:"reason"`
-		OperatorNote string `json:"operator_note"`
+		Recipient string `json:"recipient"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)

@@ -13,9 +13,7 @@ import {
 import { requireContractData } from '../../../api/contractKernel'
 import {
   buildControlMutationHeaders,
-  buildRoutineControlMutationHeaders,
   createControlError,
-  requireOperatorReason,
   type ControlMutationOptions,
 } from '../shared'
 import { withControlCopy } from '../shared'
@@ -27,20 +25,6 @@ import type {
 } from './core/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from './core/catalogData'
 
-// Admin AI gateway boundary (W2 transports). Reads with a Control
-// equivalent ride the Control Plane (`GET
-// /api/control/v1/platform/ai-gateway*`, unified contract envelope
-// `{ data }` / `{ error: { code, message, request_id } }`) through the
-// generated hooks: catalog list, providers list, connection get. The
-// read-only extras moved to the Control Plane the same way: route preview,
-// model detection, pricing-reference lookup, and the 7-day observation
-// window. Writes moved to the Control Plane with the same envelope
-// (nil-ack mutations resolve `{ data: {} }`): catalog save and connection
-// update are routine config writes (backend ReasonOptional, no reason
-// ceremony, audit records empty), while the server-side connection probe
-// (provider/path required since #847 removed the mapping fallback) keeps
-// its probe note. Callers keep importing these names, never generated code
-// directly.
 type GatewayMutationOptions = ControlMutationOptions
 type GatewayConfigSummary = {
   base_url?: string
@@ -112,7 +96,7 @@ export type GatewayConnectionSummary = GatewayConfigSummary
 
 export interface AdminGatewayCatalog {
   list: () => Promise<AdminModelItem[]>
-  save: (items: AdminModelItem[], options: GatewayMutationOptions) => Promise<void>
+  save: (items: AdminModelItem[], options?: GatewayMutationOptions) => Promise<void>
   previewRoute: (input: {
     modelId: string
     customPath?: string | undefined
@@ -138,7 +122,7 @@ export interface AdminGatewayCatalog {
 
 export interface AdminGatewayConnection {
   get: () => Promise<GatewayConnectionSummary>
-  update: (input: UpdateGatewayConfigRequest, options: GatewayMutationOptions) => Promise<void>
+  update: (input: UpdateGatewayConfigRequest, options?: GatewayMutationOptions) => Promise<void>
   testConnection: (
     input: {
       base_url: string
@@ -147,7 +131,7 @@ export interface AdminGatewayConnection {
       model?: string | undefined
       path: string
     },
-    options: GatewayMutationOptions,
+    options?: GatewayMutationOptions,
   ) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
 }
 
@@ -431,12 +415,12 @@ async function listModelCatalog(): Promise<AdminModelItem[]> {
 
 async function saveModelCatalog(
   items: AdminModelItem[],
-  options: GatewayMutationOptions,
+  options: GatewayMutationOptions = {},
 ): Promise<void> {
   try {
     const body = await saveControlAIGatewayCatalog(
       { items: items.map(toGatewayCatalogItem) },
-      { headers: buildRoutineControlMutationHeaders(options) },
+      { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存模型库失败')
@@ -524,12 +508,12 @@ async function getGatewayConnection(): Promise<GatewayConnectionSummary> {
 
 async function updateGatewayConnection(
   input: UpdateGatewayConfigRequest,
-  options: GatewayMutationOptions,
+  options: GatewayMutationOptions = {},
 ): Promise<void> {
   try {
     const body = await updateControlAIGateway(
       { ...input },
-      { headers: buildRoutineControlMutationHeaders(options) },
+      { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存 AI 网关配置失败')
@@ -546,24 +530,18 @@ async function testGatewayConnection(
     model?: string | undefined
     path: string
   },
-  options: GatewayMutationOptions,
+  options: GatewayMutationOptions = {},
 ): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
-  // Server-side probe (browsers cannot read cross-origin status); the token
-  // is used for this probe only and never persisted. Mutation-guarded, so
-  // it needs an operator reason like any other control write.
-  const operatorReason = requireOperatorReason(options.operatorReason)
   const payload: {
     base_url: string
     token?: string
     provider: string
     model?: string
     path: string
-    reason: string
   } = {
     base_url: input.base_url,
     provider: input.provider,
     path: input.path,
-    reason: operatorReason,
   }
   if (input.token != null) payload.token = input.token
   if (input.model != null) payload.model = input.model

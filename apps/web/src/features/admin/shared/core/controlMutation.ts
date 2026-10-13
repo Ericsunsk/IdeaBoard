@@ -2,7 +2,6 @@ import { buildContractRequestHeaders, newRequestId } from '../../../../api/contr
 
 /** Common options carried by every Admin Control mutation. */
 export type ControlMutationOptions = {
-  operatorReason: string
   idempotencyKey?: string | undefined
 }
 
@@ -13,35 +12,14 @@ export type ControlError = Error & {
 
 export type ControlErrorMessages = Readonly<Record<string, string>>
 
-/** Normalize and validate the operator note before a request is sent. */
-export function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw createControlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-/** Build standard Control headers while preserving caller-owned retry keys. */
+/** Build Control headers while preserving caller-owned retry keys. */
 export function buildControlMutationHeaders(
-  options: ControlMutationOptions,
-  defaultIdempotencyKey?: string,
-): Record<string, string> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? defaultIdempotencyKey ?? newRequestId(),
-    operatorReason,
-  })
-}
-
-/** Routine writes allow an empty reason but preserve caller-owned retry keys. */
-export function buildRoutineControlMutationHeaders(
-  options: Partial<ControlMutationOptions> = {},
+  options: ControlMutationOptions = {},
   defaultIdempotencyKey?: string,
 ): Record<string, string> {
   return buildContractRequestHeaders({
     requestId: newRequestId(),
     idempotencyKey: options.idempotencyKey ?? defaultIdempotencyKey ?? newRequestId(),
-    operatorReason: options.operatorReason?.trim() || undefined,
   })
 }
 

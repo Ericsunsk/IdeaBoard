@@ -18,7 +18,6 @@ const (
 	msgServiceUnavailable3             = "计费操作失败"                      // CodeServiceUnavailable
 	msgBadRequest5                     = "sku 无效"                      // CodeBadRequest
 	msgServiceUnavailable4             = "上传服务暂不可用"                    // CodeServiceUnavailable
-	msgControlReasonRequired           = "需要填写操作原因"                    // CodeControlReasonRequired
 	msgIdempotencyKeyRequired          = "缺少 Idempotency-Key"          // CodeIdempotencyKeyRequired
 	msgRateLimited                     = "当前上传请求过多，请稍后重试"              // CodeRateLimited
 	msgBadRequest6                     = "请选择文件"                       // CodeBadRequest
@@ -47,7 +46,6 @@ const (
 	msgPaginationCursorInvalid         = "分页游标无效"                      // CodePaginationCursorInvalid
 	msgBadRequest13                    = "page_size 无效"                // CodeBadRequest
 	msgServiceUnavailable9             = "读取账本失败"                      // CodeServiceUnavailable
-	msgBadRequest14                    = "reason 无效"                   // CodeBadRequest
 	msgBadRequest15                    = "run_id 无效"                   // CodeBadRequest
 	msgBadRequest16                    = "status 无效"                   // CodeBadRequest
 	msgBadRequest17                    = "limit 无效"                    // CodeBadRequest

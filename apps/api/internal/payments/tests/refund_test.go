@@ -75,10 +75,14 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 
 	refund, replayed, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
-		IdempotencyKey: "refund-integration-1", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "refund-integration-1", Now: now,
 	})
 	if err != nil || replayed {
 		t.Fatalf("CreatePendingPaymentRefund() refund=%+v replayed=%v error=%v", refund, replayed, err)
+	}
+	var refundReason string
+	if err := db.QueryRow(t.Context(), `SELECT reason FROM payment_refunds WHERE id = $1::uuid`, refund.ID).Scan(&refundReason); err != nil || refundReason != "" {
+		t.Fatalf("Admin refund reason = %q, %v", refundReason, err)
 	}
 	if refund.AmountMinor != 200 || refund.Currency != "usd" || refund.Status != paymentsdomain.PaymentRefundPending {
 		t.Fatalf("refund = %+v", refund)
@@ -89,20 +93,20 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 	}
 	_, replayed, err = repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
-		IdempotencyKey: "refund-integration-1", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "refund-integration-1", Now: now,
 	})
 	if err != nil || !replayed {
 		t.Fatalf("refund replay replayed=%v error=%v", replayed, err)
 	}
 	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 199,
-		IdempotencyKey: "refund-integration-1", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "refund-integration-1", Now: now,
 	}); !errors.Is(err, paymentcontracts.ErrRefundIdempotency) {
 		t.Fatalf("refund idempotency conflict error = %v", err)
 	}
 	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 301,
-		IdempotencyKey: "refund-integration-over", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "refund-integration-over", Now: now,
 	}); !errors.Is(err, paymentcontracts.ErrRefundAmountExceeds) {
 		t.Fatalf("over-limit refund error = %v", err)
 	}
@@ -116,7 +120,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 	}
 	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
-		IdempotencyKey: "refund-integration-2", Reason: "unused Ideas", Now: now.Add(2 * time.Minute),
+		IdempotencyKey: "refund-integration-2", Now: now.Add(2 * time.Minute),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +152,7 @@ func TestPaymentRefundReservationCommitsBeforeAmbientControlTransaction(t *testi
 	carrierCtx := dbutil.ContextWithAmbientTx(t.Context(), carrier)
 	refund, replayed, err := repo.CreatePendingPaymentRefund(carrierCtx, paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
-		IdempotencyKey: "refund-ambient-commit", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "refund-ambient-commit", Now: now,
 	})
 	if err != nil || replayed {
 		_ = carrier.Rollback(t.Context())
@@ -229,7 +233,7 @@ func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *te
 	carrierCtx := dbutil.ContextWithAmbientTx(t.Context(), carrier)
 	command := paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
-		IdempotencyKey: "refund-service-chain", Reason: "unused Ideas",
+		IdempotencyKey: "refund-service-chain",
 	}
 	first, err := service.CreatePaymentRefund(carrierCtx, command)
 	if err != nil || first.Status != paymentsdomain.PaymentRefundSucceeded {
@@ -366,7 +370,7 @@ func TestPaymentRefundRejectsExactFourteenDayBoundary(t *testing.T) {
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-paymentsdomain.RefundEligibilityWindow))
 	_, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 1,
-		IdempotencyKey: "refund-integration-expired", Reason: "unused Idea", Now: now,
+		IdempotencyKey: "refund-integration-expired", Now: now,
 	})
 	if !errors.Is(err, paymentcontracts.ErrRefundExpired) {
 		t.Fatalf("exact boundary error = %v", err)
@@ -380,7 +384,7 @@ func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 1,
-		IdempotencyKey: "refund-terminal-immutable", Reason: "unused Idea", Now: now,
+		IdempotencyKey: "refund-terminal-immutable", Now: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -400,7 +404,7 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
-		IdempotencyKey: "refund-reconciliation", Reason: "unused Ideas", Now: now.Add(-3 * time.Minute),
+		IdempotencyKey: "refund-reconciliation", Now: now.Add(-3 * time.Minute),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -460,7 +464,7 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 		go func() {
 			_, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 				ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
-				IdempotencyKey: fmt.Sprintf("refund-concurrent-%d", index), Reason: "unused Ideas", Now: now,
+				IdempotencyKey: fmt.Sprintf("refund-concurrent-%d", index), Now: now,
 			})
 			errs <- err
 		}()

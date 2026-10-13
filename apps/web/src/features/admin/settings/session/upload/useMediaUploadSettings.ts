@@ -6,18 +6,11 @@ import {
   updateControlMediaUploadSetting,
 } from '../../../../../api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '../../../../../api/contractKernel'
-import { buildRoutineControlMutationHeaders } from '../../../shared/index'
+import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminMediaUploadSettingsFeedback } from '../useSettingsFeedback'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'
 import { withControlCopy } from '../../../shared/index'
 
-// Admin media upload boundary (W2 transports). Reads and writes go through
-// the Control Plane with the contract envelope (`{data}`); every mutation
-// carries a header-only Idempotency-Key and emits a control audit record.
-// Media upload is a routine config write (backend ReasonOptional), so saves
-// skip the confirm dialog and audit an empty reason. The
-// deleted `/api/admin/settings/media-upload` route is gone; this module is
-// the single transport.
 export type MediaUploadSetting = {
   upload_max_concurrent: number
 }
@@ -61,8 +54,6 @@ export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSett
   })
 
   async function saveSetting(): Promise<boolean> {
-    // Routine config write (backend ReasonOptional): save directly without
-    // the confirm dialog; the audit records an empty reason.
     return lifecycle.save()
   }
 
@@ -91,10 +82,7 @@ async function saveMediaUploadSetting(draft: MediaUploadSetting): Promise<MediaU
     const body = await updateControlMediaUploadSetting(
       { upload_max_concurrent: draft.upload_max_concurrent },
       {
-        // Routine config write (backend ReasonOptional): no operator-reason
-        // header, the audit records an empty reason. Idempotency-Key stays
-        // required on both tiers.
-        headers: buildRoutineControlMutationHeaders(),
+        headers: buildControlMutationHeaders(),
       },
     )
     return requireContractData<MediaUploadSetting>(body, '保存上传设置失败')

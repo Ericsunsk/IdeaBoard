@@ -33,7 +33,6 @@ export function createAdminPaymentOrderResource(
       await adapter.refund(publicOrderNumber, {
         idea_quantity: input.ideaQuantity,
         idempotency_key: input.idempotencyKey,
-        operatorReason: input.operatorReason,
       })
       return toPaymentOrderDetail(await adapter.get(publicOrderNumber))
     },

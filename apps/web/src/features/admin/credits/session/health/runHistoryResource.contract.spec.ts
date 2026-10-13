@@ -7,9 +7,7 @@ describe('Admin Credit Run history resource', () => {
     const listReconciliationRuns = vi
       .fn()
       .mockResolvedValue({ runs: [makeReconciliationRun({ id: 21 })] })
-    const getReconciliationRun = vi
-      .fn()
-      .mockResolvedValue(makeReconciliationRun({ id: 21, reason: '人工复核' }))
+    const getReconciliationRun = vi.fn().mockResolvedValue(makeReconciliationRun({ id: 21 }))
     const resource = createAdminCreditRunHistoryResource({
       listReconciliationRuns,
       getReconciliationRun,

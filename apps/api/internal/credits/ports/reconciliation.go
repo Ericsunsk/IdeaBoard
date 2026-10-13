@@ -36,7 +36,6 @@ type ReconciliationRun struct {
 	RequestedBy         *int64                  `json:"-"`
 	RequestedByPublicID *uuid.UUID              `json:"requested_by_public_id,omitempty"`
 	RequestedByName     string                  `json:"requested_by_display_name,omitempty"`
-	Reason              string                  `json:"reason,omitempty"`
 	ScheduledFor        *time.Time              `json:"scheduled_for,omitempty"`
 	FindingCount        int64                   `json:"finding_count"`
 	CriticalCount       int64                   `json:"critical_count"`
@@ -193,7 +192,6 @@ type ListReconciliationInput struct {
 
 type StartManualReconciliationInput struct {
 	ActorID int64
-	Reason  string
 }
 
 type Reconciliation interface {

@@ -1,6 +1,6 @@
 package httpapi
 
-// Control Model Pool handler tests (issue #849): per-Service pool reads
+// Control Model Pool handler tests: per-Service pool reads
 // and atomic replaces behind control:billing.
 //
 // The fake below is an in-memory stand-in for *catalog.Repository with
@@ -139,7 +139,7 @@ func poolHarness(t *testing.T, pools *fakeControlModelPools) *controlHarness {
 func poolAdminCall(method, path, body string, keySuffix int) controlCall {
 	call := controlCall{method: method, path: path, body: body, userID: controlOperatorID, role: "admin"}
 	if method != http.MethodGet {
-		call.headers = controlMutationHeaders(fmt.Sprintf("pool-key-%d", keySuffix), "pool review")
+		call.headers = controlMutationHeaders(fmt.Sprintf("pool-key-%d", keySuffix))
 	}
 	return call
 }
@@ -358,7 +358,7 @@ func TestControlModelPoolAuthAndFailClosed(t *testing.T) {
 	mutations := []controlCall{
 		{method: http.MethodPut, path: "/api/control/v1/billing/catalog/ai-image:generation/pool",
 			body:    `{"expected_version":0,"entries":[]}`,
-			headers: controlMutationHeaders("pool-auth-1", "auth reason")},
+			headers: controlMutationHeaders("pool-auth-1")},
 	}
 
 	for _, call := range append(reads, mutations...) {
@@ -388,7 +388,7 @@ func TestControlModelPoolAuthAndFailClosed(t *testing.T) {
 		{method: http.MethodGet, path: "/api/control/v1/billing/catalog/ai-image:generation/pool", userID: admin.userID, role: admin.role},
 		{method: http.MethodPut, path: "/api/control/v1/billing/catalog/ai-image:generation/pool",
 			body: `{"expected_version":0,"entries":[]}`, userID: admin.userID, role: admin.role,
-			headers: controlMutationHeaders("pool-nil-1", "nil reason")},
+			headers: controlMutationHeaders("pool-nil-1")},
 	} {
 		status, _, payload := nilHarness.serve(call)
 		if status != http.StatusServiceUnavailable {

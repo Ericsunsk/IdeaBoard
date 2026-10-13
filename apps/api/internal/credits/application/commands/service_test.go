@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/credits/application/commands"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	"sync"
@@ -29,7 +30,6 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 			IdempotencyKey: "admin-grant:test-user-42:welcome",
 			Actor:          domain.Actor{Type: domain.ActorAdmin, ID: "7"},
 			Source:         "admin_grant",
-			Reason:         "integration test grant",
 			BusinessReference: domain.BusinessReference{
 				Type: "admin_adjustment",
 				ID:   "test-user-42-welcome",
@@ -62,6 +62,9 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 		t.Fatalf("ledger transactions = %d, want 1", len(page.Transactions))
 	}
 	transaction := page.Transactions[0]
+	if transaction.Reason != "" {
+		t.Fatalf("Admin ledger reason = %q, want empty", transaction.Reason)
+	}
 	if transaction.TransactionID != result.TransactionID || transaction.CommandType != domain.CommandGrant {
 		t.Fatalf("ledger transaction = %+v", transaction)
 	}
@@ -479,5 +482,23 @@ VALUES ($1, $2, 1)`, grant.TransactionID, sinkAccountID); err == nil {
 	}
 	if len(page.Transactions) != 2 || len(page.Transactions[0].Postings) != 3 {
 		t.Fatalf("ledger after correction = %+v", page.Transactions)
+	}
+}
+
+func TestNormalizeMetadataRequiresBusinessReasonOnlyForNonAdminActors(t *testing.T) {
+	metadata := testhelpers.TestMetadata("metadata:reason", "metadata-reason")
+	metadata.Actor.Type = domain.ActorAdmin
+	metadata.Reason = ""
+	if _, err := commands.NormalizeMetadata(metadata); err != nil {
+		t.Fatalf("Admin metadata without reason: %v", err)
+	}
+	metadata.Actor.Type = domain.ActorService
+	if _, err := commands.NormalizeMetadata(metadata); !errors.Is(err, domain.ErrInvalidCommand) {
+		t.Fatalf("service metadata without reason = %v, want invalid command", err)
+	}
+	metadata.Reason = "  Task hold  "
+	normalized, err := commands.NormalizeMetadata(metadata)
+	if err != nil || normalized.Reason != "Task hold" {
+		t.Fatalf("business reason = %q, %v", normalized.Reason, err)
 	}
 }

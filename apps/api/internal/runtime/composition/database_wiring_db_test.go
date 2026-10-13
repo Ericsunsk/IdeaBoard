@@ -204,12 +204,12 @@ func assertControlAuditAppendOnlySmoke(t *testing.T, db *pgxpool.Pool) {
 	if err := tx.QueryRow(ctx, `
 INSERT INTO control_audit_records (
   public_id, operator_user_id, operation_type, capability,
-  target_type, target_id, reason, outcome, error_message,
+  target_type, target_id, outcome, error_message,
   request_correlation_id, idempotency_key, metadata
 )
 VALUES (
   'audit_priv_smoke', 42, 'privilege.smoke', 'control:test',
-  'smoke', 'smoke-1', 'startup grant proof', 'success', '',
+  'smoke', 'smoke-1', 'success', '',
   'corr-priv-smoke', '', '{}'
 )
 RETURNING internal_id`).Scan(&auditID); err != nil {
@@ -218,7 +218,7 @@ RETURNING internal_id`).Scan(&auditID); err != nil {
 	if auditID <= 0 {
 		t.Fatalf("control audit insert returned invalid internal_id %d", auditID)
 	}
-	if _, err := tx.Exec(ctx, `UPDATE control_audit_records SET reason = 'tampered' WHERE public_id = 'audit_priv_smoke'`); err == nil {
+	if _, err := tx.Exec(ctx, `UPDATE control_audit_records SET target_id = 'tampered' WHERE public_id = 'audit_priv_smoke'`); err == nil {
 		t.Fatal("runtime UPDATE on control_audit_records unexpectedly succeeded")
 	} else if !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("control audit UPDATE error = %v, want permission denied", err)

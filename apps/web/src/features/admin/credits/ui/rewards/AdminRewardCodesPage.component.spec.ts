@@ -16,7 +16,6 @@ const resource = vi.hoisted(() => ({
 }))
 const confirm = vi.hoisted(() => ({
   confirm: vi.fn().mockResolvedValue(true),
-  readReason: vi.fn().mockReturnValue('运营复核'),
 }))
 
 let toast: AppToastMocks
@@ -258,7 +257,6 @@ describe('AdminRewardCodesPage', () => {
         idempotencyKey: expect.any(String),
         code: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){2}$/),
       }),
-      { operatorReason: '运营复核' },
     )
     const submittedCode = resource.create.mock.calls[0]![0].code
     expect(await screen.findByText('ABCD12342026')).toBeVisible()
@@ -366,7 +364,6 @@ describe('AdminRewardCodesPage', () => {
         maxRedemptions: 100,
         code: 'NEWC-ODE1-WXYZ',
       }),
-      { operatorReason: '' },
     )
     expect(confirm.confirm).not.toHaveBeenCalled()
     expect(await screen.findByRole('dialog', { name: '保存新 Code' })).toBeVisible()
@@ -399,16 +396,12 @@ describe('AdminRewardCodesPage', () => {
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(resource.update).toHaveBeenCalledTimes(1))
-    expect(resource.update).toHaveBeenCalledWith(
-      7,
-      {
-        displayName: '新用户奖励',
-        creditAmount: 80,
-        maxRedemptions: 100,
-        expiresAt: '',
-      },
-      { operatorReason: '' },
-    )
+    expect(resource.update).toHaveBeenCalledWith(7, {
+      displayName: '新用户奖励',
+      creditAmount: 80,
+      maxRedemptions: 100,
+      expiresAt: '',
+    })
     expect(confirm.confirm).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog', { name: '保存新 Code' })).not.toBeInTheDocument()
   })
@@ -445,9 +438,7 @@ describe('AdminRewardCodesPage', () => {
     expect(toggle).toBeChecked()
     expect(screen.getByText('可兑换')).toBeVisible()
     await user.click(toggle)
-    await waitFor(() =>
-      expect(resource.setEnabled).toHaveBeenCalledWith(7, false, { operatorReason: '' }),
-    )
+    await waitFor(() => expect(resource.setEnabled).toHaveBeenCalledWith(7, false))
     expect(confirm.confirm).not.toHaveBeenCalled()
     // 乐观 intent 同 tick 翻转：同一 DOM 节点即时 unchecked + disabled，
     // Status 胶囊仍跟服务端（可兑换），不随开关预翻。
@@ -495,9 +486,7 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.getByText('已停用')).toBeVisible()
 
     await user.click(toggle)
-    await waitFor(() =>
-      expect(resource.setEnabled).toHaveBeenCalledWith(7, true, { operatorReason: '' }),
-    )
+    await waitFor(() => expect(resource.setEnabled).toHaveBeenCalledWith(7, true))
     // 乐观链路同一 DOM 节点即时翻转 checked（不等服务端），胶囊仍跟服务端。
     const pending = screen.getByRole('switch', { name: '新用户奖励启用状态' })
     expect(pending).toBe(toggle)
@@ -543,9 +532,7 @@ describe('AdminRewardCodesPage', () => {
       }),
     )
 
-    await waitFor(() =>
-      expect(resource.delete).toHaveBeenCalledWith(7, { operatorReason: '运营复核' }),
-    )
+    await waitFor(() => expect(resource.delete).toHaveBeenCalledWith(7))
     expect(screen.getByText('新用户奖励')).toBeVisible()
     expect(toast.error).toHaveBeenCalledWith('已有兑换记录，只能停用')
   })

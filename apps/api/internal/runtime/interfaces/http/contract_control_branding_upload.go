@@ -1,22 +1,12 @@
 package httpapi
 
-// Control branding-logo upload: multipart site-asset upload behind
-// control:platform.
+// Control branding-logo upload stores images under the site-assets prefix.
+// Validation enforces a 50MB cap and detected image-format allowlist.
 //
-// The file rides the Storage service into the site-assets prefix (the
-// same delivery plane the public branding read serves), so the returned
-// logo_url drops straight into the branding setting update. Validation
-// mirrors the deleted legacy admin upload (50MB image cap, detected
-// format allow-list, never trust the filename).
-//
-// Transport note: the control guard buffers mutation bodies up to 64KiB
-// for reason extraction and idempotency hashing, which cannot carry
-// image bytes. This route therefore registers as a POST read-guard
-// (no body buffering) and enforces the mutation guarantees in-handler:
-// X-Operator-Reason (or the multipart "reason" field) and a header-only
-// Idempotency-Key are both required (400 otherwise), the key replays the
-// first stored response on content-identical reuse and conflicts (409)
-// on divergent reuse, and every call emits the standard audit record.
+// Multipart bodies exceed the guard's 64KiB idempotency buffer, so this
+// POST route uses the read guard and enforces mutation guarantees in-handler:
+// header-only Idempotency-Key, content-identical replay, conflicting-content
+// rejection, and the standard audit record.
 
 import (
 	"context"
@@ -34,16 +24,13 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
-	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
 )
 
-// controlBrandingLogoMaxBytes bounds one branding logo upload (same 50MB
-// budget as the legacy admin upload; branding marks are tiny in
-// practice).
+// controlBrandingLogoMaxBytes bounds one branding logo upload.
 const controlBrandingLogoMaxBytes = 50 * 1024 * 1024
 
 // ControlBrandingUploadService is the Storage upload seam behind the
@@ -109,21 +96,8 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 		return
 	}
 	// Handler-enforced mutation guarantees (see the file header): the
-	// guard cannot buffer multipart bodies, so reason and key are
+	// guard cannot buffer multipart bodies, so the key is
 	// required here instead of in the guard.
-	reason := extractControlReason(c, nil)
-	if reason == "" {
-		if raw := strings.TrimSpace(c.PostForm("reason")); raw != "" {
-			reason = raw
-		} else if raw := strings.TrimSpace(c.PostForm("operator_note")); raw != "" {
-			reason = raw
-		}
-	}
-	if _, err := adminaction.New(ctx.Operator.UserID(), reason); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, msgControlReasonRequired)
-		return
-	}
-	setControlReason(c, reason)
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired)

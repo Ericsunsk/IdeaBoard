@@ -59,7 +59,7 @@ export const MODELS_MESSAGES = {
   gatewayLoadFailed: '读取网关配置失败',
   gatewayTestFailed: '网关连接测试失败',
   gatewaySaveTitle: '保存 AI 网关配置',
-  gatewaySaveMessage: '确定保存 AI 网关连接配置吗？该操作将记录操作人与原因。',
+  gatewaySaveMessage: '确定保存 AI 网关连接配置吗？该操作将记录操作人。',
   gatewaySaveConfirm: '保存配置',
   gatewayRereadFailed: '配置已保存，但重读网关状态失败，请重试',
   gatewaySaveFailed: '保存网关配置失败',

@@ -453,7 +453,6 @@ func TestServiceClientContractAdminMutationsSuccess(t *testing.T) {
 			path:   "/internal/users/ban",
 			wantFields: map[string]any{
 				"userId":       "auth-123",
-				"banReason":    "policy violation",
 				"banExpiresIn": float64(3600),
 			},
 			responseData: map[string]any{
@@ -461,7 +460,7 @@ func TestServiceClientContractAdminMutationsSuccess(t *testing.T) {
 				"banned":       true,
 			},
 			call: func(ctx context.Context, client *ServiceClient) error {
-				return client.BanUser(ctx, " auth-123 ", " policy violation ", 3600)
+				return client.BanUser(ctx, " auth-123 ", 3600)
 			},
 		},
 		{
@@ -552,7 +551,7 @@ func TestServiceClientContractAdminMutationsRejectMissingSuccessEnvelopeFields(t
 			name:         "ban user",
 			responseData: map[string]any{"auth_user_id": "auth-123", "banned": true},
 			call: func(ctx context.Context, client *ServiceClient) error {
-				return client.BanUser(ctx, "auth-123", "", 0)
+				return client.BanUser(ctx, "auth-123", 0)
 			},
 		},
 		{
@@ -640,14 +639,14 @@ func TestServiceClientContractAdminMutationsRejectInvalidSuccessData(t *testing.
 			name:         "ban wrong user id",
 			responseData: map[string]any{"auth_user_id": "auth-other", "banned": true},
 			call: func(ctx context.Context, client *ServiceClient) error {
-				return client.BanUser(ctx, "auth-123", "", 0)
+				return client.BanUser(ctx, "auth-123", 0)
 			},
 		},
 		{
 			name:         "ban false literal",
 			responseData: map[string]any{"auth_user_id": "auth-123", "banned": false},
 			call: func(ctx context.Context, client *ServiceClient) error {
-				return client.BanUser(ctx, "auth-123", "", 0)
+				return client.BanUser(ctx, "auth-123", 0)
 			},
 		},
 		{
@@ -825,14 +824,12 @@ func TestServiceClientGetUserStatesUsesStableContract(t *testing.T) {
 						"auth_user_id": "auth-admin",
 						"role":         "admin",
 						"banned":       false,
-						"ban_reason":   nil,
 						"ban_expires":  nil,
 					},
 					map[string]any{
 						"auth_user_id": "auth-banned",
 						"role":         "user",
 						"banned":       true,
-						"ban_reason":   "spam",
 						"ban_expires":  "2026-10-11T03:00:00Z",
 					},
 				},
@@ -850,15 +847,12 @@ func TestServiceClientGetUserStatesUsesStableContract(t *testing.T) {
 		t.Fatalf("states = %#v, want 2 known identities (missing omitted)", states)
 	}
 	admin := states["auth-admin"]
-	if admin.Role != "admin" || admin.Banned || admin.BanReason != nil || admin.BanExpiresAt != nil {
+	if admin.Role != "admin" || admin.Banned || admin.BanExpiresAt != nil {
 		t.Fatalf("admin state = %+v, want unbanned admin without ban metadata", admin)
 	}
 	banned := states["auth-banned"]
 	if banned.Role != "user" || !banned.Banned {
 		t.Fatalf("banned state = %+v, want banned user", banned)
-	}
-	if banned.BanReason == nil || *banned.BanReason != "spam" {
-		t.Fatalf("banned ban reason = %+v, want spam", banned.BanReason)
 	}
 	if banned.BanExpiresAt == nil || banned.BanExpiresAt.UTC().Format("2006-01-02") != "2026-10-11" {
 		t.Fatalf("banned ban expiry = %+v, want 2026-10-11", banned.BanExpiresAt)

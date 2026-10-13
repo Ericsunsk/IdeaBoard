@@ -6,10 +6,11 @@ import UserAuthModals from './UserAuthModals.vue'
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
+  query: {} as Record<string, string>,
 }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: mocks.query }),
   useRouter: () => ({ replace: mocks.replace }),
 }))
 
@@ -64,6 +65,8 @@ const OverlayLoginPanelStub = defineComponent({
 
 describe('UserAuthModals', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.query = {}
     mockAppToast()
   })
 
@@ -118,4 +121,33 @@ describe('UserAuthModals', () => {
     expect(view.emitted('overlay-close')).toHaveLength(1)
     expect(mocks.replace).not.toHaveBeenCalled()
   })
+
+  it.each([
+    { action: '成功', destination: '/admin/users?page=1#active' },
+    { action: '关闭', destination: '/' },
+  ])(
+    'navigates to $destination on $action with an Admin redirect',
+    async ({ action, destination }) => {
+      mocks.query = { redirect: '/admin/users?page=1#active' }
+      const view = renderWithUser(UserAuthModals, {
+        props: { mode: 'login' },
+        global: {
+          stubs: {
+            DialogRoot: TransitioningDialogRootStub,
+            DialogPortal: PassthroughStub,
+            DialogOverlay: PassthroughStub,
+            DialogContent: PassthroughStub,
+            DialogDescription: PassthroughStub,
+            DialogTitle: PassthroughStub,
+            LoginAuthPanel: OverlayLoginPanelStub,
+            RegisterAuthPanel: AuthPanelStub,
+          },
+        },
+      })
+
+      await view.user.click(screen.getByRole('button', { name: action }))
+
+      expect(mocks.replace).toHaveBeenCalledWith(destination)
+    },
+  )
 })

@@ -153,7 +153,6 @@ type controlAuditRow struct {
 	targetType string
 	targetID   string
 	outcome    string
-	reason     string
 	requestID  string
 	idemKey    string
 	publicID   string
@@ -249,7 +248,6 @@ func TestControlAuditDurableSinkPersistsBanOnce(t *testing.T) {
 		Route:          "POST /users/{user_id}/ban",
 		RequestID:      "req-ban-1",
 		IdempotencyKey: "ban-key-1",
-		Reason:         "abuse",
 		Outcome:        httpapi.ControlAuditOK,
 		Status:         http.StatusOK,
 		OccurredAt:     time.Now().UTC(),
@@ -258,7 +256,7 @@ func TestControlAuditDurableSinkPersistsBanOnce(t *testing.T) {
 
 	rows, err := pool.Query(ctx, `
 SELECT operator_user_id, operation_type, capability, target_type, target_id,
-       outcome, reason, request_correlation_id, idempotency_key, public_id,
+       outcome, request_correlation_id, idempotency_key, public_id,
        metadata->>'route', (metadata->>'status')::int
 FROM control_audit_records WHERE operator_user_id = $1 ORDER BY internal_id`, operatorNumeric)
 	if err != nil {
@@ -270,7 +268,7 @@ FROM control_audit_records WHERE operator_user_id = $1 ORDER BY internal_id`, op
 		var route *string
 		var status *int
 		if err := rows.Scan(&row.operator, &row.operation, &row.capability, &row.targetType,
-			&row.targetID, &row.outcome, &row.reason, &row.requestID, &row.idemKey, &row.publicID, &route, &status); err != nil {
+			&row.targetID, &row.outcome, &row.requestID, &row.idemKey, &row.publicID, &route, &status); err != nil {
 			rows.Close()
 			t.Fatalf("scan audit row: %v", err)
 		}
@@ -304,9 +302,6 @@ FROM control_audit_records WHERE operator_user_id = $1 ORDER BY internal_id`, op
 	}
 	if row.outcome != "success" {
 		t.Errorf("outcome = %q, want success (read maps via store, success passes through)", row.outcome)
-	}
-	if row.reason != "abuse" {
-		t.Errorf("reason = %q, want abuse", row.reason)
 	}
 	if row.requestID != "req-ban-1" {
 		t.Errorf("request_id = %q, want req-ban-1", row.requestID)
@@ -471,7 +466,6 @@ func TestControlAuditDurableSinkFailureNeverFailsBusiness(t *testing.T) {
 	req.Header.Set(contract.RequestIDHeader, "req-http-fail-1")
 	req.Header.Set("X-Test-User", "11")
 	req.Header.Set(contract.IdempotencyKeyHeader, "http-fail-key-1")
-	req.Header.Set(httpapi.OperatorReasonHeader, "abuse")
 	recorder := httptest.NewRecorder()
 	engine.ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusOK {

@@ -177,7 +177,6 @@ import { AdminDialogShell } from '../../../shared'
 import { AdminInput } from '../../../shared'
 import { formatAdminDisplayError } from '../../../shared'
 import { useAdminGatewayConfigFeedback } from '../../session/useAdminModelCatalogFeedback'
-import { ADMIN_PROBE_OPERATOR_REASON } from '../../../shared'
 import { MODELS_MESSAGES } from '../pages/messages'
 import {
   createAdminGatewayResource,
@@ -250,9 +249,6 @@ async function loadGatewayConfig() {
 }
 
 const handleTestConnection = form.handleSubmit(async (values) => {
-  // Server-side probes skip the confirm dialog (backend POST read-guard:
-  // no reason ceremony); the fixed probe note still lands on the audit record.
-  // 失败一律走 toast（feedback.testFailed），inline 只留 base_url 表单校验。
   testing.value = true
 
   try {
@@ -265,15 +261,12 @@ const handleTestConnection = form.handleSubmit(async (values) => {
       feedback.testFailed(MODELS_MESSAGES.gatewayProbeRequired)
       return
     }
-    const response = await resource.value.testConnection(
-      {
-        base_url: finalBaseUrl,
-        token: values.token.trim() || undefined,
-        provider,
-        path,
-      },
-      { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
-    )
+    const response = await resource.value.testConnection({
+      base_url: finalBaseUrl,
+      token: values.token.trim() || undefined,
+      provider,
+      path,
+    })
     if (response.success) {
       feedback.testPassed(response.message)
     } else {
@@ -287,9 +280,6 @@ const handleTestConnection = form.handleSubmit(async (values) => {
 })
 
 const handleSave = form.handleSubmit(async (values) => {
-  // Routine config write (backend ReasonOptional): save directly without
-  // the confirm dialog; the audit records an empty reason.
-  const operatorReason = ''
   saving.value = true
   error.value = ''
 
@@ -311,7 +301,7 @@ const handleSave = form.handleSubmit(async (values) => {
     payload.account_id = values.account_id.trim().toLowerCase()
     payload.gateway_id = values.gateway_id.trim().toLowerCase()
 
-    await resource.value.update(payload, { operatorReason })
+    await resource.value.update(payload)
 
     feedback.saved()
     // saved 必须是服务端确认的真相：重读失败就报错、不关弹窗、不 emit。

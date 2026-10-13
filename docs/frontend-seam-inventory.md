@@ -2,7 +2,7 @@
 
 此文件是 Frontend public Seam 的当前治理契约。`json seam-inventory` block 是 dependency boundary、public API surface 和 Knip governance 共用的 machine source of truth；修改 entry status 或 consumer edges 时必须同步更新契约。
 
-当前包含 428 records：278 active、2 planned、148 retired。只有 active entries 是当前可用入口，planned entries 不是已接受入口，retired entries 不授权新 imports。Inventory 记录 ownership、exports、consumers、dependency measurements 和治理 metadata；下方表格由 machine block 生成。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
+当前包含 427 records：277 active、2 planned、148 retired。只有 active entries 是当前可用入口，planned entries 不是已接受入口，retired entries 不授权新 imports。Inventory 记录 ownership、exports、consumers、dependency measurements 和治理 metadata；下方表格由 machine block 生成。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
 
 ## Schema
 
@@ -1040,10 +1040,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "SetControlRewardCodeEnabledMutationError",
         "SetControlRewardCodeEnabledMutationResult",
         "SetControlRewardCodeEnabledMutationVariables",
-        "StartControlReconciliationMutationBody",
         "StartControlReconciliationMutationError",
         "StartControlReconciliationMutationResult",
-        "StartControlReconciliationMutationVariables",
         "UpdateControlRewardCodeMutationBody",
         "UpdateControlRewardCodeMutationError",
         "UpdateControlRewardCodeMutationResult",
@@ -1387,11 +1385,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "source": "src/shared/api/generated-query/control/control-credits/control-credits.ts",
-          "name": "StartControlReconciliationMutationBody",
-          "exportedAs": "StartControlReconciliationMutationBody"
-        },
-        {
-          "source": "src/shared/api/generated-query/control/control-credits/control-credits.ts",
           "name": "StartControlReconciliationMutationError",
           "exportedAs": "StartControlReconciliationMutationError"
         },
@@ -1399,11 +1392,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "source": "src/shared/api/generated-query/control/control-credits/control-credits.ts",
           "name": "StartControlReconciliationMutationResult",
           "exportedAs": "StartControlReconciliationMutationResult"
-        },
-        {
-          "source": "src/shared/api/generated-query/control/control-credits/control-credits.ts",
-          "name": "StartControlReconciliationMutationVariables",
-          "exportedAs": "StartControlReconciliationMutationVariables"
         },
         {
           "source": "src/shared/api/generated-query/control/control-credits/control-credits.ts",
@@ -10509,6 +10497,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/admin/monitor/resource.contract.spec.ts",
+          "to": "src/api/generated-query/control/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/monitor/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
@@ -10529,10 +10522,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 17,
-      "measuredFanOut": 159,
-      "targetFanIn": 17,
-      "targetFanOut": 159,
+      "measuredFanIn": 18,
+      "measuredFanOut": 157,
+      "targetFanIn": 18,
+      "targetFanOut": 157,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -10606,7 +10599,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ControlPaymentRefundRequest",
         "ControlPublishPricesRequest",
         "ControlPublishPricesRequestPrices",
-        "ControlReasonRequest",
         "ControlReplaceModelPoolEnvelope",
         "ControlReplaceModelPoolEnvelopeData",
         "ControlReplaceModelPoolRequest",
@@ -10672,7 +10664,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ListControlRewardRedemptionsParams",
         "ListControlTasksParams",
         "ListControlUsersParams",
-        "OperatorReasonParameter",
         "PageSizeParameter",
         "PaginatedControlBillingAccounts",
         "PaginatedControlLedger",
@@ -10768,7 +10759,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/control/model/controlPaymentRefundRequest.ts",
         "src/api/generated-query/control/model/controlPublishPricesRequest.ts",
         "src/api/generated-query/control/model/controlPublishPricesRequestPrices.ts",
-        "src/api/generated-query/control/model/controlReasonRequest.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolEnvelopeData.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts",
@@ -10834,7 +10824,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/control/model/listControlRewardRedemptionsParams.ts",
         "src/api/generated-query/control/model/listControlTasksParams.ts",
         "src/api/generated-query/control/model/listControlUsersParams.ts",
-        "src/api/generated-query/control/model/operatorReasonParameter.ts",
         "src/api/generated-query/control/model/pageSizeParameter.ts",
         "src/api/generated-query/control/model/paginatedControlBillingAccounts.ts",
         "src/api/generated-query/control/model/paginatedControlLedger.ts",
@@ -11188,11 +11177,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "source": "src/shared/api/generated-query/control/model/index.ts",
-          "name": "ControlReasonRequest",
-          "exportedAs": "ControlReasonRequest"
-        },
-        {
-          "source": "src/shared/api/generated-query/control/model/index.ts",
           "name": "ControlReplaceModelPoolEnvelope",
           "exportedAs": "ControlReplaceModelPoolEnvelope"
         },
@@ -11515,11 +11499,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "source": "src/shared/api/generated-query/control/model/index.ts",
           "name": "ListControlUsersParams",
           "exportedAs": "ListControlUsersParams"
-        },
-        {
-          "source": "src/shared/api/generated-query/control/model/index.ts",
-          "name": "OperatorReasonParameter",
-          "exportedAs": "OperatorReasonParameter"
         },
         {
           "source": "src/shared/api/generated-query/control/model/index.ts",
@@ -22083,9 +22062,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 14,
+      "measuredFanOut": 13,
       "targetFanIn": 1,
-      "targetFanOut": 14,
+      "targetFanOut": 13,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": null,
@@ -22104,7 +22083,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/i18n/index.ts",
         "src/core/seo/routeSeo.ts",
         "src/core/utils/storage.ts",
-        "src/features/admin/app/navigationMeta.ts",
         "src/features/admin/app/routes.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
@@ -23283,14 +23261,19 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/auth/components/UserAuthModals.vue",
+          "to": "src/core/auth/routePolicy.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/routePaths.ts",
           "to": "src/core/auth/routePolicy.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -23301,7 +23284,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/core/auth/routePolicy.ts",
       "ownershipScope": ["src/core/auth/routePolicy.ts"],
       "publicExports": [
-        "ADMIN_LOGIN_PATH",
         "ADMIN_ROOT_PATH",
         "HOME_PATH",
         "SHARE_JOIN_PATH",
@@ -23438,11 +23420,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "allowedConsumers": [
         {
           "from": "src/core/components/ActionButton.component.spec.ts",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
@@ -23597,9 +23574,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 32,
+      "measuredFanIn": 31,
       "measuredFanOut": 4,
-      "targetFanIn": 32,
+      "targetFanIn": 31,
       "targetFanOut": 4,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -24092,19 +24069,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/components/SiteBrandLogo.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/components/SiteBrandLogo.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -24694,11 +24666,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/composables/useLogoutRedirect.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/ui/pages/CanvasPage.vue",
           "to": "src/core/composables/useLogoutRedirect.ts",
           "kind": "runtime"
@@ -24709,9 +24676,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 1,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -24920,11 +24887,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/composables/useSiteBranding.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/session/branding/useBrandingSettings.ts",
           "to": "src/core/composables/useSiteBranding.ts",
           "kind": "runtime"
@@ -24940,9 +24902,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 7,
       "measuredFanOut": 5,
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -26835,11 +26797,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -27295,9 +27252,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 123,
+      "measuredFanIn": 122,
       "measuredFanOut": 5,
-      "targetFanIn": 123,
+      "targetFanIn": 122,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -28218,19 +28175,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/lib/brandMark.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/ui/cards/branding/AdminBrandingCard.vue",
           "to": "src/core/lib/brandMark.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -29746,11 +29698,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
@@ -29806,9 +29753,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 14,
+      "measuredFanIn": 13,
       "measuredFanOut": 1,
-      "targetFanIn": 14,
+      "targetFanIn": 13,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -30034,11 +29981,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/core/utils/auth.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
@@ -30139,9 +30081,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 26,
+      "measuredFanIn": 25,
       "measuredFanOut": 4,
-      "targetFanIn": 26,
+      "targetFanIn": 25,
       "targetFanOut": 4,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -32410,7 +32352,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "measuredFanIn": 1,
       "measuredFanOut": 31,
       "targetFanIn": 1,
-      "targetFanOut": 31,
+      "targetFanOut": 30,
       "shims": [],
       "shimTtl": "1 phase (default)",
       "retirementPhase": "P4",
@@ -32436,7 +32378,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/query/queryDefaults.ts",
         "src/core/query/userCreditsInvalidation.ts",
         "src/core/utils/ids.ts",
-        "src/features/admin/credits/shared/AdminActionReasonField.vue",
         "src/features/admin/credits/shared/api.ts",
         "src/features/admin/credits/shared/feedback.ts",
         "src/features/admin/credits/shared/format.ts",
@@ -32529,17 +32470,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/admin/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/app/AdminLayout.vue",
-          "to": "src/features/admin/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/features/admin/routePaths.ts",
           "kind": "runtime"
         },
@@ -32599,9 +32530,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 14,
       "measuredFanOut": 1,
-      "targetFanIn": 16,
+      "targetFanIn": 14,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -32617,7 +32548,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ADMIN_CREDIT_HEALTH_PATH",
         "ADMIN_CREDIT_PRICING_PATH",
         "ADMIN_FEATURE_PROMPTS_PATH",
-        "ADMIN_LOGIN_PATH",
         "ADMIN_MODELS_PATH",
         "ADMIN_MONITOR_PATH",
         "ADMIN_PAYMENT_ORDERS_PATH",
@@ -32648,11 +32578,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "source": "src/shared/constants/routePaths.ts",
           "name": "ADMIN_FEATURE_PROMPTS_PATH",
           "exportedAs": "ADMIN_FEATURE_PROMPTS_PATH"
-        },
-        {
-          "source": "src/shared/constants/routePaths.ts",
-          "name": "ADMIN_LOGIN_PATH",
-          "exportedAs": "ADMIN_LOGIN_PATH"
         },
         {
           "source": "src/shared/constants/routePaths.ts",
@@ -32704,53 +32629,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanOutTargets": ["src/core/auth/routePolicy.ts"]
     },
     {
-      "path": "src/features/admin/shared/core/actionReasonContract.ts",
-      "kind": "canonical",
-      "confidence": "high",
-      "status": "active",
-      "owner": "p4-lane",
-      "activationPhase": "pre-P0",
-      "scope": "cross-feature",
-      "exportStyle": "current AST exports",
-      "surfaceBaseline": true,
-      "allowedConsumers": [
-        {
-          "from": "src/features/admin/shared/core/actionReasonContract.unit.spec.ts",
-          "to": "src/features/admin/shared/core/actionReasonContract.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/index.ts",
-          "to": "src/features/admin/shared/core/actionReasonContract.ts",
-          "kind": "runtime"
-        }
-      ],
-      "measuredFanIn": 2,
-      "measuredFanOut": 0,
-      "targetFanIn": 2,
-      "targetFanOut": 0,
-      "shims": [],
-      "shimTtl": "2 phases — delete after P5",
-      "retirementPhase": null,
-      "deletionOwner": "p4-admin-shared",
-      "notes": "Public subpath with an explicit reviewed target mapping.",
-      "sourcePaths": ["src/features/admin/shared/core/actionReasonContract.ts"],
-      "targetPath": "src/features/admin/shared/core/actionReasonContract.ts",
-      "ownershipScope": [
-        "src/features/admin/shared/core/actionReasonContract.ts"
-      ],
-      "publicExports": [
-        "AdminActionReasonValidation",
-        "MAX_ADMIN_ACTION_REASON_LENGTH",
-        "validateAdminActionReason"
-      ],
-      "surfaceSeverity": "warn",
-      "targetFanOutTargets": [],
-      "sourceOwnershipScope": [
-        "src/features/admin/shared/validation/actionReasonContract.ts"
-      ]
-    },
-    {
       "path": "src/features/admin/shared/core/cellClasses.ts",
       "kind": "canonical",
       "confidence": "high",
@@ -32782,7 +32660,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -32826,7 +32704,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -32872,7 +32750,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -32898,11 +32776,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/monitor/resource.ts",
-          "to": "src/features/admin/shared/core/controlGuidance.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/index.ts",
           "to": "src/features/admin/shared/core/controlGuidance.ts",
           "kind": "runtime"
@@ -32923,12 +32796,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 4,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -32958,6 +32831,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/admin/monitor/resource.ts",
+          "to": "src/features/admin/shared/core/controlMutation.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/shared/core/controlCopy.ts",
           "to": "src/features/admin/shared/core/controlMutation.ts",
           "kind": "runtime"
@@ -32983,12 +32861,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 5,
       "measuredFanOut": 1,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33000,12 +32878,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ControlErrorMessages",
         "ControlMutationOptions",
         "buildControlMutationHeaders",
-        "buildRoutineControlMutationHeaders",
         "createControlError",
         "mapControlError",
         "readControlErrorCode",
-        "readControlRequestId",
-        "requireOperatorReason"
+        "readControlRequestId"
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": ["src/api/contractKernel.ts"],
@@ -33035,7 +32911,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33080,7 +32956,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33123,7 +32999,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33157,7 +33033,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33205,7 +33081,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33252,7 +33128,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33363,7 +33239,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 14,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -33437,16 +33313,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/admin/app/AdminLayout.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/useAdminLoginFeedback.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -33621,16 +33487,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
-          "from": "src/features/admin/credits/ui/shared/AdminActionReasonDialog.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/credits/ui/shared/AdminActionReasonField.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/shared/invalidBorder.browser.spec.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -33686,11 +33542,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.component.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/dialog/AdminGatewayConfigDialog.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -33732,11 +33583,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/admin/monitor/core/status.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/resource.contract.spec.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -34083,11 +33929,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/admin/users/session/commands.ts",
           "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/session/commands.ts",
-          "to": "src/features/admin/shared/index.ts",
           "kind": "type-only"
         },
         {
@@ -34102,11 +33943,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/admin/users/session/resource.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/users/session/sessionCommands.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -34126,17 +33962,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 126,
+      "measuredFanIn": 119,
       "measuredFanOut": 46,
-      "targetFanIn": 126,
+      "targetFanIn": 119,
       "targetFanOut": 46,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Sole horizontal Admin seam. shared/core, shared/session and shared/ui own their respective contracts. Verticals expose index.ts only for cross-vertical consumers.",
       "sourcePaths": [
-        "src/features/admin/shared/core/actionReasonContract.ts",
         "src/features/admin/shared/core/adminSelectSkin.ts",
         "src/features/admin/shared/core/adminThemeTokens.ts",
         "src/features/admin/shared/core/cellClasses.ts",
@@ -34242,15 +34077,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ADMIN_CONTROL_UNAVAILABLE_CODE",
         "ADMIN_IDENTITY_EMPTY",
         "ADMIN_NUMERIC_EMPTY",
-        "ADMIN_PROBE_OPERATOR_REASON",
-        "ADMIN_REASON_REQUIRED_MESSAGE",
-        "ADMIN_REVERSIBLE_DEFAULT_REASON",
         "ADMIN_SELECT_SIDE_OFFSET",
         "ADMIN_SERVICE_GROUPS",
         "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
         "ADMIN_TABLE_MORE_COLUMN_WIDTH",
         "ALL_ADMIN_BRAND_LOGOS",
-        "AdminActionReasonValidation",
         "AdminAlert",
         "AdminAlertSeverity",
         "AdminAnomalyItem",
@@ -34273,9 +34104,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "AdminConfirmIntent",
         "AdminConfirmOptions",
         "AdminConfirmPort",
-        "AdminConfirmReasonSpec",
         "AdminConfirmRequest",
-        "AdminConfirmRisk",
         "AdminConfirmState",
         "AdminControlUnavailableError",
         "AdminCursorValue",
@@ -34347,7 +34176,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ControlErrorMessages",
         "ControlMutationOptions",
         "LoadControlSettingOptions",
-        "MAX_ADMIN_ACTION_REASON_LENGTH",
         "OptimisticToggleFeedback",
         "OptimisticToggleMutate",
         "SelectOptionItem",
@@ -34422,7 +34250,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "buildAdminAnomalyItems",
         "buildAdminTimeRangeBuckets",
         "buildControlMutationHeaders",
-        "buildRoutineControlMutationHeaders",
         "confirmSettingsSave",
         "createAdminBrandLogoResource",
         "createControlError",
@@ -34450,14 +34277,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "mapControlError",
         "monitorChartSpecs",
         "pickAdminTimeRangeOptions",
-        "readConfirmReason",
         "readControlErrorCode",
         "readControlRequestId",
-        "readReversibleReason",
         "reconcileStableRows",
         "replaceAdminBrandLogoOverrides",
-        "requireDestructiveReason",
-        "requireOperatorReason",
         "resolveModelBrandLogo",
         "secretField",
         "shouldShowAdminTimeRangeTick",
@@ -34481,15 +34304,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "usePagePagination",
         "useQueryPolling",
         "useRefetchOnClose",
-        "validateAdminActionReason",
         "withControlCopy"
       ],
       "exportMappings": [
-        {
-          "source": "src/features/admin/shared/core/actionReasonContract.ts",
-          "name": "validateAdminActionReason",
-          "exportedAs": "validateAdminActionReason"
-        },
         {
           "source": "src/features/admin/shared/core/cellClasses.ts",
           "name": "adminInlineJumpClass",
@@ -34537,18 +34354,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "source": "src/features/admin/shared/core/controlMutation.ts",
-          "name": "buildRoutineControlMutationHeaders",
-          "exportedAs": "buildRoutineControlMutationHeaders"
-        },
-        {
-          "source": "src/features/admin/shared/core/controlMutation.ts",
           "name": "createControlError",
           "exportedAs": "createControlError"
-        },
-        {
-          "source": "src/features/admin/shared/core/controlMutation.ts",
-          "name": "requireOperatorReason",
-          "exportedAs": "requireOperatorReason"
         },
         {
           "source": "src/features/admin/shared/core/controlResource.ts",
@@ -34787,18 +34594,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "source": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "name": "ADMIN_PROBE_OPERATOR_REASON",
-          "exportedAs": "ADMIN_PROBE_OPERATOR_REASON"
-        },
-        {
-          "source": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
           "name": "confirmSettingsSave",
           "exportedAs": "confirmSettingsSave"
-        },
-        {
-          "source": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "name": "requireDestructiveReason",
-          "exportedAs": "requireDestructiveReason"
         },
         {
           "source": "src/features/admin/shared/session/feedback/toast.ts",
@@ -35223,7 +35020,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35291,7 +35088,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 6,
       "targetFanOut": 14,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35357,7 +35154,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35408,7 +35205,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35452,7 +35249,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 4,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35502,7 +35299,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35551,7 +35348,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35599,7 +35396,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35642,7 +35439,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35683,11 +35480,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 2,
+      "measuredFanOut": 1,
       "targetFanIn": 2,
-      "targetFanOut": 2,
+      "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35698,18 +35495,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "ownershipScope": [
         "src/features/admin/shared/session/feedback/confirmSettingsSave.ts"
       ],
-      "publicExports": [
-        "ADMIN_PROBE_OPERATOR_REASON",
-        "ADMIN_REASON_REQUIRED_MESSAGE",
-        "ADMIN_REVERSIBLE_DEFAULT_REASON",
-        "AdminConfirmRisk",
-        "confirmSettingsSave",
-        "readReversibleReason",
-        "requireDestructiveReason"
-      ],
+      "publicExports": ["confirmSettingsSave"],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "src/features/admin/shared/session/feedback/toast.ts",
         "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
       ],
       "sourceOwnershipScope": [
@@ -35798,11 +35586,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/toast.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
@@ -35818,12 +35601,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 18,
+      "measuredFanIn": 17,
       "measuredFanOut": 2,
-      "targetFanIn": 18,
+      "targetFanIn": 17,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35862,16 +35645,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
           "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.unit.spec.ts",
-          "to": "src/features/admin/shared/session/feedback/useAdminConfirm.ts",
           "kind": "type-only"
         },
         {
@@ -35895,12 +35668,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 6,
       "measuredFanOut": 1,
-      "targetFanIn": 7,
+      "targetFanIn": 6,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35915,11 +35688,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "AdminConfirmIntent",
         "AdminConfirmOptions",
         "AdminConfirmPort",
-        "AdminConfirmReasonSpec",
         "AdminConfirmRequest",
         "AdminConfirmState",
         "activeAdminConfirm",
-        "readConfirmReason",
         "useAdminConfirm"
       ],
       "surfaceSeverity": "warn",
@@ -35955,7 +35726,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -35998,7 +35769,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36047,7 +35818,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36122,7 +35893,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 8,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36172,7 +35943,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36213,7 +35984,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36263,7 +36034,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36299,7 +36070,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36340,7 +36111,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36390,7 +36161,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 6,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36451,7 +36222,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36499,7 +36270,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36543,7 +36314,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36596,7 +36367,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36641,7 +36412,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36692,7 +36463,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36739,7 +36510,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36786,7 +36557,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36843,7 +36614,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 4,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36883,7 +36654,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36928,7 +36699,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -36972,7 +36743,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 6,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37024,7 +36795,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37067,7 +36838,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37116,7 +36887,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37208,7 +36979,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37256,7 +37027,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37314,7 +37085,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 4,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37369,7 +37140,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37414,7 +37185,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37454,7 +37225,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 8,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37503,7 +37274,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37549,7 +37320,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37593,7 +37364,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 0,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37638,7 +37409,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 13,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37699,7 +37470,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37740,7 +37511,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 5,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37796,7 +37567,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 3,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37844,7 +37615,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37893,7 +37664,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37933,7 +37704,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 1,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -37981,7 +37752,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 2,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -38029,7 +37800,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 2,
       "targetFanOut": 3,
       "shims": [],
-      "shimTtl": "2 phases — delete after P5",
+      "shimTtl": "2 phases \u2014 delete after P5",
       "retirementPhase": null,
       "deletionOwner": "p4-admin-shared",
       "notes": "Public subpath with an explicit reviewed target mapping.",
@@ -38199,11 +37970,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
-          "to": "src/features/auth/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/users/session/sessionCommands.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
@@ -38274,9 +38040,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 29,
+      "measuredFanIn": 28,
       "measuredFanOut": 46,
-      "targetFanIn": 29,
+      "targetFanIn": 28,
       "targetFanOut": 46,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -38338,6 +38104,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/auth/client.ts",
         "src/core/auth/oauthProviders.ts",
         "src/core/auth/passwordPolicy.ts",
+        "src/core/auth/routePolicy.ts",
         "src/core/auth/sessionPolicy.ts",
         "src/core/components/IbFormField.vue",
         "src/core/composables/useAppToast.ts",
@@ -38353,7 +38120,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/auth.ts",
         "src/core/utils/formValidation.ts",
         "src/core/utils/storage.ts",
-        "src/features/admin/app/login/AdminLoginPage.vue",
         "src/features/legal/routePaths.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
@@ -40535,9 +40301,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Graph mutation port resolver used by execution and editing commands; a file-scoped entry keeps the mutation capability separate from graph read contracts.",
-      "sourcePaths": ["src/features/canvas/core/graph/canvasGraphStoreWriter.ts"],
+      "sourcePaths": [
+        "src/features/canvas/core/graph/canvasGraphStoreWriter.ts"
+      ],
       "targetPath": "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
-      "ownershipScope": ["src/features/canvas/core/graph/canvasGraphStoreWriter.ts"],
+      "ownershipScope": [
+        "src/features/canvas/core/graph/canvasGraphStoreWriter.ts"
+      ],
       "publicExports": ["resolveWritableCanvasGraphStore"],
       "targetFanOutTargets": [
         "src/features/canvas/core/graph/canvasGraphStore.ts",
@@ -40576,9 +40346,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "JSON graph-value comparison shared by patch algebra and history; a leaf entry keeps history comparison independent of the graph store runtime.",
-      "sourcePaths": ["src/features/canvas/core/graph/canvasGraphValueEquality.ts"],
+      "sourcePaths": [
+        "src/features/canvas/core/graph/canvasGraphValueEquality.ts"
+      ],
       "targetPath": "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
-      "ownershipScope": ["src/features/canvas/core/graph/canvasGraphValueEquality.ts"],
+      "ownershipScope": [
+        "src/features/canvas/core/graph/canvasGraphValueEquality.ts"
+      ],
       "publicExports": ["isSameJsonValue"],
       "targetFanOutTargets": [],
       "surfaceSeverity": "error"
@@ -40661,7 +40435,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "notes": "Renderer-independent group geometry shared by Graph Editing and Node UI; separate entry avoids a geometry-to-graph-barrel re-export cycle.",
       "sourcePaths": ["src/features/canvas/core/graph/canvasGroupGeometry.ts"],
       "targetPath": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
-      "ownershipScope": ["src/features/canvas/core/graph/canvasGroupGeometry.ts"],
+      "ownershipScope": [
+        "src/features/canvas/core/graph/canvasGroupGeometry.ts"
+      ],
       "publicExports": [
         "CANVAS_GROUP_FRAME_PADDING_PX",
         "CanvasFlowNodeLike",
@@ -41939,9 +41715,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Pending execution facts and lease contract. Flow deletion consumes this leaf directly to avoid the execution/flow-adapter barrel cycle.",
-      "sourcePaths": ["src/features/canvas/session/execution/pending-execution/core.ts"],
+      "sourcePaths": [
+        "src/features/canvas/session/execution/pending-execution/core.ts"
+      ],
       "targetPath": "src/features/canvas/session/execution/pending-execution/core.ts",
-      "ownershipScope": ["src/features/canvas/session/execution/pending-execution/core.ts"],
+      "ownershipScope": [
+        "src/features/canvas/session/execution/pending-execution/core.ts"
+      ],
       "publicExports": [
         "PendingImageExecutionCore",
         "PendingImageExecutionCoreOptions",
@@ -42790,9 +42570,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Pure selection group action contract shared with overlays; independent of graph-editing runtime and tool UI to avoid mutual barrel cycles.",
-      "sourcePaths": ["src/features/canvas/session/graph-editing/groupContracts.ts"],
+      "sourcePaths": [
+        "src/features/canvas/session/graph-editing/groupContracts.ts"
+      ],
       "targetPath": "src/features/canvas/session/graph-editing/groupContracts.ts",
-      "ownershipScope": ["src/features/canvas/session/graph-editing/groupContracts.ts"],
+      "ownershipScope": [
+        "src/features/canvas/session/graph-editing/groupContracts.ts"
+      ],
       "publicExports": ["CanvasSelectionGroupAction"],
       "targetFanOutTargets": ["src/features/canvas/core/graph/index.ts"],
       "surfaceSeverity": "error"
@@ -43243,11 +43027,22 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Canvas feedback capabilities shared by Board Session, task execution, graph commands and tools; kept separate from Workspace composition to avoid a runtime composition cycle.",
-      "sourcePaths": ["src/features/canvas/session/workspace/useCanvasFeedback.ts"],
+      "sourcePaths": [
+        "src/features/canvas/session/workspace/useCanvasFeedback.ts"
+      ],
       "targetPath": "src/features/canvas/session/workspace/useCanvasFeedback.ts",
-      "ownershipScope": ["src/features/canvas/session/workspace/useCanvasFeedback.ts"],
-      "publicExports": ["CanvasFeedback", "createCanvasFeedback", "useCanvasFeedback"],
-      "targetFanOutTargets": ["src/core/composables/useAppToast.ts", "src/core/i18n/index.ts"],
+      "ownershipScope": [
+        "src/features/canvas/session/workspace/useCanvasFeedback.ts"
+      ],
+      "publicExports": [
+        "CanvasFeedback",
+        "createCanvasFeedback",
+        "useCanvasFeedback"
+      ],
+      "targetFanOutTargets": [
+        "src/core/composables/useAppToast.ts",
+        "src/core/i18n/index.ts"
+      ],
       "surfaceSeverity": "error"
     },
     {
@@ -43280,7 +43075,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/features/canvas/tools/image-tools/core/index.ts",
       "ownershipScope": ["src/features/canvas/tools/image-tools/core/index.ts"],
       "publicExports": ["IMAGE_TOOL_CHROME_LAYOUT"],
-      "targetFanOutTargets": ["src/features/canvas/tools/image-tools/core/imageToolChrome.ts"],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/image-tools/core/imageToolChrome.ts"
+      ],
       "surfaceSeverity": "error"
     },
     {
@@ -43429,7 +43226,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/features/canvas/tools/image-tools/ui/chrome.ts",
       "ownershipScope": ["src/features/canvas/tools/image-tools/ui/chrome.ts"],
       "publicExports": ["ImageToolChromeFrame"],
-      "targetFanOutTargets": ["src/features/canvas/tools/image-tools/ui/ChromeFrame.vue"],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/image-tools/ui/ChromeFrame.vue"
+      ],
       "surfaceSeverity": "error"
     },
     {
@@ -43462,7 +43261,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/features/canvas/tools/image-tools/ui/stage.ts",
       "ownershipScope": ["src/features/canvas/tools/image-tools/ui/stage.ts"],
       "publicExports": ["ImageToolStagePresentation"],
-      "targetFanOutTargets": ["src/features/canvas/tools/image-tools/ui/StagePresentation.vue"],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/image-tools/ui/StagePresentation.vue"
+      ],
       "surfaceSeverity": "error"
     },
     {
@@ -43646,7 +43447,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetPath": "src/features/canvas/tools/inpaint/testing/index.ts",
       "ownershipScope": ["src/features/canvas/tools/inpaint/testing/index.ts"],
       "publicExports": ["MaskPaintingCanvasModule"],
-      "targetFanOutTargets": ["src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts"],
+      "targetFanOutTargets": [
+        "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts"
+      ],
       "surfaceSeverity": "error"
     },
     {
@@ -43853,7 +43656,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "notes": "Retouch curve control Browser testing entry with its required styles and point normalization; external tests use this explicit harness surface.",
       "sourcePaths": ["src/features/canvas/tools/retouch/testing/browser.ts"],
       "targetPath": "src/features/canvas/tools/retouch/testing/browser.ts",
-      "ownershipScope": ["src/features/canvas/tools/retouch/testing/browser.ts"],
+      "ownershipScope": [
+        "src/features/canvas/tools/retouch/testing/browser.ts"
+      ],
       "publicExports": ["CurveGraph", "normalizeCurveChannelPoints"],
       "targetFanOutTargets": [
         "src/features/canvas/tools/retouch/core/kinds/curves.ts",
@@ -44760,9 +44565,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Active node-panel state shared by Screen and tools; separate entry avoids importing the Screen component composition root.",
-      "sourcePaths": ["src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"],
+      "sourcePaths": [
+        "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"
+      ],
       "targetPath": "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts",
-      "ownershipScope": ["src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"],
+      "ownershipScope": [
+        "src/features/canvas/ui/screens/useFlowActiveNodePanels.ts"
+      ],
       "publicExports": [
         "ACTIVE_NODE_PANEL_KIND",
         "ActiveNodePanel",
@@ -44813,10 +44622,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "retirementPhase": null,
       "deletionOwner": null,
       "notes": "Canvas interaction lock state shared by Screen, workflow and Workspace runtimes; separate entry avoids importing the Screen component composition root.",
-      "sourcePaths": ["src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"],
+      "sourcePaths": [
+        "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"
+      ],
       "targetPath": "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
-      "ownershipScope": ["src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"],
-      "publicExports": ["CanvasInteractionKey", "useFlowCanvasInteractionState"],
+      "ownershipScope": [
+        "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"
+      ],
+      "publicExports": [
+        "CanvasInteractionKey",
+        "useFlowCanvasInteractionState"
+      ],
       "targetFanOutTargets": ["node_modules/vue/index.js"],
       "surfaceSeverity": "error"
     },
@@ -45666,7 +45482,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 20,
       "targetFanOut": 50,
       "shims": [],
-      "shimTtl": "1 phase — delete after P2",
+      "shimTtl": "1 phase \u2014 delete after P2",
       "retirementPhase": "P2",
       "deletionOwner": "workspace-p2",
       "notes": "Workspace feature seam; consumed by Board catalog/sync and Canvas.",
@@ -45786,7 +45602,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 0,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase — delete after P2",
+      "shimTtl": "1 phase \u2014 delete after P2",
       "retirementPhase": "P2",
       "deletionOwner": "workspace-p2",
       "notes": "",
@@ -45840,7 +45656,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 0,
       "targetFanOut": 1,
       "shims": [],
-      "shimTtl": "1 phase — delete after P2",
+      "shimTtl": "1 phase \u2014 delete after P2",
       "retirementPhase": "P2",
       "deletionOwner": "workspace-p2",
       "notes": "",
@@ -45921,11 +45737,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/admin/app/AdminHeaderBar.vue",
-          "to": "src/features/workspace/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/app/login/AdminLoginPage.vue",
           "to": "src/features/workspace/routePaths.ts",
           "kind": "runtime"
         },
@@ -46055,9 +45866,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 33,
+      "measuredFanIn": 32,
       "measuredFanOut": 1,
-      "targetFanIn": 33,
+      "targetFanIn": 32,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -46240,7 +46051,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "notes": "Workspace selection runtime entry; Account consumes this leaf rather than the shell barrel to avoid the Workspace shell to Account cycle.",
       "sourcePaths": ["src/features/workspace/selection/workspaceContext.ts"],
       "targetPath": "src/features/workspace/selection/workspaceContext.ts",
-      "ownershipScope": ["src/features/workspace/selection/workspaceContext.ts"],
+      "ownershipScope": [
+        "src/features/workspace/selection/workspaceContext.ts"
+      ],
       "publicExports": [
         "ProvisionWorkspaceInput",
         "UseWorkspaceSelectionOptions",
@@ -49022,7 +48835,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ControlPaymentRefundRequest",
         "ControlPublishPricesRequest",
         "ControlPublishPricesRequestPrices",
-        "ControlReasonRequest",
         "ControlReplaceModelPoolEnvelope",
         "ControlReplaceModelPoolEnvelopeData",
         "ControlReplaceModelPoolRequest",
@@ -49088,7 +48900,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ListControlRewardRedemptionsParams",
         "ListControlTasksParams",
         "ListControlUsersParams",
-        "OperatorReasonParameter",
         "PageSizeParameter",
         "PaginatedControlBillingAccounts",
         "PaginatedControlLedger",
@@ -52489,11 +52300,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/payments/orders/AdminPaymentOrdersPage.vue",
           "to": "src/shared/components/ActionButton.vue",
           "kind": "runtime"
@@ -52569,9 +52375,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 31,
+      "measuredFanIn": 30,
       "measuredFanOut": 5,
-      "targetFanIn": 31,
+      "targetFanIn": 30,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -52956,19 +52762,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/components/SiteBrandLogo.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
           "to": "src/shared/components/SiteBrandLogo.vue",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -53586,11 +53387,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/composables/useLogoutRedirect.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/ui/pages/CanvasPage.vue",
           "to": "src/shared/composables/useLogoutRedirect.ts",
           "kind": "runtime"
@@ -53606,9 +53402,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 5,
       "measuredFanOut": 1,
-      "targetFanIn": 6,
+      "targetFanIn": 5,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -53738,11 +53534,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/composables/useSiteBranding.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/branding/useBrandingSettings.ts",
           "to": "src/shared/composables/useSiteBranding.ts",
           "kind": "runtime"
@@ -53763,9 +53554,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 7,
       "measuredFanOut": 5,
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -54434,11 +54225,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/constants/routePaths.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/lib/anomalyRules.ts",
           "to": "src/shared/constants/routePaths.ts",
           "kind": "runtime"
@@ -54589,9 +54375,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 44,
+      "measuredFanIn": 43,
       "measuredFanOut": 0,
-      "targetFanIn": 44,
+      "targetFanIn": 43,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -54607,7 +54393,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ADMIN_CREDIT_HEALTH_PATH",
         "ADMIN_CREDIT_PRICING_PATH",
         "ADMIN_FEATURE_PROMPTS_PATH",
-        "ADMIN_LOGIN_PATH",
         "ADMIN_MODELS_PATH",
         "ADMIN_MONITOR_PATH",
         "ADMIN_PAYMENT_ORDERS_PATH",
@@ -55680,11 +55465,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
           "to": "src/shared/i18n/index.ts",
           "kind": "runtime"
@@ -56110,9 +55890,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 112,
+      "measuredFanIn": 111,
       "measuredFanOut": 5,
-      "targetFanIn": 112,
+      "targetFanIn": 111,
       "targetFanOut": 5,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -56783,19 +56563,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/lib/brandMark.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/settings/branding/AdminBrandingCard.vue",
           "to": "src/shared/lib/brandMark.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 3,
       "measuredFanOut": 0,
-      "targetFanIn": 4,
+      "targetFanIn": 3,
       "targetFanOut": 0,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -57836,11 +57611,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "src/shared/router/queryParams.ts",
           "kind": "runtime"
@@ -57891,9 +57661,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 14,
+      "measuredFanIn": 13,
       "measuredFanOut": 1,
-      "targetFanIn": 14,
+      "targetFanIn": 13,
       "targetFanOut": 1,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -58309,11 +58079,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
-          "from": "src/features/admin/pages/login/AdminLoginPage.vue",
-          "to": "src/shared/utils/auth.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "src/shared/utils/auth.ts",
           "kind": "runtime"
@@ -58389,9 +58154,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 16,
+      "measuredFanIn": 15,
       "measuredFanOut": 4,
-      "targetFanIn": 16,
+      "targetFanIn": 15,
       "targetFanOut": 4,
       "shims": [],
       "shimTtl": "1 phase (default)",
@@ -59889,7 +59654,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/client.ts`                                                                 | canonical | active  | p1-lane         | 6       | 12 → 12                  | 4 → 4                     |
 | `src/api/contractKernel.ts`                                                         | canonical | active  | p1-lane         | 24      | 40 → 40                  | 2 → 2                     |
 | `src/api/generated-query/control/control-billing/control-billing.ts`                | canonical | active  | p1-lane         | 56      | 3 → 3                    | 4 → 4                     |
-| `src/api/generated-query/control/control-credits/control-credits.ts`                | canonical | active  | p1-lane         | 145     | 4 → 4                    | 4 → 4                     |
+| `src/api/generated-query/control/control-credits/control-credits.ts`                | canonical | active  | p1-lane         | 143     | 4 → 4                    | 4 → 4                     |
 | `src/api/generated-query/control/control-payments/control-payments.ts`              | canonical | active  | p1-lane         | 39      | 3 → 3                    | 4 → 4                     |
 | `src/api/generated-query/control/control-platform/control-platform.ts`              | canonical | active  | p1-lane         | 402     | 14 → 14                  | 4 → 4                     |
 | `src/api/generated-query/control/control-tasks/control-tasks.ts`                    | canonical | active  | p1-lane         | 22      | 2 → 2                    | 4 → 4                     |
@@ -59900,7 +59665,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts`        | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/api/generated-query/control/model/controlStripeConfigRequest.ts`               | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/api/generated-query/control/model/controlTaskEnvelope.ts`                      | canonical | active  | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
-| `src/api/generated-query/control/model/index.ts`                                    | canonical | active  | p1-lane         | 159     | 17 → 17                  | 159 → 159                 |
+| `src/api/generated-query/control/model/index.ts`                                    | canonical | active  | p1-lane         | 157     | 18 → 18                  | 157 → 157                 |
 | `src/api/generated-query/control/model/supportChannelKind.ts`                       | canonical | active  | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
 | `src/api/generated-query/control/model/supportChannelsSetting.ts`                   | canonical | active  | p1-lane         | 1       | 3 → 3                    | 1 → 1                     |
 | `src/api/generated-query/public/boards/boards.ts`                                   | canonical | active  | p1-lane         | 144     | 2 → 2                    | 4 → 4                     |
@@ -59926,7 +59691,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/workspaceTaskTransport.ts`                                                 | canonical | active  | p1-lane         | 7       | 7 → 7                    | 5 → 5                     |
 | `src/api/workspaceTaskWaiter.ts`                                                    | canonical | active  | p1-lane         | 2       | 2 → 2                    | 5 → 5                     |
 | `src/api/workspaceTasks.ts`                                                         | canonical | active  | p1-lane         | 23      | 3 → 3                    | 3 → 3                     |
-| `src/app/router/index.ts`                                                           | canonical | active  | integrator      | 1       | 1 → 1                    | 14 → 14                   |
+| `src/app/router/index.ts`                                                           | canonical | active  | integrator      | 1       | 1 → 1                    | 13 → 13                   |
 | `src/components/ui/avatar/index.ts`                                                 | canonical | active  | design-system   | 3       | 2 → 2                    | 3 → 3                     |
 | `src/components/ui/badge/index.ts`                                                  | canonical | active  | design-system   | 3       | 3 → 3                    | 3 → 3                     |
 | `src/components/ui/button/index.ts`                                                 | canonical | active  | design-system   | 10      | 25 → 25                  | 6 → 6                     |
@@ -59943,9 +59708,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/auth/client.ts`                                                           | canonical | active  | p1-lane         | 3       | 2 → 2                    | 4 → 4                     |
 | `src/core/auth/oauthProviders.ts`                                                   | canonical | active  | p1-lane         | 2       | 6 → 6                    | 0 → 0                     |
 | `src/core/auth/passwordPolicy.ts`                                                   | canonical | active  | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
-| `src/core/auth/routePolicy.ts`                                                      | canonical | active  | p1-lane         | 9       | 3 → 3                    | 0 → 0                     |
+| `src/core/auth/routePolicy.ts`                                                      | canonical | active  | p1-lane         | 8       | 4 → 4                    | 0 → 0                     |
 | `src/core/auth/sessionPolicy.ts`                                                    | canonical | active  | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
-| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane         | 4       | 32 → 32                  | 4 → 4                     |
+| `src/core/components/ActionButton.vue`                                              | canonical | active  | p1-lane         | 4       | 31 → 31                  | 4 → 4                     |
 | `src/core/components/ChartCard.vue`                                                 | canonical | active  | p1-lane         | 1       | 2 → 2                    | 2 → 2                     |
 | `src/core/components/ChartPanel.vue`                                                | canonical | active  | p1-lane         | 2       | 2 → 2                    | 1 → 1                     |
 | `src/core/components/ChartRenderer.vue`                                             | canonical | active  | p1-lane         | 1       | 3 → 3                    | 3 → 3                     |
@@ -59953,7 +59718,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/components/DataTableFrame.vue`                                            | canonical | active  | p1-lane         | 2       | 4 → 4                    | 3 → 3                     |
 | `src/core/components/IbFormField.vue`                                               | canonical | active  | p1-lane         | 2       | 5 → 5                    | 3 → 3                     |
 | `src/core/components/RangedLineChartCard.vue`                                       | canonical | active  | p1-lane         | 2       | 2 → 2                    | 7 → 7                     |
-| `src/core/components/SiteBrandLogo.vue`                                             | canonical | active  | p1-lane         | 1       | 4 → 4                    | 0 → 0                     |
+| `src/core/components/SiteBrandLogo.vue`                                             | canonical | active  | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
 | `src/core/components/StatusBadge.vue`                                               | canonical | active  | p1-lane         | 3       | 4 → 4                    | 3 → 3                     |
 | `src/core/components/StudioName.vue`                                                | canonical | active  | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
 | `src/core/components/UserConfirmDialog.vue`                                         | canonical | active  | p1-lane         | 1       | 3 → 3                    | 5 → 5                     |
@@ -59961,10 +59726,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/composables/useAppClipboard.ts`                                           | canonical | active  | p1-lane         | 1       | 5 → 5                    | 0 → 0                     |
 | `src/core/composables/useAppToast.ts`                                               | canonical | active  | p1-lane         | 2       | 17 → 17                  | 1 → 1                     |
 | `src/core/composables/useAsyncAction.ts`                                            | canonical | active  | p1-lane         | 3       | 16 → 16                  | 1 → 1                     |
-| `src/core/composables/useLogoutRedirect.ts`                                         | canonical | active  | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
+| `src/core/composables/useLogoutRedirect.ts`                                         | canonical | active  | p1-lane         | 1       | 5 → 5                    | 1 → 1                     |
 | `src/core/composables/useMenuTriggerFocusRestore.ts`                                | canonical | active  | p1-lane         | 1       | 1 → 1                    | 1 → 1                     |
 | `src/core/composables/useOverlayInteractionLifecycle.ts`                            | canonical | active  | p1-lane         | 6       | 10 → 10                  | 1 → 1                     |
-| `src/core/composables/useSiteBranding.ts`                                           | canonical | active  | p1-lane         | 16      | 8 → 8                    | 5 → 5                     |
+| `src/core/composables/useSiteBranding.ts`                                           | canonical | active  | p1-lane         | 16      | 7 → 7                    | 5 → 5                     |
 | `src/core/composables/useSupportChannels.ts`                                        | canonical | active  | p1-lane         | 4       | 9 → 9                    | 6 → 6                     |
 | `src/core/composables/useUserConfirmDialog.ts`                                      | canonical | active  | p1-lane         | 2       | 3 → 3                    | 1 → 1                     |
 | `src/core/config/pagination.ts`                                                     | canonical | active  | p1-lane         | 2       | 15 → 15                  | 0 → 0                     |
@@ -59976,7 +59741,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/contracts/imageServices.ts`                                               | canonical | active  | p1-lane         | 3       | 29 → 29                  | 0 → 0                     |
 | `src/core/errors/errorCatalog.ts`                                                   | canonical | active  | p1-lane         | 5       | 30 → 30                  | 1 → 1                     |
 | `src/core/i18n/formatters.ts`                                                       | canonical | active  | p1-lane         | 5       | 21 → 21                  | 2 → 2                     |
-| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 123 → 123                | 5 → 5                     |
+| `src/core/i18n/index.ts`                                                            | canonical | active  | p1-lane         | 7       | 122 → 122                | 5 → 5                     |
 | `src/core/i18n/localeCore.ts`                                                       | canonical | active  | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
 | `src/core/i18n/localeManifest.ts`                                                   | canonical | active  | p1-lane         | 2       | 5 → 5                    | 5 → 5                     |
 | `src/core/i18n/locales/en/index.ts`                                                 | canonical | active  | p1-lane         | 12      | 3 → 3                    | 0 → 0                     |
@@ -59987,7 +59752,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/i18n/userLocale.ts`                                                       | canonical | active  | p1-lane         | 9       | 17 → 17                  | 6 → 6                     |
 | `src/core/interaction/interactiveControlState.ts`                                   | canonical | active  | p1-lane         | 5       | 9 → 9                    | 0 → 0                     |
 | `src/core/interaction/menuKeyboardNavigation.ts`                                    | canonical | active  | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
-| `src/core/lib/brandMark.ts`                                                         | canonical | active  | p1-lane         | 2       | 4 → 4                    | 0 → 0                     |
+| `src/core/lib/brandMark.ts`                                                         | canonical | active  | p1-lane         | 2       | 3 → 3                    | 0 → 0                     |
 | `src/core/lib/chartPrimitives.ts`                                                   | canonical | active  | p1-lane         | 15      | 12 → 12                  | 3 → 3                     |
 | `src/core/lib/chartTimeRange.ts`                                                    | canonical | active  | p1-lane         | 7       | 3 → 3                    | 0 → 0                     |
 | `src/core/lib/pageChrome.ts`                                                        | canonical | active  | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
@@ -60003,10 +59768,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/query/queryDefaults.ts`                                                   | canonical | active  | p1-lane         | 5       | 18 → 18                  | 0 → 0                     |
 | `src/core/query/taskResult.ts`                                                      | canonical | active  | p1-lane         | 5       | 8 → 8                    | 1 → 1                     |
 | `src/core/query/userCreditsInvalidation.ts`                                         | canonical | active  | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
-| `src/core/router/queryParams.ts`                                                    | canonical | active  | p1-lane         | 3       | 14 → 14                  | 1 → 1                     |
+| `src/core/router/queryParams.ts`                                                    | canonical | active  | p1-lane         | 3       | 13 → 13                  | 1 → 1                     |
 | `src/core/seo/routeSeo.ts`                                                          | canonical | active  | p1-lane         | 12      | 4 → 4                    | 0 → 0                     |
 | `src/core/seo/seoStaticHtml.ts`                                                     | canonical | active  | p1-lane         | 1       | 1 → 1                    | 1 → 1                     |
-| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane         | 16      | 26 → 26                  | 4 → 4                     |
+| `src/core/utils/auth.ts`                                                            | canonical | active  | p1-lane         | 16      | 25 → 25                  | 4 → 4                     |
 | `src/core/utils/currency.ts`                                                        | canonical | active  | p1-lane         | 3       | 2 → 2                    | 2 → 2                     |
 | `src/core/utils/dateTime.ts`                                                        | canonical | active  | p1-lane         | 5       | 6 → 6                    | 2 → 2                     |
 | `src/core/utils/errorMessages.ts`                                                   | canonical | active  | p1-lane         | 4       | 11 → 11                  | 0 → 0                     |
@@ -60027,15 +59792,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/account/ui/chrome/index.ts`                                           | canonical | planned | p3-lane         | 5       | 8 → 8                    | 13 → 13                   |
 | `src/features/account/ui/chrome/userAccountMenu.types.ts`                           | canonical | active  | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
 | `src/features/account/ui/index.ts`                                                  | cascading | retired | p3-lane         | 23      | 0 → 0                    | 79 → 79                   |
-| `src/features/admin/credits/wallets/index.ts`                                       | canonical | retired | p4-lane         | 1       | 1 → 1                    | 31 → 31                   |
+| `src/features/admin/credits/wallets/index.ts`                                       | canonical | retired | p4-lane         | 1       | 1 → 1                    | 31 → 30                   |
 | `src/features/admin/prompts/core/promptVariables.ts`                                | canonical | active  | p1-lane         | 3       | 3 → 3                    | 1 → 1                     |
-| `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane         | 14      | 16 → 16                  | 1 → 1                     |
-| `src/features/admin/shared/core/actionReasonContract.ts`                            | canonical | active  | p4-lane         | 3       | 2 → 2                    | 0 → 0                     |
+| `src/features/admin/routePaths.ts`                                                  | canonical | active  | p1-lane         | 13      | 14 → 14                  | 1 → 1                     |
 | `src/features/admin/shared/core/cellClasses.ts`                                     | canonical | active  | p4-lane         | 4       | 3 → 3                    | 0 → 0                     |
 | `src/features/admin/shared/core/cellPlaceholders.ts`                                | canonical | active  | p4-lane         | 4       | 2 → 2                    | 0 → 0                     |
 | `src/features/admin/shared/core/controlCopy.ts`                                     | canonical | active  | p4-lane         | 2       | 2 → 2                    | 1 → 1                     |
-| `src/features/admin/shared/core/controlGuidance.ts`                                 | canonical | active  | p4-lane         | 3       | 5 → 5                    | 0 → 0                     |
-| `src/features/admin/shared/core/controlMutation.ts`                                 | canonical | active  | p4-lane         | 10      | 4 → 4                    | 1 → 1                     |
+| `src/features/admin/shared/core/controlGuidance.ts`                                 | canonical | active  | p4-lane         | 3       | 4 → 4                    | 0 → 0                     |
+| `src/features/admin/shared/core/controlMutation.ts`                                 | canonical | active  | p4-lane         | 8       | 5 → 5                    | 1 → 1                     |
 | `src/features/admin/shared/core/controlResource.ts`                                 | canonical | active  | p4-lane         | 2       | 1 → 1                    | 3 → 3                     |
 | `src/features/admin/shared/core/reconcileStableRows.ts`                             | canonical | active  | p4-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/admin/shared/core/secretSchema.ts`                                    | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
@@ -60043,7 +59807,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/tableColumns.ts`                                    | canonical | active  | p4-lane         | 2       | 2 → 2                    | 0 → 0                     |
 | `src/features/admin/shared/core/taskMetricTokens.ts`                                | canonical | active  | p4-lane         | 7       | 3 → 3                    | 1 → 1                     |
 | `src/features/admin/shared/core/uiClasses.ts`                                       | canonical | active  | p4-lane         | 38      | 14 → 14                  | 0 → 0                     |
-| `src/features/admin/shared/index.ts`                                                | canonical | active  | p4-admin-shared | 246     | 126 → 126                | 47 → 47                   |
+| `src/features/admin/shared/index.ts`                                                | canonical | active  | p4-admin-shared | 233     | 119 → 119                | 46 → 46                   |
 | `src/features/admin/shared/session/anomalyRules.ts`                                 | canonical | active  | p4-lane         | 4       | 3 → 3                    | 3 → 3                     |
 | `src/features/admin/shared/session/brand/brandLogos.ts`                             | canonical | active  | p4-lane         | 14      | 6 → 6                    | 14 → 14                   |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts`                  | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
@@ -60053,9 +59817,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/session/collection/usePagePagination.ts`                 | canonical | active  | p4-lane         | 1       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/session/collection/useQueryPolling.ts`                   | canonical | active  | p4-lane         | 1       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/session/collection/useRefetchOnClose.ts`                 | canonical | active  | p4-lane         | 1       | 1 → 1                    | 1 → 1                     |
-| `src/features/admin/shared/session/feedback/confirmSettingsSave.ts`                 | canonical | active  | p4-lane         | 7       | 2 → 2                    | 2 → 2                     |
-| `src/features/admin/shared/session/feedback/toast.ts`                               | canonical | active  | p4-lane         | 4       | 18 → 18                  | 2 → 2                     |
-| `src/features/admin/shared/session/feedback/useAdminConfirm.ts`                     | canonical | active  | p4-lane         | 9       | 7 → 7                    | 1 → 1                     |
+| `src/features/admin/shared/session/feedback/confirmSettingsSave.ts`                 | canonical | active  | p4-lane         | 1       | 2 → 2                    | 1 → 1                     |
+| `src/features/admin/shared/session/feedback/toast.ts`                               | canonical | active  | p4-lane         | 4       | 17 → 17                  | 2 → 2                     |
+| `src/features/admin/shared/session/feedback/useAdminConfirm.ts`                     | canonical | active  | p4-lane         | 7       | 6 → 6                    | 1 → 1                     |
 | `src/features/admin/shared/session/timeRange.ts`                                    | canonical | active  | p4-lane         | 5       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/session/useAnomalyRadar.ts`                              | canonical | active  | p4-lane         | 1       | 1 → 1                    | 5 → 5                     |
 | `src/features/admin/shared/ui/AdminBadge.vue`                                       | canonical | active  | p4-lane         | 2       | 2 → 2                    | 3 → 3                     |
@@ -60101,7 +59865,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`                   | canonical | active  | p4-lane         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                       | canonical | active  | p4-lane         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/components/auth-fields/index.ts`                                 | cascading | retired | p2-lane         | 10      | 3 → 3                    | 11 → 11                   |
-| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane         | 28      | 29 → 29                  | 46 → 46                   |
+| `src/features/auth/index.ts`                                                        | canonical | active  | p2-lane         | 28      | 28 → 28                  | 46 → 46                   |
 | `src/features/board/core/document/index.ts`                                         | cascading | retired | p3-lane         | 87      | 1 → 1                    | 0 → 0                     |
 | `src/features/board/core/index.ts`                                                  | cascading | retired | p3-lane         | 92      | 14 → 14                  | 0 → 0                     |
 | `src/features/board/core/media/index.ts`                                            | cascading | retired | p3-lane         | 1       | 1 → 1                    | 0 → 0                     |
@@ -60174,7 +59938,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/workspace/index.ts`                                                   | canonical | active  | p2-lane         | 41      | 20 → 20                  | 50 → 50                   |
 | `src/features/workspace/infrastructure/workspaceContext.shim.ts`                    | cascading | retired | workspace-p2    | 20      | 0 → 0                    | 1 → 1                     |
 | `src/features/workspace/infrastructure/workspaceResource.ts`                        | cascading | retired | workspace-p2    | 20      | 0 → 0                    | 1 → 1                     |
-| `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane         | 9       | 33 → 33                  | 1 → 1                     |
+| `src/features/workspace/routePaths.ts`                                              | canonical | active  | p1-lane         | 9       | 32 → 32                  | 1 → 1                     |
 | `src/features/workspace/routes/workspaceRoutes.ts`                                  | canonical | active  | workspace       | 2       | 3 → 3                    | 14 → 14                   |
 | `src/features/workspace/selection/workspaceContext.ts`                              | canonical | active  | workspace       | 20      | 5 → 5                    | 11 → 11                   |
 | `src/features/workspace/selection/workspaceSelectionPort.ts`                        | canonical | active  | workspace-p2    | 7       | 2 → 2                    | 3 → 3                     |
@@ -60192,7 +59956,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/shared/api/generated-query/control/model/controlStripeConfigRequest.ts`        | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
 | `src/shared/api/generated-query/control/model/controlTaskEnvelope.ts`               | canonical | retired | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
-| `src/shared/api/generated-query/control/model/index.ts`                             | canonical | retired | p1-lane         | 159     | 17 → 17                  | 0 → 0                     |
+| `src/shared/api/generated-query/control/model/index.ts`                             | canonical | retired | p1-lane         | 157     | 17 → 17                  | 0 → 0                     |
 | `src/shared/api/generated-query/control/model/supportChannelKind.ts`                | canonical | retired | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
 | `src/shared/api/generated-query/control/model/supportChannelsSetting.ts`            | canonical | retired | p1-lane         | 1       | 3 → 3                    | 1 → 1                     |
 | `src/shared/api/generated-query/public/boards/boards.ts`                            | canonical | retired | p1-lane         | 144     | 2 → 2                    | 4 → 4                     |
@@ -60223,7 +59987,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/auth/oauthProviders.ts`                                                 | canonical | retired | p1-lane         | 2       | 6 → 6                    | 0 → 0                     |
 | `src/shared/auth/passwordPolicy.ts`                                                 | canonical | retired | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
 | `src/shared/auth/sessionPolicy.ts`                                                  | canonical | retired | p1-lane         | 8       | 5 → 5                    | 1 → 1                     |
-| `src/shared/components/ActionButton.vue`                                            | canonical | retired | p1-lane         | 4       | 31 → 31                  | 5 → 5                     |
+| `src/shared/components/ActionButton.vue`                                            | canonical | retired | p1-lane         | 4       | 30 → 30                  | 5 → 5                     |
 | `src/shared/components/ChartCard.vue`                                               | canonical | retired | p1-lane         | 1       | 2 → 2                    | 2 → 2                     |
 | `src/shared/components/ChartPanel.vue`                                              | canonical | retired | p1-lane         | 2       | 2 → 2                    | 1 → 1                     |
 | `src/shared/components/ChartRenderer.vue`                                           | canonical | retired | p1-lane         | 1       | 3 → 3                    | 3 → 3                     |
@@ -60231,7 +59995,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/components/DataTableFrame.vue`                                          | canonical | retired | p1-lane         | 2       | 4 → 4                    | 3 → 3                     |
 | `src/shared/components/IbFormField.vue`                                             | canonical | retired | p1-lane         | 2       | 5 → 5                    | 3 → 3                     |
 | `src/shared/components/RangedLineChartCard.vue`                                     | canonical | retired | p1-lane         | 2       | 2 → 2                    | 7 → 7                     |
-| `src/shared/components/SiteBrandLogo.vue`                                           | canonical | retired | p1-lane         | 1       | 4 → 4                    | 0 → 0                     |
+| `src/shared/components/SiteBrandLogo.vue`                                           | canonical | retired | p1-lane         | 1       | 3 → 3                    | 0 → 0                     |
 | `src/shared/components/StatusBadge.vue`                                             | canonical | retired | p1-lane         | 3       | 4 → 4                    | 3 → 3                     |
 | `src/shared/components/StudioName.vue`                                              | canonical | retired | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
 | `src/shared/components/UserAccountMenu.vue`                                         | canonical | retired | p3-lane         | 1       | 5 → 5                    | 14 → 14                   |
@@ -60241,9 +60005,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/composables/useAppClipboard.ts`                                         | canonical | retired | p1-lane         | 1       | 5 → 5                    | 0 → 0                     |
 | `src/shared/composables/useAppToast.ts`                                             | canonical | retired | p1-lane         | 2       | 17 → 17                  | 1 → 1                     |
 | `src/shared/composables/useAsyncAction.ts`                                          | canonical | retired | p1-lane         | 3       | 16 → 16                  | 1 → 1                     |
-| `src/shared/composables/useLogoutRedirect.ts`                                       | canonical | retired | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
+| `src/shared/composables/useLogoutRedirect.ts`                                       | canonical | retired | p1-lane         | 1       | 5 → 5                    | 1 → 1                     |
 | `src/shared/composables/useOverlayInteractionLifecycle.ts`                          | canonical | retired | p1-lane         | 6       | 10 → 10                  | 1 → 1                     |
-| `src/shared/composables/useSiteBranding.ts`                                         | canonical | retired | p1-lane         | 16      | 8 → 8                    | 5 → 5                     |
+| `src/shared/composables/useSiteBranding.ts`                                         | canonical | retired | p1-lane         | 16      | 7 → 7                    | 5 → 5                     |
 | `src/shared/composables/useSupportChannels.ts`                                      | canonical | retired | p1-lane         | 4       | 9 → 9                    | 6 → 6                     |
 | `src/shared/composables/useUserConfirmDialog.ts`                                    | canonical | retired | p1-lane         | 2       | 3 → 3                    | 1 → 1                     |
 | `src/shared/config/pagination.ts`                                                   | canonical | retired | p1-lane         | 2       | 15 → 15                  | 0 → 0                     |
@@ -60252,7 +60016,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/constants/contacts.ts`                                                  | canonical | retired | p1-lane         | 1       | 1 → 1                    | 0 → 0                     |
 | `src/shared/constants/legalLinks.ts`                                                | canonical | retired | p1-lane         | 1       | 2 → 2                    | 1 → 1                     |
 | `src/shared/constants/media.ts`                                                     | canonical | retired | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
-| `src/shared/constants/routePaths.ts`                                                | canonical | retired | p1-lane         | 27      | 44 → 44                  | 0 → 0                     |
+| `src/shared/constants/routePaths.ts`                                                | canonical | retired | p1-lane         | 26      | 43 → 43                  | 0 → 0                     |
 | `src/shared/domain/externalImageProviders.ts`                                       | canonical | retired | p1-lane         | 4       | 12 → 12                  | 0 → 0                     |
 | `src/shared/domain/generationContract.ts`                                           | canonical | retired | p1-lane         | 18      | 23 → 23                  | 0 → 0                     |
 | `src/shared/domain/imageActions.ts`                                                 | canonical | retired | p1-lane         | 1       | 6 → 6                    | 1 → 1                     |
@@ -60261,7 +60025,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/domain/serviceRegistry.ts`                                              | canonical | retired | p1-lane         | 6       | 4 → 4                    | 2 → 2                     |
 | `src/shared/errors/errorCatalog.ts`                                                 | canonical | retired | p1-lane         | 5       | 30 → 30                  | 1 → 1                     |
 | `src/shared/i18n/formatters.ts`                                                     | canonical | retired | p1-lane         | 5       | 20 → 20                  | 2 → 2                     |
-| `src/shared/i18n/index.ts`                                                          | canonical | retired | p1-lane         | 7       | 112 → 112                | 5 → 5                     |
+| `src/shared/i18n/index.ts`                                                          | canonical | retired | p1-lane         | 7       | 111 → 111                | 5 → 5                     |
 | `src/shared/i18n/localeCore.ts`                                                     | canonical | retired | p1-lane         | 5       | 5 → 5                    | 0 → 0                     |
 | `src/shared/i18n/locales/en/index.ts`                                               | cascading | retired | p1-lane         | 11      | 1 → 1                    | 0 → 0                     |
 | `src/shared/i18n/locales/es/index.ts`                                               | cascading | retired | p1-lane         | 11      | 2 → 2                    | 0 → 0                     |
@@ -60271,7 +60035,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/i18n/userLocale.ts`                                                     | canonical | retired | p1-lane         | 9       | 15 → 15                  | 6 → 6                     |
 | `src/shared/interaction/interactiveControlState.ts`                                 | canonical | retired | p1-lane         | 5       | 8 → 8                    | 0 → 0                     |
 | `src/shared/interaction/menuKeyboardNavigation.ts`                                  | canonical | retired | p1-lane         | 1       | 2 → 2                    | 0 → 0                     |
-| `src/shared/lib/brandMark.ts`                                                       | canonical | retired | p1-lane         | 2       | 4 → 4                    | 0 → 0                     |
+| `src/shared/lib/brandMark.ts`                                                       | canonical | retired | p1-lane         | 2       | 3 → 3                    | 0 → 0                     |
 | `src/shared/lib/chartPrimitives.ts`                                                 | canonical | retired | p1-lane         | 15      | 12 → 12                  | 3 → 3                     |
 | `src/shared/lib/chartTimeRange.ts`                                                  | canonical | retired | p1-lane         | 7       | 3 → 3                    | 0 → 0                     |
 | `src/shared/lib/pageChrome.ts`                                                      | canonical | retired | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
@@ -60287,14 +60051,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/shared/query/queryDefaults.ts`                                                 | canonical | retired | p1-lane         | 5       | 16 → 16                  | 0 → 0                     |
 | `src/shared/query/taskResult.ts`                                                    | canonical | retired | p1-lane         | 5       | 8 → 8                    | 1 → 1                     |
 | `src/shared/query/userCreditsInvalidation.ts`                                       | canonical | retired | p1-lane         | 4       | 6 → 6                    | 0 → 0                     |
-| `src/shared/router/queryParams.ts`                                                  | canonical | retired | p1-lane         | 3       | 14 → 14                  | 1 → 1                     |
+| `src/shared/router/queryParams.ts`                                                  | canonical | retired | p1-lane         | 3       | 13 → 13                  | 1 → 1                     |
 | `src/shared/seo/routeSeo.ts`                                                        | canonical | retired | p1-lane         | 12      | 4 → 4                    | 0 → 0                     |
 | `src/shared/theme/appOverlayMenu.ts`                                                | canonical | retired | p1-lane         | 5       | 7 → 7                    | 0 → 0                     |
 | `src/shared/theme/composables/useTheme.ts`                                          | canonical | retired | p1-lane         | 4       | 7 → 7                    | 3 → 3                     |
 | `src/shared/theme/dialogMask.ts`                                                    | canonical | retired | p1-lane         | 1       | 6 → 6                    | 0 → 0                     |
 | `src/shared/theme/formControls.ts`                                                  | canonical | retired | p1-lane         | 4       | 10 → 10                  | 0 → 0                     |
 | `src/shared/theme/lightboxScrim.ts`                                                 | canonical | retired | p1-lane         | 3       | 3 → 3                    | 0 → 0                     |
-| `src/shared/utils/auth.ts`                                                          | canonical | retired | p1-lane         | 15      | 16 → 16                  | 4 → 4                     |
+| `src/shared/utils/auth.ts`                                                          | canonical | retired | p1-lane         | 15      | 15 → 15                  | 4 → 4                     |
 | `src/shared/utils/currency.ts`                                                      | canonical | retired | p1-lane         | 3       | 2 → 2                    | 2 → 2                     |
 | `src/shared/utils/dateTime.ts`                                                      | canonical | retired | p1-lane         | 5       | 6 → 6                    | 2 → 2                     |
 | `src/shared/utils/errorMessages.ts`                                                 | canonical | retired | p1-lane         | 4       | 11 → 11                  | 0 → 0                     |

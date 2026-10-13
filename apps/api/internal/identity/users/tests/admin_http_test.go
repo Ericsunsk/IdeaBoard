@@ -98,7 +98,7 @@ func (f *fakeAdminAuthManager) SetUserRole(_ context.Context, _ string, _ string
 	return nil
 }
 
-func (f *fakeAdminAuthManager) BanUser(_ context.Context, authUserID string, _ string, _ int) error {
+func (f *fakeAdminAuthManager) BanUser(_ context.Context, authUserID string, _ int) error {
 	f.bannedAuthUserID = authUserID
 	return f.banErr
 }
@@ -1139,7 +1139,7 @@ func TestAdminBanUserCommitsBusinessFirstWithSyncPending(t *testing.T) {
 		handler.BanUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+targetUser.PublicID.String()+"/ban", strings.NewReader(`{"reason":"abuse","expires_in_days":7}`))
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+targetUser.PublicID.String()+"/ban", strings.NewReader(`{"expires_in_days":7}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)

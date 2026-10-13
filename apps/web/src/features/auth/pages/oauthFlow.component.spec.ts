@@ -2,7 +2,6 @@ import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../test/toast'
-import AdminLoginPage from '../../admin/app/login/AdminLoginPage.vue'
 import LoginAuthPanel from '../components/LoginAuthPanel.vue'
 import UserAuthCallbackPage from './UserAuthCallbackPage.vue'
 
@@ -14,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
   routerReplace: vi.fn(),
   completeOAuthCallback: vi.fn(),
-  login: vi.fn(),
   logout: vi.fn(),
   getCapabilities: vi.fn(),
   signInWithOAuth: vi.fn(),
@@ -29,8 +27,6 @@ vi.mock('vue-router', () => ({
 
 vi.mock('../session/userSession', () => ({
   useUserStore: () => ({
-    isAdmin: false,
-    login: mocks.login,
     logout: mocks.logout,
     completeOAuthCallback: mocks.completeOAuthCallback,
   }),
@@ -54,19 +50,6 @@ vi.mock('../../../core/composables/useSiteBranding', () => ({
 
 vi.mock('../../../core/composables/useAppToast')
 
-vi.mock('../../admin/app/login/useAdminLoginFeedback', () => ({
-  useAdminLoginFeedback: () => ({
-    failed: vi.fn(),
-    nonAdminAccount: vi.fn(),
-    sessionRevokeFailed: vi.fn(),
-    succeeded: vi.fn(),
-  }),
-}))
-
-vi.mock('../../../core/composables/useLogoutRedirect', () => ({
-  useLogoutRedirect: () => ({ logoutAndRedirect: vi.fn() }),
-}))
-
 const ButtonStub = defineComponent({
   inheritAttrs: false,
   props: {
@@ -80,11 +63,6 @@ const ButtonStub = defineComponent({
       {{ label }}<slot />
     </button>
   `,
-})
-
-const CardStub = defineComponent({
-  template:
-    '<section><slot name="header" /><slot name="title" /><slot name="content" /><slot name="footer" /></section>',
 })
 
 const InputStub = defineComponent({
@@ -101,23 +79,6 @@ function renderLoginPanel() {
         Button: ButtonStub,
         InputText: InputStub,
         Password: InputStub,
-      },
-    },
-  })
-}
-
-function renderAdminLogin() {
-  return renderWithUser(AdminLoginPage, {
-    global: {
-      stubs: {
-        Button: ButtonStub,
-        Card: CardStub,
-        IconField: { template: '<div><slot /></div>' },
-        InputIcon: { template: '<span><slot /></span>' },
-        InputText: InputStub,
-        Password: InputStub,
-        RouterLink: { template: '<a><slot /></a>' },
-        SiteBrandLogo: true,
       },
     },
   })
@@ -187,13 +148,6 @@ describe('Social OAuth entry points', () => {
 
     expect(toast.error).toHaveBeenCalledOnce()
     expect(toast.success).not.toHaveBeenCalled()
-  })
-
-  it('does not expose Google login on Admin Login', () => {
-    renderAdminLogin()
-
-    expect(screen.queryByRole('button', { name: /Google/i })).not.toBeInTheDocument()
-    expect(mocks.getCapabilities).not.toHaveBeenCalled()
   })
 })
 

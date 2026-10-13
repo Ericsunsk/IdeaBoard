@@ -124,7 +124,7 @@ func TestCatalogCommandsPersistAppendOnlyAudit(t *testing.T) {
 		t.Fatalf("SetAvailability() error = %v", err)
 	}
 	rows, err := db.Query(ctx, `
-SELECT action_type, actor_id, reason, COALESCE(price_version_id, 0), metadata
+SELECT action_type, actor_id, COALESCE(price_version_id, 0), metadata
 FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	if err != nil {
 		t.Fatal(err)
@@ -133,24 +133,23 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	want := []struct {
 		action  string
 		actorID int64
-		reason  string
 		priceID int64
 	}{
-		{action: "create_price", actorID: 13, reason: "price published", priceID: price.PriceVersionID},
-		{action: "set_availability", actorID: 14, reason: "availability updated", priceID: price.PriceVersionID},
+		{action: "create_price", actorID: 13, priceID: price.PriceVersionID},
+		{action: "set_availability", actorID: 14, priceID: price.PriceVersionID},
 	}
 	for index, expected := range want {
 		if !rows.Next() {
 			t.Fatalf("audit row %d missing", index)
 		}
-		var action, reason string
+		var action string
 		var actorID, priceID int64
 		var metadata string
-		if err := rows.Scan(&action, &actorID, &reason, &priceID, &metadata); err != nil {
+		if err := rows.Scan(&action, &actorID, &priceID, &metadata); err != nil {
 			t.Fatal(err)
 		}
-		if action != expected.action || actorID != expected.actorID || reason != expected.reason || priceID != expected.priceID {
-			t.Fatalf("audit row %d = (%q,%d,%q,%d), want %+v", index, action, actorID, reason, priceID, expected)
+		if action != expected.action || actorID != expected.actorID || priceID != expected.priceID {
+			t.Fatalf("audit row %d = (%q,%d,%d), want %+v", index, action, actorID, priceID, expected)
 		}
 		if action == "create_price" && (!strings.Contains(metadata, `"old": null`) || !strings.Contains(metadata, `"new"`) || !strings.Contains(metadata, `"outcome": "published"`)) {
 			t.Fatalf("publish audit metadata = %s", metadata)
@@ -164,7 +163,7 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	}
 
 	for _, statement := range []string{
-		`UPDATE billing_admin_actions SET reason = 'tampered' WHERE sku = 'test:audit'`,
+		`UPDATE billing_admin_actions SET metadata = '{}'::jsonb WHERE sku = 'test:audit'`,
 		`DELETE FROM billing_admin_actions WHERE sku = 'test:audit'`,
 	} {
 		if _, err := db.Exec(ctx, statement); err == nil {

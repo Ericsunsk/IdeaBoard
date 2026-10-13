@@ -1,26 +1,9 @@
 package httpapi
 
-// Control task read model over workspace task stores (#809-close).
-//
-// The legacy task services were deleted with the #809 hard cut, so the
-// control task routes (list/detail/cancel) had no Tasks dep and failed
-// closed with 503. workspaceControlTaskAdapter implements
-// ControlTaskAdmin from the workspace-scoped task store plus a small set
-// of global control queries (see workspace_tasks.sql): operators see
-// every workspace (capability auth + audit stay in the guard), unknown
-// ids converge to not-found (never 403), and cancel records the
-// operator as actor with the guard-enforced reason while releasing any
-// credit hold through the settlement Service.
-//
-// Projection notes (documented for the merger/frontend):
-//   - Prompt/params come from the workflow_input envelope (best effort:
-//     params.prompt, else params.user_prompt, else empty).
-//   - Result has no column in the workspace schema and stays empty;
-//     outputs carry asset refs (no delivery URLs: media delivery is the
-//     media workstream's seam, never fabricated here).
-//   - LatestExecution stays nil (no lease snapshot in the workspace
-//     schema); execution attempts and metrics read live from
-//     task_execution_attempts / task_execution_metrics.
+// Control task reads and cancellation use workspace task stores plus global
+// control queries. Operators can access all workspaces through the guard.
+// Cancellation records the operator and system cause, and releases the credit
+// hold through the settlement Service.
 
 import (
 	"context"
@@ -205,7 +188,7 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 	}
 	if attempts, err := a.loadControlTaskAttempts(ctx, row.PublicID); err == nil {
 		detail.ExecutionAttempts = attempts
-		// Final-model projection (#852): LatestExecution points at the
+		// Final-model projection: LatestExecution points at the
 		// attempt owning the final model (terminal first), so the
 		// selected-vs-final distinction stays consistent in one read.
 		if final := tasksdomain.FinalAttempt(attempts); final != nil {
@@ -221,7 +204,7 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 		detail.ExecutionAttempts = []tasksdomain.AdminTaskAttempt{}
 	}
 	// Read-only routing projection over the pinned submit-time
-	// snapshot (#852, ADR-0012 rule 9). Missing or malformed snapshots
+	// snapshot. Missing or malformed snapshots
 	// degrade to nil (missing model data), never a failed detail read.
 	if routing, ok := tasksdomain.ParseAdminRoutingSnapshot(row.RoutingSnapshot); ok {
 		detail.Routing = routing
@@ -315,7 +298,7 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 			CreatedAt:       dbutil.TimeValue(row.CreatedAt),
 			CompletedAt:     completed,
 		}
-		// Read-only routing projection (#852): the monitor list
+		// Read-only routing projection: the monitor list
 		// records the requested Service + resolution, snapshot pool
 		// version, and selected model from the already-selected
 		// routing_snapshot bytes (no extra query per row).
@@ -347,7 +330,7 @@ func controlTaskListIDs(rows []dbsqlc.ListControlTasksRow) []string {
 }
 
 // loadControlTaskFinalModels attributes one page of tasks to their
-// resolved (final) model in a single query (#852): per task, the latest
+// resolved (final) model in a single query: per task, the latest
 // terminal attempt carrying a model wins, falling back to the latest
 // attempt of any status so in-flight tasks still attribute. Read-only
 // projection over attempt facts; task and billing state untouched.
@@ -423,11 +406,11 @@ func (a *workspaceControlTaskAdapter) ResolveAdminTaskUserID(ctx context.Context
 // publication is gated on a nil error. A terminal replay (already=true)
 // stages nothing, so an idempotent re-cancel announces nothing.
 //
-// On the guard-owned (ambient) transaction (#889) the announcement is
+// On the guard-owned (ambient) transaction the announcement is
 // additionally deferred: it registers as a post-commit hook and runs
 // only after the guard commits, so an audit or commit failure discards
 // it instead of announcing a rolled-back flip.
-func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskID string, adminID int64, reason string) error {
+func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskID string, adminID int64) error {
 	q := a.queries()
 	if q == nil || a.store == nil {
 		return workspacetasks.ErrNotFound
@@ -437,10 +420,7 @@ func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskI
 	if err != nil {
 		return workspacetasks.ErrNotFound
 	}
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		reason = "cancelled"
-	}
+	const reason = "cancelled"
 	settler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		TaskRead: a.store, TaskLifecycle: a.store,
 		TaskBilling: a.store, Holder: a.holder,
@@ -451,7 +431,7 @@ func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskI
 		settlementState = cancelled.BillingSnapshot.SettlementState
 		holdTransactionID = cancelled.BillingSnapshot.HoldTransactionID
 	}
-	// #889: on the guard-owned (ambient) transaction the flip has not
+	// On the guard-owned transaction the flip has not
 	// committed yet — it commits with the audit row at the guard. Defer
 	// the announcement to the post-commit hooks instead of publishing a
 	// fact the guard can still roll back; an audit or commit failure

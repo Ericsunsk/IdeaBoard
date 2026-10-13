@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ADMIN_LOGIN_PATH, ADMIN_ROOT_PATH, isPathUnderRoute } from './routePaths'
+import { ADMIN_ROOT_PATH, isPathUnderRoute } from './routePaths'
 import { USER_LOGIN_PATH } from '../workspace/routePaths'
 
 describe('isPathUnderRoute', () => {
@@ -24,7 +24,6 @@ describe('isPathUnderRoute', () => {
 
   it('matches auth login child paths without accepting prefix spoofs', () => {
     expect(isPathUnderRoute('/user/login/callback', USER_LOGIN_PATH)).toBe(true)
-    expect(isPathUnderRoute('/admin/login/session', ADMIN_LOGIN_PATH)).toBe(true)
     expect(isPathUnderRoute('/user/loginish', USER_LOGIN_PATH)).toBe(false)
   })
 })

@@ -85,7 +85,7 @@ func controlTransition(workspace, taskID string, actorPublicID uuid.UUID) httpap
 		WorkspaceID: workspace,
 		TaskID:      taskID,
 		Status:      "cancelled",
-		Reason:      "operator cancelled for abuse",
+		Reason:      "cancelled",
 		ActorUserID: tenancy.FormatUserPublicID(actorPublicID),
 	}
 }
@@ -142,9 +142,8 @@ func TestControlTaskEventAdapterDeliversBothChannelsOnce(t *testing.T) {
 	}
 }
 
-// TestControlTaskEventAdapterEnvelopeCarriesCancelReason pins the operator
-// reason onto the workspace payload: a subscriber must be able to tell WHY
-// the platform cancelled its task.
+// TestControlTaskEventAdapterEnvelopeCarriesCancelReason preserves the task
+// cancellation cause in the workspace payload.
 func TestControlTaskEventAdapterEnvelopeCarriesCancelReason(t *testing.T) {
 	_, webhooks, enqueuer, workspace := controlAdapterFixture(t)
 	adapter := newControlTaskEventAdapter(nil, events.NewWorkspaceEventLog(), nil, webhooks)
@@ -161,8 +160,8 @@ func TestControlTaskEventAdapterEnvelopeCarriesCancelReason(t *testing.T) {
 	if err := events.ValidateV1Envelope(envelope); err != nil {
 		t.Fatalf("emitted envelope must validate: %v", err)
 	}
-	if got := string(envelope.Data); !containsAll(got, taskID, "operator cancelled for abuse") {
-		t.Fatalf("envelope data = %s, want the task id and the operator reason", got)
+	if got := string(envelope.Data); !containsAll(got, taskID, "cancelled") {
+		t.Fatalf("envelope data = %s, want the task id and the cancellation cause", got)
 	}
 }
 

@@ -176,7 +176,6 @@
   --primitive-red-550: #e23a3a;
   --primitive-shadow-22-58-soft: 0 22px 58px rgba(0, 0, 0, 0.12);
   --primitive-shadow-10-24: 0 10px 24px rgba(0, 0, 0, 0.1);
-  --primitive-shadow-24-70-slate: 0 24px 70px rgba(45, 64, 89, 0.12);
   --primitive-shadow-22-58-strong: 0 22px 58px rgba(0, 0, 0, 0.65);
   --primitive-shadow-14-34-outline:
     0 14px 34px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
@@ -241,7 +240,6 @@
   --primitive-size-340: 340px;
   --primitive-width-38rem-fluid: min(38rem, calc(100vw - 1rem));
   --primitive-size-260: 260px;
-  --primitive-width-420-fluid: min(420px, 100%);
 
   /*
  Physical alpha recipes keep sRGB channels and opacity without runtime color mixing.

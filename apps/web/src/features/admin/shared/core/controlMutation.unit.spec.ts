@@ -1,35 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildControlMutationHeaders,
-  buildRoutineControlMutationHeaders,
   mapControlError,
   readControlErrorCode,
-  requireOperatorReason,
 } from './controlMutation'
 
 describe('control mutation helpers', () => {
-  it('trims operator reasons and rejects blank values with a machine code', () => {
-    expect(requireOperatorReason('  reviewed by support  ')).toBe('reviewed by support')
-    expect(() => requireOperatorReason('  ')).toThrowError(
-      expect.objectContaining({ code: 'control_reason_required' }),
-    )
-  })
-
   it('builds stable Control headers with an explicit or resource default key', () => {
     expect(
-      buildControlMutationHeaders(
-        { operatorReason: ' reviewed ', idempotencyKey: 'retry-key' },
-        'resource-key',
-      ),
+      buildControlMutationHeaders({ idempotencyKey: 'retry-key' }, 'resource-key'),
     ).toMatchObject({
       'Idempotency-Key': 'retry-key',
-      'X-Operator-Reason': 'reviewed',
     })
-    expect(
-      buildControlMutationHeaders({ operatorReason: 'reviewed' }, 'resource-key'),
-    ).toMatchObject({
+    expect(buildControlMutationHeaders({}, 'resource-key')).toMatchObject({
       'Idempotency-Key': 'resource-key',
-      'X-Operator-Reason': 'reviewed',
     })
   })
 
@@ -39,28 +23,17 @@ describe('control mutation helpers', () => {
     expect(readControlErrorCode(new Error('transport'))).toBeUndefined()
   })
 
-  it('allows blank routine reasons while retaining explicit reasons and retry keys', () => {
-    const blank = buildRoutineControlMutationHeaders({ operatorReason: '  ' }, 'resource-key')
-    expect(blank).toMatchObject({ 'Idempotency-Key': 'resource-key' })
-    expect(blank).not.toHaveProperty('X-Operator-Reason')
-
-    const explicit = buildRoutineControlMutationHeaders(
-      { operatorReason: ' reviewed ', idempotencyKey: 'retry-key' },
-      'resource-key',
-    )
-    expect(explicit).toMatchObject({
-      'Idempotency-Key': 'retry-key',
-      'X-Operator-Reason': 'reviewed',
+  it('generates distinct request and idempotency keys for new mutations', () => {
+    const first = buildControlMutationHeaders()
+    const second = buildControlMutationHeaders()
+    expect(first).toEqual({
+      'Request-Id': expect.any(String),
+      'Idempotency-Key': expect.any(String),
     })
-    expect(explicit['Request-Id']).toBeTruthy()
-    expect(explicit['Request-Id']).not.toBe(blank['Request-Id'])
-    const first = buildRoutineControlMutationHeaders()
-    const second = buildRoutineControlMutationHeaders()
+    expect(first['Request-Id']).toBeTruthy()
+    expect(first['Request-Id']).not.toBe(second['Request-Id'])
     expect(first['Idempotency-Key']).toBeTruthy()
     expect(first['Idempotency-Key']).not.toBe(second['Idempotency-Key'])
-    expect(() => buildControlMutationHeaders({ operatorReason: '  ' })).toThrowError(
-      expect.objectContaining({ code: 'control_reason_required' }),
-    )
   })
 
   it('maps domain-owned copy while preserving the request id', () => {

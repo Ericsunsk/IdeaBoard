@@ -81,7 +81,6 @@ func controlAtomicParams(operatorNumeric int64, requestID string) audit.RecordPa
 		Capability:     "control:users",
 		TargetType:     "route",
 		TargetID:       "POST /users/{user_id}/ban",
-		Reason:         "abuse",
 		Outcome:        audit.OutcomeSuccess,
 		RequestID:      requestID,
 		IdempotencyKey: "atomic-key-1",

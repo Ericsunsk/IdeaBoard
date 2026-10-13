@@ -15,24 +15,11 @@ import { requireContractData } from '../../../../../api/contractKernel'
 import { controlCreditIdempotencyKey } from '../../../../../api/idempotencyKey'
 import {
   buildControlMutationHeaders,
-  buildRoutineControlMutationHeaders,
   createControlError,
-  requireOperatorReason,
   withControlCopy,
   type ControlMutationOptions,
 } from '../../../shared'
 
-// Admin reward code boundary (W2 transports). Search/create/update/
-// enable/delete ride the Control Plane reward-code operations
-// (`/api/control/v1/rewards/codes*`) with the unified contract envelope
-// (`{ data }` success / `{ error: { code, message, request_id } }`
-// errors). Update and enable/disable are routine config writes (backend
-// ReasonOptional): no confirm dialog, the audit records an empty reason.
-// Create and delete keep their confirm dialogs with a required reason.
-// Every mutation carries a header-only Idempotency-Key. The deleted
-// `/api/admin/rewards/codes/*` routes are gone; this module is the single
-// transport. View types and normalizers keep their shapes so the UI and
-// specs keep working.
 const REWARD_CODE_CONTROL_MESSAGES = {
   forbidden: '权限不足，无法操作兑换码',
   403: '权限不足，无法操作兑换码',
@@ -130,21 +117,18 @@ type RewardCodeMutationOptions = ControlMutationOptions
 
 export type AdminRewardCodeResource = {
   search: (input: SearchRewardCodesInput) => Promise<RewardCodePage>
-  create: (
-    input: CreateRewardCodeInput,
-    options: RewardCodeMutationOptions,
-  ) => Promise<CreatedRewardCode>
+  create: (input: CreateRewardCodeInput) => Promise<CreatedRewardCode>
   update: (
     id: number,
     input: UpdateRewardCodeInput,
-    options: RewardCodeMutationOptions,
+    options?: RewardCodeMutationOptions,
   ) => Promise<UpdatedRewardCode>
   setEnabled: (
     id: number,
     enabled: boolean,
-    options: RewardCodeMutationOptions,
+    options?: RewardCodeMutationOptions,
   ) => Promise<RewardCode>
-  delete: (id: number, options: RewardCodeMutationOptions) => Promise<void>
+  delete: (id: number, options?: RewardCodeMutationOptions) => Promise<void>
 }
 
 export function createAdminRewardCodeResource(): AdminRewardCodeResource {
@@ -183,11 +167,7 @@ async function searchRewardCodes(input: SearchRewardCodesInput): Promise<RewardC
   return result
 }
 
-async function createRewardCode(
-  input: CreateRewardCodeInput,
-  options: RewardCodeMutationOptions,
-): Promise<CreatedRewardCode> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
+async function createRewardCode(input: CreateRewardCodeInput): Promise<CreatedRewardCode> {
   const idempotencyKey = requireRewardIdempotencyKey(input.idempotencyKey)
   requireUnexpiredRewardExpiry(input.expiresAt)
   let body: unknown
@@ -199,9 +179,8 @@ async function createRewardCode(
         credit_amount: input.creditAmount,
         max_redemptions: input.maxRedemptions,
         expires_at: input.expiresAt,
-        reason: operatorReason,
       },
-      { headers: buildControlMutationHeaders({ operatorReason, idempotencyKey }) },
+      { headers: buildControlMutationHeaders({ idempotencyKey }) },
     )
   } catch (error) {
     throw withControlCopy(error, '创建兑换码失败', REWARD_CODE_CONTROL_MESSAGES)
@@ -220,11 +199,8 @@ async function createRewardCode(
 async function updateRewardCode(
   id: number,
   input: UpdateRewardCodeInput,
-  options: RewardCodeMutationOptions,
+  options?: RewardCodeMutationOptions,
 ): Promise<UpdatedRewardCode> {
-  // Routine config write (backend ReasonOptional): the reason may be empty
-  // (audit records it as-is) while Idempotency-Key stays required.
-  const operatorReason = options.operatorReason.trim()
   requireUnexpiredRewardExpiry(input.expiresAt)
   let body: unknown
   try {
@@ -234,20 +210,15 @@ async function updateRewardCode(
       max_redemptions: number
       expires_at: string
       code?: string
-      reason: string
     } = {
       display_name: input.displayName.trim(),
       credit_amount: input.creditAmount,
       max_redemptions: input.maxRedemptions,
       expires_at: input.expiresAt,
-      reason: operatorReason,
     }
     if (input.code) payload.code = input.code
     body = await updateControlRewardCode(id, payload, {
-      headers: buildRoutineControlMutationHeaders(
-        options,
-        controlCreditIdempotencyKey('reward-update'),
-      ),
+      headers: buildControlMutationHeaders(options, controlCreditIdempotencyKey('reward-update')),
     })
   } catch (error) {
     throw withControlCopy(error, '更新兑换码失败', REWARD_CODE_CONTROL_MESSAGES)
@@ -263,18 +234,15 @@ async function updateRewardCode(
 async function setRewardCodeEnabled(
   id: number,
   enabled: boolean,
-  options: RewardCodeMutationOptions,
+  options?: RewardCodeMutationOptions,
 ): Promise<RewardCode> {
-  // Routine config write (backend ReasonOptional): the reason may be empty
-  // (audit records it as-is) while Idempotency-Key stays required.
-  const operatorReason = options.operatorReason.trim()
   let body: unknown
   try {
     body = await setControlRewardCodeEnabled(
       id,
-      { enabled, reason: operatorReason },
+      { enabled },
       {
-        headers: buildRoutineControlMutationHeaders(
+        headers: buildControlMutationHeaders(
           options,
           controlCreditIdempotencyKey('reward-enabled'),
         ),
@@ -292,14 +260,12 @@ async function setRewardCodeEnabled(
   )
 }
 
-async function deleteRewardCode(id: number, options: RewardCodeMutationOptions): Promise<void> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
-  if (options.idempotencyKey != null) requireRewardIdempotencyKey(options.idempotencyKey)
+async function deleteRewardCode(id: number, options?: RewardCodeMutationOptions): Promise<void> {
+  if (options?.idempotencyKey != null) requireRewardIdempotencyKey(options?.idempotencyKey)
   try {
     const body = await deleteControlRewardCode(id, {
       headers: buildControlMutationHeaders({
-        operatorReason,
-        idempotencyKey: options.idempotencyKey ?? controlCreditIdempotencyKey('reward-delete'),
+        idempotencyKey: options?.idempotencyKey ?? controlCreditIdempotencyKey('reward-delete'),
       }),
     })
     // Delete resolves `{ data: <ControlDeletedRewardCode> }`; acknowledgement

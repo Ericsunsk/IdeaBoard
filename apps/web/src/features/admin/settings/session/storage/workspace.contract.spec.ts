@@ -71,18 +71,15 @@ describe('admin storage workspace facade', () => {
       await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, enabled)
 
       expect(confirm.confirm).not.toHaveBeenCalled()
-      expect(mockResource.saveProfile).toHaveBeenCalledWith(
-        {
-          id: 'profile-1',
-          payload: {
-            name: '对象存储',
-            provider: 's3-compatible',
-            enabled,
-            config: { bucket_name: 'images' },
-          },
+      expect(mockResource.saveProfile).toHaveBeenCalledWith({
+        id: 'profile-1',
+        payload: {
+          name: '对象存储',
+          provider: 's3-compatible',
+          enabled,
+          config: { bucket_name: 'images' },
         },
-        { operatorReason: '' },
-      )
+      })
       expect(feedback.saveDraftSucceeded).toHaveBeenCalledWith('saved')
       expect(workspace.toggle.isPending('profile-1')).toBe(false)
       // 服务端已追上：覆盖已 reconcile，不再遮挡。
@@ -330,10 +327,7 @@ describe('admin storage workspace facade', () => {
       },
     })
 
-    expect(mockResource.saveProfile).toHaveBeenCalledWith(
-      { payload: makePayload() },
-      { operatorReason: '' },
-    )
+    expect(mockResource.saveProfile).toHaveBeenCalledWith({ payload: makePayload() })
     expect(feedback.refreshFailed).toHaveBeenCalledWith(refreshError)
     expect(workspace.storages.value[0]?.config.secret_access_key).toBe('')
   })
@@ -366,9 +360,7 @@ describe('admin storage workspace facade', () => {
     expect(confirm.confirm).not.toHaveBeenCalled()
     // 探针 reason 对齐 routine 空 reason（后端 POST read-guard 非 Mutation，
     // 无需 reason/Idempotency 仪式，审计记空 reason）。
-    expect(mockResource.testProfile).toHaveBeenCalledWith('profile-1', {
-      operatorReason: '',
-    })
+    expect(mockResource.testProfile).toHaveBeenCalledWith('profile-1')
   })
 
   it('keeps delete confirmation and refresh sequencing inside the workspace', async () => {
@@ -380,16 +372,13 @@ describe('admin storage workspace facade', () => {
     expect(confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '确认删除存储',
-        message: '确定删除存储「对象存储」吗？此操作不可恢复，且将记录操作人与原因。',
+        message: '确定删除存储「对象存储」吗？此操作不可恢复，且将记录操作人。',
         confirmLabel: '确定删除',
         intent: 'danger',
-        reason: { isRequired: true },
       }),
     )
 
-    expect(mockResource.deleteProfile).toHaveBeenCalledWith('profile-1', {
-      operatorReason: 'storage review',
-    })
+    expect(mockResource.deleteProfile).toHaveBeenCalledWith('profile-1')
     expect(feedback.profileDeleted).toHaveBeenCalledWith('deleted')
     expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(2)
   })
@@ -399,7 +388,6 @@ function createWorkspace() {
   const feedback = createStorageFeedback()
   const confirm = {
     confirm: vi.fn().mockResolvedValue(true),
-    readReason: vi.fn().mockReturnValue('storage review'),
   }
   const { runAsyncAction } = useAsyncAction()
   const workspace = createAdminStorageWorkspace({

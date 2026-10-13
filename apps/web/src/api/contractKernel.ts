@@ -223,14 +223,10 @@ export function newRequestId(): string {
 export function buildContractRequestHeaders(options?: {
   requestId?: string | undefined
   idempotencyKey?: string | undefined
-  // Control Plane operator note (issue #808): X-Operator-Reason carries
-  // the reason for high-risk mutations whose bodies have no reason field.
-  operatorReason?: string | undefined
 }): Record<string, string> {
   const headers: Record<string, string> = {}
   if (options?.requestId) headers['Request-Id'] = options.requestId
   if (options?.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
-  if (options?.operatorReason) headers['X-Operator-Reason'] = options.operatorReason
   return headers
 }
 

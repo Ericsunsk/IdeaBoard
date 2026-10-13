@@ -4,19 +4,11 @@ import {
 } from '../../../../../api/generated-query/control/control-payments/control-payments'
 import type { ControlStripeConfigRequest } from '../../../../../api/generated-query/control/model/controlStripeConfigRequest'
 import { requireContractData } from '../../../../../api/contractKernel'
-import { buildRoutineControlMutationHeaders } from '../../../shared/index'
+import { buildControlMutationHeaders } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'
 import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './types'
 
-// Admin Stripe settings boundary (W2 transports). Reads and writes go
-// through the Control Plane payment operations with the contract envelope
-// (`{data}` over the same configuration summary). Writes are routine config
-// writes (backend ReasonOptional): they skip the operator-reason ceremony
-// and audit an empty reason (mirrored into the body `reason` field) while
-// keeping a header-only Idempotency-Key. The deleted
-// `/api/admin/payments/stripe-config` route is gone; this module is the
-// single transport.
 /** @externalContract Control Plane Stripe configuration response. */
 export type ApiStripeConfigurationSummary = {
   configured: boolean
@@ -41,9 +33,6 @@ export function createAdminStripeSettingsResource(): AdminStripeSettingsResource
         map: normalizeStripeConfiguration,
       }),
     save: async (input, mutation) => {
-      // Routine config write (backend ReasonOptional): the reason may be
-      // empty (audit records it as-is) while Idempotency-Key stays required.
-      const reason = mutation.operatorReason.trim()
       try {
         const data = requireContractData<ApiStripeConfigurationSummary>(
           await updateControlStripeConfig(
@@ -53,10 +42,9 @@ export function createAdminStripeSettingsResource(): AdminStripeSettingsResource
               payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
               product_tax_code: input.productTaxCode.trim(),
               purchases_enabled: input.isPurchasesEnabled,
-              reason,
             } as ControlStripeConfigRequest,
             {
-              headers: buildRoutineControlMutationHeaders(mutation),
+              headers: buildControlMutationHeaders(mutation),
             },
           ),
           '保存 Stripe 设置失败',

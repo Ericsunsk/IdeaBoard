@@ -92,7 +92,7 @@ export const SETTINGS_MESSAGES = {
   mailDangerZoneTitle: 'Danger Zone',
   mailDangerZoneDescription: '删除邮件发送配置后事务邮件将不可用，且不可撤销。',
   mailDeleteTitle: '删除邮件配置',
-  mailDeleteMessage: '确定删除邮件发送配置吗？删除后事务邮件将不可用。该操作将记录操作人与原因。',
+  mailDeleteMessage: '确定删除邮件发送配置吗？删除后事务邮件将不可用。该操作将记录操作人。',
   mailFromNameRequired: '发件人名称不能为空',
   mailFromEmailInvalid: '请输入有效的发件人 Email',
   mailApiKeyRequired: '请输入邮件服务商 API Key',

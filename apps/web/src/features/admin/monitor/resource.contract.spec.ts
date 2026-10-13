@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ControlAckEnvelope } from '../../../api/generated-query/control/model'
 import * as monitorResource from './resource'
 import {
   ADMIN_MONITOR_QUERY_KEY,
@@ -11,7 +12,6 @@ import {
   getAdminTaskListQueryKey,
   getAdminMonitorQueryKey,
 } from './resource'
-import { ADMIN_CONTROL_UNAVAILABLE_CODE } from '../shared'
 
 const transport = vi.hoisted(() => ({
   request: vi.fn(),
@@ -21,9 +21,6 @@ vi.mock('../../../api/client', () => ({
   api: { request: transport.request },
 }))
 
-// Task list/detail ride the live Control task read model (#852); only
-// task cancellation still fails closed with guidance (mutations need an
-// operator reason the monitor UI does not collect).
 describe('task monitor resource', () => {
   beforeEach(() => {
     transport.request.mockClear()
@@ -152,10 +149,29 @@ describe('task monitor resource', () => {
     expect(detail.execution_attempts[1]?.retry_layer).toBe('model_fallback')
   })
 
-  it('fails task cancellation closed with guidance and no transport call', async () => {
+  it('cancels tasks through Control with request and idempotency headers', async () => {
+    const response: ControlAckEnvelope = { data: { ok: true } }
+    transport.request.mockResolvedValue(response)
+
+    await cancelAdminTaskByID('task-a')
+
+    expect(transport.request).toHaveBeenCalledWith(
+      '/control/v1/tasks/task-a/cancel',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Request-Id': expect.any(String),
+          'Idempotency-Key': expect.any(String),
+        }),
+      }),
+    )
+  })
+
+  it('rejects a cancellation response without contract data', async () => {
+    transport.request.mockResolvedValue({})
+
     await expect(cancelAdminTaskByID('task-a')).rejects.toMatchObject({
-      code: ADMIN_CONTROL_UNAVAILABLE_CODE,
+      code: 'malformed_envelope',
     })
-    expect(transport.request).not.toHaveBeenCalled()
   })
 })

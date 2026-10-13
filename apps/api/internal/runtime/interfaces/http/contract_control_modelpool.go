@@ -1,9 +1,9 @@
 package httpapi
 
-// Control Model Pool family (issue #849): per-Service Model Pool reads
+// Control Model Pool family: per-Service Model Pool reads
 // and atomic replaces behind control:billing.
 //
-// The pool is the relational Service Model Pool contract from #853/#848
+// The pool is the relational Service Model Pool contract
 // (internal/generation/catalog): one Service owns an unordered set of
 // {model, enabled, supported_resolutions} entries plus a monotonic
 // pool version pinned into routing snapshots. This surface extends the
@@ -72,10 +72,6 @@ type controlReplaceModelPoolRequest struct {
 		Enabled     bool     `json:"enabled"`
 		Resolutions []string `json:"resolutions"`
 	} `json:"entries"`
-	// Reason rides the operator-note convention (header wins; the guard
-	// extracts and audits it centrally). Accepted here only so strict
-	// decoding does not 400 the documented shape.
-	Reason *string `json:"reason,omitempty"`
 }
 
 // serviceOfControlPoolSKU maps a billing SKU to its Service slug. Only

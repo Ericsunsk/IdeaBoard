@@ -6,7 +6,6 @@ import type { MailConfigSummary } from '../../../session/mail/types'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('test reason'))
 
 vi.mock('../../../../shared/session/feedback/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../shared/session/feedback/toast')>()),
@@ -14,7 +13,7 @@ vi.mock('../../../../shared/session/feedback/toast', async (importOriginal) => (
 }))
 
 vi.mock('../../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
+  useAdminConfirm: () => ({ confirm: confirmMock }),
 }))
 
 const summary: MailConfigSummary = {
@@ -49,7 +48,6 @@ describe('AdminMailConfigCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     confirmMock.mockResolvedValue(true)
-    readReasonMock.mockReturnValue('test reason')
     vi.mocked(resource.get).mockResolvedValue(summary)
     vi.mocked(resource.update).mockImplementation(async (input) => ({
       ...summary,
@@ -106,15 +104,12 @@ describe('AdminMailConfigCard', () => {
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() =>
-      expect(resource.update).toHaveBeenCalledWith(
-        {
-          from_name: 'IdeaBoard Ops',
-          from_email: 'noreply@example.com',
-          reply_to: 'support@example.com',
-          enabled: true,
-        },
-        { operatorReason: '' },
-      ),
+      expect(resource.update).toHaveBeenCalledWith({
+        from_name: 'IdeaBoard Ops',
+        from_email: 'noreply@example.com',
+        reply_to: 'support@example.com',
+        enabled: true,
+      }),
     )
     expect(confirmMock).not.toHaveBeenCalled()
     expect((screen.getByLabelText('邮件服务商 API Key') as HTMLInputElement).value).toBe('')
@@ -128,11 +123,7 @@ describe('AdminMailConfigCard', () => {
     await user.type(screen.getByLabelText('测试收件地址'), 'ops@example.com')
     await user.click(screen.getByRole('button', { name: '发送 Test Email' }))
 
-    await waitFor(() =>
-      expect(resource.test).toHaveBeenCalledWith('ops@example.com', {
-        operatorReason: '',
-      }),
-    )
+    await waitFor(() => expect(resource.test).toHaveBeenCalledWith('ops@example.com'))
     expect(confirmMock).not.toHaveBeenCalled()
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(2))
     expect(toast.success).toHaveBeenCalledWith('Test Email 已发送')
@@ -201,15 +192,12 @@ describe('AdminMailConfigCard', () => {
     await user.click(toggle)
 
     await waitFor(() =>
-      expect(resource.update).toHaveBeenCalledWith(
-        {
-          from_name: 'IdeaBoard',
-          from_email: 'noreply@example.com',
-          reply_to: 'support@example.com',
-          enabled: false,
-        },
-        { operatorReason: '' },
-      ),
+      expect(resource.update).toHaveBeenCalledWith({
+        from_name: 'IdeaBoard',
+        from_email: 'noreply@example.com',
+        reply_to: 'support@example.com',
+        enabled: false,
+      }),
     )
     expect(confirmMock).not.toHaveBeenCalled()
     // 乐观 intent 同 tick 翻转：同一节点即时 unchecked + disabled。
@@ -247,15 +235,12 @@ describe('AdminMailConfigCard', () => {
       await user.click(toggle)
 
       await waitFor(() =>
-        expect(resource.update).toHaveBeenCalledWith(
-          {
-            from_name: summary.from_name,
-            from_email: summary.from_email,
-            reply_to: summary.reply_to,
-            enabled: !initialEnabled,
-          },
-          { operatorReason: '' },
-        ),
+        expect(resource.update).toHaveBeenCalledWith({
+          from_name: summary.from_name,
+          from_email: summary.from_email,
+          reply_to: summary.reply_to,
+          enabled: !initialEnabled,
+        }),
       )
       await waitFor(() => expect(toggle).toBeEnabled())
       expect(toggle).toHaveAttribute('aria-checked', String(!initialEnabled))
@@ -269,16 +254,13 @@ describe('AdminMailConfigCard', () => {
       await user.click(screen.getByRole('button', { name: '保存' }))
 
       await waitFor(() =>
-        expect(resource.update).toHaveBeenLastCalledWith(
-          {
-            from_name: 'Draft Sender',
-            from_email: 'draft@example.com',
-            reply_to: 'draft-support@example.com',
-            api_key: 'draft-api-key',
-            enabled: !initialEnabled,
-          },
-          { operatorReason: '' },
-        ),
+        expect(resource.update).toHaveBeenLastCalledWith({
+          from_name: 'Draft Sender',
+          from_email: 'draft@example.com',
+          reply_to: 'draft-support@example.com',
+          api_key: 'draft-api-key',
+          enabled: !initialEnabled,
+        }),
       )
       await waitFor(() => expect(apiKey).toHaveValue(''))
     },
@@ -353,9 +335,7 @@ describe('AdminMailConfigCard', () => {
     const deleteButton = within(dangerZone).getByRole('button', { name: '删除配置' })
     await user.click(deleteButton)
 
-    await waitFor(() =>
-      expect(resource.clear).toHaveBeenCalledWith({ operatorReason: 'test reason' }),
-    )
+    await waitFor(() => expect(resource.clear).toHaveBeenCalledWith())
     expect(confirmMock).toHaveBeenCalledOnce()
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(2))
     expect(toast.success).toHaveBeenCalledWith('邮件配置已删除')

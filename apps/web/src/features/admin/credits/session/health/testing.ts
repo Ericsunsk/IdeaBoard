@@ -93,7 +93,7 @@ export function createCreditHealthHandlers(state: CreditHealthMswState): HttpHan
       return HttpResponse.json({ data: state.getHealth() })
     }),
     http.post('/api/control/v1/credits/reconciliation/runs', async ({ request }) => {
-      state.startRequests.push(await request.json())
+      state.startRequests.push(await request.text())
       const activeRun = makeReconciliationRun({
         id: state.nextRunId,
         status: 'queued',

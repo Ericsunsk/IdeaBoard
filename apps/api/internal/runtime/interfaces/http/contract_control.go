@@ -1,53 +1,24 @@
 package httpapi
 
-// Control Plane HTTP kernel (issue #808, backend slice).
+// Control Plane HTTP kernel under /api/control/v1.
 //
-// Additive only: this file and its control_* siblings mount a SEPARATE
-// middleware chain and route group under /api/control/v1. Legacy
-// /api/admin/* routes were removed in #809 (hard cut); their handler
-// methods are reused under the control guard (dedicated control handlers
-// plus controlProxy adapters).
+// Guarantees:
+//   - Auth: admin-only human sessions or internal workers; service accounts,
+//     API keys, and OAuth apps never pass.
+//   - Rate limits: a dedicated fixed-window bucket per operator.
+//   - Audit: every guarded call records its operator, target, operation,
+//     request identity, outcome, and timestamp outside the public event registry.
+//   - Idempotency: mutations require a header-only Idempotency-Key. Durable
+//     scope is operator/operation/target/key; matching requests replay their
+//     first successful response, while different requests conflict before
+//     side effects. The process-local store is only a fast path.
+//   - Envelope: dedicated handlers and platform-config adapters produce the
+//     same contract envelope. Binary logo downloads and monitor SSE use their
+//     own protocols. Validation and provider side effects belong to domain seams.
 //
-// Separation guarantees (Baseline 2.2):
-//   - Auth: same session transport as Public, but authorization is
-//     admin-only (admin business role on a human session or an internal
-//     worker; service accounts, API keys, and OAuth apps never pass).
-//     Production sessions mint no control capabilities at login, so the
-//     family capability strings below are audit labels only.
-//   - Rate limits: a dedicated fixed-window bucket per operator, separate
-//     from Public limits, rendered via contract.SetRateLimit.
-//   - Audit: EVERY guarded route emits a ControlAuditRecord (operator,
-//     target, capability, request_id, idempotency key, reason, outcome,
-//     timestamp) to structured slog plus an optional in-memory sink for
-//     tests. Control audit records NEVER enter the public event registry
-//     (no event-bus import anywhere under these files; guarded by
-//     TestV1RegistryExcludesControl and by construction).
-//   - Idempotency: header-only Idempotency-Key on ALL mutating control
-//     routes (no body-key fallback). The durable scope is
-//     operator/operation/target/key with a canonical request hash
-//     (see contract_control_idempotency.go): same key + same request
-//     replays the first 2xx result (cross-process, restart-safe), same
-//     key + different request is a 409 before any side effect runs.
-//     The shared contract IdempotencyStore is the same-process fast
-//     path only.
-//   - Envelope: dedicated handlers render the contract success/error
-//     envelope with Request-Id. The small set of platform-config
-//     families (ai-gateway, storage, search providers, feature prompts,
-//     monitor, brand-logo overrides, rewards) reuses the legacy admin
-//     handler methods under the control guard so validation and provider
-//     side effects stay single-sourced; the control-facing render layer
-//     translates every proxied response into the contract envelope at
-//     the boundary (parent #809; binary brand-logo and the SSE monitor
-//     stream stay raw protocol exceptions). Auth, audit, idempotency,
-//     and reason guarantees hold uniformly via the guard either way.
-//
-// Persistence: every guarded call is emitted as structured slog and is
-// persisted to the append-only control_audit_records sink. High-risk
-// mutations also leave their durable domain fact carrying actor + reason
-// (credits ledger command metadata, identity admin command actor, tenancy
-// membership actor, settings outbound-policy actor, and gateway/catalog
-// actor ids). The audit sink is an observation record; domain tables remain
-// the source of truth for business state.
+// Every call is logged and persisted to control_audit_records. High-risk
+// mutations also record their actor in durable domain facts. Domain tables
+// remain the source of truth for business state.
 
 import (
 	"bytes"
@@ -92,31 +63,8 @@ const (
 	ControlAuditFailed = audit.OutcomeFailure
 )
 
-// OperatorReasonHeader carries the operator note for mutating control
-// routes that reuse legacy handlers whose bodies have no reason field.
-// Dedicated control handlers also accept reason/operator_note JSON body
-// fields; the header is the uniform fallback either way.
-const OperatorReasonHeader = "X-Operator-Reason"
-
-const controlReasonContextKey = "control.operator_reason"
-
-func setControlReason(c *gin.Context, reason string) {
-	if c != nil {
-		c.Set(controlReasonContextKey, strings.TrimSpace(reason))
-	}
-}
-
-func controlReasonFromContext(c *gin.Context) string {
-	if c == nil {
-		return ""
-	}
-	raw, _ := c.Get(controlReasonContextKey)
-	reason, _ := raw.(string)
-	return strings.TrimSpace(reason)
-}
-
 // maxControlBodyBytes bounds control request bodies buffered by the guard
-// for reason extraction and idempotency hashing. Control payloads are
+// for idempotency hashing. Control payloads are
 // small operator JSON documents; larger uploads never belong here.
 const maxControlBodyBytes = 64 << 10
 
@@ -133,7 +81,6 @@ type ControlAuditRecord struct {
 	Route          string        `json:"route"`
 	RequestID      string        `json:"request_id"`
 	IdempotencyKey string        `json:"idempotency_key,omitempty"`
-	Reason         string        `json:"reason,omitempty"`
 	Outcome        audit.Outcome `json:"outcome"`
 	Replayed       bool          `json:"replayed,omitempty"`
 	Status         int           `json:"status"`
@@ -194,9 +141,6 @@ func emitControlAudit(ctx context.Context, sink ControlAuditSink, record Control
 	if record.IdempotencyKey != "" {
 		attrs = append(attrs, "idempotency_key", record.IdempotencyKey)
 	}
-	if record.Reason != "" {
-		attrs = append(attrs, "reason", record.Reason)
-	}
 	if record.Replayed {
 		attrs = append(attrs, "replayed", true)
 	}
@@ -220,33 +164,8 @@ func controlOperatorIdentity(p principal.Principal) (subjectType, subjectID stri
 	return subjectType, subjectID
 }
 
-// extractControlReason returns the operator note for a mutating control
-// call: the X-Operator-Reason header wins, otherwise the reason or
-// operator_note JSON body field. Empty means missing.
-func extractControlReason(c *gin.Context, body []byte) string {
-	if c == nil {
-		return ""
-	}
-	if reason := strings.TrimSpace(c.GetHeader(OperatorReasonHeader)); reason != "" {
-		return reason
-	}
-	if len(body) == 0 {
-		return ""
-	}
-	var payload map[string]any
-	if err := contract.DecodeStrict(body, &payload); err != nil {
-		return ""
-	}
-	for _, key := range []string{"reason", "operator_note"} {
-		if raw, ok := payload[key].(string); ok && strings.TrimSpace(raw) != "" {
-			return strings.TrimSpace(raw)
-		}
-	}
-	return ""
-}
-
 // bufferControlBody reads and restores the request body (mutations only)
-// so the guard can hash it and extract the reason while handlers still
+// so the guard can hash it while handlers still
 // see the full body. Oversized bodies fail closed with 400.
 func bufferControlBody(c *gin.Context) ([]byte, bool) {
 	if c == nil || c.Request == nil || c.Request.Body == nil {
@@ -292,20 +211,10 @@ type controlRoute struct {
 	// (e.g. "POST /users/{user_id}/role").
 	Route string
 	// Mutation marks a guarded write: the header Idempotency-Key is always
-	// required and the outcome is success/failed. The operator reason is
-	// required unless ReasonOptional exempts the route (routine config
-	// mutations only; fund/safety-affecting writes keep the default).
+	// required and the outcome is success/failed.
 	Mutation bool
-	// ReasonOptional exempts a Mutation from the operator-reason
-	// requirement (secure by default: false means reason is enforced).
-	// The header Idempotency-Key stays required, the audit record is
-	// still emitted (with an empty reason when none was supplied), and
-	// a supplied reason must still be well-formed. Set it only for
-	// routine config mutations; fund/safety-affecting writes keep the
-	// default and fail closed with 400 when the reason is missing.
-	ReasonOptional bool
-	// Detached keeps a Mutation on the detached guard path (reason +
-	// header Idempotency-Key + L1 fast-path + durable winner election
+	// Detached keeps a Mutation on the detached guard path (header
+	// Idempotency-Key + L1 fast-path + durable winner election
 	// through short independent transactions + observer audit) instead
 	// of the atomic guard transaction. Set it for external side effects
 	// that cannot join a database transaction by construction (Auth mail
@@ -386,15 +295,6 @@ func parseControlPageSize(c *gin.Context, def int) (int, bool) {
 		return 0, false
 	}
 	return parsed, true
-}
-
-// controlReasonOr prefers the body-carried operator note, falling back
-// to the guard-extracted reason (X-Operator-Reason header wins there).
-func controlReasonOr(ctx controlContext, reason string) string {
-	if trimmed := strings.TrimSpace(reason); trimmed != "" {
-		return trimmed
-	}
-	return ctx.Reason
 }
 
 // nonEmptyControlMessage returns the trimmed message or the fallback

@@ -19,7 +19,7 @@ const summaryPayload = {
 // Mail config boundary contract (#809 leftovers): the full flow (read,
 // save, clear, test) goes through the Control Plane mail-setting
 // operations with the contract envelope (`{ data }`). Mutations carry a
-// header-only Idempotency-Key and an operator reason (mirrored into the
+// header-only Idempotency-Key (mirrored into the
 // body `reason` field). This spec pins the adapter half: control URLs,
 // headers, bodies, and control error-code branches.
 describe('mail/resource', () => {
@@ -39,7 +39,7 @@ describe('mail/resource', () => {
     })
   })
 
-  it('updates through control with reason and idempotency headers', async () => {
+  it('updates through control with idempotency headers', async () => {
     let seen: { method: string; body: unknown; headers: Record<string, string> } | undefined
     useMswHandlers(
       http.put('/api/control/v1/platform/settings/mail', async ({ request }) => {
@@ -48,26 +48,23 @@ describe('mail/resource', () => {
           body: await request.json(),
           headers: {
             idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
-            operatorReason: request.headers.get('X-Operator-Reason') ?? '',
           },
         }
         return HttpResponse.json({ data: { ...summaryPayload, readiness: 'not_tested' } })
       }),
     )
 
-    const updated = await createAdminMailConfigResource().update(
-      { from_name: 'IdeaBoard Ops', from_email: 'noreply@example.com' },
-      { operatorReason: 'rotate sender' },
-    )
+    const updated = await createAdminMailConfigResource().update({
+      from_name: 'IdeaBoard Ops',
+      from_email: 'noreply@example.com',
+    })
 
     expect(seen?.method).toBe('PUT')
     expect(seen?.body).toEqual({
       from_name: 'IdeaBoard Ops',
       from_email: 'noreply@example.com',
-      reason: 'rotate sender',
     })
     expect(seen?.headers.idempotencyKey).toMatch(/.+/)
-    expect(seen?.headers.operatorReason).toBe('rotate sender')
     expect(updated.readiness).toBe('not_tested')
   })
 
@@ -87,16 +84,16 @@ describe('mail/resource', () => {
     const summary = await resource.get()
     expect(summary.enabled).toBe(true)
 
-    const updated = await resource.update(
-      { from_name: 'IdeaBoard', from_email: 'noreply@example.com', enabled: false },
-      { operatorReason: 'disable mail' },
-    )
+    const updated = await resource.update({
+      from_name: 'IdeaBoard',
+      from_email: 'noreply@example.com',
+      enabled: false,
+    })
 
     expect(seenBody).toEqual({
       from_name: 'IdeaBoard',
       from_email: 'noreply@example.com',
       enabled: false,
-      reason: 'disable mail',
     })
     expect(updated.enabled).toBe(false)
   })
@@ -111,68 +108,53 @@ describe('mail/resource', () => {
     )
 
     const resource = createAdminMailConfigResource()
-    await resource.update(
-      { from_name: 'IdeaBoard', from_email: 'noreply@example.com' },
-      { operatorReason: 'first' },
-    )
-    await resource.update(
-      { from_name: 'IdeaBoard', from_email: 'noreply@example.com' },
-      { operatorReason: 'second' },
-    )
+    await resource.update({ from_name: 'IdeaBoard', from_email: 'noreply@example.com' })
+    await resource.update({ from_name: 'IdeaBoard', from_email: 'noreply@example.com' })
 
     expect(keys).toHaveLength(2)
     expect(keys[0]).toMatch(/.+/)
     expect(keys[0]).not.toBe(keys[1])
   })
 
-  it('clears through control delete with an operator reason', async () => {
-    let seen: { method: string; operatorReason: string } | undefined
+  it('clears through control delete', async () => {
+    let seen: { method: string } | undefined
     useMswHandlers(
       http.delete('/api/control/v1/platform/settings/mail', ({ request }) => {
         seen = {
           method: request.method,
-          operatorReason: request.headers.get('X-Operator-Reason') ?? '',
         }
         return HttpResponse.json({ data: { deleted: true } })
       }),
     )
 
-    await createAdminMailConfigResource().clear({ operatorReason: 'decommission mail' })
+    await createAdminMailConfigResource().clear()
 
     expect(seen?.method).toBe('DELETE')
-    expect(seen?.operatorReason).toBe('decommission mail')
   })
 
-  it('tests through control with an operator reason', async () => {
-    let seen:
-      { method: string; body: unknown; operatorReason: string; idempotencyKey: string } | undefined
+  it('tests through control', async () => {
+    let seen: { method: string; body: unknown; idempotencyKey: string } | undefined
     useMswHandlers(
       http.post('/api/control/v1/platform/settings/mail/test', async ({ request }) => {
         seen = {
           method: request.method,
           body: await request.json(),
-          operatorReason: request.headers.get('X-Operator-Reason') ?? '',
           idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
         }
         return HttpResponse.json({ data: { sent: true } })
       }),
     )
 
-    await createAdminMailConfigResource().test('ops@example.com', {
-      operatorReason: 'verify sender',
-    })
+    await createAdminMailConfigResource().test('ops@example.com')
 
     expect(seen?.method).toBe('POST')
-    expect(seen?.body).toEqual({ recipient: 'ops@example.com', reason: 'verify sender' })
-    expect(seen?.operatorReason).toBe('verify sender')
-    // Mail probe is a detached Control mutation (#909): the operator
-    // reason and a header-only Idempotency-Key are both required, so a
-    // same-key retry replays without resending and a divergent body
-    // conflicts server-side.
+    expect(seen?.body).toEqual({ recipient: 'ops@example.com' })
+    // Mail probes use a header-only Idempotency-Key: the same request
+    // replays without resending; a different body conflicts server-side.
     expect(seen?.idempotencyKey).toMatch(/.+/)
   })
 
-  it('sends routine update/test mutations without an operator reason but keeps refusing unaudited clears', async () => {
+  it('sends update/test mutations with idempotency headers', async () => {
     let seenUpdate: { body: unknown; headers: Record<string, string> } | undefined
     let seenTest: { body: unknown; headers: Record<string, string> } | undefined
     useMswHandlers(
@@ -181,7 +163,6 @@ describe('mail/resource', () => {
           body: await request.json(),
           headers: {
             idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
-            operatorReason: request.headers.get('X-Operator-Reason') ?? '',
           },
         }
         return HttpResponse.json({ data: summaryPayload })
@@ -191,7 +172,6 @@ describe('mail/resource', () => {
           body: await request.json(),
           headers: {
             idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
-            operatorReason: request.headers.get('X-Operator-Reason') ?? '',
           },
         }
         return HttpResponse.json({ data: { sent: true } })
@@ -199,25 +179,16 @@ describe('mail/resource', () => {
     )
     const resource = createAdminMailConfigResource()
 
-    await resource.update(
-      { from_name: 'IdeaBoard', from_email: 'noreply@example.com' },
-      { operatorReason: '   ' },
-    )
+    await resource.update({ from_name: 'IdeaBoard', from_email: 'noreply@example.com' })
     expect(seenUpdate?.body).toEqual({
       from_name: 'IdeaBoard',
       from_email: 'noreply@example.com',
-      reason: '',
     })
-    expect(seenUpdate?.headers.operatorReason).toBe('')
     expect(seenUpdate?.headers.idempotencyKey).toMatch(/.+/)
 
-    await resource.test('ops@example.com', { operatorReason: '' })
-    expect(seenTest?.body).toEqual({ recipient: 'ops@example.com', reason: '' })
-    expect(seenTest?.headers.operatorReason).toBe('')
+    await resource.test('ops@example.com')
+    expect(seenTest?.body).toEqual({ recipient: 'ops@example.com' })
     expect(seenTest?.headers.idempotencyKey).toMatch(/.+/)
-
-    // Mail clear stays enforced (backend 400 without a reason).
-    await expect(resource.clear({ operatorReason: '' })).rejects.toThrow('需要填写操作原因')
   })
 
   it('maps read 403/404/503 to operator copy', async () => {
@@ -258,7 +229,7 @@ describe('mail/resource', () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/settings/mail', () =>
         HttpResponse.json(
-          { error: { code: 'control_reason_required', message: 'no reason', request_id: 'r' } },
+          { error: { code: 'control_not_found', message: 'missing', request_id: 'r' } },
           { status: 400 },
         ),
       ),
@@ -272,13 +243,8 @@ describe('mail/resource', () => {
 
     const resource = createAdminMailConfigResource()
     await expect(
-      resource.update(
-        { from_name: 'IdeaBoard', from_email: 'noreply@example.com' },
-        { operatorReason: 'x' },
-      ),
-    ).rejects.toThrow('需要填写操作原因')
-    await expect(resource.clear({ operatorReason: 'x' })).rejects.toThrow(
-      '操作已提交，请勿重复操作',
-    )
+      resource.update({ from_name: 'IdeaBoard', from_email: 'noreply@example.com' }),
+    ).rejects.toThrow('邮件配置不存在')
+    await expect(resource.clear()).rejects.toThrow('操作已提交，请勿重复操作')
   })
 })

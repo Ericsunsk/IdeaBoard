@@ -14,7 +14,6 @@ type CreatePendingPaymentRefundInput struct {
 	OrderNumber    string
 	IdeaQuantity   int64
 	IdempotencyKey string
-	Reason         string
 	Now            time.Time
 }
 
@@ -32,7 +31,6 @@ func MapCredentialError(err error) error {
 func NormalizePaymentRefundCommand(command paymentcontracts.CreatePaymentRefundCommand) (paymentcontracts.CreatePaymentRefundCommand, error) {
 	command.OrderNumber = strings.TrimSpace(command.OrderNumber)
 	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
-	command.Reason = strings.TrimSpace(command.Reason)
 	if command.ActorID <= 0 || command.OrderNumber == "" || command.IdeaQuantity <= 0 {
 		return paymentcontracts.CreatePaymentRefundCommand{}, paymentcontracts.ErrRefundAmountInvalid
 	}

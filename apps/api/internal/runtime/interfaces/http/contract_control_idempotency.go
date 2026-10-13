@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Control mutation durable idempotency (#891).
+// Control mutation durable idempotency.
 //
 // Durable scope: (operator, operation, target, key). Operator is the
 // public subject (usr_* for human sessions, the stable subject string
@@ -24,9 +24,7 @@ import (
 // Canonical request hash: HashIdempotencyRequest(method, route template,
 // target_type, target_id, raw body). The route template (not the
 // concrete path) keeps the hash stable; the target columns carry the
-// concrete resource identity. The operator reason stays out of the
-// identity on purpose: it is audit metadata, so retrying the same
-// business request with a new note replays instead of conflicting.
+// concrete resource identity.
 // Only the digest is persisted, never raw fields.
 //
 // Retryable vs retained: the same key + same hash replays the first

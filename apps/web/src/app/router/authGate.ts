@@ -1,4 +1,3 @@
-import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/navigationMeta'
 import { isSessionFresh } from '../../features/auth'
 import { buildLoginRedirectPath } from '../../core/auth/sessionPolicy'
 import { WORKSPACE_DEFAULT_PATH } from '../../features/workspace/routes/workspaceRoutes'
@@ -49,14 +48,11 @@ export function resolveAuthGateRedirect(input: {
 }): string | true {
   const isLoggedIn = Boolean(input.user)
 
-  if (input.requiresAuth && !isLoggedIn) {
+  if ((input.requiresAuth || input.isAdminRoute) && !isLoggedIn) {
     return buildLoginRedirectPath(input.currentPath, input.currentFullPath)
   }
 
   if (input.guest && isLoggedIn) {
-    if (input.isAdminRoute) {
-      return input.user?.role === 'admin' ? ADMIN_DEFAULT_PATH : WORKSPACE_DEFAULT_PATH
-    }
     return WORKSPACE_DEFAULT_PATH
   }
 

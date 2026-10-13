@@ -6,7 +6,7 @@ import {
   replaceAdminModelPool,
 } from './modelPoolResource'
 
-const reason = { operatorReason: 'pool review' }
+const options = {}
 const sku = 'ai-image:generation'
 
 function poolHandlers(state: {
@@ -14,7 +14,7 @@ function poolHandlers(state: {
   entries: unknown[]
   putStatus?: number
   putBody?: unknown
-  seen?: { body?: unknown; idempotencyKey?: string | null; operatorReason?: string | null }
+  seen?: { body?: unknown; idempotencyKey?: string | null }
 }) {
   return [
     http.get('/api/control/v1/billing/catalog/:sku/pool', () => {
@@ -26,7 +26,6 @@ function poolHandlers(state: {
       state.seen = state.seen ?? {}
       state.seen.body = await request.json()
       state.seen.idempotencyKey = request.headers.get('Idempotency-Key')
-      state.seen.operatorReason = request.headers.get('X-Operator-Reason')
       if (state.putStatus && state.putStatus !== 200) {
         return HttpResponse.json(state.putBody ?? {}, { status: state.putStatus })
       }
@@ -57,7 +56,7 @@ describe('Admin Model Pool resource', () => {
     })
   })
 
-  it('replaces the complete pool with version, entries, and operator reason', async () => {
+  it('replaces the complete pool with version, entries, with idempotency headers', async () => {
     const state = {
       version: 2,
       entries: [],
@@ -71,7 +70,6 @@ describe('Admin Model Pool resource', () => {
       seen: {} as {
         body?: unknown
         idempotencyKey?: string | null
-        operatorReason?: string | null
       },
     }
     useMswHandlers(...poolHandlers(state))
@@ -80,7 +78,7 @@ describe('Admin Model Pool resource', () => {
       replaceAdminModelPool(
         sku,
         { version: 2, entries: [{ modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] }] },
-        reason,
+        options,
       ),
     ).resolves.toEqual({
       service: 'generation',
@@ -92,10 +90,8 @@ describe('Admin Model Pool resource', () => {
     expect(state.seen.body).toEqual({
       expected_version: 2,
       entries: [{ model_id: 'a/first', enabled: true, resolutions: ['1k', '2k'] }],
-      reason: 'pool review',
     })
     expect(state.seen.idempotencyKey).toMatch(/.+/)
-    expect(state.seen.operatorReason).toBe('pool review')
   })
 
   it('maps a version conflict to the stale-pool copy', async () => {
@@ -107,12 +103,11 @@ describe('Admin Model Pool resource', () => {
       seen: {} as {
         body?: unknown
         idempotencyKey?: string | null
-        operatorReason?: string | null
       },
     }
     useMswHandlers(...poolHandlers(state))
 
-    const failure = await replaceAdminModelPool(sku, { version: 2, entries: [] }, reason).catch(
+    const failure = await replaceAdminModelPool(sku, { version: 2, entries: [] }, options).catch(
       (error: unknown) => error,
     )
     expect(failure).toBeInstanceOf(Error)
@@ -120,7 +115,7 @@ describe('Admin Model Pool resource', () => {
     expect((failure as Error).message).toBe('模型池已被更新，请刷新后重试')
   })
 
-  it('replaces the pool without an operator reason while keeping the idempotency key', async () => {
+  it('replaces the pool with an idempotency key', async () => {
     const state = {
       version: 2,
       entries: [],
@@ -134,17 +129,16 @@ describe('Admin Model Pool resource', () => {
       seen: {} as {
         body?: unknown
         idempotencyKey?: string | null
-        operatorReason?: string | null
       },
     }
     useMswHandlers(...poolHandlers(state))
 
-    await expect(
-      replaceAdminModelPool(sku, { version: 2, entries: [] }, { operatorReason: '  ' }),
-    ).resolves.toMatchObject({ version: 3, changed: true })
-    expect(state.seen.body).toEqual({ expected_version: 2, entries: [], reason: '' })
+    await expect(replaceAdminModelPool(sku, { version: 2, entries: [] })).resolves.toMatchObject({
+      version: 3,
+      changed: true,
+    })
+    expect(state.seen.body).toEqual({ expected_version: 2, entries: [] })
     expect(state.seen.idempotencyKey).toMatch(/.+/)
-    expect(state.seen.operatorReason).toBeNull()
   })
 
   it('lists catalog models through the injected lister', async () => {

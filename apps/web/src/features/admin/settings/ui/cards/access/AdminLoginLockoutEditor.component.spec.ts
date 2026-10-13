@@ -8,7 +8,7 @@ import AdminLoginLockoutEditor from './AdminLoginLockoutEditor.vue'
 vi.mock('../../../../../../core/composables/useAppToast')
 
 describe('AdminLoginLockoutEditor', () => {
-  const lockoutPuts: Array<{ body: unknown; operatorReason: string | null }> = []
+  const lockoutPuts: Array<{ body: unknown }> = []
 
   function useLockoutHandlers() {
     useMswHandlers(
@@ -25,7 +25,6 @@ describe('AdminLoginLockoutEditor', () => {
         const body = await request.json()
         lockoutPuts.push({
           body,
-          operatorReason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({ data: body })
       }),
@@ -76,7 +75,6 @@ describe('AdminLoginLockoutEditor', () => {
 
     await waitFor(() => expect(lockoutPuts).toHaveLength(1))
     expect(lockoutPuts[0]?.body).toEqual({ threshold: 8, duration_seconds: 300 })
-    expect(lockoutPuts[0]?.operatorReason).toBeNull()
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('登录锁定已保存'))
   })
 

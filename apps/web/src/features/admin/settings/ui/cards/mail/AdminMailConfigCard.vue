@@ -341,13 +341,9 @@ function buildUpdatePayload(values: MailFormValues, enabledValue: boolean): Mail
 }
 
 const save = form.handleSubmit(async (values) => {
-  // Routine config write (backend ReasonOptional): save directly without
-  // the confirm dialog; the audit records an empty reason.
   saving.value = true
   try {
-    const updated = await resource.value.update(buildUpdatePayload(values, enabled.value), {
-      operatorReason: '',
-    })
+    const updated = await resource.value.update(buildUpdatePayload(values, enabled.value))
     populate(updated)
     feedback.saved()
   } catch (caughtError) {
@@ -360,22 +356,16 @@ const save = form.handleSubmit(async (values) => {
 async function toggleEnabled(next: boolean) {
   const committed = summary.value
   if (!committed || mailToggle.isPending(MAIL_TOGGLE_KEY)) return
-  // Routine config write (backend ReasonOptional): persist directly without
-  // the confirm dialog; the audit records an empty reason. 乐观翻转与
-  // pending/回滚收口到共享 composable，失败 toast 由 feedback 传入。
   await mailToggle.toggle(
     MAIL_TOGGLE_KEY,
     next,
     async (_, nextVal) => {
-      const updated = await resource.value.update(
-        {
-          from_name: committed.from_name,
-          from_email: committed.from_email,
-          reply_to: committed.reply_to,
-          enabled: nextVal,
-        },
-        { operatorReason: '' },
-      )
+      const updated = await resource.value.update({
+        from_name: committed.from_name,
+        from_email: committed.from_email,
+        reply_to: committed.reply_to,
+        enabled: nextVal,
+      })
       summary.value = updated
       mailToggle.reconcile(MAIL_TOGGLE_KEY, updated.enabled)
     },
@@ -391,16 +381,16 @@ async function toggleEnabled(next: boolean) {
 }
 
 async function clear() {
-  const operatorReason = await confirmSettingsSave(confirm, {
+  const isConfirmed = await confirmSettingsSave(confirm, {
     title: SETTINGS_MESSAGES.mailDeleteTitle,
     message: SETTINGS_MESSAGES.mailDeleteMessage,
     confirmLabel: SETTINGS_MESSAGES.mailDelete,
     risk: 'destructive',
   })
-  if (!operatorReason) return
+  if (!isConfirmed) return
   saving.value = true
   try {
-    await resource.value.clear({ operatorReason })
+    await resource.value.clear()
     await load()
     feedback.cleared()
   } catch (caughtError) {
@@ -416,11 +406,9 @@ async function sendTest() {
     feedback.testFailed(new Error(SETTINGS_MESSAGES.mailTestRecipientInvalid))
     return
   }
-  // Routine probe (backend ReasonOptional): send directly without
-  // interactive confirmation; the audit records an empty reason.
   testing.value = true
   try {
-    await resource.value.test(target, { operatorReason: '' })
+    await resource.value.test(target)
     await load()
     feedback.testSent()
   } catch (caughtError) {

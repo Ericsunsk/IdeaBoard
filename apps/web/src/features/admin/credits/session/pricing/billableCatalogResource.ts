@@ -17,12 +17,7 @@ import type {
   AdminBillableItemStatus,
   PricingVariant,
 } from '../../core/pricing/billableCatalogTypes'
-import {
-  buildControlMutationHeaders,
-  buildRoutineControlMutationHeaders,
-  requireOperatorReason,
-  type ControlMutationOptions,
-} from '../../../shared'
+import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 import { withControlCopy } from '../../../shared'
 
 const BILLABLE_ITEM_CONTROL_MESSAGES = {
@@ -31,13 +26,6 @@ const BILLABLE_ITEM_CONTROL_MESSAGES = {
   404: '功能不存在',
 } as const
 
-// Admin billing catalog boundary (W2 transports). Reads and writes go
-// through the Control Plane billing operations with the contract envelope
-// (`{data}` over the same catalog service projections); every mutation
-// carries a header-only Idempotency-Key plus an operator reason (mirrored
-// into the body `reason` field where the schema accepts it) and emits a
-// control audit record. The deleted `/api/admin/billing/catalog/*` routes
-// are gone; this module is the single transport.
 type BillableItemCatalogCard = {
   sku: string
   namespace: string
@@ -72,14 +60,14 @@ export interface AdminBillableCatalogResource {
   publishPrices: (
     sku: string,
     prices: Partial<Record<PricingVariant, number | undefined>>,
-    options: BillableCatalogMutationOptions,
+    options?: BillableCatalogMutationOptions,
   ) => Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>>
   setAvailability: (
     sku: string,
     enabled: boolean,
-    options: BillableCatalogMutationOptions,
+    options?: BillableCatalogMutationOptions,
   ) => Promise<AdminBillableItemAvailability>
-  deleteArchived: (sku: string, options: BillableCatalogMutationOptions) => Promise<string>
+  deleteArchived: (sku: string, options?: BillableCatalogMutationOptions) => Promise<string>
 }
 
 export function createAdminBillableCatalogResource(): AdminBillableCatalogResource {
@@ -93,7 +81,7 @@ export function createAdminBillableCatalogResource(): AdminBillableCatalogResour
 
 export async function deleteArchivedBillableItem(
   sku: string,
-  options: BillableCatalogMutationOptions,
+  options?: BillableCatalogMutationOptions,
 ): Promise<string> {
   try {
     const body = await deleteControlCatalogItem(sku, {
@@ -109,18 +97,14 @@ export async function deleteArchivedBillableItem(
 export async function setBillableItemAvailability(
   sku: string,
   enabled: boolean,
-  options: BillableCatalogMutationOptions,
+  options?: BillableCatalogMutationOptions,
 ): Promise<AdminBillableItemAvailability> {
-  // Routine config write (backend ReasonOptional): the reason may be empty
-  // (audit records it as-is) while Idempotency-Key stays required.
-  // Publish and delete stay enforced and keep the required-reason helper.
-  const operatorReason = options.operatorReason.trim()
   try {
     const body = await setControlCatalogAvailability(
       sku,
-      { enabled, reason: operatorReason },
+      { enabled },
       {
-        headers: buildRoutineControlMutationHeaders(options),
+        headers: buildControlMutationHeaders(options),
       },
     )
     return normalizeAvailability(
@@ -141,14 +125,13 @@ export async function setBillableItemAvailability(
 export async function publishBillableItemPrices(
   sku: string,
   prices: Partial<Record<PricingVariant, number | undefined>>,
-  options: BillableCatalogMutationOptions,
+  options?: BillableCatalogMutationOptions,
 ): Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   const requestPrices = stripUndefined(prices) as Record<PricingVariant, number>
   try {
     const body = await publishControlCatalogPrices(
       sku,
-      { prices: requestPrices, reason: operatorReason },
+      { prices: requestPrices },
       { headers: buildControlMutationHeaders(options) },
     )
     const data = requireContractData<{

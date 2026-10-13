@@ -1,14 +1,13 @@
 package httpapi
 
-// Control users family (issue #808): user administration reads and
+// Control users family: user administration reads and
 // high-risk identity mutations behind control:users.
 //
 // Reads/writes go through the identity seams (AdminUserService reads,
 // IdentityAdminCommands mutations, AdminUserImpersonator for
 // impersonation); this file owns only the control transport (contract
-// envelope, usr_ identifiers, reason + Idempotency-Key via the guard,
-// control error codes, audit targets). Legacy /api/admin user routes
-// are untouched.
+// envelope, usr_ identifiers, Idempotency-Key via the guard,
+// control error codes, audit targets).
 
 import (
 	"errors"
@@ -28,9 +27,8 @@ import (
 )
 
 // controlUser is the Control Plane user projection. Identifiers are the
-// external usr_ public ids; internal numeric ids never appear. Display
-// fields mirror the legacy admin list item so operator tooling keeps
-// working; absent relations default to zero values.
+// external usr_ public ids; internal numeric ids never appear.
+// Absent relations default to zero values.
 type controlUser struct {
 	ID               string    `json:"id"`
 	DisplayName      string    `json:"display_name"`
@@ -81,7 +79,7 @@ func newControlUserFromListItem(item *identityports.AdminUserListItem) controlUs
 }
 
 // controlUserCursor is the opaque list cursor (page-based underneath the
-// legacy list seam; never exposed as page numbers on the wire).
+// identity list seam; never exposed as page numbers on the wire).
 type controlUserCursor struct {
 	Page int `json:"page"`
 }
@@ -235,8 +233,7 @@ func (d *ContractControlDeps) updateControlUserRole(c *gin.Context, ctx controlC
 }
 
 type controlBanUserRequest struct {
-	Reason        string `json:"reason"`
-	ExpiresInDays int    `json:"expires_in_days"`
+	ExpiresInDays int `json:"expires_in_days"`
 }
 
 func (d *ContractControlDeps) banControlUser(c *gin.Context, ctx controlContext) {
@@ -257,9 +254,7 @@ func (d *ContractControlDeps) banControlUser(c *gin.Context, ctx controlContext)
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest25)
 		return
 	}
-	reason := controlReasonOr(ctx, req.Reason)
 	outcome, err := commands.Ban(c.Request.Context(), ctx.Operator, id.String(), identityports.IdentityAdminBanInput{
-		Reason:        reason,
 		ExpiresInDays: req.ExpiresInDays,
 	})
 	if err != nil {

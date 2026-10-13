@@ -39,9 +39,9 @@ BEGIN
   WHERE prices.sku = p_sku;
 
   INSERT INTO billing_admin_actions (
-    action_type, sku, price_version_id, actor_id, reason, metadata
+    action_type, sku, price_version_id, actor_id, metadata
   ) VALUES (
-    'delete_archived', p_sku, NULL, p_actor_id, 'archived item deleted',
+    'delete_archived', p_sku, NULL, p_actor_id,
     jsonb_build_object(
       'display_name', v_display_name,
       'description', v_description,
@@ -278,9 +278,9 @@ BEGIN
   WHERE sku = p_sku;
 
   INSERT INTO billing_admin_actions (
-    action_type, sku, price_version_id, actor_id, reason, metadata
+    action_type, sku, price_version_id, actor_id, metadata
   ) VALUES (
-    'create_price', p_sku, v_price_version_id, p_actor_id, 'price published',
+    'create_price', p_sku, v_price_version_id, p_actor_id,
     jsonb_build_object(
       'materialized', v_materialized,
       'old', CASE
@@ -356,9 +356,9 @@ BEGIN
   END IF;
 
   INSERT INTO billing_admin_actions (
-    action_type, sku, price_version_id, actor_id, reason, metadata
+    action_type, sku, price_version_id, actor_id, metadata
   ) VALUES (
-    'set_availability', p_sku, v_price_version_id, p_actor_id, 'availability updated',
+    'set_availability', p_sku, v_price_version_id, p_actor_id,
     jsonb_build_object(
       'old', CASE WHEN v_old_enabled THEN 'active' ELSE 'disabled' END,
       'new', CASE WHEN p_enabled THEN 'active' ELSE 'disabled' END,
@@ -424,28 +424,13 @@ CREATE TABLE billing_admin_actions (
     sku character varying(128) NOT NULL,
     price_version_id bigint,
     actor_id bigint NOT NULL,
-    reason character varying(1000) NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT billing_admin_actions_actor_id_check CHECK ((actor_id > 0)),
     CONSTRAINT ck_billing_admin_actions_metadata CHECK ((jsonb_typeof(metadata) = 'object'::text)),
     CONSTRAINT ck_billing_admin_actions_price_scope CHECK (((((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('delete_archived'::character varying)::text])) AND (price_version_id IS NULL)) OR (((action_type)::text = ANY (ARRAY[('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text])) AND (price_version_id IS NOT NULL)))),
-    CONSTRAINT ck_billing_admin_actions_reason CHECK ((((reason)::text = btrim((reason)::text, '
-
-'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
     CONSTRAINT ck_billing_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text, ('delete_archived'::character varying)::text])))
 );
-
--- The imported dump lost the leading space and tab in the trim character set.
--- Rebind the constraint to the canonical whitespace contract.
-ALTER TABLE billing_admin_actions
-  DROP CONSTRAINT ck_billing_admin_actions_reason;
-ALTER TABLE billing_admin_actions
-  ADD CONSTRAINT ck_billing_admin_actions_reason CHECK (
-    reason = btrim(reason, E' \t\n\r\f')
-    AND char_length(reason) BETWEEN 1 AND 1000
-  );
-
 
 --
 -- Name: billing_admin_actions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
@@ -871,8 +856,8 @@ BEGIN
     IF v_resolution IN ('1k') THEN
       UPDATE billing_skus SET current_price_version_id = v_new_id WHERE sku = p_sku;
     END IF;
-    INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id, reason, metadata)
-    VALUES ('create_price', p_sku, v_new_id, p_actor_id, 'price published',
+    INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id, metadata)
+    VALUES ('create_price', p_sku, v_new_id, p_actor_id,
       jsonb_build_object('output_resolution', v_resolution, 'materialized', v_materialized,
         'old', CASE WHEN v_old_id IS NULL THEN NULL ELSE jsonb_build_object('price_version_id', v_old_id, 'version', v_old_version, 'unit_credits', v_old_unit) END,
         'new', jsonb_build_object('price_version_id', v_new_id, 'version', v_version, 'unit_credits', v_unit), 'outcome', 'published'));

@@ -132,13 +132,13 @@ func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 	}
 	if _, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 301,
-		IdempotencyKey: "refund-after-dispute-over", Reason: "unused Ideas", Now: now.Add(time.Minute),
+		IdempotencyKey: "refund-after-dispute-over", Now: now.Add(time.Minute),
 	}); !errors.Is(err, paymentcontracts.ErrRefundAmountExceeds) {
 		t.Fatalf("over-cap refund error=%v", err)
 	}
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
-		IdempotencyKey: "refund-after-dispute-exact", Reason: "unused Ideas", Now: now.Add(time.Minute),
+		IdempotencyKey: "refund-after-dispute-exact", Now: now.Add(time.Minute),
 	})
 	if err != nil || refund.IdeaQuantity != 300 {
 		t.Fatalf("remaining refund=%+v err=%v", refund, err)
@@ -157,7 +157,7 @@ func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
-		IdempotencyKey: "refund-before-dispute", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "refund-before-dispute", Now: now,
 	})
 	if err != nil || refund.IdeaQuantity != 300 {
 		t.Fatalf("pending refund=%+v err=%v", refund, err)

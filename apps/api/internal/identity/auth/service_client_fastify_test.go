@@ -48,7 +48,7 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserStates against Fastify: %v", err)
 	}
-	if states[authUserID].Role != "admin" || states[authUserID].Banned || states[authUserID].BanReason != nil || states[authUserID].BanExpiresAt != nil {
+	if states[authUserID].Role != "admin" || states[authUserID].Banned || states[authUserID].BanExpiresAt != nil {
 		t.Fatalf("GetUserStates response = %+v, want unbanned admin state", states)
 	}
 
@@ -59,7 +59,7 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 		return client.SetUserRole(ctx, authUserID, "admin")
 	})
 	assertFastifyMutationSuccess(t, "BanUser", func() error {
-		return client.BanUser(ctx, authUserID, " policy violation ", 3600)
+		return client.BanUser(ctx, authUserID, 3600)
 	})
 	assertFastifyMutationSuccess(t, "UnbanUser", func() error {
 		return client.UnbanUser(ctx, authUserID)

@@ -1,11 +1,8 @@
 package httpapi
 
-// Control billing family (issue #808): billing accounts and the
-// Registry-backed pricing catalog behind control:billing.
-//
-// The billing account is implicit per workspace (no public account id in
-// URLs); the catalog delegates to the billing BillableCatalogService
-// seam. Legacy /api/admin/billing/* routes are untouched.
+// Control billing accounts and Registry-backed pricing catalog.
+// Accounts are implicit per workspace; catalog operations delegate to
+// BillableCatalogService.
 
 import (
 	"errors"
@@ -96,10 +93,6 @@ func (d *ContractControlDeps) listControlBillingCatalog(c *gin.Context, _ contro
 
 type controlPublishPricesRequest struct {
 	Prices map[string]int64 `json:"prices"`
-	// Reason rides the operator-note convention (header wins; the guard
-	// extracts and audits it centrally). Accepted here only so strict
-	// decoding does not 400 the documented shape.
-	Reason *string `json:"reason,omitempty"`
 }
 
 func (d *ContractControlDeps) publishControlCatalogPrices(c *gin.Context, ctx controlContext) {
@@ -149,8 +142,7 @@ func (d *ContractControlDeps) setControlCatalogAvailability(c *gin.Context, ctx 
 		return
 	}
 	var req struct {
-		Enabled *bool   `json:"enabled"`
-		Reason  *string `json:"reason,omitempty"`
+		Enabled *bool `json:"enabled"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil || req.Enabled == nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)

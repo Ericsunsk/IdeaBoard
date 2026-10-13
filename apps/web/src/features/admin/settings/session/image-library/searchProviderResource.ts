@@ -1,7 +1,4 @@
-import {
-  buildRoutineControlMutationHeaders,
-  type ControlMutationOptions,
-} from '../../../shared/index'
+import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared/index'
 import {
   listControlSearchProviders,
   testControlSearchProvider,
@@ -16,16 +13,6 @@ import type {
   SearchProviderUpdate,
 } from './searchProviderTypes'
 
-// Admin search provider boundary (final cut). Reads ride the generated
-// Control hook (`listControlSearchProviders`); writes already go through
-// the Control Plane (`updateControlSearchProvider` /
-// `testControlSearchProvider`). All routes use the unified contract
-// envelope (`{ data }` success / `{ error: { code, message, request_id } }`
-// errors); only the binary brand-logo and SSE monitor stream stay raw.
-// Update is a routine config write (backend ReasonOptional) and test is a
-// POST read-guard, so both skip the operator-reason ceremony and audit an
-// empty reason while keeping the header-only Idempotency-Key.
-
 type SearchProviderMutationOptions = ControlMutationOptions
 
 export interface AdminSearchProviderResource {
@@ -33,11 +20,11 @@ export interface AdminSearchProviderResource {
   update: (
     provider: SearchProviderId,
     input: SearchProviderUpdate,
-    options: SearchProviderMutationOptions,
+    options?: SearchProviderMutationOptions,
   ) => Promise<void>
   test: (
     provider: SearchProviderId,
-    options: SearchProviderMutationOptions,
+    options?: SearchProviderMutationOptions,
   ) => Promise<SearchProviderTestResult>
 }
 
@@ -66,13 +53,13 @@ function listSearchProviders() {
 async function updateSearchProvider(
   provider: SearchProviderId,
   input: SearchProviderUpdate,
-  options: SearchProviderMutationOptions,
+  options?: SearchProviderMutationOptions,
 ): Promise<void> {
   try {
     const body = await updateControlSearchProvider(
       provider,
       { ...input },
-      { headers: buildRoutineControlMutationHeaders(options) },
+      { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存图片搜索供应商配置失败')
@@ -83,11 +70,11 @@ async function updateSearchProvider(
 
 async function testSearchProvider(
   provider: SearchProviderId,
-  options: SearchProviderMutationOptions,
+  options?: SearchProviderMutationOptions,
 ): Promise<SearchProviderTestResult> {
   try {
     const body = await testControlSearchProvider(provider, {
-      headers: buildRoutineControlMutationHeaders(options),
+      headers: buildControlMutationHeaders(options),
     })
     return requireContractData<SearchProviderTestResult>(body, '测试图片搜索供应商连接失败')
   } catch (error) {

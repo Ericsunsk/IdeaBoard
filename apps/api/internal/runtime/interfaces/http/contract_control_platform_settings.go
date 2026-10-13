@@ -1,14 +1,7 @@
 package httpapi
 
-// Control platform-settings family (issue #808): runtime settings reads
-// and updates behind control:platform.
-//
-// Handlers delegate to the shared *settings.RuntimeSettingsService seam
-// (the same shared instance; the legacy /api/admin/settings/* routes were
-// removed in #809); updates carry the operator as actor where the seam
-// supports it (outbound policy) and always carry the guard-resolved
-// operator reason in the audit record (possibly empty on ReasonOptional
-// routes).
+// Control runtime settings delegate to settings.RuntimeSettingsService.
+// Updates carry the acting operator where supported and emit guarded audit records.
 
 import (
 	"net/http"

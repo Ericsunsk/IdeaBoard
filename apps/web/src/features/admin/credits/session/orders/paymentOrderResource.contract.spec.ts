@@ -91,7 +91,7 @@ describe('paymentOrderResource', () => {
     expect(serialized).not.toContain('4242424242424242')
   })
 
-  it('creates refunds through control with the idempotency key and operator reason', async () => {
+  it('creates refunds through control with the idempotency key with idempotency headers', async () => {
     let seenBody: unknown
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
@@ -102,7 +102,6 @@ describe('paymentOrderResource', () => {
         seenBody = await request.json()
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         }
         return HttpResponse.json({ data: { status: 'pending' } })
       }),
@@ -113,11 +112,9 @@ describe('paymentOrderResource', () => {
       adapter.refund(orderNumber, {
         idea_quantity: 500,
         idempotency_key: 'refund-1',
-        operatorReason: 'duplicate charge',
       }),
     ).resolves.toMatchObject({ status: 'pending' })
-    expect(seenBody).toEqual({ idea_quantity: 500, reason: 'duplicate charge' })
+    expect(seenBody).toEqual({ idea_quantity: 500 })
     expect(seenHeaders.idempotencyKey).toBe('refund-1')
-    expect(seenHeaders.operatorReason).toBe('duplicate charge')
   })
 })

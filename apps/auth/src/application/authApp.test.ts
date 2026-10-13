@@ -71,7 +71,6 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
         auth_user_id,
         role: 'user',
         banned: false,
-        ban_reason: null,
         ban_expires: null,
       })),
     finalizeTrustedRegistrationIdentity: async () => true,

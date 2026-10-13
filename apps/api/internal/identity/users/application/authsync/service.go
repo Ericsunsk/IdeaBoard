@@ -247,7 +247,7 @@ func checkIntentCurrent(intent Intent, state UserSyncState) (reason string, ok b
 
 // repairOpFor picks the cheapest op that re-asserts the current facts.
 // Role is preferred: SetUserRole is unconditional and metadata-free,
-// while ban/unban pushes carry reason/expiry payloads.
+// while ban/unban pushes carry expiry payloads.
 func repairOpFor(state UserSyncState) string {
 	if state.Banned() {
 		return OpBan
@@ -275,7 +275,7 @@ func (s *Service) push(ctx context.Context, claim *convergeClaim) error {
 	case OpRole:
 		return s.auth.SetUserRole(ctx, intent.AuthUserID, intent.DesiredRole)
 	case OpBan:
-		return s.auth.BanUser(ctx, intent.AuthUserID, intent.Reason, intent.ExpiresInSeconds)
+		return s.auth.BanUser(ctx, intent.AuthUserID, intent.ExpiresInSeconds)
 	case OpUnban:
 		return s.auth.UnbanUser(ctx, intent.AuthUserID)
 	default:

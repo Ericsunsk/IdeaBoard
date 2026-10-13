@@ -147,14 +147,12 @@ describe('AuthInternalCommands', () => {
               auth_user_id: 'auth-admin',
               role: 'admin',
               banned: false,
-              ban_reason: null,
               ban_expires: null,
             },
             {
               auth_user_id: 'auth-banned',
               role: 'user',
               banned: true,
-              ban_reason: 'spam',
               ban_expires: '2026-10-11T03:00:00.000Z',
             },
           ]
@@ -172,14 +170,12 @@ describe('AuthInternalCommands', () => {
               auth_user_id: 'auth-admin',
               role: 'admin',
               banned: false,
-              ban_reason: null,
               ban_expires: null,
             },
             {
               auth_user_id: 'auth-banned',
               role: 'user',
               banned: true,
-              ban_reason: 'spam',
               ban_expires: '2026-10-11T03:00:00.000Z',
             },
           ],
@@ -433,8 +429,8 @@ describe('AuthInternalCommands', () => {
           calls.push(['delete-cascade', authUserID])
           return true
         },
-        updateAuthUserBanState: async (authUserID, banned, reason, expiresIn) => {
-          calls.push(['ban-state', authUserID, banned, reason, expiresIn])
+        updateAuthUserBanState: async (authUserID, banned, expiresIn) => {
+          calls.push(['ban-state', authUserID, banned, expiresIn])
           return true
         },
         deleteAuthUserSessions: async (authUserID) => {
@@ -455,7 +451,6 @@ describe('AuthInternalCommands', () => {
     assert.deepEqual(
       await commands.banIdentity({
         authUserID: ' auth-ban ',
-        banReason: ' abuse ',
         banExpiresIn: '3600',
       }),
       {
@@ -477,9 +472,9 @@ describe('AuthInternalCommands', () => {
     })
     assert.deepEqual(calls, [
       ['delete-cascade', 'auth-delete'],
-      ['ban-state', 'auth-ban', true, 'abuse', 3600],
+      ['ban-state', 'auth-ban', true, 3600],
       ['sessions', 'auth-ban'],
-      ['ban-state', 'auth-unban', false, null, null],
+      ['ban-state', 'auth-unban', false, null],
       ['sessions', 'auth-revoke'],
       ['role', 'auth-role', 'admin'],
     ])

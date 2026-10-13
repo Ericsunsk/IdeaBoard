@@ -187,7 +187,7 @@ func (commands *IdentityAdminCommands) Ban(ctx context.Context, actor principal.
 		if fresh.Banned() {
 			if deadline == nil && fresh.BanExpiresAt == nil {
 				// Permanent re-ban: never fabricate a replacement ban
-				// push (the stored reason/expiry would clobber the
+				// push (the stored expiry would clobber the
 				// Auth-side metadata). Report pending honestly instead.
 				pending, err := store.HasPendingIntent(txCtx, target.user.ID)
 				if err != nil {
@@ -209,7 +209,6 @@ func (commands *IdentityAdminCommands) Ban(ctx context.Context, actor principal.
 				Op:               authsync.OpBan,
 				DesiredRole:      normalizeAdminRole(fresh.Role),
 				DesiredBanned:    true,
-				Reason:           strings.TrimSpace(input.Reason),
 				ExpiresInSeconds: expiresInSeconds,
 				BaseVersion:      version,
 			})
@@ -238,7 +237,6 @@ func (commands *IdentityAdminCommands) Ban(ctx context.Context, actor principal.
 			Op:               authsync.OpBan,
 			DesiredRole:      normalizeAdminRole(fresh.Role),
 			DesiredBanned:    true,
-			Reason:           strings.TrimSpace(input.Reason),
 			ExpiresInSeconds: expiresInSeconds,
 			BaseVersion:      version,
 		})

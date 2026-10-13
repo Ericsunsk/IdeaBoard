@@ -258,9 +258,6 @@
   --shadow-auth-shell:
     0 24px 50px -15px var(--color-auth-shell-glow),
     inset 0 1px 1px var(--color-auth-shell-highlight);
-  /* Neutral slate entry shadow for the Admin login card (kept distinct from
-     the brand-tinted auth shell glow). */
-  --shadow-login-card: var(--primitive-shadow-24-70-slate);
   /* Shared focus ring (3px outline-equivalent halo tracking --ring). */
   --shadow-focus-ring: 0 0 0 3px var(--ring);
   /* Tier 2 resting/floating elevation (current paint, Tier 1 ingredients). */

@@ -1,8 +1,8 @@
 package httpapi
 
-// Control Plane extended-family tests (#809-close): authorization
+// Control Plane extended-family tests: authorization
 // matrix, audit record fields, header-only idempotency replay/conflict,
-// and reason-required enforcement for the gateway extras, brand-logo
+// and idempotency enforcement for the gateway extras, brand-logo
 // overrides + proxy, OAuth providers, reward codes + redemptions,
 // branding logo upload, and monitor stream routes, plus happy-path
 // coverage for the dedicated OAuth/upload handlers and the workspace
@@ -26,7 +26,7 @@ import (
 	rewardports "ideaboard/api/internal/rewards/ports"
 )
 
-// --- reward fakes (single-sourced legacy handlers under the control
+// --- reward fakes (domain handlers under the control
 // guard; responses translated into the contract envelope at the
 // boundary) ---
 
@@ -203,22 +203,22 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 	mutations := []controlCall{
 		{method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/route-preview", body: `{"model_id":"openai/gpt-4o"}`},
 		{method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`,
-			headers: controlMutationHeaders("ext-matrix-1", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-1")},
 		{method: http.MethodPut, path: "/api/control/v1/platform/brand-logo-overrides/oauth-provider/google", body: `{"logo_key":"google-oauth"}`,
-			headers: controlMutationHeaders("ext-matrix-2", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-2")},
 		{method: http.MethodDelete, path: "/api/control/v1/platform/brand-logo-overrides/oauth-provider/google",
-			headers: controlMutationHeaders("ext-matrix-3", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-3")},
 		{method: http.MethodPut, path: "/api/control/v1/users/oauth/google", body: `{"enabled":true,"client_id":"x"}`,
-			headers: controlMutationHeaders("ext-matrix-4", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-4")},
 		{method: http.MethodPost, path: "/api/control/v1/rewards/codes/search", body: `{}`},
 		{method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{"display_name":"x","code":"ABCDEFGH","credit_amount":10,"max_redemptions":0}`,
-			headers: controlMutationHeaders("ext-matrix-5", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-5")},
 		{method: http.MethodPatch, path: "/api/control/v1/rewards/codes/7", body: `{"display_name":"y","credit_amount":5,"max_redemptions":0}`,
-			headers: controlMutationHeaders("ext-matrix-6", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-6")},
 		{method: http.MethodPatch, path: "/api/control/v1/rewards/codes/7/enabled", body: `{"enabled":false}`,
-			headers: controlMutationHeaders("ext-matrix-7", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-7")},
 		{method: http.MethodDelete, path: "/api/control/v1/rewards/codes/7",
-			headers: controlMutationHeaders("ext-matrix-8", "matrix reason")},
+			headers: controlMutationHeaders("ext-matrix-8")},
 	}
 
 	t.Run("anonymous denied with 401", func(t *testing.T) {
@@ -325,41 +325,17 @@ func TestControlExtendedNilDepsFailClosed(t *testing.T) {
 	}
 }
 
-func TestControlExtendedReasonAndIdempotency(t *testing.T) {
+func TestControlExtendedIdempotency(t *testing.T) {
 	h := newControlHarness(t, nil)
 	admin := controlCall{userID: controlOperatorID, role: "admin"}
 
-	t.Run("mutations require reason", func(t *testing.T) {
-		// Only reason-enforced mutations are listed here: OAuth provider
-		// updates and reward code updates/toggles are routine config
-		// (ReasonOptional) and succeed without a reason.
-		cases := []controlCall{
-			{method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{}`,
-				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-3"}},
-			{method: http.MethodDelete, path: "/api/control/v1/rewards/codes/7",
-				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-5"}},
-		}
-		for _, call := range cases {
-			call.userID = admin.userID
-			call.role = admin.role
-			status, _, payload := h.serve(call)
-			if status != http.StatusBadRequest {
-				t.Fatalf("%s %s status = %d, want 400", call.method, call.path, status)
-			}
-			if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
-				t.Fatalf("code = %q, want control_reason_required", code)
-			}
-		}
-	})
-
-	t.Run("probes skip the reason and key ceremony", func(t *testing.T) {
+	t.Run("probes run without an idempotency key", func(t *testing.T) {
 		// Connectivity dry-runs (ai-gateway test-connection, search
-		// provider test) are POST read-guards: no reason or
-		// Idempotency-Key is required, and a supplied reason is logged to
-		// the audit record. Nil deps fail closed past the guard (501/503),
+		// provider test) are POST read-guards with no Idempotency-Key.
+		// Nil deps fail closed past the guard (501/503),
 		// proving the guard itself no longer 400s. The mail probe is
 		// deliberately NOT in this list: it is a detached mutation
-		// (reason + key required, replay/conflict, audited success) even
+		// (key required, replay/conflict, audited success) even
 		// though its side effect is a single external probe email.
 		probes := []controlCall{
 			{method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`},
@@ -369,31 +345,28 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 			call.userID = admin.userID
 			call.role = admin.role
 			status, _, payload := h.serve(call)
-			if code := controlErrorCode(t, payload); code == string(contract.CodeControlReasonRequired) ||
-				code == string(contract.CodeIdempotencyKeyRequired) {
-				t.Fatalf("%s %s status = %d code = %q, want no reason/key ceremony", call.method, call.path, status, code)
+			if code := controlErrorCode(t, payload); code == string(contract.CodeIdempotencyKeyRequired) {
+				t.Fatalf("%s %s status = %d code = %q, want no idempotency requirement", call.method, call.path, status, code)
 			}
 		}
-		// A supplied reason is still captured on the audit record.
-		reasoned := controlCall{
+		// Probes still emit an audit record.
+		probe := controlCall{
 			method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`,
 			userID: admin.userID, role: admin.role,
-			headers: map[string]string{OperatorReasonHeader: "pre-deploy probe"},
 		}
-		if status, _, _ := h.serve(reasoned); status != http.StatusNotImplemented {
-			t.Fatalf("reasoned probe status = %d, want 501 (nil dep, guard passed)", status)
+		if status, _, _ := h.serve(probe); status != http.StatusNotImplemented {
+			t.Fatalf("probe status = %d, want 501 (nil dep, guard passed)", status)
 		}
 		last := h.sink.Records()[len(h.sink.Records())-1]
-		if last.Reason != "pre-deploy probe" || last.Operation != "platform.test_ai_gateway_connection" {
-			t.Fatalf("probe audit = %+v, want logged reason + operation", last)
+		if last.Operation != "platform.test_ai_gateway_connection" {
+			t.Fatalf("probe audit = %+v, want the operation", last)
 		}
 	})
 
 	t.Run("mutations require header idempotency key", func(t *testing.T) {
 		call := controlCall{
-			method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{"reason":"x"}`,
+			method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{}`,
 			userID: controlOperatorID, role: "admin",
-			headers: map[string]string{OperatorReasonHeader: "has reason, no key"},
 		}
 		status, _, payload := h.serve(call)
 		if status != http.StatusBadRequest {
@@ -406,9 +379,9 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 
 	t.Run("cancel replays on key reuse and conflicts on divergent body", func(t *testing.T) {
 		first := controlCall{
-			method: http.MethodPost, path: "/api/control/v1/tasks/task_replay123/cancel", body: `{"reason":"first"}`,
+			method: http.MethodPost, path: "/api/control/v1/tasks/task_replay123/cancel", body: `{}`,
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("ext-replay-1", "first reason"),
+			headers: controlMutationHeaders("ext-replay-1"),
 		}
 		status, _, _ := h.serve(first)
 		if status != http.StatusOK {
@@ -418,7 +391,7 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 			t.Fatalf("cancel calls = %d, want 1", h.tasks.cancelCalls)
 		}
 		second := first
-		second.headers = controlMutationHeaders("ext-replay-1", "first reason")
+		second.headers = controlMutationHeaders("ext-replay-1")
 		status, _, _ = h.serve(second)
 		if status != http.StatusOK {
 			t.Fatalf("replay cancel status = %d, want 200", status)
@@ -431,8 +404,8 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 			t.Fatalf("replay audit = %+v, want replayed success", last)
 		}
 		divergent := first
-		divergent.body = `{"reason":"different"}`
-		divergent.headers = controlMutationHeaders("ext-replay-1", "different reason")
+		divergent.body = `{"unexpected":true}`
+		divergent.headers = controlMutationHeaders("ext-replay-1")
 		status, _, payload := h.serve(divergent)
 		if status != http.StatusConflict {
 			t.Fatalf("divergent status = %d, want 409", status)
@@ -442,24 +415,18 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 		}
 	})
 
-	t.Run("cancel carries the operator reason to the seam and audit", func(t *testing.T) {
+	t.Run("cancel records the operator and audit target", func(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
-			method: http.MethodPost, path: "/api/control/v1/tasks/task_reason123/cancel",
+			method: http.MethodPost, path: "/api/control/v1/tasks/task_audit123/cancel",
 			userID: controlOperatorID, role: "admin",
-			headers: controlMutationHeaders("ext-reason-6", "runaway task"),
+			headers: controlMutationHeaders("ext-mutation-6"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("cancel status = %d, want 200", status)
 		}
-		h.tasks.mu.Lock()
-		reason := h.tasks.cancelReason
-		h.tasks.mu.Unlock()
-		if reason != "runaway task" {
-			t.Fatalf("seam reason = %q, want operator reason", reason)
-		}
 		last := h.sink.Records()[len(h.sink.Records())-1]
-		if last.Reason != "runaway task" || last.Operation != "tasks.cancel" || last.TargetID != "task_reason123" {
-			t.Fatalf("audit = %+v, want reason + tasks.cancel + target", last)
+		if last.Operation != "tasks.cancel" || last.TargetID != "task_audit123" {
+			t.Fatalf("audit = %+v, want tasks.cancel + target", last)
 		}
 	})
 }
@@ -477,7 +444,7 @@ func TestControlRewardsProxyHappyPath(t *testing.T) {
 			method: http.MethodPost, path: "/api/control/v1/rewards/codes",
 			body:   `{"display_name":"launch","code":"ABCDEFGH","credit_amount":10,"max_redemptions":100}`,
 			userID: admin.userID, role: admin.role,
-			headers: controlMutationHeaders("ext-reward-1", "launch promo"),
+			headers: controlMutationHeaders("ext-reward-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("create status = %d, body=%v", status, payload)
@@ -487,7 +454,7 @@ func TestControlRewardsProxyHappyPath(t *testing.T) {
 		}
 		last := h.sink.Records()[len(h.sink.Records())-1]
 		if last.Operation != "rewards.create_code" || last.Capability != ControlCapabilityCredits ||
-			last.Reason != "launch promo" || last.Outcome != ControlAuditOK {
+			last.Outcome != ControlAuditOK {
 			t.Fatalf("audit = %+v", last)
 		}
 	})
@@ -517,12 +484,12 @@ func TestControlRewardsProxyHappyPath(t *testing.T) {
 		mutations := []controlCall{
 			{method: http.MethodPatch, path: "/api/control/v1/rewards/codes/7",
 				body:    `{"display_name":"y","credit_amount":5,"max_redemptions":10}`,
-				headers: controlMutationHeaders("ext-reward-2", "rename")},
+				headers: controlMutationHeaders("ext-reward-2")},
 			{method: http.MethodPatch, path: "/api/control/v1/rewards/codes/7/enabled",
 				body:    `{"enabled":false}`,
-				headers: controlMutationHeaders("ext-reward-3", "pause")},
+				headers: controlMutationHeaders("ext-reward-3")},
 			{method: http.MethodDelete, path: "/api/control/v1/rewards/codes/7",
-				headers: controlMutationHeaders("ext-reward-4", "cleanup")},
+				headers: controlMutationHeaders("ext-reward-4")},
 		}
 		for _, call := range mutations {
 			call.userID = admin.userID
@@ -563,12 +530,12 @@ func TestControlOAuthHandlers(t *testing.T) {
 		}
 	})
 
-	t.Run("update provider carries reason", func(t *testing.T) {
+	t.Run("update provider emits an audit record", func(t *testing.T) {
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPut, path: "/api/control/v1/users/oauth/discord",
 			body:   `{"enabled":true,"client_id":"cid","client_secret":"sek"}`,
 			userID: admin.userID, role: admin.role,
-			headers: controlMutationHeaders("ext-oauth-1", "enable discord"),
+			headers: controlMutationHeaders("ext-oauth-1"),
 		})
 		if status != http.StatusOK {
 			t.Fatalf("update status = %d, want 200", status)
@@ -577,7 +544,7 @@ func TestControlOAuthHandlers(t *testing.T) {
 			t.Fatalf("service input = %+v %+v", oauth.lastProvide, oauth.lastUpdate)
 		}
 		last := h.sink.Records()[len(h.sink.Records())-1]
-		if last.Reason != "enable discord" || last.Outcome != ControlAuditOK {
+		if last.Outcome != ControlAuditOK {
 			t.Fatalf("audit = %+v", last)
 		}
 	})
@@ -628,7 +595,7 @@ func TestControlStripeProviderAllowlist(t *testing.T) {
 			method: http.MethodPut, path: "/api/control/v1/payments/providers/adyen",
 			body:   `{"enabled":true}`,
 			userID: admin.userID, role: admin.role,
-			headers: controlMutationHeaders("ext-stripe-allowlist", "allowlist probe"),
+			headers: controlMutationHeaders("ext-stripe-allowlist"),
 		})
 		if status != http.StatusNotFound {
 			t.Fatalf("update status = %d, want 404", status)
@@ -637,13 +604,11 @@ func TestControlStripeProviderAllowlist(t *testing.T) {
 }
 
 func TestControlBrandingUploadGuards(t *testing.T) {
-	newUploadRequest := func(t *testing.T, reason, key string, fileBytes []byte, filename string) *http.Request {
+	newUploadRequest := func(t *testing.T, key string, fileBytes []byte, filename string) *http.Request {
 		t.Helper()
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
-		if reason != "" {
-			_ = writer.WriteField("reason", reason)
-		}
+
 		if fileBytes != nil {
 			part, err := writer.CreateFormFile("file", filename)
 			if err != nil {
@@ -688,18 +653,8 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("reason required", func(t *testing.T) {
-		status, payload := serveUpload(h.engine, newUploadRequest(t, "", "ext-up-1", png, "logo.png"))
-		if status != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", status)
-		}
-		if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
-			t.Fatalf("code = %q, want control_reason_required", code)
-		}
-	})
-
 	t.Run("idempotency key required", func(t *testing.T) {
-		status, payload := serveUpload(h.engine, newUploadRequest(t, "brand refresh", "", png, "logo.png"))
+		status, payload := serveUpload(h.engine, newUploadRequest(t, "", png, "logo.png"))
 		if status != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", status)
 		}
@@ -709,18 +664,18 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 	})
 
 	t.Run("file required and validated", func(t *testing.T) {
-		status, _ := serveUpload(h.engine, newUploadRequest(t, "brand refresh", "ext-up-2", nil, ""))
+		status, _ := serveUpload(h.engine, newUploadRequest(t, "ext-up-2", nil, ""))
 		if status != http.StatusBadRequest {
 			t.Fatalf("missing file status = %d, want 400", status)
 		}
-		status, payload := serveUpload(h.engine, newUploadRequest(t, "brand refresh", "ext-up-3", []byte("not an image"), "logo.png"))
+		status, payload := serveUpload(h.engine, newUploadRequest(t, "ext-up-3", []byte("not an image"), "logo.png"))
 		if status != http.StatusBadRequest {
 			t.Fatalf("bad content status = %d (%v), want 400", status, payload)
 		}
 	})
 
 	t.Run("happy path replays on key reuse and conflicts on divergent content", func(t *testing.T) {
-		status, payload := serveUpload(h.engine, newUploadRequest(t, "brand refresh", "ext-up-4", png, "logo.png"))
+		status, payload := serveUpload(h.engine, newUploadRequest(t, "ext-up-4", png, "logo.png"))
 		if status != http.StatusOK {
 			t.Fatalf("upload status = %d (%v), want 200", status, payload)
 		}
@@ -728,7 +683,7 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 		if data["logo_url"] != "/uploads/site/assets/logo.png" {
 			t.Fatalf("logo_url = %v", data["logo_url"])
 		}
-		againStatus, againPayload := serveUpload(h.engine, newUploadRequest(t, "brand refresh", "ext-up-4", png, "logo.png"))
+		againStatus, againPayload := serveUpload(h.engine, newUploadRequest(t, "ext-up-4", png, "logo.png"))
 		if againStatus != http.StatusOK {
 			t.Fatalf("replay status = %d, want 200", againStatus)
 		}
@@ -736,7 +691,7 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 		if againData["logo_url"] != data["logo_url"] {
 			t.Fatalf("replay logo_url = %v, want %v", againData["logo_url"], data["logo_url"])
 		}
-		divergent, divergentPayload := serveUpload(h.engine, newUploadRequest(t, "brand refresh", "ext-up-4", append(png, 0x01), "logo.png"))
+		divergent, divergentPayload := serveUpload(h.engine, newUploadRequest(t, "ext-up-4", append(png, 0x01), "logo.png"))
 		if divergent != http.StatusConflict {
 			t.Fatalf("divergent status = %d (%v), want 409", divergent, divergentPayload)
 		}
@@ -744,8 +699,12 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 			t.Fatalf("code = %q, want idempotency_conflict", code)
 		}
 		records := h.sink.Records()
-		if len(records) == 0 || records[len(records)-1].Reason != "brand refresh" {
-			t.Fatalf("branding upload audit reason = %+v, want multipart reason", records)
+		if len(records) == 0 {
+			t.Fatal("branding upload must emit an audit record")
+		}
+		last := records[len(records)-1]
+		if last.Operation != "platform.upload_branding_logo" || last.Outcome != ControlAuditFailed || last.Status != http.StatusConflict {
+			t.Fatalf("branding upload audit = %+v, want audited conflict", last)
 		}
 	})
 }
@@ -768,7 +727,7 @@ func TestWorkspaceControlTaskAdapterFailClosed(t *testing.T) {
 	if _, err := adapter.ResolveAdminTaskUserID(ctx, "usr_abc"); !isControlTaskNotFound(err) {
 		t.Fatalf("ResolveAdminTaskUserID err = %v, want not found", err)
 	}
-	if err := adapter.CancelAdminTask(ctx, "task_missing123", controlOperatorID, "reason"); !isControlTaskNotFound(err) {
+	if err := adapter.CancelAdminTask(ctx, "task_missing123", controlOperatorID); !isControlTaskNotFound(err) {
 		t.Fatalf("CancelAdminTask err = %v, want not found", err)
 	}
 }
@@ -779,10 +738,10 @@ func TestControlBrandLogoOverrideAuditTarget(t *testing.T) {
 		method: http.MethodPut, path: "/api/control/v1/platform/brand-logo-overrides/oauth-provider/google",
 		body:   `{"logo_key":"google-oauth"}`,
 		userID: controlOperatorID, role: "admin",
-		headers: controlMutationHeaders("ext-brand-1", "override logo"),
+		headers: controlMutationHeaders("ext-brand-1"),
 	})
 	// Nil dep fails closed with 501, but the audit record still carries
-	// the scope-qualified target, capability, reason, and key.
+	// the scope-qualified target, capability and key.
 	if status != http.StatusNotImplemented {
 		t.Fatalf("status = %d, want 501", status)
 	}
@@ -791,7 +750,7 @@ func TestControlBrandLogoOverrideAuditTarget(t *testing.T) {
 		t.Fatalf("target = %q %q, want brand_logo_override oauth-provider:google", last.TargetType, last.TargetID)
 	}
 	if last.Capability != ControlCapabilityPlatform || last.Operation != "platform.upsert_brand_logo_override" ||
-		last.Reason != "override logo" || last.IdempotencyKey != "ext-brand-1" {
+		last.IdempotencyKey != "ext-brand-1" {
 		t.Fatalf("audit = %+v", last)
 	}
 }

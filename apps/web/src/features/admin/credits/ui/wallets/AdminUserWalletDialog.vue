@@ -82,7 +82,6 @@
       <WalletAdjustPanel
         v-if="activeTab === 'grant' || activeTab === 'deduction' || activeTab === 'refund'"
         v-model:amount-credits="amountCredits"
-        v-model:reason="reason"
         v-model:show-errors="showErrors"
         :active-tab="activeTab"
         :refund-source="refundSource"
@@ -147,7 +146,6 @@ const loadedCursors = new Set<string>()
 const activeCommand = ref<AdminCreditCommandKind | null>(null)
 const refundSource = ref<AdminCreditLedgerTransaction | null>(null)
 const amountCredits = ref<number | null>(null)
-const reason = ref('')
 const showErrors = ref(false)
 const resource = useAdminCreditWalletResource(
   () => (props.visible ? props.user.publicId : null),
@@ -203,7 +201,6 @@ const validation = computed(() =>
     kind: activeCommand.value ?? 'grant',
     userPublicId: props.user.publicId,
     amountCredits: amountCredits.value,
-    reason: reason.value,
     chargeTransactionId: refundSource.value?.transaction_id,
     remainingRefundableCredits: refundSource.value?.charge?.remaining_refundable_credits,
   }),
@@ -274,7 +271,6 @@ function openCommand(kind: Exclude<AdminCreditCommandKind, 'refund'>) {
   activeCommand.value = kind
   activeTab.value = kind
   amountCredits.value = null
-  reason.value = ''
   showErrors.value = false
 }
 
@@ -284,7 +280,6 @@ function openRefund(transaction: AdminCreditLedgerTransaction) {
   activeCommand.value = 'refund'
   activeTab.value = 'refund'
   amountCredits.value = null
-  reason.value = ''
   showErrors.value = false
 }
 function switchToLedgerTab() {
@@ -295,7 +290,6 @@ function clearCommand() {
   activeCommand.value = null
   refundSource.value = null
   amountCredits.value = null
-  reason.value = ''
   showErrors.value = false
 }
 async function requestCommandConfirmation() {
@@ -314,7 +308,6 @@ async function requestCommandConfirmation() {
       name: props.user.displayName,
       action: label,
       amount: formatIdeaAmount(amountCredits.value),
-      reason: reason.value.trim(),
     }),
     confirmLabel: t('admin.wallet.confirmCommandLabel', { action: label }),
     intent: kind === 'grant' ? 'warn' : 'danger',
@@ -325,7 +318,6 @@ async function requestCommandConfirmation() {
       kind,
       userPublicId: props.user.publicId,
       amountCredits: amountCredits.value,
-      reason: reason.value,
       chargeTransactionId: refundSource.value?.transaction_id,
       remainingRefundableCredits: refundSource.value?.charge?.remaining_refundable_credits,
     })

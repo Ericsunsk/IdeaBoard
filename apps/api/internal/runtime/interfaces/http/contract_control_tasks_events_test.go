@@ -1,24 +1,9 @@
 package httpapi
 
-// Control task status announcements (admin cancel dead-channel fix).
-//
-// The defect these pin: an operator cancel settled the task but its
-// staged status event was never drained, so `task.cancelled` reached
-// neither the task status channel nor the workspace envelope. Both
-// delivery channels are asserted with COUNTS, not just presence: the
-// failure mode being guarded is a silent no-op, and "at least once" would
-// happily pass a double-send.
-//
-// The port is deliberately a recording fake declared HERE, in the Control
-// Plane's own package, with no dependency on the event layer. That is the
-// point of the neutral port: the delivery mechanism is a composition-time
-// choice, so "did the operator cancel announce exactly once" is provable
-// without a bus, a hub, or a webhook endpoint.
-//
-// These are PostgreSQL integration tests over the real settlement legs
-// (cancel flips the row and releases the hold inside ONE transaction).
-// They skip without API_TEST_DATABASE_DSN like the other postgres
-// integration tests.
+// Control cancellation integration tests verify atomic task/hold settlement
+// and exactly one announcement to each delivery channel. A recording port
+// keeps the Control Plane independent of delivery infrastructure.
+// Tests require API_TEST_DATABASE_DSN.
 
 import (
 	"context"
@@ -334,7 +319,7 @@ func (e *controlCancelEnv) readPriceVersion(t *testing.T) (int64, int64) {
 // TestControlAdminCancelAnnouncesTaskCancelledExactlyOnce is the primary
 // regression test for the dead channel: an operator cancel must announce
 // task.cancelled EXACTLY once on the task status channel and EXACTLY once
-// as a workspace event, carrying the workspace, task, operator reason,
+// as a workspace event, carrying the workspace, task, system cancellation cause,
 // and operator identity.
 func TestControlAdminCancelAnnouncesTaskCancelledExactlyOnce(t *testing.T) {
 	env := openControlCancelEnv(t)
@@ -350,7 +335,7 @@ func TestControlAdminCancelAnnouncesTaskCancelledExactlyOnce(t *testing.T) {
 		events,
 	)
 
-	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID, "operator cancelled for abuse"); err != nil {
+	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID); err != nil {
 		t.Fatalf("CancelAdminTask: %v", err)
 	}
 	if got := env.taskStatus(t, taskID); got != "cancelled" {
@@ -371,8 +356,8 @@ func TestControlAdminCancelAnnouncesTaskCancelledExactlyOnce(t *testing.T) {
 	if published.TaskID != taskID || published.WorkspaceID != env.workspace {
 		t.Fatalf("status announcement scope = %s/%s, want %s/%s", published.WorkspaceID, published.TaskID, env.workspace, taskID)
 	}
-	if published.Reason != "operator cancelled for abuse" {
-		t.Fatalf("status announcement reason = %q, want the operator reason", published.Reason)
+	if published.Reason != "cancelled" {
+		t.Fatalf("status announcement reason = %q, want cancelled", published.Reason)
 	}
 	if published.ActorUserID != tenancy.FormatUserPublicID(operatorPublicID) {
 		t.Fatalf("status announcement actor = %q, want the operator usr_ id", published.ActorUserID)
@@ -398,7 +383,7 @@ func TestControlAdminCancelReplaysAnnounceNothingOnce(t *testing.T) {
 	events := &recordingControlTaskEvents{}
 	adapter := env.adapter(&controlTxHolder{credits: creditService}, nil, events)
 
-	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID, "first"); err != nil {
+	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID); err != nil {
 		t.Fatalf("first CancelAdminTask: %v", err)
 	}
 	statuses, envelopes := events.snapshot()
@@ -406,7 +391,7 @@ func TestControlAdminCancelReplaysAnnounceNothingOnce(t *testing.T) {
 		t.Fatalf("after first cancel: statuses=%d envelopes=%d, want 1/1", len(statuses), len(envelopes))
 	}
 	// The second cancel hits an already-terminal row: no fresh flip, no staging.
-	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID, "replay"); err != nil {
+	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID); err != nil {
 		t.Fatalf("replayed CancelAdminTask: %v", err)
 	}
 	statuses, envelopes = events.snapshot()
@@ -431,7 +416,7 @@ func TestControlAdminCancelRollbackAnnouncesNothing(t *testing.T) {
 	events := &recordingControlTaskEvents{}
 	adapter := env.adapter(holder, nil, events)
 
-	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID, "should roll back"); err == nil {
+	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID); err == nil {
 		t.Fatal("cancel with a failing Release must fail")
 	}
 	if got := env.taskStatus(t, taskID); got != "pending" {
@@ -455,7 +440,7 @@ func TestControlAdminCancelSettlesWithNilEventPort(t *testing.T) {
 	env.seedPaidTask(t, creditService, taskID)
 
 	adapter := env.adapter(&controlTxHolder{credits: creditService}, nil, nil)
-	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID, "no port wired"); err != nil {
+	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID); err != nil {
 		t.Fatalf("cancel with a nil event port: %v", err)
 	}
 	if got := env.taskStatus(t, taskID); got != "cancelled" {
@@ -478,7 +463,7 @@ func TestControlAdminCancelSurvivesEventPortFailure(t *testing.T) {
 		envelopeErr: errors.New("webhook dispatch down"),
 	}
 	adapter := env.adapter(&controlTxHolder{credits: creditService}, nil, events)
-	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID, "port is down"); err != nil {
+	if err := adapter.CancelAdminTask(context.Background(), taskID, env.userID); err != nil {
 		t.Fatalf("a failing event port must not fail the cancel: %v", err)
 	}
 	if got := env.taskStatus(t, taskID); got != "cancelled" {

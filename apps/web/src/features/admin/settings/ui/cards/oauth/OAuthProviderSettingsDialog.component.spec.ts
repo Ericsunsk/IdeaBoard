@@ -96,15 +96,11 @@ describe('OAuthProviderSettingsDialog', () => {
     await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
     await waitFor(() =>
-      expect(resource.save).toHaveBeenCalledWith(
-        'google',
-        {
-          enabled: true,
-          clientId: 'google-client.apps.googleusercontent.com',
-          clientSecret: '',
-        },
-        '',
-      ),
+      expect(resource.save).toHaveBeenCalledWith('google', {
+        enabled: true,
+        clientId: 'google-client.apps.googleusercontent.com',
+        clientSecret: '',
+      }),
     )
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(4))
     expect(emitted()['update:visible']).toEqual([[false]])

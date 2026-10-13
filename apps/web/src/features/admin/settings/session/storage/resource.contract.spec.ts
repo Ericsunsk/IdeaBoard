@@ -29,23 +29,23 @@ describe('createAdminStorageResource', () => {
     await expect(resource.fetchProfiles()).resolves.toEqual([
       makeGeneratedProfile('profile-listed'),
     ])
-    const reason = { operatorReason: 'storage review' }
-    await expect(resource.saveProfile({ payload }, reason)).resolves.toMatchObject({
+    const options = {}
+    await expect(resource.saveProfile({ payload }, options)).resolves.toMatchObject({
       message: 'created',
       profile: {
         id: 'profile-created',
       },
     })
-    await expect(resource.saveProfile({ id: 'profile-1', payload }, reason)).resolves.toMatchObject(
-      {
-        message: 'updated',
-        profile: {
-          id: 'profile-updated',
-        },
+    await expect(
+      resource.saveProfile({ id: 'profile-1', payload }, options),
+    ).resolves.toMatchObject({
+      message: 'updated',
+      profile: {
+        id: 'profile-updated',
       },
-    )
-    await expect(resource.testProfile('profile-1', reason)).resolves.toEqual({ message: 'tested' })
-    await expect(resource.applyProfile('profile-1', reason)).resolves.toMatchObject({
+    })
+    await expect(resource.testProfile('profile-1', options)).resolves.toEqual({ message: 'tested' })
+    await expect(resource.applyProfile('profile-1', options)).resolves.toMatchObject({
       message: 'applied',
       profile: {
         id: 'profile-applied',
@@ -55,7 +55,7 @@ describe('createAdminStorageResource', () => {
       'cdn.example.com',
       'assets.example.com',
     ])
-    await expect(resource.deleteProfile('profile-1', reason)).resolves.toEqual({
+    await expect(resource.deleteProfile('profile-1', options)).resolves.toEqual({
       message: 'deleted',
     })
 
@@ -108,17 +108,16 @@ describe('createAdminStorageResource', () => {
     const resource = createAdminStorageResource()
 
     await expect(
-      resource.saveProfile({ payload: makeStoragePayload() }, { operatorReason: 'storage review' }),
+      resource.saveProfile({ payload: makeStoragePayload() }, { idempotencyKey: 'storage-1' }),
     ).rejects.toThrow('存储名称已存在')
   })
 
-  it('carries the idempotency key without an operator reason on routine storage saves', async () => {
+  it('carries the idempotency key on routine storage saves', async () => {
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
       http.post('/api/control/v1/platform/storage/profiles', ({ request }) => {
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         }
         return HttpResponse.json({
           data: { message: 'created', profile: makeGeneratedProfile('profile-created') },
@@ -127,12 +126,9 @@ describe('createAdminStorageResource', () => {
     )
     const resource = createAdminStorageResource()
 
-    await resource.saveProfile(
-      { payload: makeStoragePayload() },
-      { operatorReason: '', idempotencyKey: 'storage-1' },
-    )
+    await resource.saveProfile({ payload: makeStoragePayload() }, { idempotencyKey: 'storage-1' })
 
-    expect(seenHeaders).toEqual({ idempotencyKey: 'storage-1', operatorReason: null })
+    expect(seenHeaders).toEqual({ idempotencyKey: 'storage-1' })
   })
 
   it('probes storage connections with a routine empty reason while keeping the idempotency key', async () => {
@@ -141,7 +137,6 @@ describe('createAdminStorageResource', () => {
       http.post('/api/control/v1/platform/storage/profiles/:id/test', ({ request }) => {
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         }
         return HttpResponse.json({ data: { message: 'tested' } })
       }),
@@ -149,11 +144,11 @@ describe('createAdminStorageResource', () => {
     const resource = createAdminStorageResource()
 
     // 后端 POST read-guard 非 Mutation：空 reason 合法，与 mail/搜索探针对齐。
-    await expect(
-      resource.testProfile('profile-1', { operatorReason: '', idempotencyKey: 'probe-1' }),
-    ).resolves.toEqual({ message: 'tested' })
+    await expect(resource.testProfile('profile-1', { idempotencyKey: 'probe-1' })).resolves.toEqual(
+      { message: 'tested' },
+    )
 
-    expect(seenHeaders).toEqual({ idempotencyKey: 'probe-1', operatorReason: null })
+    expect(seenHeaders).toEqual({ idempotencyKey: 'probe-1' })
   })
 
   it('uses the resource fallback when a successful response omits required data', async () => {

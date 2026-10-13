@@ -102,15 +102,12 @@ describe('StripeSettingsDialog', () => {
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() =>
-      expect(resource.save).toHaveBeenCalledWith(
-        {
-          apiKey: 'sk_test_secret',
-          paymentMethodConfigurationId: 'pmc_ideaboard',
-          productTaxCode: 'txcd_10105001',
-          isPurchasesEnabled: true,
-        },
-        { operatorReason: '' },
-      ),
+      expect(resource.save).toHaveBeenCalledWith({
+        apiKey: 'sk_test_secret',
+        paymentMethodConfigurationId: 'pmc_ideaboard',
+        productTaxCode: 'txcd_10105001',
+        isPurchasesEnabled: true,
+      }),
     )
     await waitFor(() => expect(emitted()['update:visible']).toEqual([[false]]))
     expect((screen.getByLabelText('Stripe API Key') as HTMLInputElement).value).toBe('')

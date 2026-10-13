@@ -41,7 +41,7 @@ describe('stripeSettingsResource', () => {
     })
   })
 
-  it('omits an empty API Key while saving the non-secret Stripe settings without a reason', async () => {
+  it('omits an empty API Key while saving non-secret Stripe settings', async () => {
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
       http.put('/api/control/v1/payments/providers/stripe', async ({ request }) => {
@@ -49,33 +49,27 @@ describe('stripeSettingsResource', () => {
           payment_method_configuration_id: 'pmc_ideaboard',
           product_tax_code: 'txcd_10105001',
           purchases_enabled: true,
-          reason: '',
         } satisfies Pick<ApiStripeConfigurationSummary, 'purchases_enabled'> &
           Record<string, unknown>)
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         }
         return HttpResponse.json({ data: responseData })
       }),
     )
 
     await expect(
-      createAdminStripeSettingsResource().save(
-        {
-          apiKey: '   ',
-          paymentMethodConfigurationId: ' pmc_ideaboard ',
-          productTaxCode: ' txcd_10105001 ',
-          isPurchasesEnabled: true,
-        },
-        { operatorReason: '   ' },
-      ),
+      createAdminStripeSettingsResource().save({
+        apiKey: '   ',
+        paymentMethodConfigurationId: ' pmc_ideaboard ',
+        productTaxCode: ' txcd_10105001 ',
+        isPurchasesEnabled: true,
+      }),
     ).resolves.toMatchObject({
       isApiKeyConfigured: true,
       isWebhookSecretConfigured: true,
       accountId: 'acct_123',
     })
     expect(seenHeaders.idempotencyKey).toMatch(/.+/)
-    expect(seenHeaders.operatorReason).toBeNull()
   })
 })

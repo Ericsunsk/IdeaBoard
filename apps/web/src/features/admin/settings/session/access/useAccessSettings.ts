@@ -13,15 +13,8 @@ import { requireContractData } from '../../../../../api/contractKernel'
 import type { AdminAccessSettingsFeedback } from '../useSettingsFeedback'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'
 import { withControlCopy } from '../../../shared/index'
-import { buildRoutineControlMutationHeaders } from '../../../shared/index'
+import { buildControlMutationHeaders } from '../../../shared/index'
 
-// Admin access (rate limit + registration + login lockout) boundary (W2 transports). Reads
-// and writes go through the Control Plane with the contract envelope
-// (`{data}`); every mutation carries a header-only Idempotency-Key and emits
-// a control audit record. Routine config writes (backend ReasonOptional)
-// skip the confirm dialog and audit an empty reason. The deleted
-// `/api/admin/settings/*` routes are gone; this module is the single
-// transport.
 type RateLimitSetting = {
   window_seconds: number
   max_requests: number
@@ -154,8 +147,6 @@ function useRegistrationSetting(
 
   async function handleToggleRegistration(newValue: boolean) {
     const fallbackEnabled = registrationSettingQuery.data.value?.enabled ?? !newValue
-    // Routine config write (backend ReasonOptional): toggle directly
-    // without the confirm dialog; the audit records an empty reason.
     try {
       await updateRegistrationSettingMutation.mutateAsync({
         enabled: newValue,
@@ -184,8 +175,6 @@ function useRateLimitSetting(
   })
   const rateLimitSource = computed(() => rateLimitSettingsQuery.data.value)
 
-  // The lifecycle save persists directly (routine config write, backend
-  // ReasonOptional): no confirm dialog, the audit records an empty reason.
   const saveRateLimitMutation = useMutation({
     mutationFn: (draft: AdminAccessRateLimitForm) =>
       saveRateLimitSetting({
@@ -229,8 +218,6 @@ function useRateLimitSetting(
   })
 
   async function saveRateLimit(): Promise<boolean> {
-    // Routine config write (backend ReasonOptional): save directly without
-    // the confirm dialog; the audit records an empty reason.
     return rateLimitLifecycle.save()
   }
 
@@ -293,8 +280,6 @@ function useLoginLockoutSetting(
   })
 
   async function saveLoginLockout(): Promise<boolean> {
-    // Routine config write (backend ReasonOptional): save directly without
-    // the confirm dialog; the audit records an empty reason.
     return loginLockoutLifecycle.save()
   }
 
@@ -332,10 +317,7 @@ async function saveRegistrationSetting(enabled: boolean): Promise<RegistrationSe
   try {
     const body = await updateControlRegistrationSetting(
       { enabled },
-      // Routine config write (backend ReasonOptional): no operator-reason
-      // header, the audit records an empty reason. Idempotency-Key stays
-      // required on both tiers.
-      { headers: buildRoutineControlMutationHeaders() },
+      { headers: buildControlMutationHeaders() },
     )
     return requireContractData<RegistrationSettingData>(body, '更新注册状态失败')
   } catch (error) {
@@ -347,7 +329,7 @@ async function saveRateLimitSetting(draft: RateLimitSetting): Promise<RateLimitS
   try {
     const body = await updateControlRateLimitSetting(
       { window_seconds: draft.window_seconds, max_requests: draft.max_requests },
-      { headers: buildRoutineControlMutationHeaders() },
+      { headers: buildControlMutationHeaders() },
     )
     return requireContractData<RateLimitSetting>(body, '保存访问限流失败')
   } catch (error) {
@@ -359,7 +341,7 @@ async function saveLoginLockoutSetting(draft: LoginLockoutSetting): Promise<Logi
   try {
     const body = await updateControlLoginLockoutSetting(
       { threshold: draft.threshold, duration_seconds: draft.duration_seconds },
-      { headers: buildRoutineControlMutationHeaders() },
+      { headers: buildControlMutationHeaders() },
     )
     return requireContractData<LoginLockoutSetting>(body, '保存登录锁定失败')
   } catch (error) {

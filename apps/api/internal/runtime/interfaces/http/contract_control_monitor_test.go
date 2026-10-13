@@ -1,9 +1,9 @@
 package httpapi
 
-// Control monitor/statistics/backfill liveness tests (#809-close). The
+// Control monitor/statistics/backfill liveness tests. The
 // workspace-backed statistics store wires ContractControlDeps.Monitor off
 // its honest 501, so these routes must answer 200 with the unified
-// contract envelope ({data} unwrapped from the legacy admin DTO at the
+// contract envelope ({data} unwrapped from the domain DTO at the
 // control boundary). The nil-Monitor fail-closed path stays covered by
 // TestControlUnwiredDepsFailClosed in contract_control_auth_test.go.
 
@@ -122,7 +122,7 @@ func TestControlStatisticsBackfillLive(t *testing.T) {
 	}
 	call := admin(controlCall{
 		method: http.MethodPost, path: "/api/control/v1/platform/statistics/backfill",
-		body: `{"range":"7d"}`, headers: controlMutationHeaders("monitor-backfill-1", "rebuild stats after deploy"),
+		body: `{"range":"7d"}`, headers: controlMutationHeaders("monitor-backfill-1"),
 	})
 	if status, _, payload := h.serve(call); status != http.StatusOK {
 		t.Fatalf("wired backfill = %d (%v), want 200", status, payload)

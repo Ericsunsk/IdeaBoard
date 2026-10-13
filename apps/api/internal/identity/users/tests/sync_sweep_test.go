@@ -25,7 +25,7 @@ func (f *recordingRoleManager) SetUserRole(_ context.Context, _ string, role str
 	return f.roleErr
 }
 
-func (f *recordingRoleManager) BanUser(_ context.Context, _ string, _ string, _ int) error {
+func (f *recordingRoleManager) BanUser(_ context.Context, _ string, _ int) error {
 	f.bans++
 	return f.banErr
 }

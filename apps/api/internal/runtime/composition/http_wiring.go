@@ -236,22 +236,10 @@ func newAppRouter(
 			Recharges:       services.paymentService,
 			Rewards:         services.rewardService,
 		},
-		// Control Plane administration (issue #808). Every seam below is
-		// shared with the platform-config handlers (no second ledger,
-		// queue, or settings store); the control guard adds capability
-		// auth, the separate rate-limit bucket, header-only idempotency,
-		// the operator reason, and the mandatory audit record.
-		// #809-close: Tasks rides the workspace task read model
-		// (workspaceControlTaskAdapter over the shared workspace store +
-		// global control queries; cancel settles through the shared
-		// holder with the operator reason). Rewards, OAuth providers,
-		// brand-logo overrides, and the AI gateway extras reuse their
-		// domain handlers under the guard (single-sourced validation);
-		// branding logo upload stores through the shared Storage
-		// service. Monitor rides the workspace-backed statistics store
-		// (task_daily_stats / task_stat_events / task_execution_attempts
-		// over the workspace tasks table) plus the River queue monitor,
-		// so the monitor / statistics / stream proxies are live.
+		// Control administration shares domain handlers and stores. The guard
+		// enforces authorization, rate limits, idempotency and durable audit.
+		// Tasks use the workspace read model and transaction-bound settlement;
+		// Monitor uses workspace statistics and the River queue monitor.
 		ContractControl: httpapi.ContractControlDeps{
 			Users:          services.userService,
 			Identity:       administration.NewIdentityAdminCommands(services.userService, services.authServiceClient, authsync.NewStore(repos.db)),

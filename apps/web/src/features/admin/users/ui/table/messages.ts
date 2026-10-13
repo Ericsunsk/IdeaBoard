@@ -20,13 +20,11 @@ export const USERS_MESSAGES = {
   actionsMenuAria: (displayName: string) => `${displayName} 操作菜单`,
   // Ban dialog.
   banAria: '封禁用户',
-  banDescription: '设置封禁时长与原因后确认封禁。',
+  banDescription: '设置封禁时长后确认封禁。',
   banAccessBadge: '访问控制',
   banForceBadge: '强制限制',
   banTitle: '高级访问限制',
   banDurationLabel: '封禁时长 (Duration)',
-  banReasonLabel: '封禁原因 (内部记录)',
-  banReasonPlaceholder: '例如：发表违规内容、恶意刷量...',
   banFooterNote: '封禁会立即断开该用户所有连接，封禁期间无法重新登录。',
   banConfirm: '确认封禁',
 } as const

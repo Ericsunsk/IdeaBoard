@@ -57,8 +57,8 @@ const CANONICAL_EMAIL_PATHS = new Set([
 // reachable from any browser session whose Auth role is `admin`. Those
 // endpoints mutate Auth state directly, so reaching them from the browser
 // bypasses the Go Control Plane orchestration that DESIGN.md requires for
-// cross-database high-risk identity actions (no operator reason, no
-// Idempotency-Key, no control audit, no local cleanup).
+// cross-database high-risk identity actions (Idempotency-Key, control audit
+// and local cleanup).
 //
 // `impersonate` is the single permission that must survive, because the Go
 // Control Plane starts impersonation through this plugin's public endpoint

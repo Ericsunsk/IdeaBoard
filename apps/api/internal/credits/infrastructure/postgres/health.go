@@ -28,15 +28,15 @@ func GetCreditHealthSnapshot(ctx context.Context, pool *pgxpool.Pool) (ports.Cre
 			slog.Warn("failed to roll back Credit health read transaction", "err", rollbackErr)
 		}
 	}()
-	active, err := QueryOptionalReconciliationRun(ctx, tx, `SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count, isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at FROM credit_reconciliation_runs WHERE status IN ('queued', 'running') ORDER BY id DESC LIMIT 1`)
+	active, err := QueryOptionalReconciliationRun(ctx, tx, `SELECT id, status, trigger_type, requested_by, scheduled_for, finding_count, critical_count, isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at FROM credit_reconciliation_runs WHERE status IN ('queued', 'running') ORDER BY id DESC LIMIT 1`)
 	if err != nil {
 		return ports.CreditHealthSnapshot{}, fmt.Errorf("credits health: read active run: %w", err)
 	}
-	successful, err := QueryOptionalReconciliationRun(ctx, tx, `SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count, isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at FROM credit_reconciliation_runs WHERE status = 'completed' ORDER BY completed_at DESC, id DESC LIMIT 1`)
+	successful, err := QueryOptionalReconciliationRun(ctx, tx, `SELECT id, status, trigger_type, requested_by, scheduled_for, finding_count, critical_count, isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at FROM credit_reconciliation_runs WHERE status = 'completed' ORDER BY completed_at DESC, id DESC LIMIT 1`)
 	if err != nil {
 		return ports.CreditHealthSnapshot{}, fmt.Errorf("credits health: read latest successful run: %w", err)
 	}
-	failed, err := QueryOptionalReconciliationRun(ctx, tx, `SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count, isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at FROM credit_reconciliation_runs WHERE status = 'failed' ORDER BY completed_at DESC, id DESC LIMIT 1`)
+	failed, err := QueryOptionalReconciliationRun(ctx, tx, `SELECT id, status, trigger_type, requested_by, scheduled_for, finding_count, critical_count, isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at FROM credit_reconciliation_runs WHERE status = 'failed' ORDER BY completed_at DESC, id DESC LIMIT 1`)
 	if err != nil {
 		return ports.CreditHealthSnapshot{}, fmt.Errorf("credits health: read latest failed run: %w", err)
 	}

@@ -79,7 +79,6 @@ type BillingAdminAction struct {
 	Sku            string             `json:"sku"`
 	PriceVersionID pgtype.Int8        `json:"price_version_id"`
 	ActorID        int64              `json:"actor_id"`
-	Reason         string             `json:"reason"`
 	Metadata       []byte             `json:"metadata"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
@@ -175,7 +174,6 @@ type ControlAuditRecord struct {
 	Capability           string             `json:"capability"`
 	TargetType           string             `json:"target_type"`
 	TargetID             string             `json:"target_id"`
-	Reason               string             `json:"reason"`
 	Outcome              string             `json:"outcome"`
 	ErrorMessage         string             `json:"error_message"`
 	RequestCorrelationID string             `json:"request_correlation_id"`
@@ -269,7 +267,6 @@ type CreditReconciliationRun struct {
 	Status              string             `json:"status"`
 	TriggerType         string             `json:"trigger_type"`
 	RequestedBy         pgtype.Int8        `json:"requested_by"`
-	Reason              pgtype.Text        `json:"reason"`
 	ScheduledFor        pgtype.Timestamptz `json:"scheduled_for"`
 	StaleHoldAfter      pgtype.Interval    `json:"stale_hold_after"`
 	FindingCount        int64              `json:"finding_count"`
@@ -424,7 +421,6 @@ type IdentityAdminReconciliationRun struct {
 	Status       string             `json:"status"`
 	TriggerType  string             `json:"trigger_type"`
 	RequestedBy  pgtype.Int8        `json:"requested_by"`
-	Reason       pgtype.Text        `json:"reason"`
 	ScheduledFor pgtype.Timestamptz `json:"scheduled_for"`
 	FindingCount int64              `json:"finding_count"`
 	AttemptCount int32              `json:"attempt_count"`
@@ -454,7 +450,6 @@ type IdentityAuthSyncIntent struct {
 	Op               string             `json:"op"`
 	DesiredRole      string             `json:"desired_role"`
 	DesiredBanned    bool               `json:"desired_banned"`
-	Reason           string             `json:"reason"`
 	ExpiresInSeconds int32              `json:"expires_in_seconds"`
 	BaseVersion      int64              `json:"base_version"`
 	Status           string             `json:"status"`

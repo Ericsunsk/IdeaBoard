@@ -11,7 +11,6 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.
 vi.mock('../../shared/session/feedback/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
     confirm: vi.fn().mockResolvedValue(true),
-    readReason: () => 'catalog review',
   }),
 }))
 

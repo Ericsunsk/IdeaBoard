@@ -8,7 +8,7 @@ export type AdminPromptConfigResource = {
   fetchPrompts: typeof fetchAdminFeaturePrompts
   savePrompt: (
     input: Parameters<typeof saveAdminFeaturePrompt>[0],
-    options: SaveFeaturePromptOptions,
+    options?: SaveFeaturePromptOptions,
   ) => ReturnType<typeof saveAdminFeaturePrompt>
 }
 

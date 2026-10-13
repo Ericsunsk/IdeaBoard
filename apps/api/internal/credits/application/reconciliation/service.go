@@ -19,7 +19,7 @@ type Service struct {
 }
 
 type Backend struct {
-	CreateReconciliationRun          func(context.Context, *pgxpool.Pool, ports.ReconciliationRunDispatcher, ports.ReconciliationTrigger, *int64, *string, *time.Time, bool) (*int64, bool, error)
+	CreateReconciliationRun          func(context.Context, *pgxpool.Pool, ports.ReconciliationRunDispatcher, ports.ReconciliationTrigger, *int64, *time.Time, bool) (*int64, bool, error)
 	ExecuteReconciliation            func(context.Context, *pgxpool.Pool, int64) error
 	FailReconciliation               func(context.Context, *pgxpool.Pool, int64, error) error
 	GetReconciliationRun             func(context.Context, *pgxpool.Pool, int64) (ports.ReconciliationRun, error)
@@ -58,7 +58,6 @@ func backendComplete(backend Backend) bool {
 type startReconciliationInput struct {
 	trigger       ports.ReconciliationTrigger
 	actorID       int64
-	reason        string
 	scheduledFor  *time.Time
 	onlyIfOverdue bool
 }
@@ -66,7 +65,6 @@ type startReconciliationInput struct {
 type normalizedReconciliationInput struct {
 	trigger       ports.ReconciliationTrigger
 	requestedBy   *int64
-	reason        *string
 	scheduledFor  *time.Time
 	onlyIfOverdue bool
 }
@@ -78,7 +76,6 @@ func (s *Service) StartReconciliation(
 	run, err := s.startReconciliation(ctx, startReconciliationInput{
 		trigger: ports.ReconciliationTriggerManual,
 		actorID: input.ActorID,
-		reason:  input.Reason,
 	})
 	if err != nil {
 		return ports.ReconciliationRun{}, err
@@ -112,7 +109,7 @@ func (s *Service) startReconciliation(
 	if err != nil {
 		return nil, err
 	}
-	runID, enqueueRequired, err := s.backend.CreateReconciliationRun(ctx, s.pool, s.dispatcher, normalized.trigger, normalized.requestedBy, normalized.reason, normalized.scheduledFor, normalized.onlyIfOverdue)
+	runID, enqueueRequired, err := s.backend.CreateReconciliationRun(ctx, s.pool, s.dispatcher, normalized.trigger, normalized.requestedBy, normalized.scheduledFor, normalized.onlyIfOverdue)
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +130,12 @@ func normalizeReconciliationInput(input startReconciliationInput) (normalizedRec
 	}
 	switch input.trigger {
 	case ports.ReconciliationTriggerManual:
-		action, _ := adminaction.New(input.actorID, input.reason)
+		action, _ := adminaction.New(input.actorID)
 		if !action.IsValid() {
 			return normalizedReconciliationInput{}, domain.ErrInvalidCommand
 		}
 		actorID := action.ActorID()
-		reason := action.Reason()
 		normalized.requestedBy = &actorID
-		normalized.reason = &reason
 	case ports.ReconciliationTriggerScheduled:
 		if input.scheduledFor == nil || input.scheduledFor.IsZero() {
 			return normalizedReconciliationInput{}, domain.ErrInvalidCommand

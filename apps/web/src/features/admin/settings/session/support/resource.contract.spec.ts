@@ -12,23 +12,20 @@ describe('support/resource', () => {
     expect(await createAdminSupportChannelsResource().get()).toEqual({ channels: [] })
   })
 
-  it('writes settings without an operator reason while keeping the idempotency key', async () => {
+  it('writes settings with an idempotency key', async () => {
     let body: unknown
-    let reason: string | null = 'unset'
     let key: string | null = null
     useMswHandlers(
       http.put('/api/control/v1/platform/settings/support-channels', async ({ request }) => {
         body = await request.json()
-        reason = request.headers.get('X-Operator-Reason')
         key = request.headers.get('Idempotency-Key')
         return HttpResponse.json({ data: body })
       }),
     )
-    expect(await createAdminSupportChannelsResource().update({ channels: [] }, '')).toEqual({
+    expect(await createAdminSupportChannelsResource().update({ channels: [] })).toEqual({
       channels: [],
     })
     expect(body).toEqual({ channels: [] })
-    expect(reason).toBeNull()
     expect(key).toBeTruthy()
   })
 

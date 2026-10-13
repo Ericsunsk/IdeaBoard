@@ -75,7 +75,7 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 		`UPDATE billing_price_versions SET unit_credits = 99 WHERE sku = 'test:runtime'`,
 		`DELETE FROM billing_skus WHERE sku = 'test:runtime'`,
 		`SELECT * FROM billing_admin_actions`,
-		`INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id, reason) SELECT 'set_availability', sku, current_price_version_id, 1, 'bypass' FROM billing_skus WHERE sku = 'test:runtime'`,
+		`INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id) SELECT 'set_availability', sku, current_price_version_id, 1 FROM billing_skus WHERE sku = 'test:runtime'`,
 		`SELECT prevent_billing_price_version_mutation()`,
 	} {
 		if _, err := conn.Exec(ctx, statement); err == nil {

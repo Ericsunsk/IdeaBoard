@@ -1,16 +1,12 @@
 import { useUserStore } from '../../../auth'
 import { impersonateAdminUser } from './api'
-import { requireOperatorReason } from '../../shared'
 
 export type AdminUserRedirect = {
   schedule: (url: string, delayMs: number) => void
 }
 
 export type AdminUserSessionCommands = {
-  startImpersonation: (
-    publicId: string,
-    options?: { operatorReason?: string | undefined },
-  ) => Promise<void>
+  startImpersonation: (publicId: string) => Promise<void>
 }
 
 function createBrowserRedirect(): AdminUserRedirect {
@@ -29,9 +25,8 @@ export function createAdminUserSessionCommands(
   const userStore = useUserStore()
 
   return {
-    async startImpersonation(publicId: string, options?: { operatorReason?: string | undefined }) {
-      const operatorReason = requireOperatorReason(options?.operatorReason ?? '')
-      await impersonateAdminUser(publicId, { operatorReason })
+    async startImpersonation(publicId: string) {
+      await impersonateAdminUser(publicId)
 
       userStore.clearAuth()
       redirect.schedule('/', 1000)

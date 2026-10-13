@@ -1,11 +1,6 @@
 import type { HttpHandler } from 'msw'
 import { http, HttpResponse } from '../../../../test/msw'
 
-// Shared MSW builder for the outbound-policy settings surface
-// (`/api/control/v1/platform/settings/outbound-policy`). State stays
-// caller-owned (board `testing/factories.ts` pattern): GET serves the current
-// hosts through `getAllowHosts`, PUT captures body + operator reason and
-// answers through `respondToUpdate`, with `onUpdate` syncing caller fixtures.
 type OutboundPolicyUpdate = {
   allow_hosts: string[]
 }
@@ -14,7 +9,7 @@ export type OutboundPolicyMswState = {
   getAllowHosts: () => string[] | Promise<string[]>
   loadRequests: number
   loadError: { status: number; body: Record<string, unknown> } | null
-  updateRequests: Array<{ body: unknown; operatorReason: string | null }>
+  updateRequests: Array<{ body: unknown }>
   updateError: { status: number; body: Record<string, unknown> } | null
   respondToUpdate: (body: OutboundPolicyUpdate) => OutboundPolicyUpdate
   onUpdate: (body: OutboundPolicyUpdate) => void
@@ -48,7 +43,6 @@ export function createOutboundPolicyHandlers(state: OutboundPolicyMswState): Htt
       const body = (await request.json()) as OutboundPolicyUpdate
       state.updateRequests.push({
         body,
-        operatorReason: request.headers.get('X-Operator-Reason'),
       })
       if (state.updateError) {
         return HttpResponse.json(state.updateError.body, { status: state.updateError.status })

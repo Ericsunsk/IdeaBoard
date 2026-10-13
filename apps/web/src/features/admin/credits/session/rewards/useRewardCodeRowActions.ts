@@ -1,7 +1,6 @@
 import { reactive } from 'vue'
 import { useAdminConfirm } from '../../../shared'
 import { useOptimisticToggle } from '../../../shared'
-import { requireDestructiveReason } from '../../../shared'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
   createAdminRewardCodeResource,
@@ -34,14 +33,11 @@ export function useRewardCodeRowActions(options: {
   }
 
   async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
-    // Enable/disable toggles are routine config writes (backend
-    // ReasonOptional): no confirm dialog, the audit records an empty reason.
-    // 乐观翻转与 pending/回滚收口到共享 composable，失败 toast 由 feedback 传入。
     await toggle.toggle(
       rewardCode.id,
       enabled,
       async (key, next) => {
-        const updated = await resource.setEnabled(key, next, { operatorReason: '' })
+        const updated = await resource.setEnabled(key, next)
         replaceRewardCode(updated)
         toggle.reconcile(key, updated.enabled)
       },
@@ -57,11 +53,11 @@ export function useRewardCodeRowActions(options: {
     )
   }
 
-  async function deleteRewardCode(rewardCode: RewardCode, operatorReason: string) {
+  async function deleteRewardCode(rewardCode: RewardCode) {
     if (deletePending[rewardCode.id]) return
     deletePending[rewardCode.id] = true
     try {
-      await resource.delete(rewardCode.id, { operatorReason })
+      await resource.delete(rewardCode.id)
       options.updateRewardCodes((page) => ({
         ...page,
         rewardCodes: page.rewardCodes.filter((candidate) => candidate.id !== rewardCode.id),
@@ -82,12 +78,10 @@ export function useRewardCodeRowActions(options: {
       message: `确定永久删除“${rewardCode.displayName}”吗？没有 Redemption 的兑换码才可删除。`,
       confirmLabel: '确认删除',
       intent: 'danger',
-      reason: { isRequired: true },
     })
     if (!confirmed) return
-    const operatorReason = requireDestructiveReason(confirm)
-    if (!operatorReason) return
-    await deleteRewardCode(rewardCode, operatorReason)
+
+    await deleteRewardCode(rewardCode)
   }
 
   return {

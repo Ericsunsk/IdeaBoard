@@ -105,7 +105,7 @@ func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 
 	first, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
-		IdempotencyKey: "history-partial-refund", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "history-partial-refund", Now: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 
 	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
-		IdempotencyKey: "history-full-refund", Reason: "unused Ideas", Now: now,
+		IdempotencyKey: "history-full-refund", Now: now,
 	})
 	if err != nil {
 		t.Fatal(err)

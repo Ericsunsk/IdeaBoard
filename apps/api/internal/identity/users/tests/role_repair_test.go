@@ -220,8 +220,8 @@ func (m *racePromotionManager) SetUserRole(ctx context.Context, authUserID, role
 	return m.inner.SetUserRole(ctx, authUserID, role)
 }
 
-func (m *racePromotionManager) BanUser(ctx context.Context, authUserID, reason string, expires int) error {
-	return m.inner.BanUser(ctx, authUserID, reason, expires)
+func (m *racePromotionManager) BanUser(ctx context.Context, authUserID string, expires int) error {
+	return m.inner.BanUser(ctx, authUserID, expires)
 }
 
 func (m *racePromotionManager) UnbanUser(ctx context.Context, authUserID string) error {

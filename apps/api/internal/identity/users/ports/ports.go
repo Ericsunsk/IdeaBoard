@@ -50,8 +50,7 @@ type UserListResponse struct {
 }
 
 type AdminBanUserRequest struct {
-	Reason        string `json:"reason"`
-	ExpiresInDays int    `json:"expires_in_days"`
+	ExpiresInDays int `json:"expires_in_days"`
 }
 
 type LoginMetadataRequest struct {
@@ -143,7 +142,6 @@ func (e *IdentityAdminCommandError) Unwrap() error {
 }
 
 type IdentityAdminBanInput struct {
-	Reason        string
 	ExpiresInDays int
 }
 
@@ -151,7 +149,7 @@ type IdentityAdminBanInput struct {
 type AuthUserManager interface {
 	DeleteUser(ctx context.Context, authUserID string) error
 	SetUserRole(ctx context.Context, authUserID string, role string) error
-	BanUser(ctx context.Context, authUserID string, reason string, expiresInSeconds int) error
+	BanUser(ctx context.Context, authUserID string, expiresInSeconds int) error
 	UnbanUser(ctx context.Context, authUserID string) error
 	RevokeUserSessions(ctx context.Context, authUserID string) error
 }

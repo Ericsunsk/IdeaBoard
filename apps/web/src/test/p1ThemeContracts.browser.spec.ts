@@ -393,7 +393,6 @@ describe('P1 theme, control state and focus browser contracts', () => {
         message: 'Audit action',
         confirmLabel: 'Delete',
         intent: 'danger',
-        reason: { isRequired: true },
         onConfirm: action,
       })
       renderWithUser(AdminConfirmDialog)

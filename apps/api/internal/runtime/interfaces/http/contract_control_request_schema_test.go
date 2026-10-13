@@ -18,7 +18,6 @@ func TestControlMutationRequestSchemas(t *testing.T) {
 		payload string
 	}{
 		{"ControlBanRequest", `{"expires_in_days":7}`},
-		{"ControlReasonRequest", `{}`},
 		{"ControlCreditCommandRequest", `{"user_id":"usr_test","amount_credits":1,"business_reference_id":"test"}`},
 		{"ControlCreditRefundRequest", `{"user_id":"usr_test","amount_credits":1,"business_reference_id":"test","charge_transaction_id":"charge_test"}`},
 		{"ControlCreditCorrectionRequest", `{"user_id":"usr_test","amount_credits":1,"business_reference_id":"test","original_transaction_id":"charge_test"}`},
@@ -40,14 +39,15 @@ func TestControlMutationRequestSchemas(t *testing.T) {
 			if err := json.Unmarshal([]byte(tt.payload), &payload); err != nil {
 				t.Fatal(err)
 			}
-			payload["reason"] = "Test operation"
-			payload["operator_note"] = "Test operator note"
 			if err := ref.Value.VisitJSON(payload); err != nil {
 				t.Fatalf("valid business payload rejected: %v", err)
 			}
-			payload["unknown_field"] = true
-			if err := ref.Value.VisitJSON(payload); err == nil {
-				t.Fatal("unknown field accepted")
+			for _, field := range []string{"unknown_field", "reason", "operator_note"} {
+				payload[field] = "text"
+				if err := ref.Value.VisitJSON(payload); err == nil {
+					t.Fatalf("unknown field %s accepted", field)
+				}
+				delete(payload, field)
 			}
 		})
 	}

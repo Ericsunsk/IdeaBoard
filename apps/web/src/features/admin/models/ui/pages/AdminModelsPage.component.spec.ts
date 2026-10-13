@@ -6,7 +6,6 @@ import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminModelsPage from './AdminModelsPage.vue'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('catalog review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 const gatewayFakes = vi.hoisted(() => ({
   detect: vi.fn(),
@@ -15,7 +14,7 @@ const gatewayFakes = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
+  useAdminConfirm: () => ({ confirm: confirmMock }),
 }))
 
 // Detect/observed/route-preview have no control equivalent (fail-closed in
@@ -53,8 +52,6 @@ describe('AdminModelsPage', () => {
   beforeEach(() => {
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
-    readReasonMock.mockReset()
-    readReasonMock.mockReturnValue('catalog review')
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()

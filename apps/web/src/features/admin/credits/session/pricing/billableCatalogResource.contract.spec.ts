@@ -8,7 +8,7 @@ import {
 } from './billableCatalogResource'
 import { createBillingCatalogHandlers, createBillingCatalogMswState } from './testing'
 
-const reason = { operatorReason: 'pricing review' }
+const options = {}
 
 describe('Admin Billable Catalog resource', () => {
   it('lists the catalog through the control plane with pricing normalization', async () => {
@@ -46,7 +46,7 @@ describe('Admin Billable Catalog resource', () => {
     ])
   })
 
-  it('publishes the configured fixed price with an operator reason', async () => {
+  it('publishes the configured fixed price with idempotency headers', async () => {
     let requestBody: unknown
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
@@ -54,7 +54,6 @@ describe('Admin Billable Catalog resource', () => {
         requestBody = await request.json()
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         }
         expect(params.sku).toBe('ai-image:inpaint')
         return HttpResponse.json({
@@ -74,7 +73,7 @@ describe('Admin Billable Catalog resource', () => {
     )
 
     await expect(
-      publishBillableItemPrices('ai-image:inpaint', { '1k': 0 }, reason),
+      publishBillableItemPrices('ai-image:inpaint', { '1k': 0 }, options),
     ).resolves.toEqual({
       '1k': {
         priceVersionId: 9,
@@ -83,12 +82,11 @@ describe('Admin Billable Catalog resource', () => {
         createdAt: '2026-07-16T08:00:00Z',
       },
     })
-    expect(requestBody).toEqual({ prices: { '1k': 0 }, reason: 'pricing review' })
+    expect(requestBody).toEqual({ prices: { '1k': 0 } })
     expect(seenHeaders.idempotencyKey).toMatch(/.+/)
-    expect(seenHeaders.operatorReason).toBe('pricing review')
   })
 
-  it('sets feature availability without an operator reason while keeping the idempotency key', async () => {
+  it('sets feature availability with an idempotency key', async () => {
     let requestBody: unknown
     let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
@@ -97,7 +95,6 @@ describe('Admin Billable Catalog resource', () => {
         expect(params.sku).toBe('ai-image:inpaint')
         seenHeaders = {
           idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
         }
         return HttpResponse.json({
           data: {
@@ -109,16 +106,13 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(
-      setBillableItemAvailability('ai-image:inpaint', false, { operatorReason: '  ' }),
-    ).resolves.toEqual({
+    await expect(setBillableItemAvailability('ai-image:inpaint', false)).resolves.toEqual({
       sku: 'ai-image:inpaint',
       status: 'disabled',
       updatedAt: '2026-07-16T10:00:00Z',
     })
-    expect(requestBody).toEqual({ enabled: false, reason: '' })
+    expect(requestBody).toEqual({ enabled: false })
     expect(seenHeaders.idempotencyKey).toMatch(/.+/)
-    expect(seenHeaders.operatorReason).toBeNull()
   })
 
   it('deletes an Archived item through the control plane', async () => {
@@ -128,14 +122,8 @@ describe('Admin Billable Catalog resource', () => {
       ),
     )
 
-    await expect(deleteArchivedBillableItem('legacy:removed', reason)).resolves.toBe(
+    await expect(deleteArchivedBillableItem('legacy:removed', options)).resolves.toBe(
       'legacy:removed',
     )
-  })
-
-  it('requires an operator reason before mutating the catalog', async () => {
-    await expect(
-      publishBillableItemPrices('ai-image:inpaint', { '1k': 0 }, { operatorReason: '  ' }),
-    ).rejects.toMatchObject({ code: 'control_reason_required' })
   })
 })

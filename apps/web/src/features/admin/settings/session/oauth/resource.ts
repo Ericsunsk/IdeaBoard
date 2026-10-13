@@ -6,7 +6,7 @@ import type { ControlOAuthProviderSummary } from '../../../../../api/generated-q
 import type { ControlOAuthProviderUpdateRequest } from '../../../../../api/generated-query/control/model/controlOAuthProviderUpdateRequest'
 import type { OAuthProviderCode } from '../../../../../core/auth/oauthProviders'
 import { requireContractData } from '../../../../../api/contractKernel'
-import { buildRoutineControlMutationHeaders } from '../../../shared/index'
+import { buildControlMutationHeaders } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'
 
@@ -29,7 +29,6 @@ export interface OAuthProviderSettingsResource {
   save(
     provider: OAuthProviderCode,
     input: SaveOAuthProviderSettingsInput,
-    operatorReason: string,
   ): Promise<OAuthProviderSettingsSummary>
 }
 
@@ -57,11 +56,7 @@ export function createOAuthProviderSettingsResource(): OAuthProviderSettingsReso
 async function saveOAuthProviderSettings(
   provider: OAuthProviderCode,
   input: SaveOAuthProviderSettingsInput,
-  operatorReason: string,
 ): Promise<OAuthProviderSettingsSummary> {
-  // Routine config write (backend ReasonOptional): the reason may be empty
-  // (audit records it as-is) while Idempotency-Key stays required.
-  const reason = operatorReason.trim()
   try {
     const body = await updateControlOAuthProvider(
       provider,
@@ -69,10 +64,9 @@ async function saveOAuthProviderSettings(
         enabled: input.enabled,
         client_id: input.clientId,
         client_secret: input.clientSecret,
-        reason,
       } as ControlOAuthProviderUpdateRequest,
       {
-        headers: buildRoutineControlMutationHeaders({ operatorReason: reason }),
+        headers: buildControlMutationHeaders(),
       },
     )
     return toSummary(

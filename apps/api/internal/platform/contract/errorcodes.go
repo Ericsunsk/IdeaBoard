@@ -176,16 +176,14 @@ const (
 
 	// Control Plane codes (issue #808). Wire-stable: do not rename
 	// without coordinating openapi.control.yaml and callers. All
-	// mutating control routes require an operator reason
-	// (control_reason_required, 400); capability denials reuse
+	// capability denials reuse
 	// forbidden (403); idempotency reuse-with-different-request reuses
 	// the kernel idempotency_conflict (409); hidden control resources
 	// converge to control_not_found (404) per Baseline 4
 	// anti-enumeration. Financial control failures reuse the #804
 	// billing codes (billing_wallet_restricted, billing_checkout_conflict,
 	// billing_quote_unavailable); no second billing code table here.
-	CodeControlReasonRequired Code = "control_reason_required"
-	CodeControlNotFound       Code = "control_not_found"
+	CodeControlNotFound Code = "control_not_found"
 
 	// Legacy billing catalog codes (billing/interfaces/http edge).
 	// Wire-stable: same freeze rule as the kernel #804 codes. The
@@ -344,7 +342,6 @@ const (
 func StatusOf(code Code) int {
 	switch code {
 	case CodePaginationCursorInvalid, CodeIdempotencyKeyRequired, CodeBadRequest, CodeBoardShareTokenInvalid,
-		CodeControlReasonRequired,
 		CodeBillingInvalidInput,
 		CodeRewardInvalidInput, CodeRewardCodeIDInvalid, CodeRewardRedemptionIDInvalid,
 		CodeRewardPaginationInvalid, CodeRewardCodeInvalid,

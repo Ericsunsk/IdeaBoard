@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { createAdminGatewayResource } from './resource'
 
-const reason = { operatorReason: 'gateway review' }
+const options = {}
 
 describe('Admin gateway resource', () => {
   it('saves catalogs through control without legacy price fields', async () => {
@@ -29,7 +29,7 @@ describe('Admin gateway resource', () => {
           supportsPromptCaching: true,
         },
       ],
-      reason,
+      options,
     )
 
     const body = requestBody as { items: Array<Record<string, unknown>> }
@@ -111,13 +111,12 @@ describe('Admin gateway resource', () => {
   })
 
   it('previews routes, detects models, and probes connections through control', async () => {
-    const seen: Array<{ path: string; body: unknown; reason: string | null }> = []
+    const seen: Array<{ path: string; body: unknown }> = []
     useMswHandlers(
       http.post('/api/control/v1/platform/ai-gateway/route-preview', async ({ request }) => {
         seen.push({
           path: 'route-preview',
           body: await request.json(),
-          reason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({
           data: {
@@ -150,7 +149,6 @@ describe('Admin gateway resource', () => {
         seen.push({
           path: 'test-connection',
           body: await request.json(),
-          reason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({
           data: { reachable: true, status_code: 200, latency_ms: 38, message: 'ok' },
@@ -173,7 +171,7 @@ describe('Admin gateway resource', () => {
     await expect(
       resource.connection.testConnection(
         { base_url: 'https://gateway.example.com', provider: 'openai', path: 'v1/models' },
-        reason,
+        options,
       ),
     ).resolves.toMatchObject({ success: true, latencyMs: 38, message: 'ok' })
     expect(seen[1]?.body).toMatchObject({
@@ -181,7 +179,6 @@ describe('Admin gateway resource', () => {
       provider: 'openai',
       path: 'v1/models',
     })
-    expect(seen[1]?.reason).toBe('gateway review')
   })
 
   it('rejects gateway config updates when the envelope reports an error', async () => {
@@ -203,7 +200,7 @@ describe('Admin gateway resource', () => {
     await expect(
       createAdminGatewayResource().connection.update(
         { base_url: 'https://gateway.example.com' },
-        reason,
+        options,
       ),
     ).rejects.toThrow()
   })
@@ -216,17 +213,8 @@ describe('Admin gateway resource', () => {
     await expect(
       createAdminGatewayResource().connection.update(
         { base_url: 'https://gateway.example.com' },
-        reason,
+        options,
       ),
     ).resolves.toBeUndefined()
-  })
-
-  it('requires an operator reason before gateway writes', async () => {
-    await expect(
-      createAdminGatewayResource().connection.testConnection(
-        { base_url: 'https://gateway.example.com', provider: 'openai', path: 'v1/models' },
-        { operatorReason: '  ' },
-      ),
-    ).rejects.toMatchObject({ code: 'control_reason_required' })
   })
 })

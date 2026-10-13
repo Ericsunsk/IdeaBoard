@@ -167,14 +167,6 @@
                   {{ selectedRun.attempt_count }}
                 </dd>
               </div>
-              <div class="sm:col-span-2">
-                <dt class="text-admin-caption font-bold text-muted-foreground">
-                  {{ CREDIT_HEALTH_MESSAGES.runHistoryReason }}
-                </dt>
-                <dd class="mt-1 mb-0 break-words text-admin-body text-foreground">
-                  {{ selectedRun.reason || CREDIT_HEALTH_MESSAGES.runHistoryDefaultReason }}
-                </dd>
-              </div>
               <div v-if="selectedRun.error_message" class="sm:col-span-2 xl:col-span-4">
                 <dt class="text-admin-caption font-bold text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryError }}

@@ -79,12 +79,11 @@
   --radius-admin-control: calc(var(--radius) * 0.8);
   --radius-admin-chip: calc(var(--radius) * 0.6);
 
-  /* Admin layout spacing (shell/popover/drawer/empty-state/login widths). */
+  /* Admin layout spacing (shell/popover/drawer/empty-state widths). */
   --spacing-admin-shell: var(--primitive-size-1600);
   --spacing-admin-popover: var(--primitive-size-340);
   --spacing-admin-drawer: var(--primitive-width-38rem-fluid);
   --spacing-admin-empty-state: var(--primitive-size-260);
-  --spacing-admin-login-card: var(--primitive-width-420-fluid);
 
   /*
    * Admin elevation tiers. Aliases of the framework shadow scale so overlay

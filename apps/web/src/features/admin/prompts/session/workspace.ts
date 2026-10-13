@@ -181,17 +181,12 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       return null
     }
 
-    // Routine config write (backend ReasonOptional): save directly
-    // without the confirm dialog; the audit records an empty reason.
     const config = await options.runAsyncAction(
       async () => {
-        const savedConfig = await resource.savePrompt(
-          {
-            slug,
-            prompt: promptMap[slug] || '',
-          },
-          { operatorReason: '' },
-        )
+        const savedConfig = await resource.savePrompt({
+          slug,
+          prompt: promptMap[slug] || '',
+        })
         syncPromptConfig(savedConfig, { preserveDirtyDraft: false })
         await refreshPromptData({ preserveDirtyDraft: true })
         return savedConfig

@@ -350,32 +350,22 @@ const submit = form.handleSubmit(async (values) => {
     toast.error(OAUTH_MESSAGES.oauthIncompleteProvider(getOAuthProviderLabel(incompleteProvider)))
     return
   }
-  // Routine config write (backend ReasonOptional): save directly without
-  // the confirm dialog; the audit records an empty reason.
-  const operatorReason = ''
+
   isSaving.value = true
   try {
     const currentProvider = selectedProvider.value
     const saveRequests = [
-      activeResource().save(
-        currentProvider,
-        {
-          enabled: values.enabled,
-          clientId: values.clientId,
-          clientSecret: values.clientSecret,
-        },
-        operatorReason,
-      ),
+      activeResource().save(currentProvider, {
+        enabled: values.enabled,
+        clientId: values.clientId,
+        clientSecret: values.clientSecret,
+      }),
       ...changedProviders.map((provider) =>
-        activeResource().save(
-          provider,
-          {
-            enabled: providerEnabled[provider] ?? false,
-            clientId: providerSummaries.value[provider]?.clientId ?? '',
-            clientSecret: '',
-          },
-          operatorReason,
-        ),
+        activeResource().save(provider, {
+          enabled: providerEnabled[provider] ?? false,
+          clientId: providerSummaries.value[provider]?.clientId ?? '',
+          clientSecret: '',
+        }),
       ),
     ]
     const [savedSummary] = await Promise.all(saveRequests)

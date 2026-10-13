@@ -32,7 +32,7 @@ function contractOk(data: unknown): Record<string, unknown> {
 
 // Reward codes ride the Control Plane with the unified contract envelope
 // (`{ data }` / `{ error: { code, message, request_id } }`); mutations
-// carry Idempotency-Key + operator reason headers.
+// carry a header-only Idempotency-Key.
 describe('AdminRewardCodeResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
@@ -61,23 +61,20 @@ describe('AdminRewardCodeResource', () => {
     })
   })
 
-  it('creates a code with idempotency key and operator reason', async () => {
+  it('creates a code with idempotency key with idempotency headers', async () => {
     transport.request.mockResolvedValue(
       contractOk({ reward_code: codeFixture(), plaintext: 'IDEA2026', replayed: false }),
     )
     const resource = createAdminRewardCodeResource()
 
-    const created = await resource.create(
-      {
-        displayName: '夏日灵感奖励',
-        code: 'IDEA2026',
-        creditAmount: 80,
-        maxRedemptions: 100,
-        expiresAt: '2026-12-31T00:00:00Z',
-        idempotencyKey: 'reward-create:1',
-      },
-      { operatorReason: '运营活动补码' },
-    )
+    const created = await resource.create({
+      displayName: '夏日灵感奖励',
+      code: 'IDEA2026',
+      creditAmount: 80,
+      maxRedemptions: 100,
+      expiresAt: '2026-12-31T00:00:00Z',
+      idempotencyKey: 'reward-create:1',
+    })
 
     expect(created).toMatchObject({
       rewardCode: { id: 7, displayName: '夏日灵感奖励' },
@@ -90,7 +87,6 @@ describe('AdminRewardCodeResource', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'Idempotency-Key': 'reward-create:1',
-          'X-Operator-Reason': '运营活动补码',
         }),
       }),
     )
@@ -98,7 +94,6 @@ describe('AdminRewardCodeResource', () => {
     expect(JSON.parse(config.body ?? '{}')).toMatchObject({
       display_name: '夏日灵感奖励',
       code: 'IDEA2026',
-      reason: '运营活动补码',
     })
   })
 
@@ -108,17 +103,13 @@ describe('AdminRewardCodeResource', () => {
     )
     const resource = createAdminRewardCodeResource()
 
-    const updated = await resource.update(
-      7,
-      {
-        displayName: '新名',
-        creditAmount: 80,
-        maxRedemptions: 100,
-        expiresAt: '',
-        code: 'NEWCODE1',
-      },
-      { operatorReason: '补发 code' },
-    )
+    const updated = await resource.update(7, {
+      displayName: '新名',
+      creditAmount: 80,
+      maxRedemptions: 100,
+      expiresAt: '',
+      code: 'NEWCODE1',
+    })
 
     expect(updated).toMatchObject({ rewardCode: { id: 7 }, plaintext: 'NEWCODE1' })
     expect(transport.request).toHaveBeenCalledWith(
@@ -127,75 +118,53 @@ describe('AdminRewardCodeResource', () => {
     )
   })
 
-  it('toggles enabled through the control plane with an operator reason', async () => {
+  it('toggles enabled through the control plane with idempotency headers', async () => {
     transport.request.mockResolvedValue(
       contractOk(codeFixture({ enabled: false, status: 'disabled' })),
     )
     const resource = createAdminRewardCodeResource()
 
-    const code = await resource.setEnabled(7, false, { operatorReason: '活动结束停用' })
+    const code = await resource.setEnabled(7, false)
 
     expect(code).toMatchObject({ id: 7, enabled: false, status: 'disabled' })
     expect(transport.request).toHaveBeenCalledWith(
       '/control/v1/rewards/codes/7/enabled',
       expect.objectContaining({
         method: 'PATCH',
-        headers: expect.objectContaining({ 'X-Operator-Reason': '活动结束停用' }),
       }),
     )
   })
 
-  it('deletes a code through the control plane with an operator reason', async () => {
+  it('deletes a code through the control plane with idempotency headers', async () => {
     transport.request.mockResolvedValue(contractOk({ reward_code_id: 7 }))
     const resource = createAdminRewardCodeResource()
 
-    await expect(resource.delete(7, { operatorReason: '误删创建' })).resolves.toBeUndefined()
+    await expect(resource.delete(7)).resolves.toBeUndefined()
     expect(transport.request).toHaveBeenCalledWith(
       '/control/v1/rewards/codes/7',
       expect.objectContaining({
         method: 'DELETE',
-        headers: expect.objectContaining({ 'X-Operator-Reason': '误删创建' }),
       }),
     )
   })
 
-  it('requires an operator reason for create/delete before any network call', async () => {
-    const resource = createAdminRewardCodeResource()
-
-    await expect(
-      resource.create(
-        {
-          displayName: '夏日灵感奖励',
-          code: 'IDEA2026',
-          creditAmount: 80,
-          maxRedemptions: 100,
-          expiresAt: '2026-12-31T00:00:00Z',
-          idempotencyKey: 'reward-create:1',
-        },
-        { operatorReason: '' },
-      ),
-    ).rejects.toMatchObject({
-      code: 'control_reason_required',
-    })
-    await expect(resource.delete(7, { operatorReason: '' })).rejects.toMatchObject({
-      code: 'control_reason_required',
-    })
-    expect(transport.request).not.toHaveBeenCalled()
-  })
-
-  it('sends routine update/enable mutations without an operator reason', async () => {
+  it('sends enable mutations with request and idempotency headers', async () => {
     transport.request.mockResolvedValue(
       contractOk(codeFixture({ enabled: false, status: 'disabled' })),
     )
     const resource = createAdminRewardCodeResource()
 
-    await resource.setEnabled(7, false, { operatorReason: '  ' })
+    await resource.setEnabled(7, false)
 
     expect(transport.request).toHaveBeenCalledWith(
       '/control/v1/rewards/codes/7/enabled',
       expect.objectContaining({
         method: 'PATCH',
-        headers: expect.not.objectContaining({ 'X-Operator-Reason': expect.anything() }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Request-Id': expect.any(String),
+          'Idempotency-Key': expect.any(String),
+        },
       }),
     )
   })

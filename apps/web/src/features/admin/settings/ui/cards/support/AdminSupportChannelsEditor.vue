@@ -185,7 +185,7 @@ const resource = props.resource ?? createAdminSupportChannelsResource()
 const queryClient = useQueryClient()
 const query = useQuery({ queryKey: supportChannelsQueryKey, queryFn: () => resource.get() })
 const mutation = useMutation({
-  mutationFn: (draft: SupportChannelsSetting) => resource.update(draft, ''),
+  mutationFn: (draft: SupportChannelsSetting) => resource.update(draft),
 })
 const isLoading = computed(() => query.isPending.value || query.isFetching.value)
 const isSaving = computed(() => mutation.isPending.value)
@@ -254,8 +254,6 @@ function move(index: number, offset: number) {
   if (channel) form.value.channels.splice(target, 0, channel)
 }
 async function save() {
-  // Routine config write (backend ReasonOptional): save directly without
-  // the confirm dialog; the audit records an empty reason.
   await lifecycle.save()
 }
 </script>

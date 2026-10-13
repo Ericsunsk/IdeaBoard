@@ -1,10 +1,10 @@
 package httpapi
 
-// Control Plane tests (issue #808): authorization matrix, audit record
-// fields, header-only idempotency replay/conflict, reason-required 400,
+// Control Plane tests: authorization matrix, audit record
+// fields, header-only idempotency replay/conflict,
 // contract envelope + Request-Id, separate rate-limit bucket, scoped
 // task access without a creation path, and the events-layer exclusion
-// guard. Legacy /api/admin routes are not touched here.
+// guard.
 
 import (
 	"context"
@@ -391,7 +391,7 @@ func (fakeControlReconciliation) GetCreditHealth(_ context.Context) (creditsheal
 }
 
 func (fakeControlReconciliation) StartReconciliation(_ context.Context, input creditsports.StartManualReconciliationInput) (creditsports.ReconciliationRun, error) {
-	return creditsports.ReconciliationRun{Reason: input.Reason}, nil
+	return creditsports.ReconciliationRun{RequestedBy: &input.ActorID}, nil
 }
 
 func (fakeControlReconciliation) GetReconciliationRun(_ context.Context, runID int64) (creditsports.ReconciliationRun, error) {
@@ -411,7 +411,6 @@ type fakeControlTasks struct {
 	cancelCalls  int
 	cancelActor  int64
 	cancelTaskID string
-	cancelReason string
 	failCancel   error
 	failGet      error
 	failList     error
@@ -435,13 +434,12 @@ func (f *fakeControlTasks) ResolveAdminTaskUserID(_ context.Context, raw string)
 	return controlUserAID, nil
 }
 
-func (f *fakeControlTasks) CancelAdminTask(_ context.Context, taskID string, adminID int64, reason string) error {
+func (f *fakeControlTasks) CancelAdminTask(_ context.Context, taskID string, adminID int64) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cancelCalls++
 	f.cancelActor = adminID
 	f.cancelTaskID = taskID
-	f.cancelReason = reason
 	return f.failCancel
 }
 

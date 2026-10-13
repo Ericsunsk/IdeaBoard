@@ -71,7 +71,6 @@ function createContractCommands(): AuthInternalCommands {
               auth_user_id: authUserID,
               role: 'admin',
               banned: false,
-              ban_reason: null,
               ban_expires: null,
             },
           ],
@@ -116,7 +115,6 @@ function createContractCommands(): AuthInternalCommands {
     banIdentity: async (input) => {
       assert.deepEqual(input, {
         authUserID,
-        banReason: 'policy violation',
         banExpiresIn: 3600,
       })
       return { ok: true, data: { auth_user_id: authUserID, banned: true } }

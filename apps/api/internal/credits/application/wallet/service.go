@@ -259,11 +259,14 @@ func normalizeRestrictWalletCommand(command ports.RestrictWalletCommand) (ports.
 	command.Reason = strings.TrimSpace(command.Reason)
 	command.Actor.Type = domain.ActorType(strings.TrimSpace(string(command.Actor.Type)))
 	command.Actor.ID = strings.TrimSpace(command.Actor.ID)
+	if command.Actor.Type == domain.ActorAdmin {
+		command.Reason = ""
+	}
 	if command.UserID <= 0 || command.Type == "" || len(command.Type) > 64 ||
 		command.Source == "" || len(command.Source) > 64 ||
 		command.RelatedObject.Type == "" || len(command.RelatedObject.Type) > 64 ||
 		command.RelatedObject.ID == "" || len(command.RelatedObject.ID) > 160 ||
-		command.Reason == "" || len(command.Reason) > 1000 ||
+		(command.Actor.Type != domain.ActorAdmin && command.Reason == "") || len(command.Reason) > 1000 ||
 		!validRestrictionActor(command.Actor) {
 		return ports.RestrictWalletCommand{}, domain.ErrInvalidCommand
 	}
@@ -277,7 +280,10 @@ func normalizeReleaseWalletRestrictionCommand(
 	command.Reason = strings.TrimSpace(command.Reason)
 	command.Actor.Type = domain.ActorType(strings.TrimSpace(string(command.Actor.Type)))
 	command.Actor.ID = strings.TrimSpace(command.Actor.ID)
-	if len(command.RestrictionID) != 36 || command.Reason == "" || len(command.Reason) > 1000 ||
+	if command.Actor.Type == domain.ActorAdmin {
+		command.Reason = ""
+	}
+	if len(command.RestrictionID) != 36 || (command.Actor.Type != domain.ActorAdmin && command.Reason == "") || len(command.Reason) > 1000 ||
 		!validRestrictionActor(command.Actor) {
 		return ports.ReleaseWalletRestrictionCommand{}, domain.ErrInvalidCommand
 	}

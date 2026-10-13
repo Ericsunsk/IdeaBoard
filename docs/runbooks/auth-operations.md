@@ -59,7 +59,7 @@
 
 4. **公开注册使用 Better Auth `/api/auth/sign-up/email`。** Client 提交 display name、canonical Email 和 Password；Email 验证后以 `canonical_email` identity 进入 Go Identity。Password 登录只接受 Email，username 不再是 identity 或登录凭据。
 
-5. **高风险动作保留审计记录。** 建议记录操作人、时间、原因、影响用户与回滚策略。
+5. **高风险动作保留审计记录。** 记录操作人、操作、时间、影响用户和结果。
 
 ## 推荐流程
 

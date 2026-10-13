@@ -160,7 +160,6 @@ export type AuthUserState = {
     auth_user_id: string;
     role: AuthRole;
     banned: boolean;
-    ban_reason?: string | null;
     ban_expires?: string | null;
 };
 
@@ -180,7 +179,6 @@ export type AuthUserRequest = {
 
 export type BanUserRequest = {
     userId: string;
-    banReason?: string;
     banExpiresIn?: number;
 };
 

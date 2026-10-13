@@ -27,27 +27,12 @@ describe('admin user session commands', () => {
       schedule: vi.fn(() => events.push('redirect')),
     }
 
-    await createAdminUserSessionCommands(redirect).startImpersonation('public-1', {
-      operatorReason: 'support case',
-    })
+    await createAdminUserSessionCommands(redirect).startImpersonation('public-1')
 
-    expect(impersonateAdminUser).toHaveBeenCalledWith('public-1', {
-      operatorReason: 'support case',
-    })
+    expect(impersonateAdminUser).toHaveBeenCalledWith('public-1')
     expect(clearAuth).toHaveBeenCalledTimes(1)
     expect(redirect.schedule).toHaveBeenCalledWith('/', 1000)
     expect(events).toEqual(['clearAuth', 'redirect'])
-  })
-
-  it('requires an operator reason before calling the bridge', async () => {
-    const { createAdminUserSessionCommands } = await import('./sessionCommands')
-
-    await expect(
-      createAdminUserSessionCommands({ schedule: vi.fn() }).startImpersonation('public-3'),
-    ).rejects.toThrow('需要填写操作原因')
-
-    expect(impersonateAdminUser).not.toHaveBeenCalled()
-    expect(clearAuth).not.toHaveBeenCalled()
   })
 
   it('surfaces bridge errors without clearing session state', async () => {
@@ -55,9 +40,7 @@ describe('admin user session commands', () => {
     const { createAdminUserSessionCommands } = await import('./sessionCommands')
 
     await expect(
-      createAdminUserSessionCommands({ schedule: vi.fn() }).startImpersonation('public-2', {
-        operatorReason: 'support case',
-      }),
+      createAdminUserSessionCommands({ schedule: vi.fn() }).startImpersonation('public-2'),
     ).rejects.toThrow('not allowed')
 
     expect(clearAuth).not.toHaveBeenCalled()

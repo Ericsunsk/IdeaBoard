@@ -1,10 +1,3 @@
-// User administration commands transport (issue 808): feature-owned
-// boundary over the Control generated client. Mutations hit
-// /api/control/v1 with a header-only Idempotency-Key and an operator
-// reason (body + X-Operator-Reason header); responses use the contract
-// envelope. Control error codes branch here so callers never match on
-// copy: control_reason_required, idempotency_conflict,
-// billing_wallet_restricted, control_not_found.
 import {
   banControlUser,
   deleteControlUser,
@@ -15,16 +8,12 @@ import {
 } from '../../../../api/generated-query/control/control-users/control-users'
 import { requireContractData } from '../../../../api/contractKernel'
 import { controlUserIdempotencyKey } from '../../../../api/idempotencyKey'
-import {
-  buildControlMutationHeaders,
-  requireOperatorReason,
-  type ControlMutationOptions,
-} from '../../shared'
+import { buildControlMutationHeaders, type ControlMutationOptions } from '../../shared'
 import { withControlCopy } from '../../shared'
 
 function controlUserHeaders(
   operation: Parameters<typeof controlUserIdempotencyKey>[0],
-  options: ControlMutationOptions,
+  options: ControlMutationOptions = {},
 ) {
   return buildControlMutationHeaders(options, controlUserIdempotencyKey(operation))
 }
@@ -42,22 +31,18 @@ async function resolveControlOk(request: Promise<unknown>, fallback: string): Pr
 
 export async function banAdminUser(input: {
   publicId: string
-  reason?: string | undefined
   expires_in_days?: number | undefined
-  operatorReason: string
+
   idempotencyKey?: string | undefined
 }): Promise<void> {
-  const operatorReason = requireOperatorReason(input.operatorReason)
   await resolveControlOk(
     banControlUser(
       input.publicId,
       {
-        ...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
         ...(input.expires_in_days === undefined ? {} : { expires_in_days: input.expires_in_days }),
       },
       {
         headers: controlUserHeaders('ban', {
-          operatorReason,
           idempotencyKey: input.idempotencyKey,
         }),
       },
@@ -68,7 +53,7 @@ export async function banAdminUser(input: {
 
 export async function unbanAdminUser(
   publicId: string,
-  options: ControlMutationOptions,
+  options: ControlMutationOptions = {},
 ): Promise<void> {
   await resolveControlOk(
     unbanControlUser(publicId, {
@@ -80,7 +65,7 @@ export async function unbanAdminUser(
 
 export async function revokeAdminUserSessions(
   publicId: string,
-  options: ControlMutationOptions,
+  options: ControlMutationOptions = {},
 ): Promise<void> {
   await resolveControlOk(
     revokeControlUserSessions(publicId, {
@@ -93,7 +78,7 @@ export async function revokeAdminUserSessions(
 export async function updateAdminUserRole(input: {
   publicId: string
   role: 'admin' | 'user'
-  operatorReason: string
+
   idempotencyKey?: string | undefined
 }): Promise<void> {
   await resolveControlOk(
@@ -102,7 +87,6 @@ export async function updateAdminUserRole(input: {
       { role: input.role },
       {
         headers: controlUserHeaders('role', {
-          operatorReason: input.operatorReason,
           idempotencyKey: input.idempotencyKey,
         }),
       },
@@ -113,7 +97,7 @@ export async function updateAdminUserRole(input: {
 
 export async function deleteAdminUser(
   publicId: string,
-  options: ControlMutationOptions,
+  options: ControlMutationOptions = {},
 ): Promise<void> {
   await resolveControlOk(
     deleteControlUser(publicId, {
@@ -125,7 +109,7 @@ export async function deleteAdminUser(
 
 export async function impersonateAdminUser(
   publicId: string,
-  options: ControlMutationOptions,
+  options: ControlMutationOptions = {},
 ): Promise<void> {
   await resolveControlOk(
     impersonateControlUser(publicId, {

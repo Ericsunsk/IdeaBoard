@@ -69,7 +69,7 @@ describe('admin user command query invalidation', () => {
       makeAdminUserCommandTarget({ publicId: 'user-1', status: 1, displayName: 'alice' }),
     )
     commands.handleActionSelect('status')
-    commands.banForm.value = { expiresInDays: 0, reason: 'audit reason' }
+    commands.banForm.value = { expiresInDays: 0 }
     await commands.confirmBanUser()
 
     commands.openUserActionMenu(
@@ -109,7 +109,6 @@ describe('admin user command query invalidation', () => {
 function createHarness() {
   const confirm = {
     confirm: vi.fn().mockResolvedValue(true),
-    readReason: vi.fn().mockReturnValue('audit reason'),
   }
   const feedback = createAdminUsersFeedback()
   const commands = useAdminUserCommands(

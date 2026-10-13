@@ -1,4 +1,4 @@
-h1:3KAL1AmK7a66AV3SlS2Hooq+ZFiOL0BdPWjU0eUS1OU=
+h1:j4sfcAE2lot02RrGYZB4HI5M2JP6u9iQ+CTOWDaQevo=
 20261002000002_baseline.sql h1:QrRMRLgqJ/RtZtUHa4XJbjIgNNfNbR58uzalezdG0fY=
 20261004000001_identity_admin_reconciliation.sql h1:r6u4xOO8911aXjSyewmJ9GQcA6zDkc16L8VeDFu3abU=
 20261004000002_payment_webhook_claim.sql h1:ysUQ0skK119SMlO+hBDRmsl5qCpWkzudbKXNnFD3eSw=
@@ -8,3 +8,4 @@ h1:3KAL1AmK7a66AV3SlS2Hooq+ZFiOL0BdPWjU0eUS1OU=
 20261008000001_task_status_event_outbox.sql h1:3f/C7jPD6cYF4HpI4FqtoAJW9rewMBh2AuAzQ8G+Rsc=
 20261008000002_control_idempotency_fencing.sql h1:vBSYz43+hLXAhwqg1Sc7CxkGmJ9DEWLxM3nhT6lPUfE=
 20261009000001_login_lockout_settings.sql h1:eZ+qW/MKP3KDY/ObLZNvc1ql0tAbmcS5c94y9sqYrwo=
+20261013115005_remove_admin_reason.sql h1:tQ2hkEROvJbMIB2z2HWD2gb/5vBF0IfG3kGEIiivtPI=
