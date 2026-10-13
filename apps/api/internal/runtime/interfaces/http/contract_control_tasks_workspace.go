@@ -22,6 +22,7 @@ import (
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -572,8 +573,11 @@ func (a *workspaceControlTaskAdapter) loadControlTaskBilling(ctx context.Context
 		return nil, false, workspacetasks.ErrNotFound
 	}
 	row, err := q.GetControlTaskBilling(ctx, taskPublicID)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
 	}
 	snapshot := &tasksdomain.AdminBillingSnapshot{
 		SKU:              row.Sku,

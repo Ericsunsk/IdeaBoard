@@ -125,14 +125,14 @@ func configBool(cfg map[string]interface{}, key string) bool {
 func parseS3Endpoint(raw string) (string, bool, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", true, fmt.Errorf(msgParseS3Endpoint)
+		return "", true, errors.New(msgParseS3Endpoint)
 	}
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return "", true, fmt.Errorf(msgParseS3Endpoint)
+		return "", true, errors.New(msgParseS3Endpoint)
 	}
 	return parsed.Host, parsed.Scheme != "http", nil
 }
@@ -140,14 +140,14 @@ func parseS3Endpoint(raw string) (string, bool, error) {
 func normalizePublicDomain(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", fmt.Errorf(msgNormalizePublicDomain)
+		return "", errors.New(msgNormalizePublicDomain)
 	}
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return "", fmt.Errorf(msgNormalizePublicDomain2)
+		return "", errors.New(msgNormalizePublicDomain2)
 	}
 	basePath := strings.TrimSuffix(path.Clean(parsed.Path), "/")
 	if basePath == "." || basePath == "/" {

@@ -14,14 +14,52 @@ package httpapi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/testdb"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type controlTaskBillingReadError struct {
+	dbsqlc.DBTX
+	err error
+}
+
+func (db controlTaskBillingReadError) QueryRow(context.Context, string, ...any) pgx.Row {
+	return db
+}
+
+func (db controlTaskBillingReadError) Scan(...any) error {
+	return db.err
+}
+
+func TestControlTaskBillingReadErrors(t *testing.T) {
+	queryErr := errors.New("billing query failed")
+	for _, tt := range []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "missing", err: pgx.ErrNoRows},
+		{name: "wrapped missing", err: fmt.Errorf("query: %w", pgx.ErrNoRows)},
+		{name: "query failure", err: queryErr, want: queryErr},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			adapter := workspaceControlTaskAdapter{q: dbsqlc.New(controlTaskBillingReadError{err: tt.err})}
+			snapshot, found, err := adapter.loadControlTaskBilling(context.Background(), "task_test")
+			if snapshot != nil || found || !errors.Is(err, tt.want) {
+				t.Fatalf("billing result = (%v, %v, %v), want (nil, false, %v)", snapshot, found, err, tt.want)
+			}
+		})
+	}
+}
 
 func openControlTaskTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()

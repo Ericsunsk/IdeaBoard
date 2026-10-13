@@ -80,10 +80,10 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 		if ctxErr := resolveCtx.Err(); ctxErr != nil {
 			return nil, ctxErr
 		}
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout4)
+		return nil, errors.New(msgResolvePolicyWithTimeout4)
 	}
 	if len(addrs) == 0 {
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout5)
+		return nil, errors.New(msgResolvePolicyWithTimeout5)
 	}
 
 	if _, err := filterAllowedIPs(host, defaultPort(parsed), addrs, normalizedAllowedHosts, normalizedAllowedHostPorts, allowedIPs, allowedIPPorts); err != nil {
@@ -123,7 +123,7 @@ func DoWithAllowHosts(
 
 	req, err := http.NewRequestWithContext(ctx, method, policy.parsed.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf(msgDoWithAllowHosts)
+		return nil, errors.New(msgDoWithAllowHosts)
 	}
 	if buildRequest != nil {
 		buildRequest(req)
@@ -139,7 +139,7 @@ func DoWithAllowHosts(
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				return fmt.Errorf(msgDoWithAllowHosts2)
+				return errors.New(msgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(req.Context(), req.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
@@ -156,7 +156,7 @@ func DoRequestWithAllowHosts(
 	allowHosts ...string,
 ) (*http.Response, error) {
 	if req == nil || req.URL == nil {
-		return nil, fmt.Errorf(msgDoRequestWithAllowHosts)
+		return nil, errors.New(msgDoRequestWithAllowHosts)
 	}
 	ctx = nonNilContext(ctx)
 	policy, err := resolvePolicy(ctx, req.URL.String(), allowHosts...)
@@ -176,7 +176,7 @@ func DoRequestWithAllowHosts(
 		Transport: transport,
 		CheckRedirect: func(next *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				return fmt.Errorf(msgDoWithAllowHosts2)
+				return errors.New(msgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(next.Context(), next.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
@@ -221,7 +221,7 @@ func transportForRequest(ctx context.Context, req *http.Request, policy *resolve
 	actual, loaded := safeTransportPool.LoadOrStore(key, transport)
 	stored, ok := actual.(*http.Transport)
 	if !ok {
-		return nil, fmt.Errorf(msgTransportForRequest)
+		return nil, errors.New(msgTransportForRequest)
 	}
 	if !loaded {
 		pruneSafeTransportPoolIfNeeded()
@@ -508,7 +508,7 @@ func restrictedDialContext(allowedHosts map[string]bool, allowedHostPorts map[st
 		if lastErr != nil {
 			return nil, lastErr
 		}
-		return nil, fmt.Errorf(msgRestrictedDialContext)
+		return nil, errors.New(msgRestrictedDialContext)
 	}
 }
 
@@ -519,10 +519,10 @@ func lookupDialIPs(ctx context.Context, host string) ([]net.IPAddr, error) {
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil {
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout4)
+		return nil, errors.New(msgResolvePolicyWithTimeout4)
 	}
 	if len(addrs) == 0 {
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout5)
+		return nil, errors.New(msgResolvePolicyWithTimeout5)
 	}
 	return addrs, nil
 }

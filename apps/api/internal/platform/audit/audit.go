@@ -13,7 +13,7 @@ import (
 	"errors"
 
 	"ideaboard/api/internal/db/dbutil"
-	"ideaboard/api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
 
 	"github.com/jackc/pgx/v5"

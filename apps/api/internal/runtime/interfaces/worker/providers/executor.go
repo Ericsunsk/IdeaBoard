@@ -252,7 +252,7 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf(msgMaterializeProviderResultImages),
+			errors.New(msgMaterializeProviderResultImages),
 		)
 	}
 
@@ -279,7 +279,7 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf(msgMaterializeProviderResultImages3),
+			errors.New(msgMaterializeProviderResultImages3),
 		)
 	}
 	if len(materialized.Items) != len(imageURLs) {

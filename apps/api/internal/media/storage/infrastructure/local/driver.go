@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -83,7 +84,7 @@ func (d *LocalStorageDriver) localPath(objectKey string) (string, error) {
 		return "", fmt.Errorf(msgLocalPath, err)
 	}
 	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf(msgLocalPath2)
+		return "", errors.New(msgLocalPath2)
 	}
 	return full, nil
 }
@@ -108,7 +109,7 @@ func (d *LocalStorageDriver) GetBucketInfo(ctx context.Context, profile *domain.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf(msgGetBucketInfo)
+	return nil, errors.New(msgGetBucketInfo)
 }
 
 func (d *LocalStorageDriver) UploadRef(ctx context.Context, profile *domain.StorageProfile, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
@@ -464,7 +465,7 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 		return nil, fmt.Errorf(msgReadStorageObject, maxBytes/1024/1024)
 	}
 	if len(data) == 0 {
-		return nil, fmt.Errorf(msgReadStorageObject2)
+		return nil, errors.New(msgReadStorageObject2)
 	}
 	return data, nil
 }

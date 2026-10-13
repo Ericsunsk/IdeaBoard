@@ -289,11 +289,11 @@ func parseRole(value string) (Role, bool) {
 }
 
 func isValidPrincipal(principal Principal) bool {
-	if !(principal.userID > 0 &&
-		principal.publicID != uuid.Nil &&
-		principal.authUserID != "" && principal.authUserID == strings.TrimSpace(principal.authUserID) &&
-		principal.displayName != "" && principal.displayName == strings.TrimSpace(principal.displayName) &&
-		principal.role.IsValid()) {
+	if principal.userID <= 0 ||
+		principal.publicID == uuid.Nil ||
+		principal.authUserID == "" || principal.authUserID != strings.TrimSpace(principal.authUserID) ||
+		principal.displayName == "" || principal.displayName != strings.TrimSpace(principal.displayName) ||
+		!principal.role.IsValid() {
 		return false
 	}
 	if principal.subjectType != "" && !principal.subjectType.IsValid() {

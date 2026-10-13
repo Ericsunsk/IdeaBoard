@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 
 	"ideaboard/api/internal/db/dbutil"
@@ -50,7 +50,7 @@ func (q repositoryQueryer) getUsersByIDs(ids []int64) ([]dbsqlc.User, error) {
 // Create 创建用户
 func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 	if user == nil {
-		return fmt.Errorf(msgCreate)
+		return errors.New(msgCreate)
 	}
 	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		uid, err := allocateStorageUID(ctx, q, strings.TrimSpace(user.StorageUID), 0)
@@ -325,7 +325,7 @@ func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID str
 			return storageUID, nil
 		}
 	}
-	return "", fmt.Errorf(msgAllocateStorageUID)
+	return "", errors.New(msgAllocateStorageUID)
 }
 
 func reserveStorageUID(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID int64) (bool, error) {

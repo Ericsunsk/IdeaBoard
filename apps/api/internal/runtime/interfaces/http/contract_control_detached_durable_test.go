@@ -325,7 +325,7 @@ func (s *failedDetachedOutcomeScope) Begin(ctx context.Context) (context.Context
 func (s *failedDetachedOutcomeScope) Commit(ctx context.Context) error {
 	s.commits++
 	if s.commits == 2 && s.failure == "commit" {
-		s.pgControlTxScope.Rollback(ctx)
+		s.Rollback(ctx)
 		return errors.New("injected settlement commit failure")
 	}
 	if s.commits == 2 && s.failure == "commit-ack" {

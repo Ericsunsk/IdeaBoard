@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"ideaboard/api/internal/platform/riverpolicy"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"ideaboard/api/internal/platform/riverpolicy"
 )
 
 // IdentityReconciliationQueue is the serial maintenance queue for the

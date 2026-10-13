@@ -12,9 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/safehttp"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"ideaboard/api/internal/platform/safehttp"
 )
 
 func testClient(t *testing.T, cfg Config) (*Client, *Metrics) {
@@ -145,18 +146,31 @@ func TestDoReplaysRequestUsingExistingGetBody(t *testing.T) {
 	}
 }
 
-func TestDoTreatsNilContextAsBackground(t *testing.T) {
+func TestDoAcceptsOptionalContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
 
-	client, _ := testClient(t, Config{MaxAttempts: 1})
-	resp, err := client.Do(nil, postRequest(t, server), RequestOptions{AllowHosts: []string{"127.0.0.1", "localhost"}})
-	if err != nil {
-		t.Fatalf("Do(nil context) error = %v", err)
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+	}{
+		{name: "background", ctx: context.Background()},
+		{name: "nil", ctx: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, _ := testClient(t, Config{MaxAttempts: 1})
+			resp, err := client.Do(tc.ctx, postRequest(t, server), RequestOptions{AllowHosts: []string{"127.0.0.1", "localhost"}})
+			if err != nil {
+				t.Fatalf("Do() error = %v", err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusNoContent {
+				t.Fatalf("Do() status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+			}
+		})
 	}
-	resp.Body.Close()
 }
 
 func TestSnapshotRequestBodyClosesReaderAfterReadError(t *testing.T) {

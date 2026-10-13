@@ -55,7 +55,7 @@ func (s *attemptClaimStore) ClaimTaskWithAttempt(ctx context.Context, workspaceI
 		// so nothing about this claim may become observable.
 		return nil, false, s.factErr
 	}
-	claimed, err := s.InMemoryStore.ClaimTask(ctx, workspaceID, taskID, leaseToken)
+	claimed, err := s.ClaimTask(ctx, workspaceID, taskID, leaseToken)
 	if err != nil {
 		return nil, false, err
 	}

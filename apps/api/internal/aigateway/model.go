@@ -380,7 +380,7 @@ func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemCon
 	}
 	if err == nil && strings.TrimSpace(rawCatalog) != "" {
 		if err := json.Unmarshal([]byte(rawCatalog), &oldItems); err != nil {
-			return nil, nil
+			oldItems = nil
 		}
 	}
 	removed := make(map[string]struct{})

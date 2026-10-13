@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
@@ -53,7 +53,7 @@ func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, publicAPIOrigi
 		case domain.StorageProviderS3Compatible:
 			return s3Driver, nil
 		default:
-			return nil, fmt.Errorf(msgNewServiceWithLocalRoot)
+			return nil, errors.New(msgNewServiceWithLocalRoot)
 		}
 	})
 

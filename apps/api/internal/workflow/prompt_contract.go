@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -138,7 +139,7 @@ func normalizeVariationsContract(params map[string]interface{}) error {
 	}
 	strength, ok := readNumberField(obj, paramkeys.Strength)
 	if !ok {
-		return fmt.Errorf(msgNormalizeVariationsContract)
+		return errors.New(msgNormalizeVariationsContract)
 	}
 	obj[paramkeys.Strength] = clampPercent(strength)
 	params[ParamKeyVariation] = obj
@@ -177,10 +178,10 @@ func normalizeUpscaleContract(params map[string]interface{}) error {
 	}
 	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return fmt.Errorf(msgNormalizeUpscaleContract)
+		return errors.New(msgNormalizeUpscaleContract)
 	}
 	if scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
-		return fmt.Errorf(msgNormalizeUpscaleContract2)
+		return errors.New(msgNormalizeUpscaleContract2)
 	}
 	obj[paramkeys.Scale] = math.Round(scale*10) / 10
 	params[ParamKeyUpscale] = obj
@@ -194,7 +195,7 @@ func normalizeFusionContract(params map[string]interface{}) error {
 	}
 	weights, ok := ReadFusionInputWeights(params)
 	if !ok || len(weights) == 0 {
-		return fmt.Errorf(msgNormalizeFusionContract)
+		return errors.New(msgNormalizeFusionContract)
 	}
 	obj[paramkeys.InputWeights] = weights
 	obj[paramkeys.Mode] = "weighted_reference"

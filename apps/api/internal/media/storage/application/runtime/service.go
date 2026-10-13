@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -125,7 +126,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 
 func checksumMultipartFile(file *multipart.FileHeader) (string, error) {
 	if file == nil {
-		return "", fmt.Errorf(msgChecksumMultipartFile)
+		return "", errors.New(msgChecksumMultipartFile)
 	}
 	src, err := file.Open()
 	if err != nil {
@@ -448,7 +449,7 @@ func (s *Service) resolveProfileFromUploadURL(ctx context.Context, rawURL string
 
 	parsed, err := url.Parse(trimmed)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return nil, fmt.Errorf(msgResolveProfileFromUploadURL)
+		return nil, errors.New(msgResolveProfileFromUploadURL)
 	}
 	if s.isPublicLocalUploadURL(parsed) {
 		return s.profiles.ResolveProfileByID(ctx, "builtin-local")
@@ -485,12 +486,12 @@ func (s *Service) findS3ProfileForUploadURL(profiles []domain.StorageProfile, ra
 			continue
 		}
 		if matched != nil {
-			return nil, fmt.Errorf(msgFindS3ProfileForUploadURL)
+			return nil, errors.New(msgFindS3ProfileForUploadURL)
 		}
 		matched = profile
 	}
 	if matched == nil {
-		return nil, fmt.Errorf(msgFindS3ProfileForUploadURL2)
+		return nil, errors.New(msgFindS3ProfileForUploadURL2)
 	}
 	return matched, nil
 }
@@ -498,11 +499,11 @@ func (s *Service) findS3ProfileForUploadURL(profiles []domain.StorageProfile, ra
 func extractObjectKeyFromUserUploadURL(profile domain.StorageProfile, rawURL string) (string, error) {
 	trimmed := strings.TrimSpace(rawURL)
 	if trimmed == "" {
-		return "", fmt.Errorf(msgExtractObjectKeyFromUserUploadURL)
+		return "", errors.New(msgExtractObjectKeyFromUserUploadURL)
 	}
 	parsed, err := url.Parse(trimmed)
 	if err != nil {
-		return "", fmt.Errorf(msgResolveProfileFromUploadURL)
+		return "", errors.New(msgResolveProfileFromUploadURL)
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return domain.NormalizeUploadObjectKey(strings.TrimPrefix(parsed.Path, "/"))
@@ -514,13 +515,13 @@ func extractObjectKeyFromUserUploadURL(profile domain.StorageProfile, rawURL str
 		accessDomain, _ := profile.Config["access_domain"].(string)
 		return extractObjectKeyFromAccessDomainURL(accessDomain, parsed)
 	default:
-		return "", fmt.Errorf(msgExtractObjectKeyFromUserUploadURL2)
+		return "", errors.New(msgExtractObjectKeyFromUserUploadURL2)
 	}
 }
 
 func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (string, error) {
 	if parsed == nil {
-		return "", fmt.Errorf(msgResolveProfileFromUploadURL)
+		return "", errors.New(msgResolveProfileFromUploadURL)
 	}
 	base := strings.TrimSpace(accessDomain)
 	if !strings.Contains(base, "://") {
@@ -528,10 +529,10 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (
 	}
 	baseURL, err := url.Parse(base)
 	if err != nil || baseURL.Host == "" {
-		return "", fmt.Errorf(msgExtractObjectKeyFromAccessDomainURL)
+		return "", errors.New(msgExtractObjectKeyFromAccessDomainURL)
 	}
 	if !strings.EqualFold(parsed.Hostname(), baseURL.Hostname()) {
-		return "", fmt.Errorf(msgExtractObjectKeyFromAccessDomainURL2)
+		return "", errors.New(msgExtractObjectKeyFromAccessDomainURL2)
 	}
 
 	relativePath := parsed.Path
@@ -552,22 +553,22 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (
 func uploadObjectKeyFromURL(rawURL string) (string, error) {
 	trimmed := strings.TrimSpace(rawURL)
 	if trimmed == "" {
-		return "", fmt.Errorf(msgExtractObjectKeyFromUserUploadURL)
+		return "", errors.New(msgExtractObjectKeyFromUserUploadURL)
 	}
 	parsed, err := url.Parse(trimmed)
 	if err != nil {
-		return "", fmt.Errorf(msgResolveProfileFromUploadURL)
+		return "", errors.New(msgResolveProfileFromUploadURL)
 	}
 	if parsed.Scheme != "" {
 		scheme := strings.ToLower(parsed.Scheme)
 		if (scheme != "http" && scheme != "https") || parsed.Host == "" {
-			return "", fmt.Errorf(msgResolveProfileFromUploadURL)
+			return "", errors.New(msgResolveProfileFromUploadURL)
 		}
 	}
 	pathValue := "/" + strings.TrimLeft(parsed.Path, "/")
 	markerIndex := strings.Index(pathValue, "/uploads/")
 	if markerIndex < 0 {
-		return "", fmt.Errorf(msgUploadObjectKeyFromURL)
+		return "", errors.New(msgUploadObjectKeyFromURL)
 	}
 	return domain.NormalizeUploadObjectKey(strings.TrimPrefix(pathValue[markerIndex:], "/"))
 }
@@ -578,7 +579,7 @@ func canonicalizeMultipartImageWithFacts(file *multipart.FileHeader) (imageforma
 		return imageformat.Facts{}, fmt.Errorf(msgCanonicalizeMultipartImageWithFacts, err)
 	}
 	if file == nil {
-		return imageformat.Facts{}, fmt.Errorf(msgChecksumMultipartFile)
+		return imageformat.Facts{}, errors.New(msgChecksumMultipartFile)
 	}
 	file.Filename = domain.CanonicalStorageFilename(file.Filename, facts.Extension)
 	if file.Header == nil {
@@ -599,7 +600,7 @@ func (s *Service) PublicUploadURL(objectKey string) string {
 func decodeDataURL(dataURL string) (string, []byte, error) {
 	parsed, err := mediarefs.ParseDataImageURL(dataURL, maxRemoteFileSize)
 	if err != nil {
-		return "", nil, fmt.Errorf(msgDecodeDataURL)
+		return "", nil, errors.New(msgDecodeDataURL)
 	}
 	return fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), parsed.Ext), parsed.Data, nil
 }

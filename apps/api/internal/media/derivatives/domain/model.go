@@ -84,7 +84,7 @@ func ProcessingInputProfile() InputProfile {
 
 func (p InputProfile) ValidateInputFacts(width, height int, sizeBytes int64) error {
 	if p.MaxSide <= 0 || p.MaxPixels <= 0 || p.MaxBytes <= 0 {
-		return fmt.Errorf(msgValidateInputFacts)
+		return errors.New(msgValidateInputFacts)
 	}
 	if width <= 0 || height <= 0 {
 		return fmt.Errorf(msgValidateInputFacts2, width, height)

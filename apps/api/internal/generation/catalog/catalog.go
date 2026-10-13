@@ -82,7 +82,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func normalizeService(raw string) (string, error) {
 	service, err := routing.NormalizeService(raw)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrInvalidPoolInput, err)
+		return "", fmt.Errorf("%w: %w", ErrInvalidPoolInput, err)
 	}
 	if !workflow.IsAIImageFeature(service) {
 		return "", fmt.Errorf("%w: unsupported service %q", ErrInvalidPoolInput, raw)
@@ -132,7 +132,7 @@ func normalizeEntries(inputs []PoolEntryInput) ([]normalizedEntry, error) {
 		for _, raw := range input.Resolutions {
 			res, err := normalizeCapability(raw)
 			if err != nil {
-				return nil, fmt.Errorf("%w: entry %d model %q: %v", ErrInvalidPoolInput, i, model, err)
+				return nil, fmt.Errorf("%w: entry %d model %q: %w", ErrInvalidPoolInput, i, model, err)
 			}
 			resSet[res] = struct{}{}
 		}

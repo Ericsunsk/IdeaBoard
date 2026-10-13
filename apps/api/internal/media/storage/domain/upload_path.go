@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
 	"strings"
 
@@ -11,11 +11,11 @@ import (
 func NormalizeStorageUserSegment(storageUID string) (string, error) {
 	normalized := strings.TrimSpace(storageUID)
 	if !domain.IsValidStorageUID(normalized) {
-		return "", fmt.Errorf(msgNormalizeStorageUserSegment)
+		return "", errors.New(msgNormalizeStorageUserSegment)
 	}
 	escaped := url.PathEscape(normalized)
 	if escaped == "" {
-		return "", fmt.Errorf(msgNormalizeStorageUserSegment)
+		return "", errors.New(msgNormalizeStorageUserSegment)
 	}
 	return escaped, nil
 }
@@ -23,11 +23,11 @@ func NormalizeStorageUserSegment(storageUID string) (string, error) {
 func NormalizeUploadSegment(raw string) (string, error) {
 	normalized := strings.TrimSpace(raw)
 	if normalized == "" {
-		return "", fmt.Errorf(msgNormalizeUploadSegment)
+		return "", errors.New(msgNormalizeUploadSegment)
 	}
 	escaped := url.PathEscape(normalized)
 	if escaped == "" {
-		return "", fmt.Errorf(msgNormalizeUploadSegment)
+		return "", errors.New(msgNormalizeUploadSegment)
 	}
 	return escaped, nil
 }

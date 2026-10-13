@@ -19,21 +19,24 @@ import (
 )
 
 func TestDeferAmbientPostCommitWithoutRegistryReportsFalse(t *testing.T) {
-	called := false
-	if DeferAmbientPostCommit(context.Background(), func(context.Context) { called = true }) {
-		t.Fatal("DeferAmbientPostCommit without a registry = true, want false")
-	}
-	txCtx := ContextWithAmbientTx(context.Background(), nil)
-	if DeferAmbientPostCommit(txCtx, func(context.Context) { called = true }) {
-		t.Fatal("DeferAmbientPostCommit on a carrier without a registry = true, want false")
-	}
-	if DeferAmbientPostCommit(nil, func(context.Context) { called = true }) {
-		t.Fatal("DeferAmbientPostCommit on a nil context = true, want false")
-	}
-	RunAmbientPostCommit(context.Background())
-	RunAmbientPostCommit(nil)
-	if called {
-		t.Fatal("unregistered hook ran, want it dropped")
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+	}{
+		{name: "background", ctx: context.Background()},
+		{name: "transaction", ctx: ContextWithAmbientTx(context.Background(), nil)},
+		{name: "nil", ctx: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			if DeferAmbientPostCommit(tc.ctx, func(context.Context) { called = true }) {
+				t.Fatal("DeferAmbientPostCommit without a registry = true, want false")
+			}
+			RunAmbientPostCommit(tc.ctx)
+			if called {
+				t.Fatal("unregistered hook ran, want it dropped")
+			}
+		})
 	}
 }
 

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 
 	"ideaboard/api/internal/media/mediarefs"
@@ -22,7 +23,7 @@ func ValidateGenerationSubmitContract(params map[string]interface{}) error {
 	}
 	for _, key := range []string{paramkeys.ReferenceImageURLs, paramkeys.MaskImageURL, paramkeys.UseMask} {
 		if _, exists := params[key]; exists {
-			return fmt.Errorf(msgValidateGenerationSubmitContract2)
+			return errors.New(msgValidateGenerationSubmitContract2)
 		}
 	}
 	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])

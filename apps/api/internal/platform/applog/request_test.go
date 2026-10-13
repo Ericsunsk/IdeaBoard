@@ -39,11 +39,18 @@ func TestContextWithRequestIDSeedsScopedLogger(t *testing.T) {
 }
 
 func TestFromContextFallsBackToDefault(t *testing.T) {
-	if FromContext(context.Background()) != slog.Default() {
-		t.Fatal("bare context should return slog.Default")
-	}
-	if FromContext(nil) != slog.Default() {
-		t.Fatal("nil context should return slog.Default")
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+	}{
+		{name: "background", ctx: context.Background()},
+		{name: "nil", ctx: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if FromContext(tc.ctx) != slog.Default() {
+				t.Fatal("context without a scoped logger should return slog.Default")
+			}
+		})
 	}
 }
 

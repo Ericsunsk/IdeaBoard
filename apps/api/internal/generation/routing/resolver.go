@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"sort"
 
+	"ideaboard/api/internal/platform/telemetry"
+
 	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel/attribute"
-	"ideaboard/api/internal/platform/telemetry"
 )
 
 // seedGenerator mints selection seeds. It is a field (defaulting to

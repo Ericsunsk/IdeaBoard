@@ -90,14 +90,14 @@ func workspaceAttemptFailure(err error) routing.AttemptFailure {
 	status := workspaceProviderHTTPStatus(err)
 	failure.HTTPStatus = status
 	lowered := strings.ToLower(err.Error())
-	switch {
-	case status == 400 || status == 422:
+	switch status {
+	case 400, 422:
 		failure.InvalidParams = true
-	case status == 401 || status == 403:
+	case 401, 403:
 		failure.AuthFailed = true
-	case status == 402:
+	case 402:
 		failure.InsufficientCredits = true
-	case status == 404:
+	case 404:
 		failure.NotFound = true
 	}
 	if containsWorkspaceFailureMarker(lowered, workspaceContentSafetyMarkers) {

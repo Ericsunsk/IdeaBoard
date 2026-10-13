@@ -25,8 +25,9 @@ package events
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"math/rand/v2"
 	"time"
 
 	"ideaboard/api/internal/platform/riverpolicy"
@@ -129,7 +130,10 @@ func (w *WebhookDeliverWorker) Work(ctx context.Context, job *river.Job[WebhookD
 // webhookJitterSample draws the signed jitter fraction in
 // [-webhookJitterFraction, +webhookJitterFraction].
 func webhookJitterSample() float64 {
-	return rand.Float64()*2*webhookJitterFraction - webhookJitterFraction
+	var sample [8]byte
+	_, _ = rand.Read(sample[:])
+	unit := float64(binary.LittleEndian.Uint64(sample[:])>>11) / (1 << 53)
+	return unit*2*webhookJitterFraction - webhookJitterFraction
 }
 
 // webhookJitteredDelay applies a signed jitter fraction to base and

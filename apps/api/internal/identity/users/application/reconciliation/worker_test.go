@@ -41,16 +41,20 @@ func TestFingerprintIsStablePerDriftSubject(t *testing.T) {
 		FindingType: FindingRoleMismatch, UserID: 7,
 		SubjectType: "user", SubjectID: "public-id",
 	}
-	if fingerprintForDraft(draft) != fingerprintForDraft(draft) {
-		t.Fatal("fingerprint is not stable")
+	fingerprint := fingerprintForDraft(draft)
+	updated := draft
+	updated.Severity = "critical"
+	updated.Details = map[string]any{"observed_role": "admin"}
+	if fingerprint != fingerprintForDraft(updated) {
+		t.Fatal("finding details changed the subject fingerprint")
 	}
 	other := draft
 	other.FindingType = FindingBanStateMismatch
-	if fingerprintForDraft(draft) == fingerprintForDraft(other) {
+	if fingerprint == fingerprintForDraft(other) {
 		t.Fatal("different finding types share a fingerprint")
 	}
-	if len(fingerprintForDraft(draft)) != 64 {
-		t.Fatalf("fingerprint = %q, want 64 hex chars", fingerprintForDraft(draft))
+	if len(fingerprint) != 64 {
+		t.Fatalf("fingerprint = %q, want 64 hex chars", fingerprint)
 	}
 }
 

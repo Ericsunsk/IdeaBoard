@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
+
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -42,7 +43,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	correlationID := task.EnsureCorrelationID()
 	model := strings.TrimSpace(input.Model)
 	if model == "" {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf(msgCallGatewayAPI))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, errors.New(msgCallGatewayAPI))
 	}
 	provider, modelName, pathOverride, err := runtimeports.SplitGatewayModel(model)
 	if err != nil {
@@ -119,7 +120,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
-			fmt.Errorf(msgCallGatewayAPI4),
+			errors.New(msgCallGatewayAPI4),
 		)
 	}
 	finalizeStartedAt := time.Now()
@@ -149,7 +150,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	if len(imageURLs) == 0 {
 		markFinalizeFinished()
-		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf(msgCallGatewayAPI5))
+		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New(msgCallGatewayAPI5))
 	}
 	imageURL := imageURLs[0]
 	finalizeFinishedAt := time.Now()

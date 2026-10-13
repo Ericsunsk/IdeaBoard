@@ -13,6 +13,30 @@ import (
 // RoutingResolver reads entries and version through ListPool.
 var _ routing.PoolStore = (*Repository)(nil)
 
+func TestPoolInputErrorsPreserveRoutingCause(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		run  func() error
+	}{
+		{name: "service", run: func() error {
+			_, err := normalizeService("")
+			return err
+		}},
+		{name: "resolution", run: func() error {
+			_, err := normalizeEntries([]PoolEntryInput{{ModelID: "openai/a", Resolutions: []string{"invalid"}}})
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.run()
+			var cause *routing.InvalidRoutingInputError
+			if !errors.Is(err, ErrInvalidPoolInput) || !errors.As(err, &cause) {
+				t.Fatalf("error = %v; want pool classification and routing cause", err)
+			}
+		})
+	}
+}
+
 func newCatalogTestRepo(t *testing.T) *Repository {
 	t.Helper()
 	return NewRepository(testdb.Open(t))

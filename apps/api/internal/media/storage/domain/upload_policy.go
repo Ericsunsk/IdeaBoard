@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -72,14 +73,14 @@ func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
 
 func TaskOutputUserUploadObjectPrefix(userID int64) (string, error) {
 	if userID <= 0 {
-		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
+		return "", errors.New(msgTaskOutputUserUploadObjectPrefix)
 	}
 	return path.Join(UploadObjectRoot, "tasks", fmt.Sprintf("%d", userID)) + "/", nil
 }
 
 func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	if userID <= 0 {
-		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
+		return "", errors.New(msgTaskOutputUserUploadObjectPrefix)
 	}
 	taskSegment, err := NormalizeUploadSegment(taskID)
 	if err != nil {
@@ -90,7 +91,7 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 
 func LibraryAssetUploadObjectPrefix(userID int64) (string, error) {
 	if userID <= 0 {
-		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
+		return "", errors.New(msgTaskOutputUserUploadObjectPrefix)
 	}
 	return path.Join(UploadObjectRoot, "library", fmt.Sprintf("%d", userID)) + "/", nil
 }
@@ -132,7 +133,7 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 
 func parseUploadResourceParts(parts []string) (UploadResource, error) {
 	if len(parts) < 1 || parts[0] == "" {
-		return UploadResource{}, fmt.Errorf(msgParseUploadResourceParts)
+		return UploadResource{}, errors.New(msgParseUploadResourceParts)
 	}
 
 	var resource UploadResource
@@ -148,7 +149,7 @@ func parseUploadResourceParts(parts []string) (UploadResource, error) {
 		resource, ok = parseSiteAssetUploadResource(parts)
 	}
 	if !ok {
-		return UploadResource{}, fmt.Errorf(msgParseUploadResourceParts2)
+		return UploadResource{}, errors.New(msgParseUploadResourceParts2)
 	}
 	return resource, nil
 }
@@ -223,12 +224,12 @@ func uploadRelativePath(parts []string, start int) (string, bool) {
 func NormalizeUploadObjectKey(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "", fmt.Errorf(msgParseUploadResourceParts)
+		return "", errors.New(msgParseUploadResourceParts)
 	}
 	cleaned := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
 	if !strings.HasPrefix(cleaned, "/"+UploadObjectRoot+"/") &&
 		!strings.HasPrefix(cleaned, "/"+WorkspaceUploadObjectRoot+"/") {
-		return "", fmt.Errorf(msgNormalizeUploadObjectKey)
+		return "", errors.New(msgNormalizeUploadObjectKey)
 	}
 	return strings.TrimPrefix(cleaned, "/"), nil
 }
@@ -236,7 +237,7 @@ func NormalizeUploadObjectKey(raw string) (string, error) {
 func NormalizeUploadObjectPrefix(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "", fmt.Errorf(msgNormalizeUploadObjectPrefix)
+		return "", errors.New(msgNormalizeUploadObjectPrefix)
 	}
 	normalized, err := NormalizeUploadObjectKey(strings.TrimSuffix(trimmed, "/"))
 	if err != nil {

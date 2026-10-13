@@ -309,5 +309,5 @@ func workspaceRiverJobID(job *river.Job[workspacetasks.WorkspaceTaskArgs]) int64
 	if job == nil || job.JobRow == nil {
 		return 0
 	}
-	return job.JobRow.ID
+	return job.ID
 }

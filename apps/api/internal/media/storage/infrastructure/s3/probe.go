@@ -227,7 +227,7 @@ type s3BucketExistenceChecker interface {
 
 func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceChecker, bucketName string) error {
 	if client == nil {
-		return fmt.Errorf(msgEnsureS3BucketAccessible)
+		return errors.New(msgEnsureS3BucketAccessible)
 	}
 	exists, err := client.BucketExists(ctx, bucketName)
 	if err != nil {

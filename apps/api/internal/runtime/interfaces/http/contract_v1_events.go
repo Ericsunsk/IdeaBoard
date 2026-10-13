@@ -381,7 +381,7 @@ func (h *contractV1Handler) emitWorkspaceEventWithID(ctx context.Context, identi
 	var err error
 	if strings.TrimSpace(eventID) != "" {
 		envelope, err = events.MintV1EnvelopeWithID(eventID, typ, workspaceID, actor, resource, data)
-		if occurredAt.IsZero() == false {
+		if !occurredAt.IsZero() {
 			envelope.OccurredAt = occurredAt.UTC()
 			err = events.ValidateV1Envelope(envelope)
 		}

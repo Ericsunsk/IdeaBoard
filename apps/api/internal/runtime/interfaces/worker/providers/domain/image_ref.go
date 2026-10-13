@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -19,7 +20,7 @@ func ResolveProviderPublicImageURL(baseParsedURL *url.URL, ref, label string) (s
 	}
 	if parsed.Scheme == "" && strings.HasPrefix(ref, "/uploads/") {
 		if baseParsedURL == nil {
-			return "", fmt.Errorf(msgResolveProviderPublicImageURL3)
+			return "", errors.New(msgResolveProviderPublicImageURL3)
 		}
 		parsed = baseParsedURL.ResolveReference(parsed)
 	}

@@ -181,9 +181,10 @@ func credentialEnd(value string, start int) int {
 	if start < len(value) && (value[start] == '\'' || value[start] == '"') {
 		quote := value[start]
 		for end := start + 1; end < len(value); end++ {
-			if value[end] == '\\' {
+			switch value[end] {
+			case '\\':
 				end++
-			} else if value[end] == quote {
+			case quote:
 				return end + 1
 			}
 		}

@@ -19,9 +19,10 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
+	_ "image/jpeg"
+
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
-	_ "image/jpeg"
 )
 
 // WorkspaceTaskResultBytesFetcher is the production remote-result seam. The

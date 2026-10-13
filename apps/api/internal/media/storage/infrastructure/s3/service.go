@@ -222,7 +222,7 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return fmt.Errorf(msgPutBytesAtKeyWithConfig)
+		return errors.New(msgPutBytesAtKeyWithConfig)
 	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
@@ -259,13 +259,13 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
+		return nil, errors.New(msgUploadReaderWithConfigRef)
 	}
 	if body == nil {
-		return nil, fmt.Errorf(msgUploadReaderWithConfigRef2)
+		return nil, errors.New(msgUploadReaderWithConfigRef2)
 	}
 	if size < 0 {
-		return nil, fmt.Errorf(msgUploadReaderWithConfigRef3)
+		return nil, errors.New(msgUploadReaderWithConfigRef3)
 	}
 
 	client, err := s.prepareUploadClient(ctx, cfg)
@@ -278,7 +278,7 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 
 func (s *S3CompatibleService) prepareUploadClient(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
+		return nil, errors.New(msgUploadReaderWithConfigRef)
 	}
 	return s.clientWithConfig(ctx, cfg)
 }
@@ -427,7 +427,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return fmt.Errorf(msgPutBytesAtKeyWithConfig)
+		return errors.New(msgPutBytesAtKeyWithConfig)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
@@ -450,11 +450,11 @@ func (s *S3CompatibleService) ReadWithConfig(ctx context.Context, objectKey stri
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
+		return nil, errors.New(msgUploadReaderWithConfigRef)
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return nil, fmt.Errorf(msgPutBytesAtKeyWithConfig)
+		return nil, errors.New(msgPutBytesAtKeyWithConfig)
 	}
 	return s.readDeliveryObject(ctx, key, cfg, maxBytes)
 }
@@ -485,7 +485,7 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 		}
 	}
 	if response == nil {
-		return nil, fmt.Errorf(msgReadDeliveryObject3)
+		return nil, errors.New(msgReadDeliveryObject3)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
@@ -516,11 +516,11 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return fmt.Errorf(msgUploadReaderWithConfigRef)
+		return errors.New(msgUploadReaderWithConfigRef)
 	}
 	prefix := strings.TrimSpace(objectKeyPrefix)
 	if prefix == "" {
-		return fmt.Errorf(msgDeletePrefixWithConfig)
+		return errors.New(msgDeletePrefixWithConfig)
 	}
 
 	client, err := s.clientWithConfig(ctx, cfg)
@@ -561,11 +561,11 @@ func (s *S3CompatibleService) ListObjectKeysWithConfig(ctx context.Context, obje
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
+		return nil, errors.New(msgUploadReaderWithConfigRef)
 	}
 	prefix := strings.Trim(strings.TrimSpace(objectKeyPrefix), "/")
 	if prefix == "" {
-		return nil, fmt.Errorf(msgDeletePrefixWithConfig)
+		return nil, errors.New(msgDeletePrefixWithConfig)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
@@ -589,11 +589,11 @@ func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey
 		return "", err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return "", fmt.Errorf(msgUploadReaderWithConfigRef)
+		return "", errors.New(msgUploadReaderWithConfigRef)
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return "", fmt.Errorf(msgPutBytesAtKeyWithConfig)
+		return "", errors.New(msgPutBytesAtKeyWithConfig)
 	}
 	if expiry <= 0 {
 		expiry = time.Hour
@@ -682,20 +682,20 @@ func (s *S3CompatibleService) nextObjectGeneration(ctx context.Context, client *
 
 func (s *S3CompatibleService) validateBaseConfig(ctx context.Context, cfg *S3CompatibleConfig) error {
 	if cfg == nil {
-		return fmt.Errorf(msgValidateBaseConfig)
+		return errors.New(msgValidateBaseConfig)
 	}
 	if strings.TrimSpace(cfg.AccessKeyID) == "" || cfg.SecretAccessKey == "" || strings.TrimSpace(cfg.BucketName) == "" {
-		return fmt.Errorf(msgValidateBaseConfig2)
+		return errors.New(msgValidateBaseConfig2)
 	}
 	if strings.TrimSpace(cfg.Endpoint) == "" {
-		return fmt.Errorf(msgValidateBaseConfig3)
+		return errors.New(msgValidateBaseConfig3)
 	}
 	return validateS3EndpointPolicy(ctx, cfg.Endpoint)
 }
 
 func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf(msgValidateBaseConfig)
+		return nil, errors.New(msgValidateBaseConfig)
 	}
 	if err := validateS3EndpointPolicy(ctx, cfg.Endpoint); err != nil {
 		return nil, err
@@ -804,7 +804,7 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 		return nil, fmt.Errorf(msgReadStorageObject, maxBytes/1024/1024)
 	}
 	if len(data) == 0 {
-		return nil, fmt.Errorf(msgReadStorageObject2)
+		return nil, errors.New(msgReadStorageObject2)
 	}
 	return data, nil
 }

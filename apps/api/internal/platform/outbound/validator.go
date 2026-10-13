@@ -2,7 +2,7 @@ package outbound
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -51,7 +51,7 @@ func ValidateConfiguredEndpoint(raw string, allowHosts ...string) (string, error
 	}
 	parsed, err := safehttp.ValidateURLWithAllowHosts(trimmed, allowHosts...)
 	if err != nil {
-		return "", fmt.Errorf(msgValidateConfiguredEndpoint)
+		return "", errors.New(msgValidateConfiguredEndpoint)
 	}
 	return strings.TrimRight(parsed.String(), "/"), nil
 }

@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/workflow"
+
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Service orchestrates the workspace task settlement boundary:

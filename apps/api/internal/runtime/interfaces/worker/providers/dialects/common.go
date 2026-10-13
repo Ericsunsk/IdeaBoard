@@ -2,6 +2,7 @@ package dialects
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -177,7 +178,7 @@ func topLevelKeysError(parsed gjson.Result) error {
 	if len(topKeys) > 0 {
 		return fmt.Errorf(msgTopLevelKeysError, strings.Join(topKeys, ", "))
 	}
-	return fmt.Errorf(msgTopLevelKeysError2)
+	return errors.New(msgTopLevelKeysError2)
 }
 
 // universalResponsePaths is the legacy extraction order, shared by every
@@ -231,7 +232,7 @@ func collectChatParts(parts []gjson.Result, collect *candidateCollector) {
 // transparent failure. Stage order mirrors the legacy extractor exactly.
 func decodeWithPaths(body []byte) ([]string, error) {
 	if len(strings.TrimSpace(string(body))) == 0 {
-		return nil, fmt.Errorf(msgDecodeWithPaths)
+		return nil, errors.New(msgDecodeWithPaths)
 	}
 	parsed := gjson.ParseBytes(body)
 	if !parsed.IsObject() && !parsed.IsArray() {

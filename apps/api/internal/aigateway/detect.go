@@ -185,7 +185,7 @@ const (
 func fetchHTTPBody(ctx context.Context, rawURL string, headers map[string]string, timeout time.Duration, maxBytes int64, target string, maxAttempts int) (body []byte, statusCode int, err error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Hostname() == "" {
-		return nil, 0, fmt.Errorf(msgFetchHTTPBody)
+		return nil, 0, errors.New(msgFetchHTTPBody)
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -337,7 +337,7 @@ func workersAIAvailable(ctx context.Context, gateway ResolvedGateway) (bool, err
 	probeURL := strings.TrimRight(strings.TrimSpace(gateway.BaseURL), "/") + "/workers-ai/models/search"
 	parsed, err := url.Parse(probeURL)
 	if err != nil || parsed.Hostname() == "" {
-		return false, fmt.Errorf(msgWorkersAIAvailable)
+		return false, errors.New(msgWorkersAIAvailable)
 	}
 
 	headers := map[string]string{}
@@ -432,12 +432,12 @@ func fetchCommunityCatalog(ctx context.Context) ([]communityRecord, error) {
 	}
 
 	if len(bodyBytes) == 0 {
-		return nil, fmt.Errorf(msgFetchCommunityCatalog3)
+		return nil, errors.New(msgFetchCommunityCatalog3)
 	}
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
-		return nil, fmt.Errorf(msgFetchCommunityCatalog4)
+		return nil, errors.New(msgFetchCommunityCatalog4)
 	}
 
 	now := time.Now()
@@ -466,7 +466,7 @@ func fetchCommunityCatalog(ctx context.Context) ([]communityRecord, error) {
 	}
 
 	if len(entries) == 0 {
-		return nil, fmt.Errorf(msgFetchCommunityCatalog5)
+		return nil, errors.New(msgFetchCommunityCatalog5)
 	}
 
 	communityCache.Lock()

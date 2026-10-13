@@ -2,6 +2,7 @@ package mediarefs
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -30,17 +31,17 @@ func ValidateUploadPath(raw string) (string, error) {
 	if isSupportedUploadPath(parts) {
 		return cleaned, nil
 	}
-	return "", fmt.Errorf(msgValidateUploadPath)
+	return "", errors.New(msgValidateUploadPath)
 }
 
 func normalizeUploadPath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if !strings.HasPrefix(trimmed, "/uploads/") {
-		return "", fmt.Errorf(msgNormalizeUploadPath)
+		return "", errors.New(msgNormalizeUploadPath)
 	}
 	cleaned := path.Clean(trimmed)
 	if !strings.HasPrefix(cleaned, "/uploads/") {
-		return "", fmt.Errorf(msgNormalizeUploadPath)
+		return "", errors.New(msgNormalizeUploadPath)
 	}
 	return cleaned, nil
 }
@@ -48,7 +49,7 @@ func normalizeUploadPath(raw string) (string, error) {
 func uploadPathParts(cleaned string) ([]string, error) {
 	parts := strings.Split(strings.TrimPrefix(cleaned, "/uploads/"), "/")
 	if len(parts) < 1 || parts[0] == "" {
-		return nil, fmt.Errorf(msgUploadPathParts)
+		return nil, errors.New(msgUploadPathParts)
 	}
 	return parts, nil
 }
@@ -71,18 +72,18 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 	trimmed := strings.TrimSpace(raw)
 	lower := strings.ToLower(trimmed)
 	if !strings.HasPrefix(lower, "data:image/") {
-		return nil, fmt.Errorf(msgParseDataImageURL)
+		return nil, errors.New(msgParseDataImageURL)
 	}
 	comma := strings.Index(trimmed, ",")
 	if comma <= 5 {
-		return nil, fmt.Errorf(msgParseDataImageURL2)
+		return nil, errors.New(msgParseDataImageURL2)
 	}
 	header := trimmed[5:comma]
 	payload := trimmed[comma+1:]
 	parts := strings.Split(header, ";")
 	mimeType := strings.ToLower(strings.TrimSpace(parts[0]))
 	if !strings.HasPrefix(mimeType, "image/") {
-		return nil, fmt.Errorf(msgParseDataImageURL2)
+		return nil, errors.New(msgParseDataImageURL2)
 	}
 	isBase64 := false
 	for _, part := range parts[1:] {
@@ -92,18 +93,18 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 		}
 	}
 	if !isBase64 {
-		return nil, fmt.Errorf(msgParseDataImageURL2)
+		return nil, errors.New(msgParseDataImageURL2)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil {
-		return nil, fmt.Errorf(msgParseDataImageURL2)
+		return nil, errors.New(msgParseDataImageURL2)
 	}
 	if maxDecodedBytes > 0 && len(decoded) > maxDecodedBytes {
-		return nil, fmt.Errorf(msgParseDataImageURL3)
+		return nil, errors.New(msgParseDataImageURL3)
 	}
 	ext := imageExtensionFromMIME(mimeType)
 	if ext == "" {
-		return nil, fmt.Errorf(msgParseDataImageURL4)
+		return nil, errors.New(msgParseDataImageURL4)
 	}
 	return &DataImage{
 		MIMEType: mimeType,

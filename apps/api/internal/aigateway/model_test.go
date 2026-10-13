@@ -1,6 +1,7 @@
 package aigateway
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -8,6 +9,34 @@ import (
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
+
+type catalogReadTx struct {
+	settings.SystemConfigWriteTx
+	raw string
+	t   *testing.T
+}
+
+func (tx catalogReadTx) Get(_ context.Context, key string) (string, error) {
+	if key != catalogConfigKey {
+		tx.t.Fatalf("unexpected config read %q after corrupt catalog", key)
+	}
+	return tx.raw, nil
+}
+
+func TestStaleMappingKeysCorruptCatalogKeepsMappings(t *testing.T) {
+	for _, raw := range []string{
+		"{corrupt",
+		`[{"id":"openai/a"},{"id":42}]`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			tx := catalogReadTx{raw: raw, t: t}
+			keys, err := staleMappingKeysForRemovedModels(t.Context(), tx, nil)
+			if err != nil || len(keys) != 0 {
+				t.Fatalf("stale mappings = %v, %v; want no pruning", keys, err)
+			}
+		})
+	}
+}
 
 func TestProbeGatewayConnectionRejectsURLMetadata(t *testing.T) {
 	for _, baseURL := range []string{

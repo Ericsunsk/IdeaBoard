@@ -2,6 +2,7 @@ package imageformat
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"image/gif"
@@ -34,7 +35,7 @@ func InspectBytes(data []byte, ext string) (Facts, error) {
 func InspectDetectedBytes(data []byte) (Facts, error) {
 	ext := DetectImageExtensionFromBytes(data)
 	if ext == "" {
-		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
+		return Facts{}, errors.New(msgInspectDetectedBytes)
 	}
 	return InspectBytes(data, ext)
 }
@@ -47,7 +48,7 @@ func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {
 		return Facts{}, fmt.Errorf(msgInspect, ext)
 	}
 	if source == nil {
-		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
+		return Facts{}, errors.New(msgInspectDetectedBytes)
 	}
 	defer func() {
 		if _, seekErr := source.Seek(0, io.SeekStart); err == nil && seekErr != nil {
@@ -95,7 +96,7 @@ func decodeImageConfig(source io.ReadSeeker) (image.Config, string, error) {
 
 func validateImageDimensions(cfg image.Config, format string) error {
 	if cfg.Width <= 0 || cfg.Height <= 0 || format == "" {
-		return fmt.Errorf(msgValidateImageDimensions)
+		return errors.New(msgValidateImageDimensions)
 	}
 	if cfg.Width > MaxImageDimensionPixels || cfg.Height > MaxImageDimensionPixels {
 		return fmt.Errorf(msgValidateImageDimensions2, cfg.Width, cfg.Height)

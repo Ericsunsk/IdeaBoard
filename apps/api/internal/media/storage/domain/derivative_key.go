@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"fmt"
+	"errors"
 	"path"
 	"strings"
 )
@@ -14,7 +14,7 @@ func ImageDerivativeObjectKey(sourceKey, assetID, tier, format string) (string, 
 		return "", err
 	}
 	if assetID == "" || tier == "" || format == "" {
-		return "", fmt.Errorf(msgImageDerivativeObjectKey)
+		return "", errors.New(msgImageDerivativeObjectKey)
 	}
 	return NormalizeUploadObjectKey(path.Join(
 		path.Dir(normalized), ImageDerivativeDirectory, assetID, tier+"."+format,

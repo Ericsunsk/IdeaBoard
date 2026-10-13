@@ -682,10 +682,7 @@ func TestV1EventsSSEGapNotice(t *testing.T) {
 		fx.engine.ServeHTTP(writer, req)
 	}()
 	deadline := time.Now().Add(5 * time.Second)
-	for {
-		if strings.Contains(writer.snapshot(), "event: gap") {
-			break
-		}
+	for !strings.Contains(writer.snapshot(), "event: gap") {
 		if time.Now().After(deadline) {
 			cancel()
 			t.Fatalf("unknown cursor must emit a gap notice; got:\n%s", writer.snapshot())

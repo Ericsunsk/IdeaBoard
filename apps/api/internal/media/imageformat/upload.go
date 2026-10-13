@@ -1,6 +1,7 @@
 package imageformat
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"io"
@@ -13,7 +14,7 @@ import (
 // negotiation or a client-side rename.
 func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 	if fh == nil {
-		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
+		return Facts{}, errors.New(msgInspectDetectedBytes)
 	}
 	f, err := fh.Open()
 	if err != nil {
@@ -42,7 +43,7 @@ func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 // running the normal signature and image-config validation.
 func InspectDetected(source io.ReadSeeker) (Facts, error) {
 	if source == nil {
-		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
+		return Facts{}, errors.New(msgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
 		return Facts{}, fmt.Errorf(msgInspect3, err)
@@ -54,7 +55,7 @@ func InspectDetected(source io.ReadSeeker) (Facts, error) {
 	}
 	ext := DetectImageExtensionFromBytes(header[:n])
 	if ext == "" {
-		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
+		return Facts{}, errors.New(msgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
 		return Facts{}, fmt.Errorf(msgInspect3, err)
@@ -72,7 +73,7 @@ func ValidateImageBytes(data []byte, ext string) error {
 	signatures := imageSignaturesByExtension(normalizedExt)
 	required := requiredImageHeaderLength(signatures)
 	if len(data) < required {
-		return fmt.Errorf(msgInspectDetectedBytes)
+		return errors.New(msgInspectDetectedBytes)
 	}
 
 	return validateImageMagic(data[:required], normalizedExt)
@@ -86,7 +87,7 @@ func ValidateImageReader(r io.Reader, ext string) error {
 		return fmt.Errorf(msgInspect, ext)
 	}
 	if r == nil {
-		return fmt.Errorf(msgInspectDetectedBytes)
+		return errors.New(msgInspectDetectedBytes)
 	}
 
 	signatures := imageSignaturesByExtension(normalizedExt)
@@ -94,7 +95,7 @@ func ValidateImageReader(r io.Reader, ext string) error {
 	buf := make([]byte, required)
 	n, err := io.ReadFull(r, buf)
 	if err != nil || n < required {
-		return fmt.Errorf(msgInspectDetectedBytes)
+		return errors.New(msgInspectDetectedBytes)
 	}
 
 	return validateImageMagic(buf, normalizedExt)
@@ -120,7 +121,7 @@ func validateImageMagic(buf []byte, ext string) error {
 	// never satisfy the claimed extension.
 	if detected := detectExtensionViaMimetype(buf); detected != "" {
 		if detected != normalizedExt {
-			return fmt.Errorf(msgValidateImageMagic)
+			return errors.New(msgValidateImageMagic)
 		}
 		return nil
 	}
@@ -129,11 +130,11 @@ func validateImageMagic(buf []byte, ext string) error {
 	signatures := imageSignaturesByExtension(normalizedExt)
 	for _, sig := range signatures {
 		if len(buf) < sig.offset+len(sig.bytes) {
-			return fmt.Errorf(msgInspectDetectedBytes)
+			return errors.New(msgInspectDetectedBytes)
 		}
 		for i, b := range sig.bytes {
 			if buf[sig.offset+i] != b {
-				return fmt.Errorf(msgValidateImageMagic)
+				return errors.New(msgValidateImageMagic)
 			}
 		}
 	}

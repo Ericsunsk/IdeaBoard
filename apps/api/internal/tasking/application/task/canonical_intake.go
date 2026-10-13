@@ -229,11 +229,11 @@ func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[stri
 		return "", nil
 	}
 	if source != nil && jsonlimit.ValueDepth(source) > maxSubmitTaskParamsDepth {
-		return "", fmt.Errorf(msgMarshalWorkflowTaskParams)
+		return "", errors.New(msgMarshalWorkflowTaskParams)
 	}
 	payload, err := json.Marshal(params)
 	if err != nil {
-		return "", fmt.Errorf(msgMarshalWorkflowTaskParams2)
+		return "", errors.New(msgMarshalWorkflowTaskParams2)
 	}
 	if len(payload) > maxSubmitTaskParamsBytes {
 		return "", fmt.Errorf(msgMarshalWorkflowTaskParams3, maxSubmitTaskParamsBytes/1024/1024)
@@ -507,25 +507,25 @@ func normalizeFusionParams(params map[string]interface{}) error {
 	}
 	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) < 2 || len(imageURLs) > 4 {
-		return fmt.Errorf(msgNormalizeFusionParams)
+		return errors.New(msgNormalizeFusionParams)
 	}
 	rawFusion, ok := params[paramkeys.Fusion]
 	if !ok {
-		return fmt.Errorf(msgNormalizeFusionParams2)
+		return errors.New(msgNormalizeFusionParams2)
 	}
 	fusion, ok := rawFusion.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf(msgNormalizeFusionParams3)
+		return errors.New(msgNormalizeFusionParams3)
 	}
 	if _, ok := fusion[paramkeys.InputWeights]; !ok {
-		return fmt.Errorf(msgNormalizeFusionParams2)
+		return errors.New(msgNormalizeFusionParams2)
 	}
 	weights, ok := workflow.ReadFusionInputWeights(params)
 	if !ok {
-		return fmt.Errorf(msgNormalizeFusionParams4)
+		return errors.New(msgNormalizeFusionParams4)
 	}
 	if len(weights) != len(imageURLs) {
-		return fmt.Errorf(msgNormalizeFusionParams5)
+		return errors.New(msgNormalizeFusionParams5)
 	}
 	normalizedWeights, err := normalizeFusionInputWeights(weights)
 	if err != nil {
@@ -546,16 +546,16 @@ func normalizeFusionInputWeights(weights []float64) ([]float64, error) {
 	total := 0.0
 	for _, weight := range weights {
 		if math.IsNaN(weight) || math.IsInf(weight, 0) {
-			return nil, fmt.Errorf(msgNormalizeFusionInputWeights)
+			return nil, errors.New(msgNormalizeFusionInputWeights)
 		}
 		if weight < 0 {
-			return nil, fmt.Errorf(msgNormalizeFusionInputWeights2)
+			return nil, errors.New(msgNormalizeFusionInputWeights2)
 		}
 		out = append(out, weight)
 		total += weight
 	}
 	if total <= 0 {
-		return nil, fmt.Errorf(msgNormalizeFusionInputWeights3)
+		return nil, errors.New(msgNormalizeFusionInputWeights3)
 	}
 	for index := range out {
 		out[index] /= total

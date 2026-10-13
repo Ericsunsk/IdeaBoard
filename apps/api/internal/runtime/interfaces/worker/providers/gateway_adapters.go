@@ -107,7 +107,7 @@ func decodeGatewayImageResponse(dialect dialects.Dialect, respBody []byte) ([]st
 
 func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[string]interface{}, error) {
 	if len(providerReq.ImageRefs) == 0 || strings.TrimSpace(providerReq.ImageRefs[0]) == "" {
-		return nil, fmt.Errorf(msgBuildUpscaleGatewayPayload)
+		return nil, errors.New(msgBuildUpscaleGatewayPayload)
 	}
 	scaleRequest := providerReq
 	inputURL, err := c.imageTransformInputURL(scaleRequest, msgBuildUpscaleGatewayPayload2)
@@ -115,7 +115,7 @@ func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[s
 		return nil, err
 	}
 	if providerReq.Scale < 1 || providerReq.Scale > 4 || math.Abs(providerReq.Scale*10-math.Round(providerReq.Scale*10)) > 1e-9 {
-		return nil, fmt.Errorf(msgBuildUpscaleGatewayPayload3)
+		return nil, errors.New(msgBuildUpscaleGatewayPayload3)
 	}
 	return map[string]interface{}{
 		"image_url":     inputURL,

@@ -213,7 +213,7 @@ func resolveCleanBreakRevisionsSchema(ctx context.Context, db cleanBreakDatabase
 		return "", fmt.Errorf("%w: found tables named %s in schemas [%s]. "+
 			"Treating an arbitrary candidate as authoritative could read the wrong recorded version history and use it to justify dropping the public schema. "+
 			"Drop the stale revisions table from the schema Atlas no longer uses (or align the migration schema), then redeploy. "+
-			"Setting ATLAS_CLEAN_BREAK_ALLOW_RESET does not resolve this: the ambiguity is about which history is real, not about permission to reset.",
+			"Setting ATLAS_CLEAN_BREAK_ALLOW_RESET does not resolve this: the ambiguity is about which history is real, not about permission to reset",
 			ErrCleanBreakRevisionsAmbiguous, cleanBreakRevisionsTableName, strings.Join(schemas, ", "))
 	}
 	if len(schemas) == 1 {
@@ -232,7 +232,7 @@ func resolveCleanBreakRevisionsSchema(ctx context.Context, db cleanBreakDatabase
 		)
 		return "", fmt.Errorf("%w: the database holds an object named %s (relation=%v, schema=%v) but the catalog lookup returned no revisions table. "+
 			"Refusing to treat this as a fresh database, because detection would silently not run and `atlas migrate apply` would then fail with a dirty database that ATLAS_CLEAN_BREAK_ALLOW_RESET cannot unblock. "+
-			"Inspect the database manually and drop the stale object, then redeploy.",
+			"Inspect the database manually and drop the stale object, then redeploy",
 			ErrCleanBreakRevisionsUnresolved, cleanBreakRevisionsTableName, hasRelation, hasSchema)
 	}
 	return "", nil
@@ -312,7 +312,7 @@ func reconcileCleanBreak(ctx context.Context, db cleanBreakDatabase, migrationCo
 		return fmt.Errorf("%w: database %q records %d Atlas revision(s) absent from %s: %s. "+
 			"This deploy ships a different migration history than the database (wrong image, image rollback, or a renamed/removed migration file). "+
 			"Deploy the image that matches the recorded history, or restore a matching migration directory. "+
-			"Only if this is an intended pre-launch clean break, after exporting the data you need to keep, set ATLAS_CLEAN_BREAK_ALLOW_RESET=true to allow the public schema to be dropped and recreated.",
+			"Only if this is an intended pre-launch clean break, after exporting the data you need to keep, set ATLAS_CLEAN_BREAK_ALLOW_RESET=true to allow the public schema to be dropped and recreated",
 			ErrCleanBreakNotAllowed, databaseName, len(missingVersions), dirPath, strings.Join(missingVersions, ", "))
 	}
 
