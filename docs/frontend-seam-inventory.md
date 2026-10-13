@@ -34127,9 +34127,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 126,
-      "measuredFanOut": 47,
+      "measuredFanOut": 46,
       "targetFanIn": 126,
-      "targetFanOut": 47,
+      "targetFanOut": 46,
       "shims": [],
       "shimTtl": "2 phases — delete after P5",
       "retirementPhase": null,
@@ -35143,7 +35143,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       ],
       "surfaceSeverity": "warn",
       "targetFanOutTargets": [
-        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -35158,7 +35157,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
+        "scripts/checkTokenGraph.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/components/ui/badge/index.ts",

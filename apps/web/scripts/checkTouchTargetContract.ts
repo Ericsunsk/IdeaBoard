@@ -1,28 +1,14 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import postcss from 'postcss'
 
 /**
  * Guard: interactive controls must reach the touch-target floor.
  *
- * A logged-in audit of Canvas Workspace, `/admin/monitor`, `/admin/statistics`,
- * `/admin/users`, `/admin/models`, `/admin/credits` and `/admin/settings` found
- * 30 controls under 24x24 CSS px, which fails WCAG 2.2 SC 2.5.8 (Target Size
- * Minimum, AA) outright, plus 16 more under this repo's stricter 32px floor:
- *
- *   AdminSwitch                     36x20   18 instances   switch track
- *   TaskEventsCard filter pills     ~x20     6 instances   dense chip rail
- *   canvas zoom buttons             23x23    4 instances   canvas status bar
- *   canvas catalog recovery         62x22    2 instances   canvas header
- *   admin range segments            32x24    6 instances   chart card header
- *   admin tabs triggers             ~x28      8 instances   sub-navigation rail
- *   node action buttons             ~x26      4 instances   canvas node overlay
- *   admin pager / chart collapse    28x28    5 instances   toolbar
- *   admin header scroll-to-top      ~x24      6 instances   sticky page title
- *   canvas board icon buttons       29x29    4 instances   canvas header
- *
  * The floor is `--spacing-touch-target-min` (32px). Controls that are
  * visually small by design carry `.hit-target-32` / `.hit-target-32-inline`
- * from `theme/touch-target.css`, which grows the hit area past the visual
+ * from `theme/atoms/touch-target.css`, which grows the hit area past the visual
  * box without inflating the design. Controls that can afford it set a real
  * `min-h-8` / `!size-8`.
  *
@@ -30,14 +16,132 @@ import { join } from 'node:path'
  * one of those two routes.
  */
 
-/** The floor, in px. Must track `--spacing-touch-target-min` in theme.css. */
+/** Accessibility floors; profile values are read from the CSS owner. */
 const FLOOR_PX = 32
+
+/** Precision floor for drag handles. Must track `--spacing-touch-target-aa`. */
+const PRECISION_PX = 24
 
 const SRC_ROOT = join(import.meta.dirname, '..', 'src')
 const STYLE = join(SRC_ROOT, 'app/style.css')
 const THEME_ENTRY = join(SRC_ROOT, 'theme/theme.css')
 
 const OPT_IN = /hit-target-32(?:-inline)?\b|hit-target-drag\b/
+
+function profilePx(source: string, name: string): number | null {
+  const declarations = new Map<string, string[]>()
+  postcss.parse(source).walkDecls((declaration) => {
+    declarations.set(declaration.prop, [
+      ...(declarations.get(declaration.prop) ?? []),
+      declaration.value,
+    ])
+  })
+  const seen = new Set<string>()
+  while (!seen.has(name)) {
+    seen.add(name)
+    const values = declarations.get(name)
+    if (values?.length !== 1) return null
+    const alias = values[0]!.match(/^var\((--[\w-]+)\)$/)?.[1]
+    if (alias) {
+      name = alias
+      continue
+    }
+    if (!/^\d+(?:\.\d+)?px$/.test(values[0]!)) return null
+    const value = Number.parseFloat(values[0]!)
+    return Number.isFinite(value) ? value : null
+  }
+  return null
+}
+
+function coarseCondition(rule: postcss.Rule): string | null {
+  let parent: postcss.Rule | postcss.AtRule | postcss.Root | postcss.Document | undefined =
+    rule.parent
+  while (parent) {
+    if (parent.type === 'atrule' && parent.name === 'media') return parent.params.trim()
+    parent = parent.parent
+  }
+  return null
+}
+
+/** Verify live profile routing and the geometry boundaries of each family. */
+export function collectTouchProfileViolations(
+  themeSource: string,
+  targetSource: string,
+  controlSource: string,
+): string[] {
+  const violations: string[] = []
+  const fine = profilePx(themeSource, '--spacing-touch-target-min')
+  const precision = profilePx(themeSource, '--spacing-touch-target-aa')
+  const coarse = profilePx(themeSource, '--spacing-touch-target-coarse')
+  if (fine === null || fine < FLOOR_PX) violations.push('Fine profile must reach the 32px floor.')
+  if (precision === null || precision < PRECISION_PX)
+    violations.push('Precision profile must reach the 24px floor.')
+  if (coarse === null || coarse < Math.max(FLOOR_PX, fine ?? FLOOR_PX))
+    violations.push('Coarse profile must reach the ordinary fine-pointer floor.')
+
+  const expected = new Map([
+    ['.hit-target-32::after:width', 'max(100%, var(--spacing-touch-target-coarse))'],
+    ['.hit-target-32::after:height', 'max(100%, var(--spacing-touch-target-coarse))'],
+    ['.hit-target-32-inline::after:height', 'max(100%, var(--spacing-touch-target-coarse))'],
+    ['.hit-target-control:min-width', 'var(--spacing-touch-target-coarse)'],
+    ['.hit-target-control:min-height', 'var(--spacing-touch-target-coarse)'],
+  ])
+  const fineExpected = new Map([
+    ['.hit-target-32::after:width', 'max(100%, var(--spacing-touch-target-min))'],
+    ['.hit-target-32::after:height', 'max(100%, var(--spacing-touch-target-min))'],
+    ['.hit-target-32-inline::after:width', '100%'],
+    ['.hit-target-32-inline::after:height', 'max(100%, var(--spacing-touch-target-min))'],
+    ['.hit-target-drag::after:width', 'max(100%, var(--spacing-touch-target-aa))'],
+    ['.hit-target-drag::after:height', 'max(100%, var(--spacing-touch-target-aa))'],
+  ])
+  const found = new Set<string>()
+  const fineFound = new Set<string>()
+  postcss.parse(targetSource).walkRules((rule) => {
+    const condition = coarseCondition(rule)
+    rule.walkDecls((declaration) => {
+      const key = `${rule.selector}:${declaration.prop}`
+      if (declaration.value.includes('--spacing-touch-target-coarse')) {
+        if (condition !== '(pointer: coarse)' || expected.get(key) !== declaration.value)
+          violations.push(`Unexpected coarse routing for ${key}.`)
+        else found.add(key)
+      }
+      if (expected.has(key) && condition !== null && declaration.value !== expected.get(key))
+        violations.push(`Pointer routing override disconnects ${key} from the coarse profile.`)
+      if (fineExpected.has(key) && condition === null) {
+        if (fineExpected.get(key) === declaration.value) fineFound.add(key)
+        else violations.push(`Invalid fine/precision geometry for ${key}.`)
+      }
+      if (rule.selector === '.hit-target-32-inline::after' && declaration.prop === 'width') {
+        if (declaration.value !== '100%')
+          violations.push(
+            'Inline targets must not expand the inline axis into neighbouring targets.',
+          )
+      }
+      if (
+        rule.selector === '.hit-target-drag::after' &&
+        /^(width|height)$/.test(declaration.prop)
+      ) {
+        if (condition !== null || declaration.value !== 'max(100%, var(--spacing-touch-target-aa))')
+          violations.push('Precision handles must retain the independent precision profile.')
+      }
+    })
+    if (rule.selector.includes('.hit-target-control::'))
+      violations.push(
+        'Real-box controls must grow in layout without an overlapping pseudo-element.',
+      )
+  })
+  for (const key of expected.keys())
+    if (!found.has(key)) violations.push(`Missing active coarse routing for ${key}.`)
+  for (const key of fineExpected.keys())
+    if (!fineFound.has(key)) violations.push(`Missing retained fine/precision geometry for ${key}.`)
+
+  for (const name of ['adminCompactIconButtonClass', 'adminTableRowActionButtonClass']) {
+    const classes = controlSource.match(new RegExp(`${name}\\s*=\\s*['"]([^'"]*)['"]`))?.[1]
+    if (!classes?.split(/\s+/).includes('hit-target-control'))
+      violations.push(`${name} must bind existing ordinary controls to the coarse profile.`)
+  }
+  return violations
+}
 
 /**
  * Strip comments before testing. Several of these files *document* the hit-area
@@ -342,18 +446,15 @@ function readRuleSource(rel: string, sources: Map<string, string>, missing: stri
 function main(): void {
   const violations: string[] = []
 
-  // 1. The floor token must exist and match FLOOR_PX.
-  const themeEntry = readFileSync(THEME_ENTRY, 'utf8')
-  const token = themeEntry.match(/--spacing-touch-target-min:\s*(\d+)px/)
-  if (!token) {
-    violations.push(
-      'theme/theme.css: `--spacing-touch-target-min` is missing. The touch-target floor must be declared once, here.',
-    )
-  } else if (Number(token[1]) !== FLOOR_PX) {
-    violations.push(
-      `theme/theme.css: \`--spacing-touch-target-min\` is ${token[1]}px but the contract floor is ${FLOOR_PX}px. Update both together.`,
-    )
-  }
+  // 1. Read profile values and verify active routing for existing controls.
+  const themeEntry = `${readFileSync(THEME_ENTRY, 'utf8')}\n${readFileSync(join(SRC_ROOT, 'theme/tokens/primitives.css'), 'utf8')}`
+  violations.push(
+    ...collectTouchProfileViolations(
+      themeEntry,
+      readFileSync(join(SRC_ROOT, 'theme/atoms/touch-target.css'), 'utf8'),
+      readFileSync(join(SRC_ROOT, 'features/admin/shared/core/uiClasses.ts'), 'utf8'),
+    ),
+  )
 
   // 2. The hit-area utility must be imported, or no control can opt in.
   const styles = readFileSync(STYLE, 'utf8')
@@ -409,4 +510,4 @@ function main(): void {
   )
 }
 
-main()
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()

@@ -22,7 +22,7 @@
         <!-- 批量作为视觉搜索参考图 (Vision Search) -->
         <button
           type="button"
-          class="h-8 px-4 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-none transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="h-8 px-4 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-none transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           @click="emit('vision-search')"
         >
           <Search class="size-3.5" aria-hidden="true" />

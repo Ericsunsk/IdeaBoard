@@ -1,0 +1,31 @@
+/*
+ * Motion intent tokens: control/enter/exit/feedback durations and easings.
+ *
+ * Single CSS/JS policy owner with `core/motion/motionPolicy.ts`: CSS
+ * transitions and JS timing readers consume these `var()` tokens, and the
+ * reduced-motion block below keeps them in sync (transforms, continuous
+ * motion, and overlays collapse through the same policy). Timing and intent
+ * names express intent; timing values and curves come from Tier 1.
+ */
+
+@layer base {
+  :root {
+    --motion-control-duration: var(--primitive-duration-160);
+    --motion-control-easing: var(--primitive-easing-standard);
+    --motion-enter-duration: var(--primitive-duration-220);
+    --motion-enter-easing: var(--primitive-easing-standard);
+    --motion-exit-duration: var(--primitive-duration-220);
+    --motion-exit-easing: var(--primitive-easing-standard);
+    --motion-feedback-duration: var(--primitive-duration-160);
+    --motion-feedback-easing: var(--primitive-easing-standard);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-control-duration: var(--primitive-duration-0);
+      --motion-enter-duration: var(--primitive-duration-0);
+      --motion-exit-duration: var(--primitive-duration-0);
+      --motion-feedback-duration: var(--primitive-duration-0);
+    }
+  }
+}

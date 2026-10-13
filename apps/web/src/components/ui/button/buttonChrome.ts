@@ -16,14 +16,16 @@ export type ButtonChromeVariant =
 export type ButtonChromeSeverity = 'primary' | 'secondary' | 'danger' | 'success' | 'info' | 'warn'
 
 export const buttonChromeColorClasses: Record<ButtonChromeVariant, string> = {
-  default: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 shadow-xs',
-  primary: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 shadow-xs',
+  default:
+    'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed shadow-xs',
+  primary:
+    'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed shadow-xs',
   secondary:
     'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70 border border-border',
   destructive:
-    'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80 shadow-xs',
+    'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed shadow-xs',
   danger:
-    'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80 shadow-xs',
+    'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed shadow-xs',
   outline:
     'border border-input bg-card text-card-foreground hover:bg-muted active:bg-muted/80 shadow-xs',
   ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80',

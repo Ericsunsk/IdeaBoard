@@ -14,31 +14,7 @@
 @import '../theme/atoms/page-chrome.css';
 @import '../theme/atoms/user-avatar-button.css';
 
-/* Tailwind does not generate utilities for the --z-* token namespace. */
-@utility z-admin-sticky {
-  z-index: var(--z-admin-sticky);
-}
-
-@utility z-admin-header {
-  z-index: var(--z-admin-header);
-}
-
-@utility z-admin-overlay {
-  z-index: var(--z-admin-overlay);
-}
-
-@utility z-admin-dialog {
-  z-index: var(--z-admin-dialog);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --motion-control-duration: 0ms;
-    --motion-enter-duration: 0ms;
-    --motion-exit-duration: 0ms;
-    --motion-feedback-duration: 0ms;
-  }
-}
+/* Native `z-*` utilities now come from `--z-index-*` (tokens/z.css). */
 
 @utility page-dot-bg {
   background-image: radial-gradient(circle, var(--color-page-dot) 1px, transparent 1px);

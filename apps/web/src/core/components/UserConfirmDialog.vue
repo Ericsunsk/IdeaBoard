@@ -37,8 +37,8 @@
                 :class="[
                   'rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50',
                   props.intent === 'danger'
-                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
+                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive-hover'
+                    : 'bg-primary text-primary-foreground hover:bg-primary-hover',
                 ]"
                 @click="emit('confirm')"
               >

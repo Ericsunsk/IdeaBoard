@@ -46,8 +46,8 @@
             :class="[
               'inline-flex items-center justify-center rounded-lg px-4 py-2 text-admin-body font-medium shadow-xs cursor-pointer transition-colors disabled:opacity-50',
               activeAdminConfirm?.intent === 'danger'
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80',
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed'
+                : 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
             ]"
             :disabled="
               activeAdminConfirm?.loading ||

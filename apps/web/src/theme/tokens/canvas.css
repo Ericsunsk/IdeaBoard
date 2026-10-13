@@ -1,79 +1,82 @@
 /*
  * Tier 3: Scoped Canvas Tokens
- * Canvas-specific workspace rendering, dot grids, flow edges, and minimap layers.
+ * Canvas workspace, node, edge and minimap rendering consumes Tier 2 roles.
+ * Light and dark assignments share one owner and declare identical key sets.
  */
 
 @layer base {
   :root {
-    --color-canvas-workspace-bg: #e7e7e7;
-    --color-canvas-surface-bg: #f7f7f7;
-    --color-canvas-neutral-line: rgb(177 177 183 / 65%);
-    --color-canvas-dot: #c9ced8;
-    --color-canvas-edge: rgba(0, 0, 0, 0.2);
-    --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
-    --color-canvas-edge-running: var(--color-canvas-edge-selected);
-    --color-canvas-accent: var(--primary);
-    --color-canvas-accent-hover: var(--primary-hover);
-    --color-canvas-accent-pressed: var(--primitive-violet-700);
-    --color-canvas-accent-soft: rgba(122, 107, 213, 0.08);
-    --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
-    --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
-    --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
-    --color-canvas-accent-shadow: rgba(146, 120, 230, 0.25);
-    --color-canvas-accent-shadow-hover: rgba(146, 120, 230, 0.35);
-    --color-canvas-accent-glow: rgba(146, 120, 230, 0.18);
-    --color-canvas-node-bg: var(--color-canvas-surface-bg);
-    --color-canvas-node-border: #e5e7eb;
-    --color-canvas-text-primary: #171717;
-    --color-canvas-text-secondary: #52525b;
-    --color-canvas-text-muted: #62626a;
-    --color-canvas-text-control: var(--color-canvas-text-secondary);
-    --color-canvas-text-option: var(--color-canvas-text-muted);
-    --color-canvas-text-inverse: #ffffff;
-    --color-canvas-tooltip-bg: rgba(24, 24, 27, 0.94);
-    --color-canvas-tooltip-text: #f4f4f5;
-    --color-canvas-running-from: #9278e6;
-    --color-canvas-running-to: #6dbef7;
-    --color-canvas-glass-bg: rgba(255, 255, 255, 0.85);
-    --color-canvas-minimap-node: rgba(0, 0, 0, 0.28);
-    --color-canvas-minimap-viewport: rgba(0, 0, 0, 0.38);
-    --color-canvas-minimap-mask: rgba(0, 0, 0, 0.08);
+    --color-canvas-workspace-bg: var(--color-workspace-bg);
+    --color-canvas-surface-bg: var(--color-workspace-surface);
+    --color-canvas-neutral-line: var(--color-tool-border);
+    --color-canvas-dot: var(--color-workspace-dot);
+    --color-canvas-edge: var(--color-workspace-connection);
+    --color-canvas-edge-selected: var(--color-workspace-connection-selected);
+    --color-canvas-edge-running: var(--color-workspace-connection-running);
+    --color-canvas-accent: var(--color-tool-accent);
+    --color-canvas-accent-hover: var(--color-tool-accent-hover);
+    --color-canvas-accent-pressed: var(--color-tool-accent-pressed);
+    --color-canvas-accent-soft: var(--color-tool-accent-soft);
+    --color-canvas-accent-wash: var(--color-tool-accent-soft);
+    --color-canvas-accent-border: var(--color-tool-accent-line);
+    --color-canvas-accent-border-soft: var(--color-tool-accent-line-soft);
+    --color-canvas-accent-tooltip-border: var(--color-tool-accent-tooltip-line);
+    --color-canvas-accent-shadow: var(--color-tool-accent-shadow);
+    --color-canvas-accent-shadow-hover: var(--color-tool-accent-shadow-hover);
+    --color-canvas-accent-glow: var(--color-tool-accent-glow);
+    --color-canvas-node-bg: var(--color-workspace-surface);
+    --color-canvas-node-border: var(--color-workspace-border);
+    --color-canvas-text-primary: var(--color-text-strong);
+    --color-canvas-text-secondary: var(--color-text-label);
+    --color-canvas-text-muted: var(--color-text-muted);
+    --color-canvas-text-control: var(--color-text-control);
+    --color-canvas-text-option: var(--color-text-option);
+    --color-canvas-text-inverse: var(--color-text-inverse);
+    --color-canvas-tooltip-bg: var(--color-tooltip-bg);
+    --color-canvas-tooltip-text: var(--color-tooltip-foreground);
+    --color-canvas-running-from: var(--color-progress-from);
+    --color-canvas-running-to: var(--color-progress-to);
+    --color-canvas-glass-bg: var(--color-tool-glass);
+    --color-canvas-minimap-node: var(--color-workspace-preview-node);
+    --color-canvas-minimap-viewport: var(--color-workspace-preview-viewport);
+    --color-canvas-minimap-mask: var(--color-workspace-preview-mask);
   }
 
   html.dark,
   .dark {
-    --color-canvas-workspace-bg: var(--primitive-neutral-950);
-    --color-canvas-surface-bg: var(--primitive-neutral-850);
-    --color-canvas-neutral-line: rgba(255, 255, 255, 0.12);
-    --color-canvas-dot: rgba(255, 255, 255, 0.08);
-    --color-canvas-edge: rgba(255, 255, 255, 0.22);
-    --color-canvas-edge-selected: #ffffff;
-    --color-canvas-edge-running: rgba(255, 255, 255, 0.7);
-    --color-canvas-accent: #ffffff;
-    --color-canvas-accent-hover: #fcfcfc;
-    --color-canvas-accent-pressed: #ebebeb;
-    --color-canvas-accent-soft: rgba(255, 255, 255, 0.12);
-    --color-canvas-accent-border: rgba(255, 255, 255, 0.25);
-    --color-canvas-accent-border-soft: rgba(255, 255, 255, 0.15);
-    --color-canvas-accent-tooltip-border: rgba(255, 255, 255, 0.2);
-    --color-canvas-accent-shadow: rgba(0, 0, 0, 0.5);
-    --color-canvas-accent-shadow-hover: rgba(0, 0, 0, 0.65);
-    --color-canvas-accent-glow: rgba(255, 255, 255, 0.15);
-    --color-canvas-node-bg: var(--primitive-neutral-850);
-    --color-canvas-node-border: rgba(255, 255, 255, 0.08);
-    --color-canvas-text-primary: #ededed;
-    --color-canvas-text-secondary: #a1a1aa;
-    --color-canvas-text-muted: #71717a;
-    --color-canvas-text-control: #ededed;
-    --color-canvas-text-option: #a1a1aa;
-    --color-canvas-text-inverse: var(--primitive-neutral-950);
-    --color-canvas-tooltip-bg: rgba(20, 20, 20, 0.96);
-    --color-canvas-tooltip-text: #ededed;
-    --color-canvas-running-from: #a78bfa;
-    --color-canvas-running-to: #38bdf8;
-    --color-canvas-glass-bg: rgba(24, 24, 24, 0.78);
-    --color-canvas-minimap-node: rgba(255, 255, 255, 0.28);
-    --color-canvas-minimap-viewport: rgba(255, 255, 255, 0.38);
-    --color-canvas-minimap-mask: rgba(255, 255, 255, 0.12);
+    --color-canvas-workspace-bg: var(--color-workspace-bg);
+    --color-canvas-surface-bg: var(--color-workspace-surface);
+    --color-canvas-neutral-line: var(--color-tool-border);
+    --color-canvas-dot: var(--color-workspace-dot);
+    --color-canvas-edge: var(--color-workspace-connection);
+    --color-canvas-edge-selected: var(--color-workspace-connection-selected);
+    --color-canvas-edge-running: var(--color-workspace-connection-running);
+    --color-canvas-accent: var(--color-tool-accent);
+    --color-canvas-accent-hover: var(--color-tool-accent-hover);
+    --color-canvas-accent-pressed: var(--color-tool-accent-pressed);
+    --color-canvas-accent-soft: var(--color-tool-accent-soft);
+    --color-canvas-accent-wash: var(--color-tool-accent-soft);
+    --color-canvas-accent-border: var(--color-tool-accent-line);
+    --color-canvas-accent-border-soft: var(--color-tool-accent-line-soft);
+    --color-canvas-accent-tooltip-border: var(--color-tool-accent-tooltip-line);
+    --color-canvas-accent-shadow: var(--color-tool-accent-shadow);
+    --color-canvas-accent-shadow-hover: var(--color-tool-accent-shadow-hover);
+    --color-canvas-accent-glow: var(--color-tool-accent-glow);
+    --color-canvas-node-bg: var(--color-workspace-surface);
+    --color-canvas-node-border: var(--color-workspace-border);
+    --color-canvas-text-primary: var(--color-text-strong);
+    --color-canvas-text-secondary: var(--color-text-label);
+    --color-canvas-text-muted: var(--color-text-muted);
+    --color-canvas-text-control: var(--color-text-control);
+    --color-canvas-text-option: var(--color-text-option);
+    --color-canvas-text-inverse: var(--color-text-inverse);
+    --color-canvas-tooltip-bg: var(--color-tooltip-bg);
+    --color-canvas-tooltip-text: var(--color-tooltip-foreground);
+    --color-canvas-running-from: var(--color-progress-from);
+    --color-canvas-running-to: var(--color-progress-to);
+    --color-canvas-glass-bg: var(--color-tool-glass);
+    --color-canvas-minimap-node: var(--color-workspace-preview-node);
+    --color-canvas-minimap-viewport: var(--color-workspace-preview-viewport);
+    --color-canvas-minimap-mask: var(--color-workspace-preview-mask);
   }
 }

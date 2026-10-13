@@ -2,7 +2,7 @@
   <div class="flex h-screen w-full flex-col overflow-hidden">
     <div
       v-if="isImpersonating"
-      class="fixed top-2 left-1/2 z-[var(--z-banner)] flex min-h-10 w-max max-w-[calc(100vw-12px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-control border border-primary/25 bg-primary/10 px-2 py-1 text-foreground backdrop-blur-[10px] md:top-2.5 md:max-w-[calc(100vw-20px)] md:rounded-panel md:px-2.5 md:py-1.5"
+      class="fixed top-2 left-1/2 z-banner flex min-h-10 w-max max-w-[calc(100vw-12px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-control border border-primary/25 bg-primary/10 px-2 py-1 text-foreground backdrop-blur-[10px] md:top-2.5 md:max-w-[calc(100vw-20px)] md:rounded-panel md:px-2.5 md:py-1.5"
     >
       <div class="inline-flex min-w-0 items-center gap-2">
         <span
@@ -18,7 +18,7 @@
         type="button"
         variant="ghost"
         size="icon"
-        class="size-6 min-w-6 shrink-0 rounded-full border border-primary/35 bg-card p-0 text-primary shadow-none hover:border-primary/50 hover:bg-primary/10 active:border-primary/55 active:bg-primary/15 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)] disabled:cursor-wait disabled:opacity-70 md:size-[26px] md:min-w-[26px]"
+        class="size-6 min-w-6 shrink-0 rounded-full border border-primary/35 bg-card p-0 text-primary shadow-none hover:border-primary/50 hover:bg-primary/10 active:border-primary/55 active:bg-primary/15 focus-visible:outline-none focus-visible:shadow-focus-ring disabled:cursor-wait disabled:opacity-70 md:size-[26px] md:min-w-[26px]"
         :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :is-disabled="stopImpersonatingLoading"

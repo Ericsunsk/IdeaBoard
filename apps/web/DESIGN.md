@@ -36,12 +36,26 @@ MUST choose the target surface before styling.
 ## Tokens
 
 `src/theme/theme.css` is the token source of truth: the sole Tailwind import,
-token imports in dependency order, the dark variant, and the `@theme inline`
-bridge that maps standard semantic `--color-*` utility keys to runtime roles.
-`src/theme/tokens/semantic.css` owns the canonical Tier 2 runtime roles;
+token imports in dependency order
+(`primitives` → `semantic` → `admin` → `canvas` → `motion` → `type` → `z`),
+the dark variant, the `@theme inline` bridge that maps standard semantic
+`--color-*` utility keys to runtime roles, and the explicit `type-*` role
+utilities. `src/theme/tokens/semantic.css` owns the canonical Tier 2 runtime
+roles plus Tier 2 domain dark assignments; `src/theme/tokens/admin.css` owns
+the Admin-distinct Tier 2b roles (light `@theme` + dark base); `src/theme/tokens/canvas.css`
+owns the Tier 3 canvas runtime (light + dark); `src/theme/tokens/motion.css`,
+`type.css`, and `z.css` own motion, type, and stacking roles.
 `src/app/style.css` is the entry named by `components.json`; it imports
-theme, base, and atoms, and owns app-wide utilities, motion overrides, toast
+theme, base, and atoms, and owns app-wide utilities, toast
 styling, and shell rules. Do not duplicate token tables in docs or components.
+
+Enforcement: `npm run lint:token-graph` (`scripts/checkTokenGraph.ts`) gates
+token graph integrity (defined, acyclic, down-tier only), exact color-role
+mode parity, and measured contrast floors; `src/theme/tokens/contracts/tokenGraph.contract.spec.ts`
+holds the positive/negative fixtures. Authored color ingredients belong to
+Tier 1; Tier 3 roles reference Tier 2 only, without retained-value exemptions.
+Normal action text (including hover/pressed) clears 4.5:1; chart marks and
+sidebar focus rings clear 3:1; body/card/sidebar text clears 7:1.
 
 - Use existing tokens before adding new ones.
 - Use semantic tokens, not raw color intent: prefer `--color-canvas-accent` over a hard-coded purple.
@@ -52,14 +66,43 @@ styling, and shell rules. Do not duplicate token tables in docs or components.
 
 Token ownership:
 
+- Tier 1 (`tokens/primitives.css`, `:root` only): mode-blind physical color
+  ramps, radii, shadows, and the `palette-light-*` / `palette-dark-*`
+  ingredient scales under distinct names. Never `.dark` overrides here.
+- Tier 2 (`tokens/semantic.css` + `theme.css` bridge): canonical shadcn roles
+  (`--background`, `--card`, `--foreground`, `--border`, `--primary`,
+  `--muted`, `--chart-*`, `--sidebar-*`, and state variants) with explicit
+  light + dark assignments; Tier 2 domain dark assignments (brand, board,
+  auth, toast, overlay, page-chrome, home, scrollbar, mask) with light values
+  - utility keys in the `theme.css` `@theme` bridge. Bare names are
+    the runtime roles; the matching `--color-*` names exist only as
+    `@theme inline` utility keys (`bg-primary`, `text-foreground`, …).
+- Tier 2b (`tokens/admin.css`): Admin-distinct operational density,
+  table/dialog/popover chrome, chart, and status roles with bounded Admin
+  consumer scope (see ADR-0016).
+- Tier 3 (`tokens/canvas.css` + feature skins): canvas-scoped roles
+  referencing Tier 2 only, including workspace, tool, text, tooltip, and
+  progress roles.
+- Motion (`tokens/motion.css` + `core/motion/motionPolicy.ts`): single
+  control/enter/exit/feedback policy (160/220/220/160ms); CSS, JS, and
+  reduced-motion stay in sync.
+- Type (`tokens/type.css` + `type-*` utilities in `theme.css`): family-only
+  `--font-*`, size `--text-*` (full Admin variant ladder kept), explicit
+  `type-{display,title,body,caption,code}` shorthands.
+- Stacking (`tokens/z.css`): native `--z-index-*` roles emitting `z-*`
+  utilities (`z-admin-dialog`, `z-banner`, …); ascending numeric order is the
+  contract.
+- Radius: single `--radius` master (0.625rem); every `--radius-*` role is a
+  `calc()` factor reproducing current pixels; `pill` stays independent.
+- Shadows: Tier 2 resting/floating roles (`--shadow-focus-ring`,
+  `--shadow-floating`, `--shadow-raised`, admin/board/auth tiers) with current
+  paint; mode-varying shadows carry explicit dark assignments.
 - `--color-admin-*`, `--text-admin-*`, `--leading-admin-*`: Admin.
 - `--color-canvas-*`: Canvas nodes, tools, overlays, image interactions.
 - `--color-board-*`: Boards.
 - Canonical semantic tokens (`--background`, `--card`,
   `--foreground`, `--border`, `--primary`,
-  `--muted`, and their state variants): shared UI semantics. Bare names are
-  the runtime roles; the matching `--color-*` names exist only as
-  `@theme inline` utility keys (`bg-primary`, `text-foreground`, …).
+  `--muted`, and their state variants): shared UI semantics.
 - `--color-auth-*`: Auth/User Shell.
 - `--color-page-chrome-*`: shared page navigation and account chrome.
 - `--color-overlay-*`: shared menus and contextual overlays.
@@ -87,16 +130,16 @@ Deliberately kept, not omissions:
   pinned by `canvasSurfaceSkin.contract.spec.ts`), board thumbnail bake
   (`boardPreviewStyle.ts`, `BoardCard.vue` preview gradients).
 - Private resolution infrastructure: runtime role declarations in
-  `src/theme/tokens/semantic.css` / `src/theme/tokens/dark.css`, utility keys
-  in `src/theme/theme.css`, and the
+  `src/theme/tokens/semantic.css` / `src/theme/tokens/admin.css` / `src/theme/tokens/canvas.css`,
+  utility keys in `src/theme/theme.css`, and the
   `adminThemeTokens.ts` / `taskMetricTokens.ts` bridges. Tier-3 standard
   tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`, …)
   resolve through the bridge to the canonical semantic roles; no
   product-prefixed alias tier is permitted.
 
 Type scale (`text-admin-*` sizes) is unaffected by the color-token freeze.
-Dark mode ships through token resolution (`html.dark` overrides in
-`src/theme/tokens/semantic.css` and `src/theme/tokens/dark.css`);
+Dark mode ships through token resolution (`html.dark` overrides in the tier
+owners: `tokens/admin.css`, `tokens/semantic.css`, `tokens/canvas.css`);
 `dark:` overrides stay banned because
 semantic tokens already cover both modes.
 
@@ -106,7 +149,8 @@ Out of freeze scope, by design:
   shadow tokens are elevation, not color. Components may keep domain-owned
   elevation tokens; generic `shadow-ib-*` aliases are forbidden.
 - Domain utility values use plain `@theme`; Canvas declarations and dark mode overrides live in
-  `tokens/canvas.css` and `tokens/dark.css`. Existing Canvas declarations
+  `tokens/canvas.css` and the tier-owner dark blocks (`tokens/admin.css`,
+  `tokens/semantic.css`). Existing Canvas declarations
   are pinned by `token-alias`/`dark-base-closure`; no new duplicates may be added.
 
 ### Text Color Ramp Standard
@@ -240,8 +284,10 @@ Bind `:model-value` and forward through the command instead, the same shape
 
 WCAG 2.2 SC 2.5.8 (Target Size Minimum, AA) asks for 24x24 CSS px. This repo holds a
 stricter 32px floor, declared once as `--spacing-touch-target-min` in
-`src/app/style.css` and enforced by `npm run lint:touch-target`
-(`scripts/checkTouchTargetContract.ts`).
+`src/theme/theme.css` alongside the precision (`--spacing-touch-target-aa`,
+24px) and coarse (`--spacing-touch-target-coarse`, 32px)
+profiles, and enforced by `npm run lint:touch-target`
+(`scripts/checkTouchTargetContract.ts`), which resolves CSS-owned profiles and verifies floors and pointer routing.
 
 Controls that are visually small by design do not inflate to 32px. Instead the _hit
 area_ grows past the visual box through `src/theme/atoms/touch-target.css`:
@@ -251,6 +297,13 @@ area_ grows past the visual box through `src/theme/atoms/touch-target.css`:
 | `.hit-target-32`        | 32px both axes     | switch tracks, canvas zoom buttons, compact toolbar buttons                    |
 | `.hit-target-32-inline` | 32px vertical only | chip rails, chart range segments, node action buttons — rows keep their rhythm |
 | `.hit-target-drag`      | 24px (AA floor)    | drag handles only — see below                                                  |
+| `.hit-target-control`   | coarse profile     | real boxes in compact Admin icon and table row action families                 |
+
+The ordinary `32` overlays select the fine profile by default and the coarse
+profile under `(pointer: coarse)`; the inline variant grows the block axis
+only. `.hit-target-control` applies the coarse profile as a real minimum box
+size so neighboring controls participate in layout. Both ordinary profiles
+are currently 32px; precision handles use an independent 24px profile.
 
 The pseudo-element belongs to the control itself, so pointer and keyboard
 activation still route to the real element and the accessible name, role, and

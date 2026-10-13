@@ -7,67 +7,27 @@
  * utilities resolve through the live
  * variable (dark-mode and subtree aware) without a second runtime value.
  * Domain utility values use plain `@theme`; Canvas and dark overrides are
- * owned by tokens/canvas.css and tokens/dark.css.
+ * owned by tokens/canvas.css and tokens/admin.css / tokens/semantic.css.
+ * Tier 2b Admin roles live in tokens/admin.css; type/z/motion roles live in
+ * tokens/type.css, tokens/z.css, and tokens/motion.css.
  */
 @import 'tailwindcss';
 @import './tokens/primitives.css';
 @import './tokens/semantic.css';
+@import './tokens/admin.css';
 @import './tokens/canvas.css';
-@import './tokens/dark.css';
+@import './tokens/motion.css';
+@import './tokens/type.css';
+@import './tokens/z.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* ── Primitive Light Elevation Palette Scale (Linear/Vercel standard) ── */
-  --palette-light-0: #fbfbfb; /* Level 0: Global canvas & workspace base */
-  --palette-light-1: #ffffff; /* Level 1: Elevated card strong, dialog shell */
-  --palette-light-2: #f5f5f5; /* Level 2: Surface muted, secondary container */
-  --palette-light-3: #fafafa; /* Level 3: Inputs, controls, interactive elements */
-  --palette-light-hover: #f0f0f0; /* Level 3.5: Control hover state */
-  --palette-light-surface-pressed: #e5e5e5; /* Level 3.6: Control pressed state */
-  --palette-light-border: #e5e7eb; /* Base structural borders & dividers */
-  --palette-light-border-soft: #ececec; /* Softer structural borders */
-  --palette-light-border-hover: #d4d4d4; /* Interactive border hover state */
-  --palette-light-border-pressed: #bfbfbf; /* Border pressed state */
-
-  /* ── Primitive Light Typography Scale (WCAG AAA/AA monotonic ramp) ── */
-  --palette-light-title: #171717; /* High-emphasis titles */
-  --palette-light-text-1: #313131; /* Primary body text (AAA >= 7.0:1) */
-  --palette-light-text-label: #52525b; /* Section labels / legends */
-  --palette-light-text-2: #62626a; /* Secondary / muted text (AA >= 4.5:1) */
-  --palette-light-text-3: #696971; /* Tertiary / captions / icons */
-
-  --font-admin:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-
-  --color-admin-bg: var(--palette-light-0);
-  --color-admin-shell: rgba(255, 255, 255, 0.62);
-  --color-admin-card: rgba(255, 255, 255, 0.94);
-  --color-admin-card-strong: var(--palette-light-1);
-  --color-admin-border: var(--palette-light-border);
-  --color-admin-border-soft: var(--palette-light-border-soft);
-  --color-admin-border-hover: var(--palette-light-border-hover);
-  --color-admin-border-pressed: var(--palette-light-border-pressed);
-  --color-admin-text-1: var(--palette-light-text-1);
-  --color-admin-text-2: var(--palette-light-text-2);
-  /* `label` is the "group heading / fieldset legend" level: heavier than
-     `text-2` but lighter than `text-1`. */
-  --color-admin-text-label: var(--palette-light-text-label);
-  --color-admin-text-3: var(--palette-light-text-3);
-  --color-admin-text-disabled: var(--palette-light-border-hover);
-  --color-admin-text-inverse: var(--palette-light-1);
-  --color-admin-title-color: var(--palette-light-title);
-  --color-admin-subtitle-color: var(--color-admin-text-2);
-  --color-admin-accent: var(--color-brand-creative-accent);
-  --color-admin-accent-hover: var(--color-brand-creative-accent-hover);
-  --color-admin-accent-pressed: var(--color-brand-creative-accent-pressed);
-  --color-admin-accent-soft: rgba(146, 120, 230, 0.08);
-  --color-admin-accent-softer: rgba(146, 120, 230, 0.05);
-  --color-admin-focus-ring: rgba(146, 120, 230, 0.18);
   /*
    * Primary transparent tiers (accent-faint family). Derived from
    * --primary via color-mix so they track the brand violet in light
-   * mode and the white accent in dark mode with no per-mode redeclaration.
+   * mode and the white accent in dark mode. Explicit dark assignments in
+   * semantic.css preserve mode parity.
    * Covers the bg-primary/*, border-primary/*, and ring-primary/* carriers
    * used across Admin surfaces.
    */
@@ -79,119 +39,59 @@
   --color-primary-line-strong: color-mix(in srgb, var(--primary) 40%, transparent);
   --color-primary-line-emphasis: color-mix(in srgb, var(--primary) 50%, transparent);
   --color-primary-line-bold: color-mix(in srgb, var(--primary) 60%, transparent);
-  /*
-   * Task status glow/bloom pair (monitor domain visual contract). The banner
-   * gradient start (glow) and end stop (wash) plus the dot halo rings live
-   * here so table and detail views share one source instead of raw rgba().
-   */
-  --color-admin-status-default-glow: rgba(152, 162, 179, 0.12);
-  --color-admin-status-pending-glow: rgba(71, 117, 168, 0.1);
-  --color-admin-status-running-glow: rgba(164, 105, 37, 0.1);
-  --color-admin-status-success-glow: rgba(40, 134, 97, 0.1);
-  --color-admin-status-danger-glow: rgba(201, 74, 86, 0.095);
-  --color-admin-status-wash: rgba(255, 255, 255, 0.74);
-  /*
-   * Provider brand hues (model catalog badges). Semantic success/info/warning
-   * cover openai/google/workers; the four hues below have no semantic
-   * equivalent, so each provider owns one token and derives soft/border
-   * carriers via opacity modifiers.
-   */
-  --color-provider-purple: #7e22bb;
-  --color-provider-orange: #c2410c;
-  --color-provider-blue: #1d4ed8;
-  --color-provider-rose: #be123c;
   /* Overlay scrims (mobile drawer veil vs dialog/drawer veil). */
-  --color-scrim: rgba(0, 0, 0, 0.4);
-  --color-scrim-soft: rgba(0, 0, 0, 0.3);
+  --color-scrim: var(--primitive-neutral-1000-alpha-40);
+  --color-scrim-soft: var(--primitive-neutral-1000-alpha-30);
   /*
    * Image overlay action fills (search result cards). Translucent black pills
    * floating over imagery/scrims; distinct from the full-veil scrims above.
    * Search keeps its overlay-btn aliases sourced from these two.
    */
-  --color-overlay-btn-bg: rgba(0, 0, 0, 0.42);
-  --color-overlay-btn-bg-hover: rgba(0, 0, 0, 0.68);
-  --color-admin-surface-muted: var(--palette-light-2);
-  --color-admin-surface-hover: var(--palette-light-hover);
-  --color-admin-surface-pressed: var(--palette-light-surface-pressed);
-  --color-admin-surface-disabled: var(--color-admin-surface-muted);
-  --color-admin-control-bg: var(--palette-light-3);
-  --color-admin-control-bg-hover: var(--color-admin-surface-hover);
-  --color-admin-control-border: var(--color-admin-border);
-  --color-admin-control-border-hover: var(--color-admin-border-hover);
-  --color-admin-control-border-pressed: var(--color-admin-border-pressed);
-  --color-admin-nav-active-bg: #22304a;
-  --color-admin-nav-active-bg-hover: #19243a;
-  --color-admin-preview-bg: var(--color-admin-surface-muted);
-  --color-admin-divider: rgba(0, 0, 0, 0.08);
-  --color-admin-model-indigo: #4f6f9f;
-  --color-admin-model-purple: var(--color-brand-creative-accent);
-  --color-admin-model-cyan: #3d8b9a;
-  --color-admin-chart-tooltip-border: var(--color-admin-border);
-  --color-admin-chart-tooltip-text: #262626;
-  --color-admin-chart-axis-line: var(--color-admin-border);
-  --color-admin-chart-split-line: var(--color-admin-surface-hover);
-  --color-admin-chart-legend-text: var(--color-admin-text-2);
-  --color-admin-chart-mist: #8f8f8f;
-  --color-admin-chart-olive: #6f8b71;
-
-  --text-admin-micro: 10px;
-  --text-admin-caption: 11px;
-  --text-admin-meta: 12px;
-  --text-admin-body: 13px;
-  --text-admin-content: 14px;
-  --text-admin-title-sm: 15px;
-  --text-admin-title: 16px;
-  --text-admin-heading: 18px;
-  --text-admin-icon: 20px;
-  --text-admin-summary-value: 28px;
-  --text-admin-modal-title: 26px;
-  --text-admin-modal-title-mobile: 22px;
-
-  --radius-admin-dialog: 14px;
+  --color-overlay-btn-bg: var(--primitive-neutral-1000-alpha-42);
+  --color-overlay-btn-bg-hover: var(--primitive-neutral-1000-alpha-68);
 
   /* ── Canvas / node tokens ─────────────────────────────── */
-  --color-canvas-workspace-bg: #e7e7e7;
-  --color-canvas-surface-bg: #f7f7f7;
-  --color-canvas-neutral-line: rgb(177 177 183 / 65%);
-  --color-canvas-dot: #c9ced8;
-  --color-canvas-edge: rgba(0, 0, 0, 0.2);
-  --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
-  --color-canvas-edge-running: var(--color-canvas-edge-selected);
-  --color-canvas-accent: var(--color-brand-creative-accent);
-  --color-canvas-accent-hover: #7a6bd5;
-  --color-canvas-accent-pressed: #6d5fd0;
-  --color-canvas-accent-soft: var(--color-brand-creative-accent-soft);
+  --color-canvas-workspace-bg: var(--color-workspace-bg);
+  --color-canvas-surface-bg: var(--color-workspace-surface);
+  --color-canvas-neutral-line: var(--color-tool-border);
+  --color-canvas-dot: var(--color-workspace-dot);
+  --color-canvas-edge: var(--color-workspace-connection);
+  --color-canvas-edge-selected: var(--color-workspace-connection-selected);
+  --color-canvas-edge-running: var(--color-workspace-connection-running);
+  --color-canvas-accent: var(--color-tool-accent);
+  --color-canvas-accent-hover: var(--color-tool-accent-hover);
+  --color-canvas-accent-pressed: var(--color-tool-accent-pressed);
+  --color-canvas-accent-soft: var(--color-tool-accent-soft);
   /*
-   * Tonal-range wash (retouch/editing gradient end stop, segmented active
-   * fill). Pinned to the Tier-3 soft value so the surface-skin alias resolves
-   * identically with or without var() support.
+   * Tonal-range wash for retouch gradients and segmented active fills,
+   * sourced from the same Tier 2 tool wash as scoped Canvas tokens.
    */
-  --color-canvas-accent-wash: rgba(122, 107, 213, 0.08);
-  --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
-  --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
-  --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
-  --color-canvas-accent-shadow: rgba(146, 120, 230, 0.25);
-  --color-canvas-accent-shadow-hover: rgba(146, 120, 230, 0.35);
-  --color-canvas-accent-glow: rgba(146, 120, 230, 0.18);
-  --color-canvas-node-bg: var(--color-canvas-surface-bg);
-  --color-canvas-node-border: var(--palette-light-border);
-  --color-canvas-text-primary: var(--palette-light-title);
-  --color-canvas-text-secondary: var(--palette-light-text-label);
-  --color-canvas-text-muted: var(--palette-light-text-2);
-  --color-canvas-text-control: var(--color-canvas-text-secondary);
-  --color-canvas-text-option: var(--color-canvas-text-muted);
-  --color-canvas-text-inverse: var(--palette-light-1);
-  --color-canvas-tooltip-bg: rgba(24, 24, 27, 0.94);
-  --color-canvas-tooltip-text: #f4f4f5;
-  --color-canvas-running-from: #9278e6;
-  --color-canvas-running-to: #6dbef7;
-  --color-canvas-glass-bg: rgba(255, 255, 255, 0.85);
-  --color-canvas-minimap-node: rgba(0, 0, 0, 0.28);
-  --color-canvas-minimap-viewport: rgba(0, 0, 0, 0.38);
-  --color-canvas-minimap-mask: rgba(0, 0, 0, 0.08);
+  --color-canvas-accent-wash: var(--color-tool-accent-soft);
+  --color-canvas-accent-border: var(--color-tool-accent-line);
+  --color-canvas-accent-border-soft: var(--color-tool-accent-line-soft);
+  --color-canvas-accent-tooltip-border: var(--color-tool-accent-tooltip-line);
+  --color-canvas-accent-shadow: var(--color-tool-accent-shadow);
+  --color-canvas-accent-shadow-hover: var(--color-tool-accent-shadow-hover);
+  --color-canvas-accent-glow: var(--color-tool-accent-glow);
+  --color-canvas-node-bg: var(--color-workspace-surface);
+  --color-canvas-node-border: var(--color-workspace-border);
+  --color-canvas-text-primary: var(--color-text-strong);
+  --color-canvas-text-secondary: var(--color-text-label);
+  --color-canvas-text-muted: var(--color-text-muted);
+  --color-canvas-text-control: var(--color-text-control);
+  --color-canvas-text-option: var(--color-text-option);
+  --color-canvas-text-inverse: var(--color-text-inverse);
+  --color-canvas-tooltip-bg: var(--color-tooltip-bg);
+  --color-canvas-tooltip-text: var(--color-tooltip-foreground);
+  --color-canvas-running-from: var(--color-progress-from);
+  --color-canvas-running-to: var(--color-progress-to);
+  --color-canvas-glass-bg: var(--color-tool-glass);
+  --color-canvas-minimap-node: var(--color-workspace-preview-node);
+  --color-canvas-minimap-viewport: var(--color-workspace-preview-viewport);
+  --color-canvas-minimap-mask: var(--color-workspace-preview-mask);
 
   /* ── Page surface tokens ─────────────────────────────────── */
-  --color-page-dot: #e2e4e8;
+  --color-page-dot: var(--primitive-slate-150);
   --color-page-chrome-border: var(--color-board-card-border);
   --color-page-chrome-border-hover: var(--color-board-card-border-hover);
   --color-page-chrome-bg: var(--color-board-control-bg);
@@ -201,44 +101,46 @@
   --color-page-chrome-color-disabled: var(--color-board-card-text);
   --color-page-chrome-focus-ring: var(--color-board-focus-ring);
   --shadow-page-chrome: none;
-  --spacing-overlay-gutter: 10px;
-  --color-overlay-bg: rgba(255, 255, 255, 0.98);
+  --spacing-overlay-gutter: var(--primitive-size-10);
+  --color-overlay-bg: var(--primitive-neutral-0-alpha-98);
   --color-overlay-border: var(--palette-light-border);
   --color-overlay-item: var(--palette-light-text-1);
   --color-overlay-item-hover-bg: var(--palette-light-hover);
   --color-overlay-danger: var(--destructive);
   --color-overlay-danger-hover-bg: color-mix(in srgb, var(--color-overlay-danger) 10%, transparent);
   --shadow-overlay-menu: none;
-  --spacing-page-dot: 12px;
-  --spacing-page-chrome-inset: 16px;
-  /* Touch-target floor. WCAG 2.2 AA asks 24px; this repo holds 32px. */
-  --spacing-touch-target-min: 32px;
+  --spacing-page-dot: var(--primitive-size-12);
+  --spacing-page-chrome-inset: var(--primitive-size-16);
+  /* Touch-target floors: 32px default/fine and coarse profiles;
+     24px precision drag handles. */
+  --spacing-touch-target-min: var(--primitive-size-32);
   /* AA floor, drag handles only (see touch-target.css). */
-  --spacing-touch-target-aa: 24px;
+  --spacing-touch-target-aa: var(--primitive-size-24);
+  --spacing-touch-target-coarse: var(--primitive-size-32);
 
   /* ── Marketing landing page tokens ───────────────────────── */
-  --color-home-hero-text: #202124;
-  --color-home-hero-subtle: #5f6368;
-  --color-home-note-bg: #e6ded5;
+  --color-home-hero-text: var(--primitive-zinc-875);
+  --color-home-hero-subtle: var(--primitive-zinc-650);
+  --color-home-note-bg: var(--primitive-stone-200);
   --color-home-note-border: transparent;
   --color-home-note-text: var(--color-home-hero-text);
 
   /* ── Global Glass & Frosted Surface tokens ────────────── */
-  --blur-glass: 12px;
+  --blur-glass: var(--primitive-blur-12);
 
   /* ── Board-level tokens ────────────────────────────────── */
   --color-board-page: var(--palette-light-0);
   --color-board-page-text: var(--palette-light-title);
   --color-board-page-text-muted: var(--palette-light-text-label);
-  --color-board-page-glow: rgba(146, 115, 235, 0.42);
-  --color-board-page-glow-clear: rgba(146, 115, 235, 0);
+  --color-board-page-glow: var(--primitive-violet-475-alpha-42);
+  --color-board-page-glow-clear: transparent;
   --color-board-primary: var(--color-brand-creative-accent-hover);
   --color-board-primary-hover: var(--color-brand-creative-accent-pressed);
-  --color-board-focus-ring: rgba(122, 107, 213, 0.16);
-  --color-board-focus-ring-strong: rgba(122, 107, 213, 0.18);
-  --color-board-surface: rgba(255, 255, 255, 0.9);
+  --color-board-focus-ring: var(--primitive-violet-650-alpha-16);
+  --color-board-focus-ring-strong: var(--primitive-violet-650-alpha-18);
+  --color-board-surface: var(--primitive-neutral-0-alpha-90);
   --color-board-surface-strong: var(--card);
-  --color-board-control-bg: rgba(255, 255, 255, 0.85);
+  --color-board-control-bg: var(--primitive-neutral-0-alpha-85);
   --color-board-control-text: var(--color-board-card-title);
   --color-board-control-input-text: var(--color-board-card-title);
   --color-board-control-icon: var(--palette-light-text-3);
@@ -246,34 +148,34 @@
   --color-board-card-border-hover: var(--palette-light-border-hover);
   --color-board-card-bg: var(--color-board-surface);
   --color-board-card-preview-from: var(--palette-light-1);
-  --color-board-card-preview-to: #f8fafc;
-  --color-board-card-preview-fade: rgba(248, 250, 252, 0.92);
-  --color-board-card-preview-fade-clear: rgba(248, 250, 252, 0);
+  --color-board-card-preview-to: var(--primitive-slate-50);
+  --color-board-card-preview-fade: var(--primitive-slate-50-alpha-92);
+  --color-board-card-preview-fade-clear: transparent;
   --color-board-card-preview-divider: var(--palette-light-border);
   --color-board-card-input-border: var(--palette-light-border);
-  --color-board-card-input-bg: rgba(255, 255, 255, 0.9);
+  --color-board-card-input-bg: var(--primitive-neutral-0-alpha-90);
   --color-board-card-title: var(--palette-light-title);
   --color-board-card-text: var(--palette-light-text-2);
   --color-board-card-action: var(--palette-light-text-label);
   --color-board-card-action-hover: var(--palette-light-title);
   --color-board-create-icon: var(--palette-light-border-hover);
   --color-board-create-title: var(--color-board-card-title);
-  --color-board-loading-bg: rgba(0, 0, 0, 0.04);
+  --color-board-loading-bg: var(--primitive-neutral-1000-alpha-4);
   --color-board-danger: var(--destructive);
   --color-board-danger-hover: var(--destructive-hover);
   --color-board-dialog-title: var(--color-board-control-input-text);
   --color-board-dialog-description: var(--color-board-page-text-muted);
-  --radius-board-dialog: 20px;
+  --radius-board-dialog: calc(var(--radius) * 2);
   --shadow-board-focus: 0 0 0 3px var(--color-board-focus-ring);
   --shadow-board-focus-strong: 0 0 0 3px var(--color-board-focus-ring-strong);
-  --shadow-board-dialog: 0 22px 58px rgba(0, 0, 0, 0.12);
+  --shadow-board-dialog: var(--primitive-shadow-22-58-soft);
 
-  --color-brand-creative-accent: #9278e6;
-  --color-brand-creative-accent-hover: #725fd0;
-  --color-brand-creative-accent-pressed: #614ec2;
-  --color-brand-creative-accent-secondary: #c084fc;
-  --color-brand-creative-accent-soft: #f5f2ff;
-  --color-brand-creative-accent-ring: rgba(146, 120, 230, 0.1);
+  --color-brand-creative-accent: var(--primitive-violet-450);
+  --color-brand-creative-accent-hover: var(--primitive-violet-675);
+  --color-brand-creative-accent-pressed: var(--primitive-violet-750);
+  --color-brand-creative-accent-secondary: var(--primitive-purple-400);
+  --color-brand-creative-accent-soft: var(--primitive-violet-25);
+  --color-brand-creative-accent-ring: var(--primitive-violet-450-alpha-10);
   --color-brand-creative-focus-accent: var(--color-brand-creative-accent);
   --color-dialog-mask: color-mix(in srgb, var(--foreground) 38%, transparent);
   /*
@@ -328,49 +230,28 @@
   --color-auth-close-hover: var(--foreground);
 
   /* ── Toast semantic tokens ── */
-  --color-toast-bg: rgba(255, 255, 255, 0.92);
+  --color-toast-bg: var(--primitive-neutral-0-alpha-92);
   --color-toast-border: var(--palette-light-border);
   --color-toast-text: var(--palette-light-text-1);
   --color-toast-muted: var(--palette-light-text-2);
-  --color-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
-  --color-toast-highlight: rgba(38, 54, 79, 0.08);
+  --color-toast-shadow: var(--primitive-shadow-10-24);
+  --color-toast-highlight: var(--primitive-slate-775-alpha-8);
   --color-toast-button: var(--color-brand-creative-accent-hover);
 
   /* ── shadcn-vue standard theme mappings ─────────────────── */
 
-  --radius-control: 10px;
-  --radius-panel: 14px;
-  --radius-overlay: 14px;
-  --radius-pill: 999px;
-  /* Admin chrome radius aliases (zero-delta: match the framework scale). */
-  --radius-admin-card: 12px;
-  --radius-admin-control: 8px;
-  --radius-admin-chip: 6px;
+  /*
+   * Radius roles derive from one master scale. Factors preserve their
+   * proportions; the pill radius is an independent physical ingredient.
+   */
+  --radius: var(--primitive-radius-base);
+  --radius-control: calc(var(--radius) * 1);
+  --radius-panel: calc(var(--radius) * 1.4);
+  --radius-overlay: calc(var(--radius) * 1.4);
+  --radius-pill: var(--primitive-radius-rounded);
 
-  /* Admin layout spacing (shell/popover/drawer/empty-state/login widths). */
-  --spacing-admin-shell: 1600px;
-  --spacing-admin-popover: 340px;
-  --spacing-admin-drawer: min(38rem, calc(100vw - 1rem));
-  --spacing-admin-empty-state: 260px;
-  --spacing-admin-login-card: min(420px, 100%);
-
-  /* Admin display weights for optical one-offs between semibold and bold. */
-  --font-weight-admin-strong: 650;
-  --font-weight-admin-emphasis: 680;
-  --font-weight-admin-display: 760;
-
-  /* ── App stacking layers (ascending numeric order is the contract) ── */
-  --z-content: 1;
-  --z-admin-sticky: 10;
-  --z-admin-header: 30;
-  --z-admin-overlay: 40;
-  --z-admin-dialog: 50;
-  --z-popover: 80;
-  --z-banner: 1200;
-  --z-lightbox: 2000;
-
-  --size-scrollbar: 10px;
-  --size-scrollbar-thumb-inset: 3px;
+  --size-scrollbar: var(--primitive-size-10);
+  --size-scrollbar-thumb-inset: var(--primitive-size-3);
   --color-scrollbar-track: transparent;
   --color-scrollbar-thumb: color-mix(in srgb, var(--foreground) 58%, transparent);
   --color-scrollbar-thumb-hover: color-mix(in srgb, var(--foreground) 72%, transparent);
@@ -380,36 +261,24 @@
     inset 0 1px 1px var(--color-auth-shell-highlight);
   /* Neutral slate entry shadow for the Admin login card (kept distinct from
      the brand-tinted auth shell glow). */
-  --shadow-login-card: 0 24px 70px rgba(45, 64, 89, 0.12);
-  /*
-   * Admin elevation tiers. Aliases of the framework shadow scale so overlay
-   * chrome (dialog/drawer/popover) and status dot halos resolve through
-   * named tokens instead of raw shadow-[...] values.
-   */
-  --shadow-admin-dialog: var(--shadow-xl);
-  --shadow-admin-drawer: var(--shadow-2xl);
-  --shadow-admin-popover: var(--shadow-lg);
-  --shadow-admin-status-dot-default: 0 0 0 4px rgba(152, 162, 179, 0.14);
-  --shadow-admin-status-dot-pending: 0 0 0 4px rgba(71, 117, 168, 0.15);
-  --shadow-admin-status-dot-running: 0 0 0 4px rgba(164, 105, 37, 0.15);
-  --shadow-admin-status-dot-success: 0 0 0 4px rgba(40, 134, 97, 0.14);
-  --shadow-admin-status-dot-danger: 0 0 0 4px rgba(201, 74, 86, 0.14);
+  --shadow-login-card: var(--primitive-shadow-24-70-slate);
+  /* Shared focus ring (3px outline-equivalent halo tracking --ring). */
+  --shadow-focus-ring: 0 0 0 3px var(--ring);
+  /* Tier 2 resting/floating elevation (current paint, Tier 1 ingredients). */
+  --shadow-floating: var(--primitive-shadow-xl);
+  --shadow-raised: var(--primitive-shadow-sm);
   --shadow-auth-input: inset 0 1px 2px color-mix(in srgb, var(--foreground) 2%, transparent);
   --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
   --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
   --shadow-auth-focus: 0 0 0 3px var(--color-auth-focus-ring);
-
-  --motion-control-duration: 160ms;
-  --motion-control-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --motion-enter-duration: 220ms;
-  --motion-enter-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --motion-exit-duration: 220ms;
-  --motion-exit-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --motion-feedback-duration: 160ms;
-  --motion-feedback-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-
-  --font-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
-  --font-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
+  --radius-xs: calc(var(--radius) * 0.2);
+  --radius-sm: calc(var(--radius) * 0.4);
+  --radius-md: calc(var(--radius) * 0.6);
+  --radius-lg: calc(var(--radius) * 0.8);
+  --radius-xl: calc(var(--radius) * 1.2);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-3xl: calc(var(--radius) * 2.4);
+  --radius-4xl: calc(var(--radius) * 3.2);
 }
 
 /*
@@ -457,4 +326,59 @@
   --color-ring: var(--ring);
   --color-surface-glass: var(--surface-glass);
   --color-border-glass: var(--border-glass);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-destructive-pressed: var(--destructive-pressed);
+}
+
+/*
+ * Type shorthands: explicit `@utility` compositions of the type.css roles
+ * (size, unitless line-height, weight, family). Admin also exposes the
+ * complete text-admin-* size ladder.
+ */
+@utility type-display {
+  font-size: var(--text-admin-modal-title);
+  line-height: var(--leading-display);
+  font-weight: var(--font-weight-display);
+  font-family: var(--font-admin);
+}
+
+@utility type-title {
+  font-size: var(--text-admin-title);
+  line-height: var(--leading-title);
+  font-weight: var(--font-weight-title);
+  font-family: var(--font-admin);
+}
+
+@utility type-body {
+  font-size: var(--text-admin-body);
+  line-height: var(--leading-body);
+  font-weight: var(--font-weight-body);
+  font-family: var(--font-admin);
+}
+
+@utility type-caption {
+  font-size: var(--text-admin-caption);
+  line-height: var(--leading-caption);
+  font-weight: var(--font-weight-caption);
+  font-family: var(--font-admin);
+}
+
+@utility type-code {
+  font-size: var(--text-admin-body);
+  line-height: var(--leading-code);
+  font-weight: var(--font-weight-code);
+  font-family: var(--font-mono);
 }

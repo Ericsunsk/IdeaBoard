@@ -30,7 +30,7 @@ body.canvas-overscroll-guard {
   --canvas-font-size-micro: 10px;
 
   /* ── Canvas Elevation & Glass Tokens ── */
-  --canvas-shadow-floating: var(--primitive-shadow-xl);
+  --canvas-shadow-floating: var(--shadow-floating);
   --canvas-glass-bg: var(
     --color-canvas-glass-bg,
     color-mix(in srgb, var(--canvas-surface-bg) 88%, transparent)

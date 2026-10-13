@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "1bb723e0eebb8075a1958379dbf048c55c906538",
+  "checkpointSha": "3524c5a9f1c3e346c78f3c7f2a673a12249aec17",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all active Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -17154,9 +17154,8 @@
         }
       ],
       "fanIn": 126,
-      "fanOut": 47,
+      "fanOut": 46,
       "fanOutTargets": [
-        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -17171,7 +17170,7 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "path",
+        "scripts/checkTokenGraph.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/components/ui/badge/index.ts",
@@ -17282,17 +17281,12 @@
         },
         {
           "from": "src/features/admin/shared/core/textRampContrast.contract.spec.ts",
-          "to": "fs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/core/textRampContrast.contract.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/core/textRampContrast.contract.spec.ts",
-          "to": "path",
+          "to": "scripts/checkTokenGraph.ts",
           "kind": "runtime"
         },
         {
@@ -18416,7 +18410,7 @@
       "undeclaredDeepImports": [],
       "activationPhase": "P4",
       "targetFanIn": 126,
-      "targetFanOut": 47,
+      "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

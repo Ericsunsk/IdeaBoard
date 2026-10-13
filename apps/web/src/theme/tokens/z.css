@@ -1,0 +1,20 @@
+/*
+ * Stacking roles: semantic z-index layers.
+ *
+ * Native `--z-index-*` names (Tailwind v4 emits `z-*` utilities from this
+ * namespace, so no manual `@utility` definitions are needed). Ascending
+ * numeric order is the contract. Roles reference physical stacking steps;
+ * consumers use native utilities (`z-admin-dialog`, `z-banner`, …).
+ */
+
+@theme {
+  /* ── App stacking layers (ascending numeric order is the contract) ── */
+  --z-index-content: var(--primitive-z-1);
+  --z-index-admin-sticky: var(--primitive-z-10);
+  --z-index-admin-header: var(--primitive-z-30);
+  --z-index-admin-overlay: var(--primitive-z-40);
+  --z-index-admin-dialog: var(--primitive-z-50);
+  --z-index-popover: var(--primitive-z-80);
+  --z-index-banner: var(--primitive-z-1200);
+  --z-index-lightbox: var(--primitive-z-2000);
+}

@@ -74,4 +74,26 @@
     width: max(100%, var(--spacing-touch-target-aa));
     height: max(100%, var(--spacing-touch-target-aa));
   }
+
+  /*
+   * Existing ordinary targets select their profile by pointer modality.
+   * Inline rows retain block-axis-only expansion; precision handles retain
+   * their own profile. Real-box controls grow in layout rather than painting
+   * an overlay over neighbouring controls.
+   */
+  @media (pointer: coarse) {
+    .hit-target-32::after {
+      width: max(100%, var(--spacing-touch-target-coarse));
+      height: max(100%, var(--spacing-touch-target-coarse));
+    }
+
+    .hit-target-32-inline::after {
+      height: max(100%, var(--spacing-touch-target-coarse));
+    }
+
+    .hit-target-control {
+      min-width: var(--spacing-touch-target-coarse);
+      min-height: var(--spacing-touch-target-coarse);
+    }
+  }
 }

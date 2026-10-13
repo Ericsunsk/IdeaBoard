@@ -339,8 +339,10 @@ export function validateSurfaceTokenMapping(
       'The app theme must resolve --color-page-chrome-border through var(--color-board-card-border).',
     )
   const neutralLine = appDecls.get('--color-canvas-neutral-line') ?? ''
-  if (normalize(neutralLine) !== normalize('rgb(177 177 183 / 65%)'))
-    issues.push('The app theme must pin --color-canvas-neutral-line to rgb(177 177 183 / 65%).')
+  if (normalize(neutralLine) !== normalize('var(--color-tool-border)'))
+    issues.push(
+      'The app theme must resolve --color-canvas-neutral-line through the Tier 2 tool border.',
+    )
   const railStyles = styleContents(handleRailSource).join('\n')
   const railDecls = new Map<string, string>()
   try {
@@ -625,7 +627,7 @@ body.canvas-overscroll-guard {
 .canvas-surface-skin {
   --canvas-control-border-color: var(--color-canvas-neutral-line);
   --canvas-surface-bg: var(--color-canvas-surface-bg);
-  --canvas-shadow-floating: var(--primitive-shadow-xl);
+  --canvas-shadow-floating: var(--shadow-floating);
   --canvas-accent: var(--color-canvas-accent);
   --canvas-accent-hover: var(--color-canvas-accent-hover);
   --canvas-text-muted: var(--color-canvas-text-secondary);
@@ -635,7 +637,7 @@ body.canvas-overscroll-guard {
 }`
 
 const APP_POSITIVE = `@theme {
-  --color-canvas-neutral-line: rgb(177 177 183 / 65%);
+  --color-canvas-neutral-line: var(--color-tool-border);
   --color-page-chrome-border: var(--color-board-card-border);
   --color-canvas-accent-wash: color-mix(in srgb, #7a6bd5 12%, transparent);
 }`
@@ -790,7 +792,7 @@ const FIXTURES: Fixture[] = [
     () =>
       validateSurfaceTokenMapping(
         SKIN_POSITIVE,
-        APP_POSITIVE.replace('rgb(177 177 183 / 65%)', 'rgb(0 0 0 / 50%)'),
+        APP_POSITIVE.replace('var(--color-tool-border)', 'var(--border)'),
         RAIL_POSITIVE,
       ),
     false,

@@ -17,9 +17,9 @@ export const catalogClasses = {
     'mb-4 flex min-h-10 items-center justify-between gap-3 rounded-panel border border-border bg-card px-3 py-2',
   recoveryText: 'min-w-0 text-admin-body font-semibold text-foreground',
   recoveryButton:
-    'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60',
+    'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60',
   createButton:
-    'cursor-pointer !h-[42px] !rounded-full !border-0 !bg-primary !px-5 !text-sm !font-bold !tracking-normal !text-primary-foreground !shadow-none hover:!bg-primary/90 focus-visible:!ring-2 focus-visible:!ring-ring !w-full md:!w-auto',
+    'cursor-pointer !h-[42px] !rounded-full !border-0 !bg-primary !px-5 !text-sm !font-bold !tracking-normal !text-primary-foreground !shadow-none hover:!bg-primary-hover focus-visible:!ring-2 focus-visible:!ring-ring !w-full md:!w-auto',
   searchWrap: 'page-chrome-surface flex h-[42px] min-w-0 items-center gap-2 rounded-full p-1.5',
   searchIcon: 'ml-2 size-3.5 shrink-0 text-muted-foreground',
   searchInput:
@@ -55,11 +55,11 @@ export const catalogClasses = {
   deleteCancelButton:
     'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-3.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60',
   deleteConfirmButton:
-    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-destructive px-3.5 text-sm font-bold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-70',
+    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-destructive px-3.5 text-sm font-bold text-destructive-foreground transition-colors hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-70',
 } as const
 // UiDialog 以 :class/cn() 组合造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
 export const catalogDeleteDialogContentClass =
-  'overflow-hidden rounded-[var(--radius-board-dialog)] border border-border bg-card shadow-[var(--shadow-board-dialog)]'
+  'overflow-hidden rounded-board-dialog border border-border bg-card shadow-[var(--shadow-board-dialog)]'
 
 export const catalogDeleteDialogStyle = {
   width: '360px',

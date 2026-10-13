@@ -11,7 +11,7 @@
     --round-control-color-hover: var(--foreground);
     --round-control-color-disabled: var(--muted-foreground);
     --round-control-focus-ring: var(--ring);
-    --round-control-shadow: var(--primitive-shadow-sm);
+    --round-control-shadow: var(--shadow-raised);
     display: inline-flex;
     align-items: center;
     justify-content: center;

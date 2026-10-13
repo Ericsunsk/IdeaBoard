@@ -18,7 +18,15 @@ const tokenOwners = [
   app,
   themeEntry,
   'src/theme/base.css',
-  ...['semantic.css', 'canvas.css', 'primitives.css', 'dark.css'].map((file) => tokens + file),
+  ...[
+    'semantic.css',
+    'admin.css',
+    'canvas.css',
+    'primitives.css',
+    'motion.css',
+    'type.css',
+    'z.css',
+  ].map((file) => tokens + file),
 ]
 const chrome = 'src/theme/atoms/page-chrome.css'
 const round = 'src/theme/atoms/round-control.css'
@@ -46,7 +54,8 @@ const requiredTokens = [
     'line-bold',
   ].map((tier) => `--color-primary-${tier}`),
   ...['dialog', 'drawer', 'popover'].map((role) => `--shadow-admin-${role}`),
-  ...['sticky', 'header', 'overlay', 'dialog'].map((role) => `--z-admin-${role}`),
+  ...['sticky', 'header', 'overlay', 'dialog'].map((role) => `--z-index-admin-${role}`),
+  ...['content', 'popover', 'banner', 'lightbox'].map((role) => `--z-index-${role}`),
   ...['strong', 'emphasis', 'display'].map((role) => `--font-weight-admin-${role}`),
   ...['card', 'control', 'chip'].map((role) => `--radius-admin-${role}`),
   ...['shell', 'popover', 'drawer', 'empty-state', 'login-card'].map(
@@ -62,24 +71,17 @@ const requiredTokens = [
   '--shadow-overlay-menu',
 ]
 const aliases: Record<string, string> = {
-  '--color-canvas-text-control': '--color-canvas-text-secondary',
-  '--color-canvas-text-option': '--color-canvas-text-muted',
-  '--color-admin-surface-disabled': '--color-admin-surface-muted',
-  '--color-admin-preview-bg': '--color-admin-surface-muted',
-  '--color-admin-control-bg-hover': '--color-admin-surface-hover',
-  '--color-admin-control-border': '--color-admin-border',
-  '--color-admin-control-border-hover': '--color-admin-border-hover',
-  '--color-admin-control-border-pressed': '--color-admin-border-pressed',
+  '--color-canvas-text-control': '--color-text-control',
+  '--color-canvas-text-option': '--color-text-option',
   '--color-admin-chart-tooltip-border': '--color-admin-border',
   '--color-admin-chart-axis-line': '--color-admin-border',
   '--color-admin-chart-split-line': '--color-admin-surface-hover',
   '--color-admin-accent': '--color-brand-creative-accent',
   '--color-admin-model-purple': '--color-brand-creative-accent',
-  '--color-canvas-accent': '--color-brand-creative-accent',
+  '--color-canvas-accent': '--color-tool-accent',
   '--color-admin-accent-hover': '--color-brand-creative-accent-hover',
   '--color-admin-accent-pressed': '--color-brand-creative-accent-pressed',
-  '--color-canvas-accent-soft': '--color-brand-creative-accent-soft',
-  '--color-admin-subtitle-color': '--color-admin-text-2',
+  '--color-canvas-accent-soft': '--color-tool-accent-soft',
   '--color-admin-chart-legend-text': '--color-admin-text-2',
   '--color-board-create-title': '--color-board-card-title',
   '--color-board-control-text': '--color-board-card-title',
@@ -99,11 +101,6 @@ const typeScale = {
   'modal-title-mobile': 22,
   'modal-title': 26,
   'summary-value': 28,
-}
-const allowedDuplicates: Record<string, readonly string[]> = {
-  '#ffffff': ['--color-admin-card-strong', '--color-admin-text-inverse'],
-  '#d4d4d4': ['--color-admin-border-hover', '--color-admin-text-disabled'],
-  '#9278e6': ['--color-canvas-running-from', '--color-brand-creative-accent'],
 }
 const darkRequired = [
   ...['hero-text', 'hero-subtle', 'note-bg', 'note-border', 'note-text'].map(
@@ -317,11 +314,37 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
   const fail = (rule: string, file: string, message: string) => {
     issues.push({ rule, file, message })
   }
-  const css = (file: string) => postcss.parse(sources[file] ?? '', { from: file })
-  const baseRoot = css(themeEntry),
-    base = declarations(baseRoot, () => true, 'theme'),
-    darkRoot = css(tokens + 'dark.css'),
-    dark = declarations(darkRoot, () => true, 'dark')
+  const stylesheets = new Map<string, Root>()
+  const css = (file: string): Root => {
+    let root = stylesheets.get(file)
+    if (!root) {
+      root = postcss.parse(sources[file] ?? '', { from: file })
+      stylesheets.set(file, root)
+    }
+    return root
+  }
+  const themeScopeFiles = [themeEntry, tokens + 'admin.css', tokens + 'type.css', tokens + 'z.css']
+  const base = new Map<string, string>()
+  for (const file of themeScopeFiles)
+    for (const [name, value] of declarations(css(file), () => true, 'theme')) base.set(name, value)
+  for (const [name, value] of declarations(css(tokens + 'semantic.css'), () => true, 'root'))
+    base.set(name, value)
+  // Bridge fallbacks resolve through Tier 2 aliases down to Tier 1 leaves.
+  const resolveScope = new Map(base)
+  for (const [name, value] of declarations(css(tokens + 'primitives.css'), () => true, 'root')) {
+    if (!resolveScope.has(name)) resolveScope.set(name, value)
+  }
+  const resolveToken = (name: string, seen = new Set<string>()): string | undefined => {
+    if (seen.has(name)) return undefined
+    seen.add(name)
+    const value = resolveScope.get(name),
+      alias = value?.match(/^var\(\s*(--[\w-]+)\s*\)$/)?.[1]
+    return alias ? resolveToken(alias, seen) : value
+  }
+  const darkScopeFiles = [tokens + 'admin.css', tokens + 'semantic.css', tokens + 'canvas.css']
+  const dark = new Map<string, string>()
+  for (const file of darkScopeFiles)
+    for (const [name, value] of declarations(css(file), () => true, 'dark')) dark.set(name, value)
   const requireKeys = (
     rule: string,
     file: string,
@@ -360,34 +383,17 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     base,
     Object.fromEntries(Object.entries(aliases).map(([name, target]) => [name, `var(${target})`])),
   )
-  requireValues(
-    'type-scale',
-    themeEntry,
-    base,
-    Object.fromEntries(
-      Object.entries(typeScale).map(([name, size]) => [`--text-admin-${name}`, `${size}px`]),
-    ),
-  )
-  const byHex = new Map<string, string[]>()
-  baseRoot.walkDecls((decl) => {
-    if (decl.prop.startsWith('--') && /^#[a-f\d]{6}$/i.test(decl.value)) {
-      const hex = decl.value.toLowerCase()
-      byHex.set(hex, [...(byHex.get(hex) ?? []), decl.prop])
-    }
-  })
-  for (const [hex, names] of byHex)
-    if (
-      names.length > 1 &&
-      (names.length !== allowedDuplicates[hex]?.length ||
-        names.some((name) => !allowedDuplicates[hex]?.includes(name)))
-    )
-      fail('literal-deduplication', themeEntry, `${hex} repeats in ${names.join(', ')}`)
-  const resolveToken = (name: string, seen = new Set<string>()): string | undefined => {
-    if (seen.has(name)) return undefined
-    seen.add(name)
-    const value = base.get(name),
-      alias = value?.match(/^var\(\s*(--[\w-]+)\s*\)$/)?.[1]
-    return alias ? resolveToken(alias, seen) : value
+  for (const [name, size] of Object.entries(typeScale)) {
+    if (normalize(resolveToken(`--text-admin-${name}`) ?? '') !== `${size}px`)
+      fail('type-scale', tokens + 'type.css', `--text-admin-${name} must resolve to ${size}px`)
+  }
+  // Physical color literals have one owner; semantic declarations reference it.
+  for (const file of [themeEntry, tokens + 'admin.css']) {
+    css(file).walkDecls((decl) => {
+      if (decl.prop.startsWith('--') && /^#[a-f\d]{6}$/i.test(decl.value)) {
+        fail('literal-deduplication', file, `${decl.prop} must reference a Tier 1 color`)
+      }
+    })
   }
   const bridgeSource = ts.createSourceFile(
     bridge,
@@ -466,27 +472,40 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     )
       fail('token-parity', file, 'Light and dark scopes must declare identical nonempty token sets')
   }
-  const darkDomain = scopedTokens(
-    darkRoot,
-    'dark',
-    /^--color-(?:admin|board|canvas|home|auth|page-chrome|overlay|toast|brand-creative|page|dialog|scrollbar)-/,
-  )
+  const darkDomain = new Map<string, string>()
+  for (const file of darkScopeFiles)
+    for (const [name, value] of scopedTokens(
+      css(file),
+      'dark',
+      /^--color-(?:admin|board|canvas|home|auth|page-chrome|overlay|toast|brand-creative|page|dialog|scrollbar)-/,
+    ).entries())
+      darkDomain.set(name, value)
   if (!darkDomain.size || [...darkDomain.keys()].some((name) => !base.has(name)))
     fail(
       'dark-base-closure',
-      tokens + 'dark.css',
+      tokens + 'semantic.css',
       'Every dark domain token must exist in app theme',
     )
-  requireKeys('dark-required', tokens + 'dark.css', dark, darkRequired)
-  requireValues('dark-chart-alias', tokens + 'dark.css', dark, {
+  requireKeys('dark-required', tokens + 'semantic.css', dark, darkRequired)
+  requireValues('dark-chart-alias', tokens + 'admin.css', dark, {
     '--color-admin-chart-axis-line': 'var(--color-admin-border-hover)',
     '--color-admin-chart-split-line': 'var(--color-admin-border)',
   })
   const semanticRoot = css(tokens + 'semantic.css')
   parity(
     tokens + 'semantic.css',
-    declarations(semanticRoot, (name) => name.startsWith('--'), 'root'),
-    declarations(semanticRoot, (name) => name.startsWith('--'), 'dark'),
+    declarations(
+      semanticRoot,
+      (name) =>
+        name.startsWith('--') && !name.startsWith('--color-') && !name.startsWith('--shadow-'),
+      'root',
+    ),
+    declarations(
+      semanticRoot,
+      (name) =>
+        name.startsWith('--') && !name.startsWith('--color-') && !name.startsWith('--shadow-'),
+      'dark',
+    ),
   )
   const canvas = css(tokens + 'canvas.css')
   parity(
@@ -510,8 +529,11 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       'tailwindcss',
       './tokens/primitives.css',
       './tokens/semantic.css',
+      './tokens/admin.css',
       './tokens/canvas.css',
-      './tokens/dark.css',
+      './tokens/motion.css',
+      './tokens/type.css',
+      './tokens/z.css',
     ].join('|')
   )
     fail('token-import-order', themeEntry, 'Token layers must load in their declared order')
@@ -544,7 +566,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     '--round-control-bg': 'var(--card)',
     '--round-control-color': 'var(--muted-foreground)',
     '--round-control-focus-ring': 'var(--ring)',
-    '--round-control-shadow': 'var(--primitive-shadow-sm)',
+    '--round-control-shadow': 'var(--shadow-raised)',
   })
   const roundAliases: Record<string, string> = {
     border: 'border',

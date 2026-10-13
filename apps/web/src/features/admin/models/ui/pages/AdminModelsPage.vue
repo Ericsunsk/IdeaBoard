@@ -67,7 +67,7 @@
           <!-- 主按钮：添加模型 (使用项目品牌紫 Token) -->
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
+            class="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover cursor-pointer"
             :aria-label="MODELS_MESSAGES.createModel"
             @click="handleCreateModel"
           >
@@ -182,7 +182,7 @@
         <button
           v-if="!hasActiveFilter && allModels.length === 0"
           type="button"
-          class="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
+          class="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover cursor-pointer"
           :aria-label="MODELS_MESSAGES.emptyCreateAria"
           @click="handleCreateModel"
         >

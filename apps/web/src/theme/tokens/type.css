@@ -1,0 +1,46 @@
+/*
+ * Type roles: family/size/line-height/weight.
+ *
+ * `--font-*` names family utilities only (never a font shorthand);
+ * `--text-*` names size utilities. The `type-*` shorthands are explicit
+ * `@utility` definitions in `theme/theme.css` composing size, unitless
+ * line-height, weight, and family from the roles below.
+ *
+ * Admin exposes the complete size ladder (micro → summary-value). Roles
+ * reference physical family, size, leading and weight ingredients.
+ */
+
+@theme {
+  --font-admin: var(--primitive-font-system-ui);
+
+  --text-admin-micro: var(--primitive-type-size-10);
+  --text-admin-caption: var(--primitive-type-size-11);
+  --text-admin-meta: var(--primitive-type-size-12);
+  --text-admin-body: var(--primitive-type-size-13);
+  --text-admin-content: var(--primitive-type-size-14);
+  --text-admin-title-sm: var(--primitive-type-size-15);
+  --text-admin-title: var(--primitive-type-size-16);
+  --text-admin-heading: var(--primitive-type-size-18);
+  --text-admin-icon: var(--primitive-type-size-20);
+  --text-admin-summary-value: var(--primitive-type-size-28);
+  --text-admin-modal-title: var(--primitive-type-size-26);
+  --text-admin-modal-title-mobile: var(--primitive-type-size-22);
+
+  /* Admin display weights for optical one-offs between semibold and bold. */
+  --font-weight-admin-strong: var(--primitive-font-weight-650);
+  --font-weight-admin-emphasis: var(--primitive-font-weight-680);
+  --font-weight-admin-display: var(--primitive-font-weight-760);
+
+  --font-display: var(--primitive-font-satoshi);
+  --font-hand: var(--primitive-font-handwriting);
+  --leading-display: var(--primitive-leading-tight);
+  --leading-title: var(--primitive-leading-heading);
+  --leading-body: var(--primitive-leading-body);
+  --leading-caption: var(--primitive-leading-caption);
+  --leading-code: var(--primitive-leading-body);
+  --font-weight-display: var(--primitive-font-weight-600);
+  --font-weight-title: var(--primitive-font-weight-600);
+  --font-weight-body: var(--primitive-font-weight-400);
+  --font-weight-caption: var(--primitive-font-weight-500);
+  --font-weight-code: var(--primitive-font-weight-400);
+}

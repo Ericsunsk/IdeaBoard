@@ -15,7 +15,7 @@
         :data-ratio="ratio"
       >
         <span
-          class="grid h-5 w-5 place-items-center rounded border border-[var(--canvas-handle-border)] text-[var(--canvas-text-subtle)]"
+          class="grid h-5 w-5 place-items-center rounded border border-[var(--canvas-handle-border,currentColor)] text-[var(--canvas-text-subtle)]"
           aria-hidden="true"
         ></span>
       </span>
@@ -37,7 +37,7 @@
           :data-ratio="option"
         >
           <span
-            class="grid h-5 w-5 place-items-center rounded border border-[var(--canvas-handle-border)] text-[var(--canvas-text-subtle)]"
+            class="grid h-5 w-5 place-items-center rounded border border-[var(--canvas-handle-border,currentColor)] text-[var(--canvas-text-subtle)]"
             aria-hidden="true"
           ></span>
         </span>

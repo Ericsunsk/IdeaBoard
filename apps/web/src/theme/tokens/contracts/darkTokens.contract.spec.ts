@@ -1,33 +1,33 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  contrastOf,
+  parseOwnerDecls,
+  resolveAlphaColor,
+  scopeValues,
+} from '../../../../scripts/checkTokenGraph'
 
 type Rgb = readonly [number, number, number]
 
-const darkSheet = readFileSync(join(import.meta.dirname, '../dark.css'), 'utf8')
+/** Read authored dark values with base-layer declarations taking precedence. */
+const tokenValues = scopeValues(parseOwnerDecls(), 'dark')
 
-function readDarkToken(name: string): string {
-  const match = darkSheet.match(new RegExp(`${name}:\\s*([^;]+);`))
-  if (!match?.[1]) throw new Error(`Token ${name} not found in tokens/dark.css`)
-  const value = match[1].trim()
-  if (value.startsWith('#')) return value
-  const varMatch = value.match(/var\((--[a-z0-9-]+)\)/)
-  if (varMatch?.[1]) {
-    return readDarkToken(varMatch[1])
-  }
+function tokenValue(name: string): string {
+  const value = tokenValues.get(name)?.value
+  if (value === undefined) throw new Error(`Token ${name} is not assigned in dark mode`)
   return value
 }
 
+function readDarkToken(name: string): string {
+  const color = resolveAlphaColor(tokenValue(name), tokenValue)
+  if (color.alpha !== 1) throw new Error(`Expected opaque token ${name}`)
+  return `#${color.rgb.map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('')}`
+}
+
 const parseHex = (value: string): Rgb => {
-  const hex = value.trim().replace('#', '')
-  if (!/^[0-9a-f]{6}$/i.test(hex)) {
-    throw new Error(`Expected a 6-digit hex color, received "${value}"`)
-  }
-  return [
-    Number.parseInt(hex.slice(0, 2), 16),
-    Number.parseInt(hex.slice(2, 4), 16),
-    Number.parseInt(hex.slice(4, 6), 16),
-  ] as const
+  const color = resolveAlphaColor(value, tokenValue)
+  if (color.alpha !== 1) throw new Error(`Expected an opaque color, received "${value}"`)
+  return color.rgb
 }
 
 const channel = (raw: number): number => {
@@ -38,12 +38,8 @@ const channel = (raw: number): number => {
 const relativeLuminance = ([r, g, b]: Rgb): number =>
   0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
 
-const contrastRatio = (foreground: string, background: string): number => {
-  const a = relativeLuminance(parseHex(foreground))
-  const b = relativeLuminance(parseHex(background))
-  const [lighter, darker] = a > b ? [a, b] : [b, a]
-  return (lighter + 0.05) / (darker + 0.05)
-}
+const contrastRatio = (foreground: string, background: string): number =>
+  contrastOf(parseHex(foreground), parseHex(background))
 
 describe('Dark Tokens Contrast & Hierarchy Contract', () => {
   const surfaces = [

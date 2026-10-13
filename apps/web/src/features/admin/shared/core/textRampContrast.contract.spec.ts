@@ -1,6 +1,11 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  contrastOf,
+  parseOwnerDecls,
+  resolveAlphaColor,
+  scopeValues,
+} from '../../../../../scripts/checkTokenGraph'
 import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 /**
@@ -15,58 +20,30 @@ import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 type Rgb = readonly [number, number, number]
 
-/**
- * Token sources of truth. Domain color roles live in the Tailwind entry
- * (`theme/theme.css`); Tier 2 core roles live in `theme/tokens/semantic.css`.
- * Chains are resolved across both files so a reference into either owner
- * settles on its authored leaf.
- */
-const themeSheet = readFileSync(join(import.meta.dirname, '../../../../theme/theme.css'), 'utf8')
-const semanticSheet = readFileSync(
-  join(import.meta.dirname, '../../../../theme/tokens/semantic.css'),
-  'utf8',
-)
-const tokenSources = [themeSheet, semanticSheet]
+/** Read authored light values with base-layer declarations taking precedence. */
+const tokenValues = scopeValues(parseOwnerDecls(), 'light')
 
-/** Reads a token by following `var()` references across the token sources. */
-function readToken(name: string): string {
-  for (const sheet of tokenSources) {
-    const match = sheet.match(new RegExp(`${name}:\\s*([^;]+);`))
-    if (!match?.[1]) continue
-    const value = match[1].trim()
-    const varMatch = value.match(/var\((--[a-z0-9-]+)\)/)
-    if (varMatch?.[1]) {
-      return readToken(varMatch[1])
-    }
-    return value
-  }
-  throw new Error(`Token ${name} not found in theme/theme.css or tokens/semantic.css`)
+function tokenValue(name: string): string {
+  const value = tokenValues.get(name)?.value
+  if (value === undefined) throw new Error(`Token ${name} is not assigned in light mode`)
+  return value
 }
 
-/** Reads a translucent token as [rgb, alpha] so the test can composite it like a browser does. */
+/** Resolve references and composition without discarding authored alpha. */
+function readToken(name: string): string {
+  const color = resolveAlphaColor(tokenValue(name), tokenValue)
+  if (color.alpha !== 1) throw new Error(`Expected opaque token ${name}`)
+  return toHex(color.rgb)
+}
+
 function readRgbaToken(name: string): { rgb: Rgb; alpha: number } {
-  const match = themeSheet.match(
-    new RegExp(
-      `${name}:\\s*rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\d.]+)\\s*\\)`,
-    ),
-  )
-  if (!match) throw new Error(`Translucent token ${name} not found in theme/theme.css`)
-  return {
-    rgb: [Number(match[1]), Number(match[2]), Number(match[3])] as const,
-    alpha: Number(match[4]),
-  }
+  return resolveAlphaColor(tokenValue(name), tokenValue)
 }
 
 const parseHex = (value: string): Rgb => {
-  const hex = value.trim().replace('#', '')
-  if (!/^[0-9a-f]{6}$/i.test(hex)) {
-    throw new Error(`Expected a 6-digit hex color, received "${value}"`)
-  }
-  return [
-    Number.parseInt(hex.slice(0, 2), 16),
-    Number.parseInt(hex.slice(2, 4), 16),
-    Number.parseInt(hex.slice(4, 6), 16),
-  ] as const
+  const color = resolveAlphaColor(value, tokenValue)
+  if (color.alpha !== 1) throw new Error(`Expected an opaque color, received "${value}"`)
+  return color.rgb
 }
 
 const channel = (raw: number): number => {
@@ -77,12 +54,8 @@ const channel = (raw: number): number => {
 const relativeLuminance = ([r, g, b]: Rgb): number =>
   0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
 
-export const contrastRatio = (foreground: string, background: string): number => {
-  const a = relativeLuminance(parseHex(foreground))
-  const b = relativeLuminance(parseHex(background))
-  const [lighter, darker] = a > b ? [a, b] : [b, a]
-  return (lighter + 0.05) / (darker + 0.05)
-}
+export const contrastRatio = (foreground: string, background: string): number =>
+  contrastOf(parseHex(foreground), parseHex(background))
 
 const compositeOver = (top: Rgb, alpha: number, bottom: Rgb): Rgb => [
   top[0] * alpha + bottom[0] * (1 - alpha),
@@ -155,8 +128,9 @@ const ADMIN_SURFACES = [
     alphaStep(`surface-muted/${alpha * 100} over card`, parseHex(surfaceMuted), alpha, cardRgb),
   ),
   { id: 'surface-hover', value: readToken('--color-admin-surface-hover') },
-  // surface-disabled and preview-bg alias surface-muted, so they add no distinct
-  // surface to this inventory; the alias assertions below guard that link.
+  // Folded duplicates (surface-disabled, preview-bg, control-bg-hover,
+  // control-border*) resolve through surface-muted/surface-hover/border, so
+  // they add no distinct surface to this inventory.
   alphaStep('bg/50 over card', bgRgb, 0.5, cardRgb),
   alphaStep('bg/30 over card', bgRgb, 0.3, cardRgb),
 ] as const

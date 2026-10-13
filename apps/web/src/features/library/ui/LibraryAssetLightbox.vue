@@ -9,7 +9,7 @@
     >
       <div
         v-if="!!asset"
-        class="fixed inset-0 z-[var(--z-lightbox)] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
         @click="emit('close')"
       >
         <!-- 顶部极简悬浮信息与操作栏 -->

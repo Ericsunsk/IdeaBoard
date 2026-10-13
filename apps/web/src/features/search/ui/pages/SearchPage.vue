@@ -8,7 +8,7 @@
 
     <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧紧贴浮岛右侧保留标准 24px 呼吸间距；全屏展开时 1:1 物理被顶出右侧屏幕 -->
     <main
-      class="relative z-[var(--z-content)] mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
+      class="relative z-content mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
       :class="[
         isLibraryIslandOpen && !isLibraryIslandExpanded
           ? 'ml-0 md:ml-[350px] mr-auto max-w-[1600px] pl-0 md:pl-6 lg:pl-8'
@@ -125,7 +125,7 @@
                   :is-loading="visionState === 'extracting'"
                   :is-disabled="visionState === 'extracting'"
                   :title="searchButtonTitle"
-                  class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-primary !px-4 !text-xs !font-bold !text-primary-foreground !shadow-none hover:!bg-primary/90 cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
+                  class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-primary !px-4 !text-xs !font-bold !text-primary-foreground !shadow-none hover:!bg-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
                 >
                   {{ t('search.actions.search') }}
                 </Button>

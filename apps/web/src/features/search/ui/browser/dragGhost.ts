@@ -6,7 +6,7 @@ const SEARCH_DRAG_GHOST_OFFSET_X = 29
 const SEARCH_DRAG_GHOST_OFFSET_Y = 22
 
 const SEARCH_DRAG_GHOST_STYLE =
-  'position:fixed;top:-9999px;left:-9999px;width:58px;height:44px;border-radius:var(--primitive-radius-lg);overflow:hidden;box-shadow:var(--primitive-shadow-xl);transform:rotate(-3deg);z-index:9999'
+  'position:fixed;top:-9999px;left:-9999px;width:58px;height:44px;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-floating);transform:rotate(-3deg);z-index:9999'
 const SEARCH_DRAG_GHOST_IMAGE_STYLE = 'width:100%;height:100%;object-fit:cover'
 
 export function resolveDragAnchor(event: Event): HTMLElement | null {

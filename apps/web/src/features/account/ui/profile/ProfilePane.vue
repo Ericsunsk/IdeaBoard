@@ -7,7 +7,7 @@
         >
           <button
             type="button"
-            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-pill border-0 bg-transparent p-0 text-primary-foreground outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-[0_0_0_3px_var(--ring)] disabled:cursor-wait"
+            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-pill border-0 bg-transparent p-0 text-primary-foreground outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-focus-ring disabled:cursor-wait"
             :disabled="isAvatarUploading"
             :aria-busy="isAvatarUploading"
             :aria-label="t('account.profile.changeAvatar')"

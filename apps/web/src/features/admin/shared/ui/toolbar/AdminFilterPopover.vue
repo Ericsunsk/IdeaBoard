@@ -26,7 +26,7 @@
 
           <button
             type="button"
-            class="h-9 w-full rounded-lg bg-primary text-primary-foreground text-admin-body font-medium transition-colors hover:bg-primary/90 active:bg-primary/80 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-xs"
+            class="h-9 w-full rounded-lg bg-primary text-primary-foreground text-admin-body font-medium transition-colors hover:bg-primary-hover active:bg-primary-pressed disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-xs"
             :disabled="!active"
             @click="$emit('reset')"
           >

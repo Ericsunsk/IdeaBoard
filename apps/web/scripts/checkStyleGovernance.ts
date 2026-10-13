@@ -31,6 +31,8 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const srcRoot = path.join(webRoot, 'src')
 const sourceExtensions = new Set(['.css', '.ts', '.vue'])
 
+export const primitiveReferencePattern = /var\(\s*--(?:primitive|palette)-[a-z0-9-]+(?=\s*[,)])/g
+
 const styleCountRules = [
   {
     id: 'raw-color',
@@ -76,7 +78,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/shared/core/adminThemeTokens.ts': {
     counts: {
-      'raw-color': 58,
+      'raw-color': 52,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
@@ -165,8 +167,9 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 // waivers with reasons instead of forced mappings. Breakpoints use the named
 // mobile-first system (`sm/md/lg`, plus `xl` where already established);
 // arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode ships via
-// token resolution: `html.dark` overrides live in
-// `src/theme/tokens/dark.css`, so `dark:` variants are banned outright —
+// token resolution: `html.dark` overrides live in the tier owners
+// (`src/theme/tokens/admin.css`, `src/theme/tokens/semantic.css`,
+// `src/theme/tokens/canvas.css`), so `dark:` variants are banned outright —
 // components use semantic tokens that resolve in both modes instead.
 
 function isTokenOwnerFile(file: SourceFile): boolean {
@@ -207,7 +210,13 @@ const tokenCountRules = [
     id: 'dark-variant',
     pattern: /dark:/g,
     message:
-      'Dark mode ships through semantic tokens (html.dark overrides in theme/tokens/dark.css); do not add dark: overrides, use tokens that resolve in both modes.',
+      'Dark mode ships through semantic tokens (html.dark overrides in the tier owners); do not add dark: overrides, use tokens that resolve in both modes.',
+  },
+  {
+    id: 'primitive-leak',
+    pattern: primitiveReferencePattern,
+    message:
+      'Components must reference Tier 2/3 roles, never Tier 1 primitives: route through a semantic token.',
   },
   {
     id: 'legacy-token',
@@ -461,6 +470,7 @@ function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
   if (!isTokenOwnerFile(file)) {
     pushOver('hex-color', hexColorAllowances)
     pushOver('font-stack', fontStackAllowances)
+    pushOver('primitive-leak', {})
     pushOver('legacy-token', legacyTokenAllowances)
   }
   pushOver('text-px', textPxAllowances)
@@ -790,7 +800,9 @@ async function main() {
   console.log(`Frontend style governance guardrails passed (${sourceFiles.length} files checked).`)
 }
 
-void main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error)
-  process.exitCode = 1
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  void main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exitCode = 1
+  })
+}

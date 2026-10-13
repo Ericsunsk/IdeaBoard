@@ -75,7 +75,7 @@ defineProps<{
 
 .user-credit-pill:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--ring);
+  box-shadow: var(--shadow-focus-ring);
 }
 
 .user-credit-pill__icon {

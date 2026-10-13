@@ -2,7 +2,7 @@
   <section
     ref="statusElement"
     tabindex="-1"
-    class="rounded-panel border px-4 py-3 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
+    class="rounded-panel border px-4 py-3 focus-visible:outline-none focus-visible:shadow-focus-ring"
     :class="statusClass"
     :role="showError ? 'alert' : 'status'"
     aria-live="polite"

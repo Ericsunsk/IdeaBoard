@@ -14,7 +14,9 @@ const valid = loadRetirementSources()
 const app = 'src/app/style.css'
 const theme = 'src/theme/theme.css'
 const semantic = 'src/theme/tokens/semantic.css'
-const dark = 'src/theme/tokens/dark.css'
+const admin = 'src/theme/tokens/admin.css'
+const type = 'src/theme/tokens/type.css'
+const canvas = 'src/theme/tokens/canvas.css'
 const round = 'src/theme/atoms/round-control.css'
 const chrome = 'src/theme/atoms/page-chrome.css'
 
@@ -43,8 +45,8 @@ const fixtureCases: Fixture[] = [
   ...[
     ['token-closure', theme, '--color-destructive-soft'],
     ['token-alias', theme, '--color-canvas-text-control'],
-    ['dark-required', dark, '--color-home-hero-text'],
-    ['dark-chart-alias', dark, '--color-admin-chart-axis-line'],
+    ['dark-required', semantic, '--color-home-hero-text'],
+    ['dark-chart-alias', admin, '--color-admin-chart-axis-line'],
     ['primitive-closure', 'src/theme/tokens/primitives.css', '--primitive-neutral-950'],
   ].map(([rule, file, name]): Fixture => ({
     rule: rule!,
@@ -103,7 +105,12 @@ const fixtureCases: Fixture[] = [
   },
   {
     rule: 'type-scale',
-    invalidate: (s) => changeDeclaration(s, theme, '--text-admin-body', '14px'),
+    invalidate: (s) => changeDeclaration(s, type, '--text-admin-body', '14px'),
+  },
+  {
+    rule: 'type-scale',
+    invalidate: (s) =>
+      changeDeclaration(s, 'src/theme/tokens/primitives.css', '--primitive-type-size-13', '14px'),
   },
   {
     rule: 'literal-deduplication',
@@ -124,23 +131,27 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'token-uniqueness',
     invalidate: (s) => {
-      s[dark] += '\nhtml.dark { --color-admin-bg: black; }'
+      s[admin] += '\nhtml.dark { --color-admin-bg: black; }'
     },
   },
   {
     rule: 'dark-base-closure',
     invalidate: (s) => {
-      s[dark] += '\nhtml.dark { --color-canvas-unregistered: black; }'
+      s[canvas] += '\nhtml.dark { --color-canvas-unregistered: black; }'
     },
   },
   {
     rule: 'dark-required',
-    invalidate: (s) => changeDeclaration(s, dark, '--color-home-hero-text', null),
+    invalidate: (s) => changeDeclaration(s, semantic, '--color-home-hero-text', null),
   },
   {
     rule: 'dark-chart-alias',
-    invalidate: (s) =>
-      changeDeclaration(s, dark, '--color-admin-chart-axis-line', 'var(--color-admin-border)'),
+    invalidate: (s) => {
+      s[admin] = s[admin]!.replace(
+        '--color-admin-chart-axis-line: var(--color-admin-border-hover)',
+        '--color-admin-chart-axis-line: var(--color-admin-border)',
+      )
+    },
   },
   {
     rule: 'token-parity',
@@ -149,7 +160,7 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'token-parity',
     invalidate: (s) => {
-      s[semantic] += '\nhtml.dark { --color-new-only-dark: black; }'
+      s[semantic] += '\nhtml.dark { --new-only-dark: black; }'
     },
   },
   {
@@ -307,9 +318,12 @@ describe('effective retirement lint policies', () => {
     theme,
     'src/theme/base.css',
     semantic,
+    admin,
+    type,
+    'src/theme/tokens/z.css',
+    'src/theme/tokens/motion.css',
     'src/theme/tokens/canvas.css',
     'src/theme/tokens/primitives.css',
-    dark,
   ])('rejects retired namespace declarations in token owner %s', (file) => {
     for (const name of [
       '--color-ib-surface',

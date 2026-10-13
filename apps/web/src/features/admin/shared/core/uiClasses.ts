@@ -32,7 +32,7 @@ export const adminTableFooterClass =
   'flex items-center justify-between border-t border-border bg-background px-4 py-2.5'
 
 export const adminTableRowActionButtonClass =
-  'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+  'hit-target-control flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
 
 export const adminSummaryGridClass = 'grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4'
 
@@ -53,7 +53,7 @@ export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !ro
  * 供 Events 折叠按钮、表格底栏翻页按钮等共享同一套视觉 Token
  */
 export const adminCompactIconButtonClass =
-  'flex !size-8 shrink-0 items-center justify-center !rounded-lg !border !border-border !bg-card !p-0 !text-muted-foreground transition-colors hover:!bg-muted hover:!text-foreground cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
+  'hit-target-control flex !size-8 shrink-0 items-center justify-center !rounded-lg !border !border-border !bg-card !p-0 !text-muted-foreground transition-colors hover:!bg-muted hover:!text-foreground cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
 
 export const adminToolbarPageLabelClass =
   'flex h-7 items-center justify-center rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground'
@@ -85,7 +85,7 @@ export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center
 
 // 全局唯一 Admin 弹窗 chrome：使用标准语义卡片与边框。
 export const adminDialogChromeClass =
-  'rounded-[var(--radius-admin-dialog)] border border-border bg-card text-card-foreground shadow-admin-dialog'
+  'rounded-admin-dialog border border-border bg-card text-card-foreground shadow-admin-dialog'
 
 export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-card'
 

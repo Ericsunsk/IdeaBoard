@@ -36,7 +36,7 @@
           <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
               data-home-hero-safe
-              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-primary px-10 text-admin-title-sm font-medium text-primary-foreground shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-primary/90 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
+              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-primary px-10 text-admin-title-sm font-medium text-primary-foreground shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-focus-ring"
               @click="startJourney"
             >
               Get started

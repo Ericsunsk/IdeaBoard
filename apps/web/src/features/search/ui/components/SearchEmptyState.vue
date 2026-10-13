@@ -17,7 +17,7 @@
       </p>
       <div class="mt-6">
         <Button
-          class="!h-9 !rounded-full !border-0 !bg-primary !px-5 !text-xs !font-semibold !text-primary-foreground hover:!bg-primary/90 cursor-pointer shadow-xs"
+          class="!h-9 !rounded-full !border-0 !bg-primary !px-5 !text-xs !font-semibold !text-primary-foreground hover:!bg-primary-hover cursor-pointer shadow-xs"
           @click="$emit('reload')"
         >
           {{ t('search.actions.retry') }}
@@ -77,7 +77,7 @@
           </button>
           <button
             type="button"
-            class="h-9 px-4 rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition-[background-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
+            class="h-9 px-4 rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition-[background-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary-hover hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
             @click="$emit('startCreating')"
           >
             <Plus class="size-3.5 stroke-[2.5]" aria-hidden="true" />

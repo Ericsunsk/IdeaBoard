@@ -13,9 +13,10 @@ function defineThemeToken<CssVar extends ThemeCssVar, Fallback extends string>(
   }
 }
 
-// Runtime roles in theme/theme.css and theme/tokens/semantic.css are the
-// source of truth; fallbacks keep third-party adapters and canvas rendering
-// stable when CSS vars cannot resolve.
+// Runtime roles in theme/theme.css, theme/tokens/semantic.css, and
+// theme/tokens/admin.css are the source of truth; fallbacks keep
+// third-party adapters and canvas rendering stable when CSS vars cannot
+// resolve.
 const adminThemeTokenBridge = {
   bg: defineThemeToken('--color-admin-bg', '#fbfbfb'),
   shell: defineThemeToken('--color-admin-shell', 'rgba(255, 255, 255, 0.62)'),
@@ -40,19 +41,13 @@ const adminThemeTokenBridge = {
   surfaceMuted: defineThemeToken('--color-admin-surface-muted', '#f5f5f5'),
   surfaceHover: defineThemeToken('--color-admin-surface-hover', '#f0f0f0'),
   surfacePressed: defineThemeToken('--color-admin-surface-pressed', '#e5e5e5'),
-  surfaceDisabled: defineThemeToken('--color-admin-surface-disabled', '#f5f5f5'),
   controlBg: defineThemeToken('--color-admin-control-bg', '#fafafa'),
-  controlBgHover: defineThemeToken('--color-admin-control-bg-hover', '#f0f0f0'),
-  controlBorder: defineThemeToken('--color-admin-control-border', '#e5e7eb'),
-  controlBorderHover: defineThemeToken('--color-admin-control-border-hover', '#d4d4d4'),
-  controlBorderPressed: defineThemeToken('--color-admin-control-border-pressed', '#bfbfbf'),
   navActiveBg: defineThemeToken('--color-admin-nav-active-bg', '#22304a'),
   navActiveBgHover: defineThemeToken('--color-admin-nav-active-bg-hover', '#19243a'),
-  previewBg: defineThemeToken('--color-admin-preview-bg', '#f5f5f5'),
   divider: defineThemeToken('--color-admin-divider', 'rgba(0, 0, 0, 0.08)'),
   success: defineThemeToken('--success', '#16a34a'),
   warning: defineThemeToken('--warning', '#d97706'),
-  danger: defineThemeToken('--destructive', '#ef4444'),
+  danger: defineThemeToken('--destructive', '#dc2626'),
   info: defineThemeToken('--info', '#0284c7'),
   modelIndigo: defineThemeToken('--color-admin-model-indigo', '#4f6f9f'),
   modelPurple: defineThemeToken('--color-admin-model-purple', '#9278e6'),

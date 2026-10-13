@@ -93,7 +93,7 @@
           :class="
             isSaved
               ? 'bg-emerald-700 text-white hover:bg-emerald-700/90'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/30'
+              : 'bg-primary text-primary-foreground hover:bg-primary-hover shadow-primary/30'
           "
           :aria-label="
             isSaved ? t('search.tooltips.removeFromLibrary') : t('search.tooltips.saveToLibrary')

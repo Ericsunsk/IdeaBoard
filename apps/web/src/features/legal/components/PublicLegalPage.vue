@@ -4,13 +4,13 @@
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
+          class="inline-flex min-h-8 items-center rounded-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-focus-ring"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
+          class="inline-flex min-h-8 items-center rounded-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-focus-ring"
         >
           Back to home
         </RouterLink>
@@ -46,7 +46,7 @@
           v-for="link in legalLinks"
           :key="link.to"
           :to="link.to"
-          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--ring)]"
+          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-focus-ring"
         >
           {{ link.label }}
         </RouterLink>

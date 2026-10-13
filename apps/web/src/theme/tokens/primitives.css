@@ -70,4 +70,258 @@
   --primitive-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --primitive-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --primitive-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
+  /*
+   * ── Light Elevation Palette Scale (Linear/Vercel standard) ──
+   * Mode-blind Tier 1 ingredients under distinct names. Tier 2 roles
+   * reference these via var(); no .dark overrides live here.
+   */
+  --palette-light-0: #fbfbfb; /* Level 0: Global canvas & workspace base */
+  --palette-light-1: #ffffff; /* Level 1: Elevated card strong, dialog shell */
+  --palette-light-2: #f5f5f5; /* Level 2: Surface muted, secondary container */
+  --palette-light-3: #fafafa; /* Level 3: Inputs, controls, interactive elements */
+  --palette-light-hover: #f0f0f0; /* Level 3.5: Control hover state */
+  --palette-light-surface-pressed: #e5e5e5; /* Level 3.6: Control pressed state */
+  --palette-light-border: #e5e7eb; /* Base structural borders & dividers */
+  --palette-light-border-soft: #ececec; /* Softer structural borders */
+  --palette-light-border-hover: #d4d4d4; /* Interactive border hover state */
+  --palette-light-border-pressed: #bfbfbf; /* Border pressed state */
+
+  /* ── Light Typography Scale (WCAG AAA/AA monotonic ramp) ── */
+  --palette-light-title: #171717; /* High-emphasis titles */
+  --palette-light-text-1: #313131; /* Primary body text (AAA >= 7.0:1) */
+  --palette-light-text-label: #52525b; /* Section labels / legends */
+  --palette-light-text-2: #62626a; /* Secondary / muted text (AA >= 4.5:1) */
+  --palette-light-text-3: #696971; /* Tertiary / captions / icons */
+
+  /* ── Dark Elevation Palette Scale (100% Pure Neutral True Black) ── */
+  --palette-dark-0: #0f0f0f; /* Level 0: Global canvas & workspace base (R=15 G=15 B=15) */
+  --palette-dark-1: #141414; /* Level 1: Deep card strong, dialog shell (R=20 G=20 B=20) */
+  --palette-dark-2: #181818; /* Level 2: Surface muted, secondary container (R=24 G=24 B=24) */
+  --palette-dark-3: #1d1d1d; /* Level 3: Inputs, controls, cards, canvas nodes (R=29 G=29 B=29) */
+  --palette-dark-hover: #262626; /* Level 3.5: Interactive control hover state (R=38 G=38 B=38) */
+  --palette-dark-surface-hover: #282828; /* Level 3.5b: Surface hover state (R=40 G=40 B=40) */
+  --palette-dark-surface-pressed: #333333; /* Level 3.6: Surface pressed state (R=51 G=51 B=51) */
+  --palette-dark-border: #282828; /* Base structural borders & canvas dots (R=40 G=40 B=40) */
+  --palette-dark-border-soft: #1f1f1f; /* Softer structural borders (R=31 G=31 B=31) */
+  --palette-dark-border-hover: #3d3d3d; /* Interactive border hover, chart axis (R=61 G=61 B=61) */
+  --palette-dark-border-pressed: #525252; /* Border pressed state (R=82 G=82 B=82) */
+
+  /* ── Dark Typography Scale (100% Pure Neutral Grays, WCAG AAA/AA) ── */
+  --palette-dark-title: #fafafa; /* High-emphasis titles */
+  --palette-dark-text-1: #f5f5f5; /* Primary body text (AAA >= 7.0:1) */
+  --palette-dark-text-label: #d4d4d4; /* Section labels / legends */
+  --palette-dark-text-2: #a3a3a3; /* Secondary / muted text (AA >= 4.5:1) */
+  --palette-dark-text-3: #737373; /* Tertiary / captions / icons */
+  --palette-dark-text-disabled: #525252; /* Disabled states */
+
+  /* Additional physical palette steps shared by authored surface recipes. */
+  --primitive-neutral-190: #e7e7e7;
+  --primitive-neutral-75: #f7f7f7;
+  --primitive-zinc-350: #b1b1b7;
+  --primitive-slate-250: #c9ced8;
+  --primitive-violet-450: #9278e6;
+  --primitive-zinc-900: #18181b;
+  --primitive-zinc-100: #f4f4f5;
+  --primitive-sky-350: #6dbef7;
+  --primitive-slate-150: #e2e4e8;
+  --primitive-zinc-875: #202124;
+  --primitive-zinc-650: #5f6368;
+  --primitive-stone-200: #e6ded5;
+  --primitive-violet-475: #9273eb;
+  --primitive-slate-50: #f8fafc;
+  --primitive-violet-675: #725fd0;
+  --primitive-violet-750: #614ec2;
+  --primitive-purple-400: #c084fc;
+  --primitive-violet-25: #f5f2ff;
+  --primitive-slate-775: #26364f;
+  --primitive-slate-725: #2d4059;
+  --primitive-green-650: #16a34a;
+  --primitive-green-700: #15803d;
+  --primitive-amber-700: #b45309;
+  --primitive-sky-600: #0284c7;
+  --primitive-sky-700: #0369a1;
+  --primitive-zinc-200: #e4e4e7;
+  --primitive-zinc-300: #d4d4d8;
+  --primitive-neutral-25: #fcfcfc;
+  --primitive-neutral-175: #ebebeb;
+  --primitive-neutral-790: #2a2a2a;
+  --primitive-stone-900: #221d19;
+  --primitive-stone-800: #3d342c;
+  --primitive-stone-75: #f4efe6;
+  --primitive-neutral-925: #121212;
+  --primitive-slate-400: #98a2b3;
+  --primitive-blue-550: #4775a8;
+  --primitive-amber-750: #a46925;
+  --primitive-green-675: #288661;
+  --primitive-rose-550: #c94a56;
+  --primitive-purple-700: #7e22bb;
+  --primitive-orange-700: #c2410c;
+  --primitive-blue-700: #1d4ed8;
+  --primitive-rose-700: #be123c;
+  --primitive-slate-825: #22304a;
+  --primitive-slate-875: #19243a;
+  --primitive-blue-575: #4f6f9f;
+  --primitive-cyan-650: #3d8b9a;
+  --primitive-neutral-450: #8f8f8f;
+  --primitive-olive-500: #6f8b71;
+  --primitive-neutral-225: #dedede;
+  --primitive-orange-400: #fb923c;
+  --primitive-rose-400: #fb7185;
+  --primitive-indigo-400: #818cf8;
+  --primitive-sky-400: #38bdf8;
+  --primitive-green-300: #86efac;
+  --primitive-red-700: #b91c1c;
+  --primitive-red-800: #991b1b;
+  --primitive-red-550: #e23a3a;
+  --primitive-shadow-22-58-soft: 0 22px 58px rgba(0, 0, 0, 0.12);
+  --primitive-shadow-10-24: 0 10px 24px rgba(0, 0, 0, 0.1);
+  --primitive-shadow-24-70-slate: 0 24px 70px rgba(45, 64, 89, 0.12);
+  --primitive-shadow-22-58-strong: 0 22px 58px rgba(0, 0, 0, 0.65);
+  --primitive-shadow-14-34-outline:
+    0 14px 34px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --primitive-shadow-ring-4-slate: 0 0 0 4px rgba(152, 162, 179, 0.14);
+  --primitive-shadow-ring-4-blue: 0 0 0 4px rgba(71, 117, 168, 0.15);
+  --primitive-shadow-ring-4-amber: 0 0 0 4px rgba(164, 105, 37, 0.15);
+  --primitive-shadow-ring-4-green: 0 0 0 4px rgba(40, 134, 97, 0.14);
+  --primitive-shadow-ring-4-rose: 0 0 0 4px rgba(201, 74, 86, 0.14);
+
+  /* Physical dimensions, type scales, motion timing and stacking steps. */
+  --primitive-size-10: 10px;
+  --primitive-size-12: 12px;
+  --primitive-size-16: 16px;
+  --primitive-size-32: 32px;
+  --primitive-size-24: 24px;
+  --primitive-blur-12: 12px;
+  --primitive-radius-base: 0.625rem;
+  --primitive-radius-rounded: 999px;
+  --primitive-size-3: 3px;
+  --primitive-font-system-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --primitive-type-size-10: 10px;
+  --primitive-type-size-11: 11px;
+  --primitive-type-size-12: 12px;
+  --primitive-type-size-13: 13px;
+  --primitive-type-size-14: 14px;
+  --primitive-type-size-15: 15px;
+  --primitive-type-size-16: 16px;
+  --primitive-type-size-18: 18px;
+  --primitive-type-size-20: 20px;
+  --primitive-type-size-28: 28px;
+  --primitive-type-size-26: 26px;
+  --primitive-type-size-22: 22px;
+  --primitive-font-weight-650: 650;
+  --primitive-font-weight-680: 680;
+  --primitive-font-weight-760: 760;
+  --primitive-font-satoshi: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
+  --primitive-font-handwriting:
+    'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
+  --primitive-leading-tight: 1.2;
+  --primitive-leading-heading: 1.35;
+  --primitive-leading-body: 1.5;
+  --primitive-leading-caption: 1.45;
+  --primitive-font-weight-600: 600;
+  --primitive-font-weight-400: 400;
+  --primitive-font-weight-500: 500;
+  --primitive-z-1: 1;
+  --primitive-z-10: 10;
+  --primitive-z-30: 30;
+  --primitive-z-40: 40;
+  --primitive-z-50: 50;
+  --primitive-z-80: 80;
+  --primitive-z-1200: 1200;
+  --primitive-z-2000: 2000;
+  --primitive-duration-160: 160ms;
+  --primitive-easing-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --primitive-duration-220: 220ms;
+  --primitive-duration-0: 0ms;
+  --primitive-size-1600: 1600px;
+  --primitive-size-340: 340px;
+  --primitive-width-38rem-fluid: min(38rem, calc(100vw - 1rem));
+  --primitive-size-260: 260px;
+  --primitive-width-420-fluid: min(420px, 100%);
+
+  /*
+ Physical alpha recipes keep sRGB channels and opacity without runtime color mixing.
+ */
+  --primitive-neutral-1000-alpha-40: rgb(0 0 0 / 40%);
+  --primitive-neutral-1000-alpha-30: rgb(0 0 0 / 30%);
+  --primitive-neutral-1000-alpha-42: rgb(0 0 0 / 42%);
+  --primitive-neutral-1000-alpha-68: rgb(0 0 0 / 68%);
+  --primitive-neutral-0-alpha-98: rgb(255 255 255 / 98%);
+  --primitive-violet-475-alpha-42: rgb(146 115 235 / 42%);
+  --primitive-violet-650-alpha-16: rgb(122 107 213 / 16%);
+  --primitive-violet-650-alpha-18: rgb(122 107 213 / 18%);
+  --primitive-neutral-0-alpha-90: rgb(255 255 255 / 90%);
+  --primitive-neutral-0-alpha-85: rgb(255 255 255 / 85%);
+  --primitive-slate-50-alpha-92: rgb(248 250 252 / 92%);
+  --primitive-neutral-1000-alpha-4: rgb(0 0 0 / 4%);
+  --primitive-violet-450-alpha-10: rgb(146 120 230 / 10%);
+  --primitive-neutral-0-alpha-92: rgb(255 255 255 / 92%);
+  --primitive-slate-775-alpha-8: rgb(38 54 79 / 8%);
+  --primitive-neutral-0-alpha-95: rgb(255 255 255 / 95%);
+  --primitive-red-500-alpha-15: rgb(239 68 68 / 15%);
+  --primitive-green-650-alpha-15: rgb(22 163 74 / 15%);
+  --primitive-amber-600-alpha-15: rgb(217 119 6 / 15%);
+  --primitive-sky-600-alpha-15: rgb(2 132 199 / 15%);
+  --primitive-violet-650-alpha-25: rgb(122 107 213 / 25%);
+  --primitive-neutral-0-alpha-40: rgb(255 255 255 / 40%);
+  --primitive-zinc-350-alpha-65: rgb(177 177 183 / 65%);
+  --primitive-neutral-1000-alpha-20: rgb(0 0 0 / 20%);
+  --primitive-violet-650-alpha-8: rgb(122 107 213 / 8%);
+  --primitive-violet-650-alpha-28: rgb(122 107 213 / 28%);
+  --primitive-violet-650-alpha-22: rgb(122 107 213 / 22%);
+  --primitive-violet-650-alpha-26: rgb(122 107 213 / 26%);
+  --primitive-violet-450-alpha-25: rgb(146 120 230 / 25%);
+  --primitive-violet-450-alpha-35: rgb(146 120 230 / 35%);
+  --primitive-violet-450-alpha-18: rgb(146 120 230 / 18%);
+  --primitive-zinc-900-alpha-94: rgb(24 24 27 / 94%);
+  --primitive-neutral-1000-alpha-28: rgb(0 0 0 / 28%);
+  --primitive-neutral-1000-alpha-38: rgb(0 0 0 / 38%);
+  --primitive-neutral-1000-alpha-8: rgb(0 0 0 / 8%);
+  --primitive-neutral-910-alpha-85: rgb(20 20 20 / 85%);
+  --primitive-neutral-910-alpha-95: rgb(20 20 20 / 95%);
+  --primitive-neutral-0-alpha-8: rgb(255 255 255 / 8%);
+  --primitive-neutral-0-alpha-12: rgb(255 255 255 / 12%);
+  --primitive-neutral-0-alpha-5: rgb(255 255 255 / 5%);
+  --primitive-neutral-0-alpha-10: rgb(255 255 255 / 10%);
+  --primitive-neutral-0-alpha-16: rgb(255 255 255 / 16%);
+  --primitive-red-400-alpha-15: rgb(248 113 113 / 15%);
+  --primitive-green-400-alpha-15: rgb(52 211 153 / 15%);
+  --primitive-amber-400-alpha-15: rgb(251 191 36 / 15%);
+  --primitive-blue-400-alpha-15: rgb(96 165 250 / 15%);
+  --primitive-neutral-0-alpha-15: rgb(255 255 255 / 15%);
+  --primitive-neutral-0-alpha-25: rgb(255 255 255 / 25%);
+  --primitive-neutral-890-alpha-78: rgb(24 24 24 / 78%);
+  --primitive-neutral-0-alpha-20: rgb(255 255 255 / 20%);
+  --primitive-neutral-0-alpha-30: rgb(255 255 255 / 30%);
+  --primitive-neutral-790-alpha-85: rgb(42 42 42 / 85%);
+  --primitive-neutral-940-alpha-88: rgb(15 15 15 / 88%);
+  --primitive-neutral-890-alpha-45: rgb(24 24 24 / 45%);
+  --primitive-neutral-0-alpha-35: rgb(255 255 255 / 35%);
+  --primitive-neutral-1000-alpha-72: rgb(0 0 0 / 72%);
+  --primitive-neutral-925-alpha-88: rgb(18 18 18 / 88%);
+  --primitive-neutral-0-alpha-2: rgb(255 255 255 / 2%);
+  --primitive-neutral-0-alpha-1: rgb(255 255 255 / 1%);
+  --primitive-neutral-910-alpha-94: rgb(20 20 20 / 94%);
+  --primitive-neutral-0-alpha-3: rgb(255 255 255 / 3%);
+  --primitive-neutral-0-alpha-22: rgb(255 255 255 / 22%);
+  --primitive-neutral-0-alpha-70: rgb(255 255 255 / 70%);
+  --primitive-neutral-1000-alpha-50: rgb(0 0 0 / 50%);
+  --primitive-neutral-1000-alpha-65: rgb(0 0 0 / 65%);
+  --primitive-neutral-910-alpha-96: rgb(20 20 20 / 96%);
+  --primitive-neutral-0-alpha-28: rgb(255 255 255 / 28%);
+  --primitive-neutral-0-alpha-38: rgb(255 255 255 / 38%);
+  --primitive-neutral-0-alpha-62: rgb(255 255 255 / 62%);
+  --primitive-neutral-0-alpha-94: rgb(255 255 255 / 94%);
+  --primitive-violet-450-alpha-8: rgb(146 120 230 / 8%);
+  --primitive-violet-450-alpha-5: rgb(146 120 230 / 5%);
+  --primitive-slate-400-alpha-12: rgb(152 162 179 / 12%);
+  --primitive-blue-550-alpha-10: rgb(71 117 168 / 10%);
+  --primitive-amber-750-alpha-10: rgb(164 105 37 / 10%);
+  --primitive-green-675-alpha-10: rgb(40 134 97 / 10%);
+  --primitive-rose-550-alpha-9p5: rgb(201 74 86 / 9.5%);
+  --primitive-neutral-0-alpha-74: rgb(255 255 255 / 74%);
+  --primitive-neutral-910-alpha-75: rgb(20 20 20 / 75%);
+  --primitive-neutral-0-alpha-6: rgb(255 255 255 / 6%);
 }
