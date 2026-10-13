@@ -100,7 +100,7 @@ const computedClasses = computed(() => {
   const effVariant = resolveEffectiveVariant()
   return cn(
     buttonChromeBaseClass,
-    props.rounded ? 'rounded-full' : 'rounded-lg',
+    props.rounded && 'rounded-pill',
     buttonChromeSizeTypography(props.size),
     adminColorClasses[effVariant],
     props.text &&

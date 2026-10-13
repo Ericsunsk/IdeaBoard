@@ -44,7 +44,7 @@ export function useLibraryIslandDnD(options: LibraryIslandDnDOptions) {
     ghost.style.left = '-9999px'
     ghost.style.width = '58px'
     ghost.style.height = '44px'
-    ghost.style.borderRadius = '8px'
+    ghost.style.borderRadius = 'var(--radius-control)'
     ghost.style.overflow = 'hidden'
     ghost.style.boxShadow = '0 12px 28px rgba(0,0,0,0.3)'
     ghost.style.transform = 'rotate(-3deg)'

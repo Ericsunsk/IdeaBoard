@@ -1,6 +1,6 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <div class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <div class="flex w-full flex-col overflow-hidden rounded-panel border border-border bg-card">
       <div v-if="showLoading" class="flex min-h-72 items-center justify-center">
         <AdminSpinner
           class="size-9 text-primary"
@@ -45,7 +45,7 @@
                 </h2>
                 <span
                   v-if="health.active_run"
-                  class="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+                  class="rounded-pill border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
                 >
                   {{ CREDIT_HEALTH_MESSAGES.activeRunBadge(health.active_run.id) }}
                 </span>

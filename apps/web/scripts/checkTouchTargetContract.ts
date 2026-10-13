@@ -294,7 +294,7 @@ const RULES: Rule[] = [
     // Pinned to the compact-button token, not a bare `!size-8` occurrence, so the
     // rule still says something if a *different* token in this large module
     // happens to be 8x8.
-    pattern: /flex !size-8 shrink-0 items-center justify-center !rounded-lg/,
+    pattern: /flex !size-8 shrink-0 items-center justify-center !rounded-control/,
     // The 28px box the original rule forbade. Still enforced, still opt-in based,
     // so a *new* compact button added to this module cannot quietly ship at 28px
     // just because the existing one is compliant.

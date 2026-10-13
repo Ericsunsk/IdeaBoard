@@ -30,7 +30,7 @@
             :to="ADMIN_DEFAULT_PATH"
             :aria-label="brandAriaLabel"
             :title="effectiveCollapsed ? projectName || 'IdeaBoard' : undefined"
-            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-xl whitespace-nowrap transition-colors hover:bg-muted active:scale-[0.98]"
+            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-control whitespace-nowrap transition-colors hover:bg-muted active:scale-[0.98]"
           >
             <span
               class="flex size-10 shrink-0 items-center justify-center transition-transform duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] group-hover:scale-105"
@@ -106,7 +106,7 @@
               :title="effectiveCollapsed ? `${group.title} · ${item.label}` : item.label"
               :aria-label="item.label"
               :aria-current="activeKey === item.key ? 'page' : undefined"
-              class="group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium whitespace-nowrap text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+              class="group flex h-10 w-full items-center overflow-hidden rounded-control text-sm font-medium whitespace-nowrap text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
               @click="drawerOpen = false"
             >
               <span class="flex size-10 shrink-0 items-center justify-center">
@@ -143,7 +143,7 @@
           type="button"
           :aria-label="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
           :title="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
-          class="group flex size-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
+          class="group flex size-10 items-center justify-center rounded-control text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
           @click="toggleCollapsed"
         >
           <SidebarCollapseIcon

@@ -9129,6 +9129,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -9534,9 +9539,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 122,
+      "measuredFanIn": 123,
       "measuredFanOut": 5,
-      "targetFanIn": 122,
+      "targetFanIn": 123,
       "targetFanOut": 5,
       "ownershipScope": ["src/core/i18n/"],
       "publicExports": [
@@ -13715,6 +13720,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -13765,9 +13775,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 119,
+      "measuredFanIn": 120,
       "measuredFanOut": 46,
-      "targetFanIn": 119,
+      "targetFanIn": 120,
       "targetFanOut": 46,
       "ownershipScope": [
         "src/features/admin/shared/core/",
@@ -22322,6 +22332,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -22347,9 +22367,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 10,
       "measuredFanOut": 3,
-      "targetFanIn": 8,
+      "targetFanIn": 10,
       "targetFanOut": 3,
       "ownershipScope": ["src/theme/composables/useTheme.ts"],
       "publicExports": [
@@ -22614,7 +22634,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/contracts/imageServices.ts` | canonical | core | 3 | 29 → 29 | 0 → 0 |
 | `src/core/errors/errorCatalog.ts` | canonical | core | 5 | 30 → 30 | 1 → 1 |
 | `src/core/i18n/formatters.ts` | canonical | core | 5 | 21 → 21 | 2 → 2 |
-| `src/core/i18n/index.ts` | canonical | core | 7 | 122 → 122 | 5 → 5 |
+| `src/core/i18n/index.ts` | canonical | core | 7 | 123 → 123 | 5 → 5 |
 | `src/core/i18n/localeCore.ts` | canonical | core | 5 | 5 → 5 | 0 → 0 |
 | `src/core/i18n/localeManifest.ts` | canonical | core | 2 | 5 → 5 | 5 → 5 |
 | `src/core/i18n/locales/en/index.ts` | canonical | core | 12 | 3 → 3 | 0 → 0 |
@@ -22675,7 +22695,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/tableColumns.ts` | canonical | admin | 2 | 2 → 2 | 0 → 0 |
 | `src/features/admin/shared/core/taskMetricTokens.ts` | canonical | admin | 7 | 3 → 3 | 1 → 1 |
 | `src/features/admin/shared/core/uiClasses.ts` | canonical | admin | 38 | 14 → 14 | 0 → 0 |
-| `src/features/admin/shared/index.ts` | canonical | admin | 233 | 119 → 119 | 46 → 46 |
+| `src/features/admin/shared/index.ts` | canonical | admin | 233 | 120 → 120 | 46 → 46 |
 | `src/features/admin/shared/session/anomalyRules.ts` | canonical | admin | 4 | 3 → 3 | 3 → 3 |
 | `src/features/admin/shared/session/brand/brandLogos.ts` | canonical | admin | 14 | 6 → 6 | 14 → 14 |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts` | canonical | admin | 1 | 1 → 1 | 5 → 5 |
@@ -22797,7 +22817,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/theme/appOverlayMenu.ts` | canonical | design-system | 5 | 6 → 6 | 0 → 0 |
 | `src/theme/composables/themeKeyboard.ts` | canonical | design-system | 2 | 1 → 1 | 2 → 2 |
 | `src/theme/composables/themeMode.ts` | canonical | design-system | 5 | 4 → 4 | 0 → 0 |
-| `src/theme/composables/useTheme.ts` | canonical | design-system | 4 | 8 → 8 | 3 → 3 |
+| `src/theme/composables/useTheme.ts` | canonical | design-system | 4 | 10 → 10 | 3 → 3 |
 | `src/theme/dialogMask.ts` | canonical | design-system | 1 | 6 → 6 | 0 → 0 |
 | `src/theme/formControls.ts` | canonical | design-system | 4 | 10 → 10 | 0 → 0 |
 | `src/theme/lightboxScrim.ts` | canonical | design-system | 3 | 3 → 3 | 0 → 0 |

@@ -44,7 +44,7 @@
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
-                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
+                class="rounded-pill bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
                 @click="emit('update:createOpen', false)"
               >
                 {{ t('library.dialogs.cancel') }}
@@ -52,7 +52,7 @@
               <Button
                 type="submit"
                 :is-disabled="createSaving || !createDraft.trim()"
-                class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
+                class="rounded-pill bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
               >
                 {{ t('library.dialogs.create') }}
               </Button>
@@ -108,7 +108,7 @@
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
-                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
+                class="rounded-pill bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
                 @click="emit('update:renameOpen', false)"
               >
                 {{ t('library.dialogs.cancel') }}
@@ -116,7 +116,7 @@
               <Button
                 type="submit"
                 :is-disabled="renameSaving || !renameDraft.trim()"
-                class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
+                class="rounded-pill bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
               >
                 {{ t('library.dialogs.save') }}
               </Button>
@@ -164,7 +164,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const dialogContentClass =
-  'overflow-hidden rounded-2xl border border-border bg-card/80 backdrop-blur-md'
+  'overflow-hidden rounded-overlay border border-border bg-card/80 backdrop-blur-md'
 
 function blockDialogOutsideDismiss(event: Event) {
   event.preventDefault()

@@ -44,7 +44,7 @@
   min-height: 46px;
   padding: 12px 14px;
   border: 1px solid var(--ideaboard-toast-border);
-  border-radius: 14px;
+  border-radius: var(--radius-panel);
   background:
     radial-gradient(circle at 18% 20%, var(--ideaboard-toast-highlight) 0%, transparent 58%),
     var(--ideaboard-toast-bg);

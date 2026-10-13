@@ -1,6 +1,6 @@
 <template>
   <AvatarRoot
-    :class="cn('relative flex size-10 shrink-0 overflow-hidden rounded-full', props.class)"
+    :class="cn('relative flex size-10 shrink-0 overflow-hidden rounded-pill', props.class)"
   >
     <slot />
   </AvatarRoot>

@@ -176,7 +176,7 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 
 .prompt-text-composer-image-row {
   --node-tool-button-size: var(--node-input-thumbnail-size);
-  --node-tool-button-radius: 8px;
+  --node-tool-button-radius: var(--radius-control);
 }
 
 .prompt-text-composer.variant-floating {
@@ -196,13 +196,13 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
  * ring as the primary indicator.
  */
 .prompt-text-composer.variant-node:focus-within {
-  border-radius: var(--canvas-radius-md);
+  border-radius: var(--radius-control);
   box-shadow: 0 0 0 2px var(--focus-outline-color);
 }
 
 .prompt-text-composer.variant-floating .prompt-text-composer-image-row {
   --node-input-thumbnail-size: calc((100% - 18px) / 4);
-  --node-tool-button-radius: 9px;
+  --node-tool-button-radius: var(--radius-control);
   gap: 6px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   justify-content: stretch;

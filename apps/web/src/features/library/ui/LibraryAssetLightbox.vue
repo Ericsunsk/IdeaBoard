@@ -61,7 +61,7 @@
           <img
             :src="asset.originalUrl || asset.previewUrl"
             :alt="asset.title || t('library.states.savedReference')"
-            class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
+            class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-2xl border-0 ring-0 outline-none select-none"
           />
         </div>
       </div>

@@ -318,7 +318,7 @@ function noopMouse() {}
 .flow-canvas-node__unsupported {
   padding: 8px 10px;
   border: 1px dashed var(--canvas-node-border);
-  border-radius: var(--canvas-radius-md);
+  border-radius: var(--radius-control);
   background: var(--canvas-node-bg);
   color: var(--canvas-text-muted);
   font-size: 12px;

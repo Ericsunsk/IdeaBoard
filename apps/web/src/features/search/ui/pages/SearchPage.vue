@@ -22,7 +22,7 @@
       <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
         <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="page-chrome-surface min-w-0 flex-1 rounded-full p-1.5 focus-within:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)]"
+            class="page-chrome-surface min-w-0 flex-1 rounded-pill p-1.5 focus-within:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)]"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
@@ -40,7 +40,7 @@
                 >
                   <button
                     type="button"
-                    class="grid size-8 overflow-hidden rounded-full bg-card cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="grid size-8 overflow-hidden rounded-pill bg-card cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :title="
                       t('search.tooltips.removeReferenceWithCount', { count: referenceSlotCount })
                     "
@@ -57,7 +57,7 @@
                   <div
                     class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-50 w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
                   >
-                    <div class="size-14 shrink-0 overflow-hidden rounded-md bg-card shadow-md">
+                    <div class="size-14 shrink-0 overflow-hidden rounded-control bg-card shadow-md">
                       <img
                         :src="reference.previewUrl"
                         :alt="t('search.reference.previewAlt')"
@@ -111,7 +111,7 @@
                 <button
                   v-if="references.length === 0"
                   type="button"
-                  class="h-8 px-3 rounded-full border border-[var(--color-page-chrome-border)] text-[var(--color-page-chrome-color)] hover:text-[var(--color-page-chrome-color-hover)] hover:border-[var(--color-page-chrome-border-hover)] hover:bg-[var(--color-page-chrome-bg-hover)] flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  class="h-8 px-3 rounded-pill border border-[var(--color-page-chrome-border)] text-[var(--color-page-chrome-color)] hover:text-[var(--color-page-chrome-color-hover)] hover:border-[var(--color-page-chrome-border-hover)] hover:bg-[var(--color-page-chrome-bg-hover)] flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   :aria-label="t('search.tooltips.addReferences')"
                   :title="t('search.tooltips.addReferences')"
                   :disabled="!canAddReference"
@@ -125,7 +125,7 @@
                   :is-loading="visionState === 'extracting'"
                   :is-disabled="visionState === 'extracting'"
                   :title="searchButtonTitle"
-                  class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-primary !px-4 !text-xs !font-bold !text-primary-foreground !shadow-none hover:!bg-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
+                  class="!h-8 !min-w-[68px] !rounded-pill !border-0 !bg-primary !px-4 !text-xs !font-bold !text-primary-foreground !shadow-none hover:!bg-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
                 >
                   {{ t('search.actions.search') }}
                 </Button>
@@ -135,7 +135,7 @@
 
           <button
             type="button"
-            class="page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-full transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)] cursor-pointer"
+            class="page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-pill transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)] cursor-pointer"
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-primary' : '']"
             :aria-label="t('search.tooltips.toggleLibrary')"
             :title="t('search.tooltips.toggleLibrary')"
@@ -208,7 +208,7 @@
         <div
           v-for="h in [260, 340, 200, 380, 280, 320, 240, 360, 300, 220]"
           :key="h"
-          class="break-inside-avoid overflow-hidden rounded-2xl bg-muted/30 animate-pulse"
+          class="break-inside-avoid overflow-hidden rounded-panel bg-muted/30 animate-pulse"
           :class="isLibraryIslandOpen && !isLibraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
           :style="{ height: `${h}px` }"
         ></div>

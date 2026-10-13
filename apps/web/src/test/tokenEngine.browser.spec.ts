@@ -98,13 +98,11 @@ describe('domain token runtime contracts', () => {
     )
   })
 
-  it('resolves radius master formulas to the current pixel radii', () => {
+  it('resolves shared radius roles to their pixel radii', () => {
     const root = probe()
-    expect(utilityPaint(root, 'rounded-control', 'border-radius')).toBe('10px')
-    expect(utilityPaint(root, 'rounded-panel', 'border-radius')).toBe('14px')
-    expect(utilityPaint(root, 'rounded-board-dialog', 'border-radius')).toBe('20px')
-    expect(utilityPaint(root, 'rounded-admin-dialog', 'border-radius')).toBe('14px')
-    expect(utilityPaint(root, 'rounded-admin-chip', 'border-radius')).toBe('6px')
+    expect(utilityPaint(root, 'rounded-control', 'border-radius')).toBe('8px')
+    expect(utilityPaint(root, 'rounded-panel', 'border-radius')).toBe('12px')
+    expect(utilityPaint(root, 'rounded-overlay', 'border-radius')).toBe('16px')
   })
 
   it('emits native stacking, shadow, and type utilities', () => {

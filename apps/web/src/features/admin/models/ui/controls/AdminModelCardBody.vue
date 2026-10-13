@@ -3,7 +3,7 @@
     <!-- 头部：品牌图标 + 模型名称 -->
     <div class="flex items-center min-w-0">
       <div
-        class="flex size-7 shrink-0 items-center justify-center rounded-lg mr-2.5 overflow-hidden transition-colors"
+        class="flex size-7 shrink-0 items-center justify-center rounded-control mr-2.5 overflow-hidden transition-colors"
         :class="brandLogo ? 'bg-muted/60 border border-border/60' : 'bg-primary-faint text-primary'"
       >
         <img
@@ -29,7 +29,7 @@
       <span class="font-semibold text-foreground">{{ model.provider }}</span>
       <span
         v-if="model.mode"
-        class="inline-flex items-center rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-admin-caption font-medium text-muted-foreground"
+        class="inline-flex items-center rounded-pill border border-border bg-muted/60 px-2.5 py-0.5 text-admin-caption font-medium text-muted-foreground"
       >
         {{ model.mode }}
       </span>
@@ -45,7 +45,7 @@
       <!-- 上下文 / 分辨率胶囊 (有值才展示，避免空灰色长条) -->
       <span
         v-if="model.contextOrResolution"
-        class="inline-flex items-center rounded-md bg-muted/80 px-2 py-0.5 text-admin-caption font-medium text-muted-foreground"
+        class="inline-flex items-center rounded-control bg-muted/80 px-2 py-0.5 text-admin-caption font-medium text-muted-foreground"
       >
         {{ model.contextOrResolution }}
       </span>
@@ -54,7 +54,7 @@
       <span
         v-for="cap in model.capabilities"
         :key="cap"
-        class="inline-flex items-center rounded-md bg-muted/80 px-2 py-0.5 text-admin-caption font-medium text-muted-foreground"
+        class="inline-flex items-center rounded-control bg-muted/80 px-2 py-0.5 text-admin-caption font-medium text-muted-foreground"
       >
         {{ cap }}
       </span>
@@ -62,7 +62,7 @@
       <!-- prompt cache 徽标 (支持才展示；目录仅保留能力位，价格走参照接口) -->
       <span
         v-if="model.supportsPromptCaching"
-        class="inline-flex items-center rounded-md bg-info-soft px-2 py-0.5 text-admin-caption font-medium text-info"
+        class="inline-flex items-center rounded-control bg-info-soft px-2 py-0.5 text-admin-caption font-medium text-info"
         :title="MODELS_MESSAGES.cardCacheTitle"
       >
         cache √
@@ -70,7 +70,7 @@
 
       <!-- 托管类型标签 (Cloudflare 托管使用翡翠绿，第三方使用浅灰) -->
       <span
-        class="inline-flex items-center rounded-md px-2 py-0.5 text-admin-caption font-medium"
+        class="inline-flex items-center rounded-control px-2 py-0.5 text-admin-caption font-medium"
         :class="
           model.hosting === MODEL_HOSTING_CLOUDFLARE
             ? 'bg-success-soft text-success'

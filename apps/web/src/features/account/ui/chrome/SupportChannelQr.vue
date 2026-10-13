@@ -47,7 +47,7 @@
           target="_blank"
           rel="noopener noreferrer"
           :aria-label="t('auth.menu.supportOpenChannel', { channel: channel.name })"
-          class="block bg-white p-2 rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+          class="block bg-white p-2 rounded-control focus-visible:outline-2 focus-visible:outline-ring"
         >
           <QrcodeVue :value="channel.url" :size="176" level="M" render-as="svg" />
         </a>

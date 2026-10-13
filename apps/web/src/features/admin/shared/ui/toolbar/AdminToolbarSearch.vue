@@ -15,7 +15,7 @@
       v-if="modelValue"
       variant="ghost"
       size="icon"
-      class="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground"
+      class="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-control text-muted-foreground hover:text-foreground"
       aria-label="清空搜索"
       @click="handleClear"
     >

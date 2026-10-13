@@ -71,7 +71,7 @@ describe('Wallet Subcomponents', () => {
       },
     })
 
-    const dotEl = document.querySelector('span.size-2.rounded-full')!
+    const dotEl = document.querySelector('span.size-2.rounded-pill')!
     expect(dotEl).toHaveClass(dot)
     if (tab === 'refund') {
       expect(dotEl).not.toHaveClass('bg-warning')

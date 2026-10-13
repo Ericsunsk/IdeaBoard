@@ -19,7 +19,7 @@ describe('Card compound components', () => {
       },
     })
 
-    expect(wrapper.classes()).toContain('rounded-xl')
+    expect(wrapper.classes()).toContain('rounded-panel')
     expect(wrapper.classes()).toContain('custom-card')
 
     const header = wrapper.findComponent(CardHeader)
@@ -60,7 +60,7 @@ describe('Card compound components', () => {
 
     it('keeps the base surface classes when elevation is off', () => {
       const wrapper = mount(Card, { props: { elevated: false, class: 'p-6' } })
-      for (const base of ['rounded-xl', 'border', 'bg-card']) {
+      for (const base of ['rounded-panel', 'border', 'bg-card']) {
         expect(wrapper.classes()).toContain(base)
       }
       expect(wrapper.classes()).toContain('p-6')

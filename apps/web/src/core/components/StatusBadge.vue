@@ -3,10 +3,10 @@
     <span v-if="props.dot" class="relative flex size-1.5" aria-hidden="true">
       <span
         v-if="shouldPulse"
-        class="absolute inline-flex size-full animate-ping rounded-full opacity-75"
+        class="absolute inline-flex size-full animate-ping rounded-pill opacity-75"
         :class="dotColorClass"
       />
-      <span class="relative inline-flex size-1.5 rounded-full" :class="dotColorClass" />
+      <span class="relative inline-flex size-1.5 rounded-pill" :class="dotColorClass" />
     </span>
     <span
       ><slot>{{ props.label }}</slot></span

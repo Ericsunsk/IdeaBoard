@@ -28,7 +28,7 @@
             }}</span>
             <span
               v-if="getTaskServiceResolution(data)"
-              class="shrink-0 rounded border border-border bg-muted px-1 font-mono text-admin-caption text-muted-foreground"
+              class="shrink-0 rounded-control border border-border bg-muted px-1 font-mono text-admin-caption text-muted-foreground"
               :title="getTaskServiceResolution(data)"
             >
               {{ getTaskServiceResolution(data) }}
@@ -102,7 +102,7 @@
             <!-- 竖直状态指示条 (复用 Events 表的状态 Token 颜色) -->
             <span
               :class="[
-                'h-3.5 w-[3px] shrink-0 rounded-full',
+                'h-3.5 w-[3px] shrink-0 rounded-pill',
                 getTaskRowView(data).metric?.dotClass || 'bg-slate-400',
               ]"
             />

@@ -77,22 +77,22 @@ describe('Admin base control adapters', () => {
   })
 
   describe('AdminBadge', () => {
-    it('renders Badge with variant and rounded-full by default', () => {
+    it('renders Badge with variant and rounded-pill by default', () => {
       const wrapper = mount(AdminBadge, {
         props: { variant: 'success', value: 'Active' },
       })
       expect(wrapper.text()).toBe('Active')
-      expect(wrapper.classes()).toContain('rounded-full')
+      expect(wrapper.classes()).toContain('rounded-pill')
       expect(wrapper.classes()).toContain('text-success')
     })
 
-    it('supports rounded false for rounded-md', () => {
+    it('supports rounded false for rounded-control', () => {
       const wrapper = mount(AdminBadge, {
         props: { variant: 'danger', rounded: false },
         slots: { default: 'Banned' },
       })
       expect(wrapper.text()).toBe('Banned')
-      expect(wrapper.classes()).toContain('rounded-md')
+      expect(wrapper.classes()).toContain('rounded-control')
       expect(wrapper.classes()).toContain('bg-destructive-soft')
     })
   })

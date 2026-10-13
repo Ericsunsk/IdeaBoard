@@ -36,9 +36,6 @@ function getThemeState(): { mode: ColorModeReturn; isDark: ComputedRef<boolean> 
 }
 
 export function isDarkModeActive(): boolean {
-  if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
-    return true
-  }
   const { isDark } = getThemeState()
   return isDark.value
 }

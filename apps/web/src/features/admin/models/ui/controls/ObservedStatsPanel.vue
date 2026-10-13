@@ -1,7 +1,7 @@
 <template>
   <section
     :aria-label="MODELS_MESSAGES.observedAria"
-    class="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5"
+    class="mt-3 rounded-panel border border-border bg-muted/40 px-3 py-2.5"
   >
     <div class="mb-2 flex items-center justify-between">
       <h4 class="text-admin-caption font-semibold text-foreground">
@@ -23,7 +23,7 @@
 
     <div v-else class="flex flex-col gap-1.5 text-xs">
       <div class="grid grid-cols-2 gap-1.5">
-        <div class="rounded-md bg-card/70 px-2.5 py-1.5">
+        <div class="rounded-control bg-card/70 px-2.5 py-1.5">
           <div class="text-admin-micro text-muted-foreground">
             {{ MODELS_MESSAGES.observedSuccessLabel }}
           </div>
@@ -31,7 +31,7 @@
             {{ successText || MODELS_MESSAGES.referenceNoData }}
           </div>
         </div>
-        <div class="rounded-md bg-card/70 px-2.5 py-1.5">
+        <div class="rounded-control bg-card/70 px-2.5 py-1.5">
           <div class="text-admin-micro text-muted-foreground">
             {{ MODELS_MESSAGES.observedCacheLabel }}
           </div>
@@ -41,7 +41,7 @@
         </div>
       </div>
 
-      <div class="flex items-center justify-between gap-2 rounded-md bg-card/70 px-2.5 py-1.5">
+      <div class="flex items-center justify-between gap-2 rounded-control bg-card/70 px-2.5 py-1.5">
         <span class="shrink-0 text-admin-micro text-muted-foreground">{{
           MODELS_MESSAGES.observedTopFailureLabel
         }}</span>
@@ -50,7 +50,7 @@
         </span>
       </div>
 
-      <div class="rounded-md bg-card/70 px-2.5 py-1.5">
+      <div class="rounded-control bg-card/70 px-2.5 py-1.5">
         <div class="mb-1 text-admin-micro text-muted-foreground">
           {{ MODELS_MESSAGES.observedSkuLabel }}
         </div>
@@ -75,7 +75,7 @@
       <!-- 成本/毛利恒 null：网关侧暂无成本来源，后端 cost_source=unavailable；
            只展示暂无数据，绝不编造数字。cost 有来源后负值标红可直接扩展。 -->
       <div
-        class="flex items-center justify-between gap-2 rounded-md bg-card/70 px-2.5 py-1.5"
+        class="flex items-center justify-between gap-2 rounded-control bg-card/70 px-2.5 py-1.5"
         :title="MODELS_MESSAGES.observedCostTitle"
       >
         <span class="shrink-0 text-admin-micro text-muted-foreground">{{

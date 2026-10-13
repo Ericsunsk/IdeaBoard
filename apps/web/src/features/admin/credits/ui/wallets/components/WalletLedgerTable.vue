@@ -1,9 +1,9 @@
 <template>
   <section
-    class="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4.5 shadow-2xs"
+    class="flex flex-col gap-3.5 rounded-overlay border border-border bg-card p-4.5 shadow-2xs"
     aria-labelledby="admin-user-wallet-ledger-title"
   >
-    <div class="overflow-hidden rounded-xl border border-border">
+    <div class="overflow-hidden rounded-panel border border-border">
       <AdminTable
         :value="transactions"
         data-key="transaction_id"

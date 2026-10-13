@@ -4,7 +4,7 @@
 // stay identical across features. Layout (pill link vs round icon button) stays
 // with the caller so this module never learns feature markup.
 export const lightboxScrimButtonBaseClass =
-  'rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-white hover:text-black hover:border-transparent'
+  'rounded-pill bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-white hover:text-black hover:border-transparent'
 
 export const lightboxScrimLinkClass = `${lightboxScrimButtonBaseClass} flex h-7 items-center justify-center px-3 text-xs font-medium no-underline cursor-pointer`
 

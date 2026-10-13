@@ -8,7 +8,7 @@
       <span>{{ item.label }}</span>
       <span
         v-if="item.key === 'health' && healthBadge"
-        class="rounded-full border px-1.5 py-0.5 text-admin-caption leading-none font-bold"
+        class="rounded-pill border px-1.5 py-0.5 text-admin-caption leading-none font-bold"
         :class="healthBadge.className"
       >
         {{ healthBadge.label }}

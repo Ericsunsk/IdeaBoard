@@ -18,11 +18,6 @@ body.canvas-overscroll-guard {
   --canvas-tool-button-gap: 7px;
   --canvas-node-floating-ui-width: 287px;
 
-  /* ── Canvas Radius Tokens ── */
-  --canvas-radius-md: 8px;
-  --canvas-radius-lg: 10px;
-  --canvas-radius-xl: 13px;
-
   /* ── Canvas Typography Tokens ── */
   --canvas-font-size-title: 15px;
   --canvas-font-size-control: 12px;

@@ -19,7 +19,7 @@ describe('App overlay menu contract', () => {
 
   it('provides accessible menu item and danger item classes', () => {
     expect(appOverlayMenuItemClass).toContain('control-state')
-    expect(appOverlayMenuItemClass).toContain('rounded-lg')
+    expect(appOverlayMenuItemClass).toContain('rounded-control')
     expect(appOverlayMenuDangerItemClass).toContain('var(--app-overlay-menu-danger-color')
   })
 })

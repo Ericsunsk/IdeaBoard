@@ -11,7 +11,7 @@
 .node-tool-surface {
   --node-tool-border-width: var(--canvas-control-border-width);
   --node-tool-button-size: var(--canvas-control-size-md);
-  --node-tool-button-radius: var(--canvas-radius-lg);
+  --node-tool-button-radius: var(--radius-control);
   --node-tool-button-gap: var(--canvas-tool-button-gap);
   --node-tool-icon-size: 21px;
   --node-tool-popover-option-height: 33px;
@@ -134,7 +134,7 @@
 /* Shared glass surface for floating node-tool panels and popovers. */
 .node-tool-glass-surface {
   border: var(--node-tool-border-width) solid var(--canvas-glass-border);
-  border-radius: var(--canvas-radius-xl);
+  border-radius: var(--radius-panel);
   background: var(--canvas-glass-bg);
   box-shadow: none;
   backdrop-filter: blur(var(--canvas-glass-blur));
@@ -158,7 +158,7 @@
   width: var(--node-tool-button-size);
   height: var(--node-tool-popover-option-height);
   border: var(--node-tool-border-width) solid var(--canvas-node-border);
-  border-radius: var(--canvas-radius-md);
+  border-radius: var(--radius-control);
   background: var(--canvas-node-bg);
   color: var(--canvas-text-option);
   cursor: pointer;

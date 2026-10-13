@@ -13,7 +13,7 @@
   >
     <div
       v-if="summary"
-      class="grid grid-cols-1 gap-2 rounded-xl border border-border bg-muted p-3 sm:grid-cols-2"
+      class="grid grid-cols-1 gap-2 rounded-panel border border-border bg-muted p-3 sm:grid-cols-2"
     >
       <div class="min-w-0">
         <div class="text-admin-caption text-muted-foreground">
@@ -119,7 +119,7 @@
         for="admin-stripe-purchases-enabled"
       >
         <div
-          class="flex min-h-10 items-center justify-between rounded-xl border border-border bg-muted px-3"
+          class="flex min-h-10 items-center justify-between rounded-panel border border-border bg-muted px-3"
         >
           <span class="text-admin-body text-muted-foreground">
             {{ PAYMENTS_MESSAGES.purchasesState(form.values.purchasesEnabled) }}

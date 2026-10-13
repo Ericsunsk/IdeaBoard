@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+  <div class="rounded-panel border border-border bg-card p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
       <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.specsTitle }}</h4>
       <span class="text-admin-caption text-muted-foreground">{{
@@ -29,7 +29,7 @@
               v-for="res in ['1024×1024', '2048×2048', '4096×4096', '128K']"
               :key="res"
               type="button"
-              class="rounded bg-muted px-1.5 py-0.5 text-admin-micro text-muted-foreground hover:bg-muted/80 cursor-pointer"
+              class="rounded-control bg-muted px-1.5 py-0.5 text-admin-micro text-muted-foreground hover:bg-muted/80 cursor-pointer"
               @click="emit('update:contextOrResolution', res)"
             >
               {{ res }}
@@ -42,10 +42,10 @@
           <label class="text-admin-caption font-semibold text-foreground">{{
             MODELS_MESSAGES.specsHostingLabel
           }}</label>
-          <div class="flex h-9 items-center rounded-lg border border-border bg-muted/40 p-1">
+          <div class="flex h-9 items-center rounded-control border border-border bg-muted/40 p-1">
             <button
               type="button"
-              class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
+              class="flex-1 rounded-control py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_CLOUDFLARE
                   ? 'bg-card text-success shadow-xs font-semibold'
@@ -57,7 +57,7 @@
             </button>
             <button
               type="button"
-              class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
+              class="flex-1 rounded-control py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_THIRD_PARTY
                   ? 'bg-card text-foreground shadow-xs font-semibold'
@@ -95,7 +95,7 @@
             v-for="tag in MODELS_MESSAGES.specsPopularCapabilities"
             :key="tag"
             type="button"
-            class="rounded-md border border-dashed border-border px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:border-primary-line-strong hover:text-primary cursor-pointer"
+            class="rounded-control border border-dashed border-border px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:border-primary-line-strong hover:text-primary cursor-pointer"
             @click="addCapabilityTag(tag)"
           >
             + {{ tag }}

@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+  <div class="rounded-panel border border-border bg-card p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
       <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.identityTitle }}</h4>
       <span class="text-admin-caption text-muted-foreground">{{
@@ -37,7 +37,7 @@
             v-for="prefix in idPrefixOptions"
             :key="prefix"
             type="button"
-            class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary-line-strong hover:bg-primary-faint-soft hover:text-primary cursor-pointer"
+            class="rounded-control border border-border bg-muted/50 px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary-line-strong hover:bg-primary-faint-soft hover:text-primary cursor-pointer"
             @click="applyPrefix(prefix)"
           >
             {{ prefix }}
@@ -75,7 +75,7 @@
             v-for="p in providerOptions"
             :key="p.slug"
             type="button"
-            class="rounded px-1.5 py-0.5 text-admin-micro font-medium transition-colors cursor-pointer"
+            class="rounded-control px-1.5 py-0.5 text-admin-micro font-medium transition-colors cursor-pointer"
             :class="
               modelProvider === p.display_name
                 ? 'bg-primary text-primary-foreground font-semibold'

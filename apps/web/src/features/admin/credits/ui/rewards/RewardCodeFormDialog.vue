@@ -51,7 +51,7 @@
           />
           <AdminButton
             variant="outline"
-            class="aspect-square shrink-0 !rounded-lg !p-0 flex items-center justify-center"
+            class="aspect-square shrink-0 !rounded-control !p-0 flex items-center justify-center"
             :disabled="pending"
             :aria-label="
               isEditing ? t('admin.rewardCode.generateNew') : t('admin.rewardCode.regenerate')
@@ -137,7 +137,7 @@
               v-for="preset in expirationPresets"
               :key="preset.label"
               type="button"
-              class="rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors"
+              class="rounded-control px-2.5 py-1 text-xs font-semibold transition-colors"
               :class="
                 isPresetActive(preset.days)
                   ? 'bg-primary text-primary-foreground shadow-xs'

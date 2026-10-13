@@ -1,7 +1,7 @@
 <template>
   <div
     class="workflow-node-header"
-    :class="{ 'rounded-t-xl': isRounded, 'is-active': isActive, 'is-copy-mode': isCopyMode }"
+    :class="{ 'rounded-t-overlay': isRounded, 'is-active': isActive, 'is-copy-mode': isCopyMode }"
     @mousedown="onHeaderMouseDown"
   >
     <div class="node-header-title">

@@ -54,13 +54,9 @@
   --primitive-blue-600: #2563eb;
 
   /* ── Radii Scale ── */
-  --primitive-radius-xs: 2px;
-  --primitive-radius-sm: 4px;
-  --primitive-radius-md: 6px;
-  --primitive-radius-lg: 8px;
-  --primitive-radius-xl: 12px;
-  --primitive-radius-2xl: 16px;
-  --primitive-radius-3xl: 20px;
+  --primitive-radius-8: 8px;
+  --primitive-radius-12: 12px;
+  --primitive-radius-16: 16px;
   --primitive-radius-pill: 9999px;
 
   /* ── Elevation Shadows ── */
@@ -193,8 +189,6 @@
   --primitive-size-24: 24px;
   --primitive-size-44: 44px;
   --primitive-blur-12: 12px;
-  --primitive-radius-base: 0.625rem;
-  --primitive-radius-rounded: 999px;
   --primitive-size-3: 3px;
   /* Inter's Latin face is declared in type.css; CJK uses the platform fallback chain. */
   --primitive-font-inter-variable:

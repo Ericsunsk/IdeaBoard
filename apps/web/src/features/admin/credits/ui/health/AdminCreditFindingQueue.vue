@@ -7,7 +7,7 @@
           {{ CREDIT_HEALTH_MESSAGES.queueTitle }}
         </div>
         <div
-          class="inline-flex items-center rounded-lg border border-border bg-muted p-0.5"
+          class="inline-flex items-center rounded-control border border-border bg-muted p-0.5"
           role="group"
           :aria-label="CREDIT_HEALTH_MESSAGES.queueViewAria"
         >
@@ -15,7 +15,7 @@
             v-for="opt in statusOptions"
             :key="opt.value"
             type="button"
-            class="rounded-md px-3 py-1 text-xs font-semibold transition-colors cursor-pointer"
+            class="rounded-control px-3 py-1 text-xs font-semibold transition-colors cursor-pointer"
             :class="
               status === opt.value
                 ? 'bg-card text-foreground shadow-xs'
@@ -91,7 +91,7 @@
           <template #body="{ data }">
             <button
               type="button"
-              class="group block max-w-[34rem] rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary cursor-pointer"
+              class="group block max-w-[34rem] rounded-control text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary cursor-pointer"
               :aria-label="
                 CREDIT_HEALTH_MESSAGES.queueViewDiagnosis(
                   getFindingTypePresentation(data.finding_type).title,
@@ -279,7 +279,7 @@
           <div
             v-for="entry in detailEntries"
             :key="entry.key"
-            class="min-w-0 rounded-lg border border-border bg-muted/50 px-3 py-2.5"
+            class="min-w-0 rounded-control border border-border bg-muted/50 px-3 py-2.5"
           >
             <dt class="text-admin-caption font-bold text-muted-foreground">
               {{ entry.key }}
@@ -299,7 +299,7 @@
       <section class="min-w-0">
         <div class="text-admin-caption font-bold text-muted-foreground">Fingerprint</div>
         <div
-          class="mt-2 break-all rounded-lg border border-border bg-muted/50 px-3 py-2.5 font-mono text-admin-caption leading-5 text-muted-foreground"
+          class="mt-2 break-all rounded-control border border-border bg-muted/50 px-3 py-2.5 font-mono text-admin-caption leading-5 text-muted-foreground"
         >
           {{ selectedFinding.fingerprint }}
         </div>

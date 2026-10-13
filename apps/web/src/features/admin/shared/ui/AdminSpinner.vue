@@ -4,7 +4,7 @@
     :aria-label="ariaLabel"
     :class="
       cn(
-        'inline-block size-6 animate-spin rounded-full border-2 border-current border-t-transparent text-primary',
+        'inline-block size-6 animate-spin rounded-pill border-2 border-current border-t-transparent text-primary',
         props.class,
       )
     "

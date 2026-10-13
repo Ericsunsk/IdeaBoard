@@ -7,7 +7,7 @@
         <button
           type="button"
           aria-label="切换导航菜单"
-          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted lg:hidden"
+          class="flex size-9 shrink-0 items-center justify-center rounded-control border border-border text-foreground transition-colors hover:bg-muted lg:hidden"
           @click="drawerOpen = !drawerOpen"
         >
           <MenuIcon v-if="!drawerOpen" class="size-5" />
@@ -49,7 +49,7 @@
               <BellIcon class="size-4" />
               <span
                 v-if="hasAnomalies"
-                class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-destructive ring-2 ring-card"
+                class="absolute top-[7px] right-[7px] size-2.5 rounded-pill bg-destructive ring-2 ring-card"
                 aria-hidden="true"
               ></span>
             </button>
@@ -78,11 +78,11 @@
                   v-for="item in anomalies"
                   :key="item.id"
                   type="button"
-                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted"
+                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-panel px-3 py-3 text-left transition-colors hover:bg-muted"
                   @click="handleAnomalySelect(item)"
                 >
                   <span
-                    class="mt-[7px] size-2 shrink-0 rounded-full bg-destructive"
+                    class="mt-[7px] size-2 shrink-0 rounded-pill bg-destructive"
                     aria-hidden="true"
                   ></span>
                   <span class="min-w-0 flex-1">
@@ -188,10 +188,10 @@ const { anomalies, anomalyCount, hasAnomalies } = useAnomalyRadar({
 })
 
 const notificationButtonClass =
-  'relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted'
+  'relative flex size-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted'
 const userAvatarButtonClass =
-  'relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted cursor-pointer'
-const userAvatarImageClass = 'size-6 rounded-full object-cover'
+  'relative flex size-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted cursor-pointer'
+const userAvatarImageClass = 'size-6 rounded-pill object-cover'
 const userAvatarPlaceholderClass =
   'flex size-full items-center justify-center text-muted-foreground'
 const userAvatarIconClass = 'size-4'

@@ -33,7 +33,7 @@
         <!-- 重新探测按钮 -->
         <button
           type="button"
-          class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
+          class="inline-flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
           :disabled="loading"
           @click="loadDetectedModels"
         >
@@ -84,7 +84,7 @@
         <!-- 紧凑 Checkbox 列表表格 -->
         <div
           v-else-if="!error"
-          class="max-h-[380px] overflow-y-auto rounded-lg border border-border bg-card"
+          class="max-h-[380px] overflow-y-auto rounded-panel border border-border bg-card"
         >
           <table class="w-full text-left text-xs border-collapse">
             <thead
@@ -94,7 +94,7 @@
                 <th class="w-10 px-3 py-2.5 text-center">
                   <input
                     type="checkbox"
-                    class="size-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                    class="size-3.5 rounded-control border-input text-primary focus:ring-primary cursor-pointer"
                     :checked="isAllSelected"
                     :indeterminate="isIndeterminate"
                     :disabled="availableFilteredCount === 0"
@@ -122,7 +122,7 @@
                 <td class="w-10 px-3 py-2.5 text-center" @click.stop>
                   <input
                     type="checkbox"
-                    class="size-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
+                    class="size-3.5 rounded-control border-input text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
                     :checked="selectedModelIds.has(model.id)"
                     :disabled="isModelExisting(model.id)"
                     :aria-label="MODELS_MESSAGES.addSelectAria(model.name || model.id)"
@@ -134,7 +134,7 @@
                 <td class="px-3 py-2.5">
                   <div class="flex items-center gap-2.5 min-w-0">
                     <div
-                      class="flex size-6 shrink-0 items-center justify-center rounded-md overflow-hidden"
+                      class="flex size-6 shrink-0 items-center justify-center rounded-control overflow-hidden"
                       :class="
                         rowBrandLogo(model)
                           ? 'bg-muted/60 border border-border/60'
@@ -165,7 +165,7 @@
                 <!-- 供应商 -->
                 <td class="px-3 py-2.5">
                   <span
-                    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-admin-caption font-medium"
+                    class="inline-flex items-center rounded-control px-1.5 py-0.5 text-admin-caption font-medium"
                     :class="modelProviderBadgeClass(model.provider)"
                   >
                     {{ model.provider }}
@@ -176,20 +176,20 @@
                 <td class="px-3 py-2.5 text-right">
                   <span
                     v-if="isModelExisting(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
+                    class="inline-flex items-center gap-1 rounded-pill bg-muted px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
                   >
                     {{ MODELS_MESSAGES.addExisting }}
                   </span>
                   <span
                     v-else-if="selectedModelIds.has(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-primary-faint px-2 py-0.5 text-admin-micro font-medium text-primary"
+                    class="inline-flex items-center gap-1 rounded-pill bg-primary-faint px-2 py-0.5 text-admin-micro font-medium text-primary"
                   >
                     <Check class="size-3" />
                     {{ MODELS_MESSAGES.addSelected }}
                   </span>
                   <span
                     v-else
-                    class="inline-flex items-center rounded-full bg-muted/40 px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
+                    class="inline-flex items-center rounded-pill bg-muted/40 px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
                   >
                     {{ MODELS_MESSAGES.addNotAdded }}
                   </span>

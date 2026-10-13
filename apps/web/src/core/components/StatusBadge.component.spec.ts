@@ -3,7 +3,7 @@ import { render, screen } from '../../test/render'
 import StatusBadge, { type AppStatusTone } from './StatusBadge.vue'
 
 // Tone pins mirror the operational status contract: Badge carrier
-// (rounded-full/inline-flex/border) + canonical semantic tone + dot color.
+// (rounded-pill/inline-flex/border) + canonical semantic tone + dot color.
 // Pulse breathes by default only on success/warning (processing signal).
 const tonePins: Array<{
   tone: AppStatusTone
@@ -49,7 +49,7 @@ describe('StatusBadge', () => {
 
     const label = screen.getByText(`status-${pin.tone}`)
     const root = label.parentElement!
-    expect(root).toHaveClass('inline-flex', 'rounded-full', 'border')
+    expect(root).toHaveClass('inline-flex', 'rounded-pill', 'border')
     for (const cls of pin.classes) {
       expect(root).toHaveClass(cls)
     }

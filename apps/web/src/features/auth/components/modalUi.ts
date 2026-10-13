@@ -11,7 +11,7 @@ export const authDialogContentClass =
   'w-[min(390px,calc(100vw-32px))] overflow-visible border-0 bg-transparent p-0 shadow-none'
 
 const authModalShellBaseClass =
-  'relative overflow-hidden rounded-[20px] border border-[var(--color-auth-shell-border)] bg-[var(--color-auth-shell)] backdrop-blur-xl px-5 text-[var(--color-auth-text)] shadow-auth-shell sm:px-7'
+  'relative overflow-hidden rounded-overlay border border-[var(--color-auth-shell-border)] bg-[var(--color-auth-shell)] backdrop-blur-xl px-5 text-[var(--color-auth-text)] shadow-auth-shell sm:px-7'
 
 export const authModalShellClass = `${authModalShellBaseClass} py-6 sm:py-7`
 
@@ -41,7 +41,7 @@ export const authPrimaryButtonClass =
   'control-state auth-primary-action [--control-hover-transform:scale(1.008)] [--control-active-transform:scale(0.99)] [--control-disabled-opacity:0.7] mt-1 inline-flex h-[42px] w-full cursor-pointer items-center justify-center rounded-control border-0 bg-gradient-to-r from-[var(--color-auth-primary-from)] to-[var(--color-auth-primary-to)] px-6 text-admin-content font-semibold text-[var(--color-auth-primary-text)] shadow-auth-primary transition-[transform,box-shadow,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-auth-primary-hover hover:opacity-90'
 
 export const authSocialIconButtonClass =
-  'control-state [--control-active-transform:scale(0.99)] [--control-disabled-opacity:0.7] inline-flex h-10 w-full items-center justify-center rounded-[10px] border border-border bg-card p-0 shadow-none outline-none transition-[border-color,background-color,box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-input focus-visible:border-ring focus-visible:bg-card focus-visible:ring-1 focus-visible:ring-ring disabled:bg-muted'
+  'control-state [--control-active-transform:scale(0.99)] [--control-disabled-opacity:0.7] inline-flex h-10 w-full items-center justify-center rounded-control border border-border bg-card p-0 shadow-none outline-none transition-[border-color,background-color,box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-input focus-visible:border-ring focus-visible:bg-card focus-visible:ring-1 focus-visible:ring-ring disabled:bg-muted'
 
 export const authFooterClass =
   'relative z-[1] text-center text-admin-meta text-[var(--color-auth-muted)]'

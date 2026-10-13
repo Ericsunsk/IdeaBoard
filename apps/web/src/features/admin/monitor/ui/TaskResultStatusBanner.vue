@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="task.status === adminTaskStatuses.failed"
-    class="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive"
+    class="flex items-start gap-2 rounded-panel border border-destructive/20 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive"
     role="alert"
   >
     <WarningTriangle class="mt-0.5 size-3.5 shrink-0" />
@@ -10,7 +10,7 @@
         <span class="font-semibold">{{ MONITOR_MESSAGES.detailFailedTitle }}</span>
         <button
           type="button"
-          class="h-5 cursor-pointer rounded border border-destructive/30 px-1.5 text-admin-caption font-medium text-destructive transition-colors hover:bg-destructive/10"
+          class="h-5 cursor-pointer rounded-control border border-destructive/30 px-1.5 text-admin-caption font-medium text-destructive transition-colors hover:bg-destructive/10"
           @click="$emit('retry')"
         >
           {{ MONITOR_MESSAGES.retry }}
@@ -24,7 +24,7 @@
 
   <div
     v-else-if="task.status === adminTaskStatuses.cancelled"
-    class="flex items-start gap-2 rounded-xl border border-border bg-muted p-3 text-xs leading-relaxed text-muted-foreground"
+    class="flex items-start gap-2 rounded-panel border border-border bg-muted p-3 text-xs leading-relaxed text-muted-foreground"
   >
     <WarningTriangle class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
     <div class="flex min-w-0 flex-1 flex-col">
@@ -37,7 +37,7 @@
 
   <div
     v-else
-    class="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3.5 py-2 text-xs"
+    class="flex items-center justify-between rounded-panel border border-border bg-muted/50 px-3.5 py-2 text-xs"
   >
     <div class="flex items-center gap-1.5">
       <span class="text-muted-foreground">{{ MONITOR_MESSAGES.detailDurationLabel }}</span>

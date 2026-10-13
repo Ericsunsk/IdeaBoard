@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminStatusPill, { type AdminStatusPillVariant } from './AdminStatusPill.vue'
 
-// variant → Badge 语义色 pin：Badge 载体类（rounded-full/inline-flex）+
+// variant → Badge 语义色 pin：Badge 载体类（rounded-pill/inline-flex）+
 // admin tone 覆盖类（cn/tailwind-merge 保留后者，压住 badgeVariants 底色）。
 const variantPins: Array<{
   variant: AdminStatusPillVariant
@@ -51,7 +51,7 @@ describe('AdminStatusPill', () => {
     const label = screen.getByText(`pill-${pin.variant}`)
     const root = label.parentElement!
     // shadcn Badge 载体：rounded 来自 Badge rounded 满圆，inline-flex/border 来自 badgeVariants。
-    expect(root).toHaveClass('inline-flex', 'rounded-full', 'border')
+    expect(root).toHaveClass('inline-flex', 'rounded-pill', 'border')
     for (const cls of pin.tone) {
       expect(root).toHaveClass(cls)
     }

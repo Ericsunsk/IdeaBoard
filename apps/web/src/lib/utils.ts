@@ -15,6 +15,9 @@ const isThemeColor = (value: string) =>
 
 const customTwMerge = extendTailwindMerge({
   extend: {
+    theme: {
+      radius: ['control', 'panel', 'overlay', 'pill'],
+    },
     classGroups: {
       'border-color': [{ border: [isThemeColor] }],
       'font-size': [

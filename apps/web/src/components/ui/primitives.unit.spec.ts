@@ -46,7 +46,7 @@ describe('Standard shadcn-vue primitives', () => {
       slots: { default: 'Active' },
     })
     expect(wrapper.text()).toBe('Active')
-    expect(wrapper.classes()).toContain('rounded-full')
+    expect(wrapper.classes()).toContain('rounded-pill')
     expect(wrapper.classes()).toContain('text-emerald-700')
   })
 
@@ -60,7 +60,7 @@ describe('Standard shadcn-vue primitives', () => {
         </Avatar>
       `,
     })
-    expect(wrapper.classes()).toContain('rounded-full')
+    expect(wrapper.classes()).toContain('rounded-pill')
   })
 
   it('renders standard Skeleton component', () => {

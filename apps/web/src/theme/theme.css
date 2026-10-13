@@ -165,7 +165,6 @@
   --color-board-danger-hover: var(--destructive-hover);
   --color-board-dialog-title: var(--color-board-control-input-text);
   --color-board-dialog-description: var(--color-board-page-text-muted);
-  --radius-board-dialog: calc(var(--radius) * 2);
   --shadow-board-focus: 0 0 0 3px var(--color-board-focus-ring);
   --shadow-board-focus-strong: 0 0 0 3px var(--color-board-focus-ring-strong);
   --shadow-board-dialog: var(--primitive-shadow-22-58-soft);
@@ -240,14 +239,11 @@
 
   /* ── shadcn-vue standard theme mappings ─────────────────── */
 
-  /*
-   * Radius roles derive from one master scale; the pill radius is independent.
-   */
-  --radius: var(--primitive-radius-base);
-  --radius-control: calc(var(--radius) * 1);
-  --radius-panel: calc(var(--radius) * 1.4);
-  --radius-overlay: calc(var(--radius) * 1.4);
-  --radius-pill: var(--primitive-radius-rounded);
+  --radius-*: initial;
+  --radius-control: var(--primitive-radius-8);
+  --radius-panel: var(--primitive-radius-12);
+  --radius-overlay: var(--primitive-radius-16);
+  --radius-pill: var(--primitive-radius-pill);
 
   --size-scrollbar: var(--primitive-size-10);
   --size-scrollbar-thumb-inset: var(--primitive-size-3);
@@ -267,14 +263,6 @@
   --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
   --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
   --shadow-auth-focus: 0 0 0 3px var(--color-auth-focus-ring);
-  --radius-xs: calc(var(--radius) * 0.2);
-  --radius-sm: calc(var(--radius) * 0.4);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: calc(var(--radius) * 1.2);
-  --radius-xl: calc(var(--radius) * 1.6);
-  --radius-2xl: calc(var(--radius) * 2);
-  --radius-3xl: calc(var(--radius) * 2.4);
-  --radius-4xl: calc(var(--radius) * 2.8);
 }
 
 /*

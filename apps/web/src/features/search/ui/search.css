@@ -1,6 +1,5 @@
 /* Search owns its visual tokens and controls; app tokens only provide shared surface semantics. */
 :root {
-  --search-card-radius: 16px;
   --search-overlay-btn-size: 28px;
   --search-dock-height: 44px;
   /* Image overlay action fills source the app overlay-btn tokens; the local

@@ -1,5 +1,7 @@
 <template>
-  <div class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-background">
+  <div
+    class="flex w-full flex-col overflow-hidden rounded-panel border border-border bg-background"
+  >
     <!-- 表头：带外层边框，底色同页面背景 (bg-background) -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
       <!-- 标题 Events + ℹ 提示图标 -->
@@ -7,7 +9,7 @@
         <span class="text-sm font-bold text-foreground">Events</span>
         <span
           :title="MONITOR_MESSAGES.eventsInfoTitle"
-          class="flex size-4 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+          class="flex size-4 cursor-pointer items-center justify-center rounded-pill text-muted-foreground hover:text-foreground"
         >
           <InfoCircle class="size-3.5" />
         </span>
@@ -22,7 +24,7 @@
           :class="[
             // 20px pills sit in a dense rail; `hit-target-32-inline` grows each
             // target to the repo floor vertically without loosening the row.
-            'hit-target-32-inline inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors px-2 py-0.5 rounded',
+            'hit-target-32-inline inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors px-2 py-0.5 rounded-control',
             filterStatus === metric.status
               ? metric.activePillClass
               : 'text-muted-foreground hover:text-foreground',
@@ -30,7 +32,7 @@
           :title="metric.pillTitle"
           @click="emit('toggleFilterStatus', metric.status)"
         >
-          <span :class="['size-2 rounded-full', metric.dotClass]"></span>
+          <span :class="['size-2 rounded-pill', metric.dotClass]"></span>
           <span>{{ metric.getCount(metricStatsSnapshot) }} {{ metric.label }}</span>
         </button>
 
@@ -51,7 +53,7 @@
     <!-- 表身：白色卡片 (bg-white)，撑满卡片下方，衔接处圆角与边框分界 -->
     <div
       v-show="!chartsCollapsed"
-      class="w-full rounded-t-xl border-t border-border bg-card px-4 py-3"
+      class="w-full rounded-t-panel border-t border-border bg-card px-4 py-3"
       :style="{ height: `${chartHeightPx}px` }"
     >
       <ChartRenderer

@@ -5,7 +5,7 @@ import { render, screen } from '../../test/render'
 import ActionButton from './ActionButton.vue'
 
 // Shared action size keeps the migrated controls' dimensions and typography.
-const actionChrome = ['h-9', 'rounded-lg', 'px-3', 'text-admin-meta']
+const actionChrome = ['h-9', 'rounded-control', 'px-3', 'text-admin-meta']
 
 describe('ActionButton', () => {
   it('applies the shared action chrome at small size by default', () => {

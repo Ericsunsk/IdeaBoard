@@ -11,7 +11,7 @@
         // and easing (never stack a transition/duration/ease utility on top:
         // its utilities-layer default would shadow the token); the property
         // list stays explicit and includes opacity so disabled fades smoothly.
-        'hit-target-32 peer control-state inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent [transition-property:background-color,border-color,color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input',
+        'hit-target-32 peer control-state inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-pill border-2 border-transparent [transition-property:background-color,border-color,color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input',
         props.class,
       )
     "
@@ -20,7 +20,7 @@
     <SwitchThumb
       :class="
         cn(
-          'pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
+          'pointer-events-none block size-4 rounded-pill bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
         )
       "
     />

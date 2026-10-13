@@ -1,11 +1,11 @@
 <template>
-  <section class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-2xs">
+  <section class="flex flex-col gap-4 rounded-panel border border-border bg-card p-5 shadow-2xs">
     <div class="flex items-center justify-between border-b border-border pb-3">
       <div class="flex items-center gap-2">
         <!-- Tab 圆点对齐 Pill 语义色：grant/refund 走 success（与 getCreditCommandVariant
              一致），deduction 走 destructive；refund 不再用 warning。 -->
         <span
-          class="size-2 rounded-full"
+          class="size-2 rounded-pill"
           :class="activeTab === 'deduction' ? 'bg-destructive' : 'bg-success'"
         />
         <h3 class="m-0 text-admin-title-sm font-bold text-foreground">
@@ -31,7 +31,7 @@
 
     <div
       v-if="activeTab === 'refund' && refundSource"
-      class="flex items-center gap-2 rounded-xl border border-primary-line bg-primary-faint px-3.5 py-2.5 text-xs text-primary font-mono"
+      class="flex items-center gap-2 rounded-panel border border-primary-line bg-primary-faint px-3.5 py-2.5 text-xs text-primary font-mono"
     >
       <span>{{
         t('admin.wallet.originalChargeNotice', {

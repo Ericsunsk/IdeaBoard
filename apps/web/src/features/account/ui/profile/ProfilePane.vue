@@ -19,7 +19,7 @@
                 v-if="userStore.user?.avatar"
                 :src="userStore.user.avatar"
                 :alt="userStore.user.display_name"
-                class="rounded-full object-cover"
+                class="rounded-pill object-cover"
               />
               <AvatarFallback
                 class="bg-primary text-admin-summary-value font-bold text-primary-foreground sm:text-[34px]"

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "2709113da3784d287022aa693e8847be11a267fc",
+  "checkpointSha": "3f212c0eabfc5dd35c1dfcf8c83f336970196534",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -10156,6 +10156,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10557,7 +10562,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 122,
+      "fanIn": 123,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -10626,7 +10631,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "targetFanIn": 122,
+      "targetFanIn": 123,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -16674,6 +16679,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -16724,7 +16734,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 119,
+      "fanIn": 120,
       "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -17223,6 +17233,11 @@
         {
           "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
@@ -17974,7 +17989,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "targetFanIn": 119,
+      "targetFanIn": 120,
       "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -22725,6 +22740,26 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -23980,6 +24015,26 @@
         {
           "from": "src/features/board/ui/gallery/BoardCard.vue",
           "to": "src/components/ui/dropdown-menu/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -38908,6 +38963,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -38933,7 +38998,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 10,
       "fanOut": 3,
       "fanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
@@ -38960,7 +39025,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "targetFanIn": 8,
+      "targetFanIn": 10,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,

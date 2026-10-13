@@ -1,10 +1,10 @@
 <template>
-  <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+  <div class="rounded-panel border border-border bg-card p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
       <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.referenceTitle }}</h4>
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:text-primary cursor-pointer disabled:opacity-50"
+        class="inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:text-primary cursor-pointer disabled:opacity-50"
         :disabled="loading || !hasIdentity || isFal"
         @click="refreshReference"
       >
@@ -42,7 +42,7 @@
       <!-- provider logo：本地品牌资产解析（经后端 brand-logo-overrides 生效覆盖），不请求 models.dev 任何域 -->
       <div class="flex items-center gap-2.5">
         <div
-          class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+          class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-control"
           :class="
             brandLogo ? 'border border-border/60 bg-muted/60' : 'bg-primary-faint text-primary'
           "
@@ -66,7 +66,7 @@
           </span>
         </div>
         <span
-          class="ml-auto inline-flex shrink-0 items-center rounded bg-muted px-1.5 py-0.5 text-admin-micro font-medium text-muted-foreground"
+          class="ml-auto inline-flex shrink-0 items-center rounded-control bg-muted px-1.5 py-0.5 text-admin-micro font-medium text-muted-foreground"
         >
           source: {{ snapshot.source }}
         </span>
@@ -78,21 +78,21 @@
       </p>
 
       <div v-else class="flex flex-col gap-2 text-xs">
-        <div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+        <div class="flex items-center justify-between rounded-panel bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.referencePricingLabel }}</span>
           <span class="font-medium text-foreground">
             {{ pricingText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
-        <div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+        <div class="flex items-center justify-between rounded-panel bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.referenceContextLabel }}</span>
           <span class="font-medium text-foreground">
             {{ contextText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
-        <div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+        <div class="flex items-center justify-between rounded-panel bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.referenceUpdatedLabel }}</span>
           <span class="font-mono text-admin-caption text-foreground">
             {{ snapshot.lastUpdated || MODELS_MESSAGES.referenceUnknown }}
@@ -104,7 +104,7 @@
              只读展示，参照 name 仅作标题，永不回写表单 description
             （网关侧运营文案优先）。 -->
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-panel bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceCapabilitiesTitle"
         >
           <span class="shrink-0 text-muted-foreground">{{
@@ -128,7 +128,7 @@
         </div>
 
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-panel bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceModalitiesTitle"
         >
           <span class="shrink-0 text-muted-foreground">{{
@@ -140,7 +140,7 @@
         </div>
 
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-panel bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceReleaseTitle"
         >
           <span class="shrink-0 text-muted-foreground">{{
@@ -152,7 +152,7 @@
         </div>
 
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-panel bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceFamilyTitle"
         >
           <span class="shrink-0 text-muted-foreground">{{
@@ -165,7 +165,7 @@
 
         <!-- 上游状态：deprecated 红色预警，beta 普通徽标；缺失即无预警，绝不误报。 -->
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-panel bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceStatusTitle"
         >
           <span class="shrink-0 text-muted-foreground">{{

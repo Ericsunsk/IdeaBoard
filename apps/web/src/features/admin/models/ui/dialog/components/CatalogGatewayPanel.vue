@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-xl border border-border bg-muted/20 p-4">
+  <div class="rounded-panel border border-border bg-muted/20 p-4">
     <button
       type="button"
       class="flex w-full items-center justify-between text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
@@ -37,7 +37,7 @@
             v-for="pathOpt in commonGatewayPaths"
             :key="pathOpt"
             type="button"
-            class="rounded bg-card border border-border px-1.5 py-0.5 text-admin-micro text-muted-foreground hover:text-primary cursor-pointer"
+            class="rounded-control bg-card border border-border px-1.5 py-0.5 text-admin-micro text-muted-foreground hover:text-primary cursor-pointer"
             @click="emit('update:customPath', pathOpt)"
           >
             {{ pathOpt }}

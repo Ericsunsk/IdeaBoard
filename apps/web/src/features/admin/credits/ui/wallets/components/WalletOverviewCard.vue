@@ -1,6 +1,6 @@
 <template>
   <section
-    class="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4.5 shadow-2xs"
+    class="flex flex-col gap-3.5 rounded-panel border border-border bg-card p-4.5 shadow-2xs"
     :aria-label="t('admin.wallet.overviewAria')"
   >
     <div class="flex flex-wrap items-center justify-between gap-4">
@@ -16,7 +16,7 @@
             </span>
             <span
               v-if="reservedCredits && reservedCredits > 0"
-              class="rounded-md bg-warning-soft px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-warning"
+              class="rounded-control bg-warning-soft px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-warning"
             >
               {{ t('admin.wallet.reservedAmount', { amount: formatIdeaAmount(reservedCredits) }) }}
             </span>
@@ -63,7 +63,7 @@
     <!-- 限制与冻结状态提示条 -->
     <div
       v-if="activeRestrictions.length"
-      class="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft p-3 text-xs"
+      class="flex items-start gap-2 rounded-panel border border-warning/30 bg-warning-soft p-3 text-xs"
     >
       <WarningTriangle class="size-4 shrink-0 text-warning mt-0.5" />
       <div class="flex flex-col gap-1">

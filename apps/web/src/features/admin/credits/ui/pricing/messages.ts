@@ -8,7 +8,6 @@
 export const BILLING_PRICING_MESSAGES = {
   searchLabel: '搜索定价功能',
   searchPlaceholder: '搜索功能名称或 SKU...',
-  filterLabel: '筛选功能状态',
   refresh: '刷新功能定价',
   billingCount: (count: number) => `共 ${count} 个计费功能`,
   totalCount: (count: number) => `(共 ${count} 个)`,
@@ -18,13 +17,8 @@ export const BILLING_PRICING_MESSAGES = {
   emptyNone: '暂无可定价功能',
   emptyNoMatch: '未找到匹配的计费功能',
   emptyNoneHint: '当前没有已注册的可计费功能 SKU。',
-  emptyNoMatchHint: '未找到符合当前搜索或筛选条件的功能。请尝试调整关键词或清空筛选。',
-  clearFilters: '清空筛选条件',
-  statusAll: '全部状态',
-  statusActive: '生效中',
-  statusUnpriced: '未定价',
-  statusDisabled: '已停用',
-  statusArchived: '已归档',
+  emptyNoMatchHint: '未找到符合当前搜索条件的功能。请尝试调整关键词或清空搜索。',
+  clearFilters: '清空搜索',
   retryLater: '请稍后重试。',
   deleteTitle: '删除已归档功能',
   deleteMessage: (displayName: string) =>

@@ -29,6 +29,7 @@
     "color-hex-length": null,
     "comment-empty-line-before": null,
     "custom-property-empty-line-before": null,
+    "custom-property-pattern": "^(?:([a-z][a-z0-9]*)(-[a-z0-9]+)*|radius-\\*)$",
     "declaration-block-no-redundant-longhand-properties": null,
     "declaration-empty-line-before": null,
     "font-family-name-quotes": null,

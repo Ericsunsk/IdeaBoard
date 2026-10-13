@@ -4,7 +4,7 @@
       cn(
         plain
           ? 'flex flex-col gap-3.5'
-          : 'break-inside-avoid overflow-hidden rounded-xl border border-border bg-card text-foreground transition-colors',
+          : 'break-inside-avoid overflow-hidden rounded-panel border border-border bg-card text-foreground transition-colors',
         props.class,
       )
     "
@@ -42,7 +42,7 @@
       :class="
         cn(
           plain
-            ? 'flex flex-col gap-4 rounded-xl border border-border bg-card p-5'
+            ? 'flex flex-col gap-4 rounded-panel border border-border bg-card p-5'
             : 'flex flex-col gap-3.5 p-5',
         )
       "

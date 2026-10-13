@@ -12,12 +12,12 @@
     </template>
 
     <div class="flex flex-col gap-3.5">
-      <div class="relative overflow-hidden rounded-xl bg-muted p-2">
+      <div class="relative overflow-hidden rounded-panel bg-muted p-2">
         <Cropper
           v-if="sourceURL"
           ref="cropperRef"
-          class="h-[340px] max-h-[52vh] min-h-[260px] w-full overflow-hidden rounded-lg bg-white"
-          boundaries-class="overflow-hidden rounded-lg"
+          class="h-[340px] max-h-[52vh] min-h-[260px] w-full overflow-hidden rounded-control bg-white"
+          boundaries-class="overflow-hidden rounded-control"
           :canvas="true"
           :src="sourceURL"
           :stencil-props="logoStencilProps"
@@ -27,12 +27,12 @@
           @error="handleCropperError"
         />
         <div
-          class="absolute bottom-3 left-3 flex items-center gap-1 rounded-md border border-border/80 bg-white/90 p-1 backdrop-blur"
+          class="absolute bottom-3 left-3 flex items-center gap-1 rounded-control border border-border/80 bg-white/90 p-1 backdrop-blur"
         >
           <AdminButton
             variant="ghost"
             size="icon"
-            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
+            :class="[adminTextButtonClass, '!size-8 !p-0']"
             aria-label="缩小"
             title="缩小"
             :disabled="isProcessing"
@@ -45,7 +45,7 @@
           <AdminButton
             variant="ghost"
             size="icon"
-            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
+            :class="[adminTextButtonClass, '!size-8 !p-0']"
             aria-label="放大"
             title="放大"
             :disabled="isProcessing"
@@ -58,7 +58,7 @@
           <AdminButton
             variant="ghost"
             size="icon"
-            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
+            :class="[adminTextButtonClass, '!size-8 !p-0']"
             aria-label="向左旋转"
             title="向左旋转"
             :disabled="isProcessing"
@@ -71,7 +71,7 @@
           <AdminButton
             variant="ghost"
             size="icon"
-            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
+            :class="[adminTextButtonClass, '!size-8 !p-0']"
             aria-label="重置"
             title="重置"
             :disabled="isProcessing"

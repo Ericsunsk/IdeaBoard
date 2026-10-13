@@ -11,7 +11,7 @@
     <template #header>
       <div class="flex items-center gap-3">
         <div
-          class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-admin-title-sm font-bold text-primary select-none shadow-2xs"
+          class="flex size-10 shrink-0 items-center justify-center rounded-control border border-border bg-muted text-admin-title-sm font-bold text-primary select-none shadow-2xs"
         >
           {{ (user.displayName || 'U').substring(0, 1).toUpperCase() }}
         </div>
@@ -44,14 +44,14 @@
       <div class="flex items-center justify-between">
         <div
           :aria-label="t('admin.wallet.actionPanelAria')"
-          class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-1 text-xs"
+          class="inline-flex items-center rounded-control border border-border bg-muted/50 p-1 text-xs"
         >
           <button
             v-for="opt in walletTabOptions"
             :key="opt.value"
             type="button"
             :aria-pressed="activeTab === opt.value"
-            class="rounded-md px-3 py-1 font-medium transition-colors cursor-pointer"
+            class="rounded-control px-3 py-1 font-medium transition-colors cursor-pointer"
             :class="
               activeTab === opt.value
                 ? 'bg-card text-foreground font-semibold shadow-xs'

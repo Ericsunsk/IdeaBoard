@@ -22,7 +22,7 @@
       }}</ActionButton>
     </div>
 
-    <div class="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+    <div class="flex flex-col gap-3 rounded-panel border border-border bg-card p-5">
       <div v-if="query.isPending.value" class="flex items-center gap-2" role="status">
         <AdminSpinner class="size-4" :aria-label="M.settingsLoading" />
         <span class="text-admin-body text-muted-foreground">{{ M.settingsLoading }}</span>

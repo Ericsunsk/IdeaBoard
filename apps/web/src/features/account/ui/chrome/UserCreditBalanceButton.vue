@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="balance.status === 'anonymous'"
-    class="page-chrome-surface inline-flex size-[var(--page-chrome-control-size,40px)] shrink-0 items-center justify-center rounded-full select-none"
+    class="page-chrome-surface inline-flex size-[var(--page-chrome-control-size,40px)] shrink-0 items-center justify-center rounded-pill select-none"
     :title="balance.ariaLabel"
     :aria-label="balance.ariaLabel"
   >
@@ -47,7 +47,7 @@ defineProps<{
   padding: 0 13px 0 11px;
   flex: none;
   overflow: hidden;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   color: var(--foreground);
   cursor: pointer;
   appearance: none;

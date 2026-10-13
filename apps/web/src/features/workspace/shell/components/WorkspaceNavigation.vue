@@ -1,6 +1,6 @@
 <template>
   <nav
-    class="page-chrome-surface static top-0 left-1/2 order-3 mt-4 flex h-[var(--page-chrome-control-size,40px)] w-full translate-x-0 items-center rounded-full p-1 md:absolute md:order-none md:mt-0 md:w-max md:-translate-x-1/2"
+    class="page-chrome-surface static top-0 left-1/2 order-3 mt-4 flex h-[var(--page-chrome-control-size,40px)] w-full translate-x-0 items-center rounded-pill p-1 md:absolute md:order-none md:mt-0 md:w-max md:-translate-x-1/2"
     :aria-label="t('common.navigation.workspaceNavigation')"
   >
     <RouterLink
@@ -57,7 +57,7 @@ const authOverlay = useAuthOverlay()
 const isWorkspaceNavigationPending = ref(false)
 const isWorkspaceActive = computed(() => route.path === USER_BOARDS_PATH)
 const navigationItemClass =
-  'flex h-full min-h-8 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-3 text-admin-body leading-none font-medium no-underline transition-[background-color,color] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1 md:flex-none'
+  'flex h-full min-h-8 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-pill border border-transparent px-3 text-admin-body leading-none font-medium no-underline transition-[background-color,color] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1 md:flex-none'
 
 const navigationItems = computed(
   () =>

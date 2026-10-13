@@ -21,7 +21,7 @@
           <AdminMono
             v-for="resolution in entry.resolutions"
             :key="resolution"
-            class="rounded bg-muted px-1 py-px text-admin-caption font-medium text-muted-foreground"
+            class="rounded-control bg-muted px-1 py-px text-admin-caption font-medium text-muted-foreground"
           >
             {{ resolution.toUpperCase() }}
           </AdminMono>

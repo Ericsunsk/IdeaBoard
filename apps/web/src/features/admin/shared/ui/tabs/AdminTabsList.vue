@@ -3,7 +3,7 @@
     v-bind="$attrs"
     :class="
       cn(
-        'inline-flex h-9 items-center justify-start rounded-lg border border-border bg-muted p-1 text-muted-foreground',
+        'inline-flex h-9 items-center justify-start rounded-control border border-border bg-muted p-1 text-muted-foreground',
         props.class,
       )
     "

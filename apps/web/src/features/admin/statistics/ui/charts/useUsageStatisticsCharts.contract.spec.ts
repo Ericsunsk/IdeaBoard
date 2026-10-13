@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
+import { useTheme } from '../../../../../theme/composables/useTheme'
+import { adminThemeTokenFallbacks } from '../../../shared'
 import { GetAdminStatisticsRange, type AdminStatistics } from '../../session/resource'
 import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'
 
@@ -10,11 +12,34 @@ describe('useUsageStatisticsCharts', () => {
   })
 
   afterEach(() => {
+    useTheme().setTheme('light')
     vi.useRealTimers()
   })
 
+  it('updates chart line colors when switching from dark to light without changing data', async () => {
+    const { setTheme } = useTheme()
+    setTheme('dark')
+    await nextTick()
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    const charts = makeCharts({
+      adminStatistics: ref(null),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    })
+    const darkOptions = charts.trendChartOptions.value
+    expect(darkOptions.scales?.x).toMatchObject({ border: { color: '#3f3f46' } })
+
+    setTheme('light')
+    await nextTick()
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(charts.trendChartOptions.value.scales?.x).toMatchObject({
+      border: { color: adminThemeTokenFallbacks.chartAxisLine },
+    })
+    expect(charts.trendChartOptions.value).not.toBe(darkOptions)
+  })
+
   it('keeps null statistics as stable zero and empty chart view-models', () => {
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(null),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -31,6 +56,36 @@ describe('useUsageStatisticsCharts', () => {
     expect(readDataset(charts.qualityTrendChartData.value, 'Success').data).toEqual(
       Array(7).fill(0),
     )
+  })
+
+  it('keeps periods and data isolated between trends and overview', () => {
+    const overviewStatistics = ref(makeStatistics())
+    const trend: Parameters<typeof useUsageStatisticsCharts>[0]['trend'] = {
+      adminStatistics: ref(makeStatistics()),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    }
+    const quality: Parameters<typeof useUsageStatisticsCharts>[0]['quality'] = {
+      adminStatistics: ref(makeStatistics()),
+      timeRange: ref(GetAdminStatisticsRange['7d']),
+    }
+    const charts = useUsageStatisticsCharts({ overviewStatistics, trend, quality })
+    const qualityData = charts.qualityTrendChartData.value
+    const riskData = charts.modelRiskChartData.value
+
+    trend.timeRange.value = GetAdminStatisticsRange['30d']
+    trend.adminStatistics.value = makeStatistics({
+      summary: { ...makeStatistics().summary, today_calls: 42 },
+    })
+    expect(charts.trendChartData.value.labels).toHaveLength(30)
+    expect(charts.qualityTrendChartData.value).toBe(qualityData)
+    expect(charts.todayCalls.value).toBe(0)
+    expect(charts.modelRiskChartData.value).toBe(riskData)
+
+    const trendData = charts.trendChartData.value
+    quality.timeRange.value = GetAdminStatisticsRange['1y']
+    expect(charts.qualityTrendChartData.value.labels).toHaveLength(365)
+    expect(charts.trendChartData.value).toBe(trendData)
+    expect(charts.modelRiskChartData.value).toBe(riskData)
   })
 
   it('builds sparse usage trend series and summary footers from the selected range', () => {
@@ -72,7 +127,7 @@ describe('useUsageStatisticsCharts', () => {
       ],
     })
 
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(statistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -134,7 +189,7 @@ describe('useUsageStatisticsCharts', () => {
       trend: [],
       quality_trend: [],
     })
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(statistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -157,7 +212,7 @@ describe('useUsageStatisticsCharts', () => {
         },
       ],
     })
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(statistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -178,7 +233,7 @@ describe('useUsageStatisticsCharts', () => {
         },
       ],
     })
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(statistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -200,7 +255,7 @@ describe('useUsageStatisticsCharts', () => {
           },
         ],
       })
-      const charts = useUsageStatisticsCharts({
+      const charts = makeCharts({
         adminStatistics: ref(statistics),
         timeRange: ref(GetAdminStatisticsRange['7d']),
       })
@@ -214,7 +269,7 @@ describe('useUsageStatisticsCharts', () => {
       expect(warnSpy.mock.calls[0]?.[0]).toContain('2026-07-04')
 
       // 跨 re-render 去重：同 key 的第二次求值不再刷屏。
-      const rerendered = useUsageStatisticsCharts({
+      const rerendered = makeCharts({
         adminStatistics: ref(statistics),
         timeRange: ref(GetAdminStatisticsRange['7d']),
       })
@@ -244,7 +299,7 @@ describe('useUsageStatisticsCharts', () => {
         },
       ],
     })
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(statistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -277,7 +332,7 @@ describe('useUsageStatisticsCharts', () => {
       ],
     })
 
-    const charts = useUsageStatisticsCharts({
+    const charts = makeCharts({
       adminStatistics: ref(adminStatistics),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
@@ -374,4 +429,12 @@ function tooltipCallbacks(options: unknown) {
       }
     }
   ).plugins.tooltip.callbacks
+}
+
+function makeCharts(options: Parameters<typeof useUsageStatisticsCharts>[0]['trend']) {
+  return useUsageStatisticsCharts({
+    overviewStatistics: options.adminStatistics,
+    trend: options,
+    quality: options,
+  })
 }

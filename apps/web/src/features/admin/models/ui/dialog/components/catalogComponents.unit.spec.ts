@@ -310,7 +310,7 @@ describe('AdminModelEditDialog subcomponents', () => {
       const badge = await screen.findByText(/已下线预警/)
       expect(badge.textContent).toMatch(/deprecated/)
       const badgeRoot = badge.parentElement!
-      expect(badgeRoot).toHaveClass('bg-destructive-soft', 'text-destructive', 'rounded-full')
+      expect(badgeRoot).toHaveClass('bg-destructive-soft', 'text-destructive', 'rounded-pill')
       expect(badgeRoot.querySelector('.animate-ping')).toBeNull()
       expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
     })
@@ -341,7 +341,7 @@ describe('AdminModelEditDialog subcomponents', () => {
       expect(screen.queryByText(/已下线预警/)).not.toBeInTheDocument()
       // beta 收口 neutral Pill：满圆 Badge + muted 载体，静态不呼吸。
       const betaRoot = screen.getByText('beta').parentElement!
-      expect(betaRoot).toHaveClass('bg-muted', 'text-muted-foreground', 'rounded-full')
+      expect(betaRoot).toHaveClass('bg-muted', 'text-muted-foreground', 'rounded-pill')
       expect(betaRoot.querySelector('.animate-ping')).toBeNull()
       // 部分缺失：模态/发布/家族行回落暂无数据，不炸版。
       expect(screen.getAllByText('暂无数据').length).toBeGreaterThanOrEqual(3)

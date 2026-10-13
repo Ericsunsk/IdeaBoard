@@ -18,7 +18,7 @@ const props = defineProps<{
   viewportHeight?: boolean
 }>()
 const tableFrameClass = computed(() => [
-  'min-w-0 overflow-hidden rounded-lg border border-border bg-card',
+  'min-w-0 overflow-hidden rounded-panel border border-border bg-card',
   props.viewportHeight && 'h-full',
 ])
 </script>

@@ -1,6 +1,6 @@
 <template>
   <article
-    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-panel border border-border bg-card text-left transition-colors hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     role="button"
     tabindex="0"
     :aria-label="board.name"
@@ -35,7 +35,7 @@
         :value="renameDraft"
         type="text"
         :aria-label="t('common.actions.rename')"
-        class="pointer-events-auto h-[30px] w-full rounded-lg border border-input bg-background/90 px-2 text-admin-body text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+        class="pointer-events-auto h-[30px] w-full rounded-control border border-input bg-background/90 px-2 text-admin-body text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
         maxlength="60"
         @click.stop
         @input="onRenameInput"

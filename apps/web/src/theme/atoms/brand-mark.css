@@ -44,7 +44,7 @@
 
   .ib-brand-mark--login {
     --brand-mark-size: 52px;
-    --brand-mark-radius: 15px;
+    --brand-mark-radius: var(--radius-overlay);
     --brand-mark-shadow: 0 10px 22px rgba(45, 64, 89, 0.08);
   }
 

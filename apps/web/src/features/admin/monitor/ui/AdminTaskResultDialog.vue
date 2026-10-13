@@ -11,7 +11,7 @@
       <div class="flex w-full items-center justify-between gap-3 pr-6">
         <div class="flex min-w-0 items-center gap-2.5">
           <span
-            class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-muted"
+            class="inline-flex size-7 shrink-0 items-center justify-center rounded-control border border-border bg-muted"
             :style="{ color: getTaskStatusDefinition(detailTask?.status || '').color }"
           >
             <CheckCircle
@@ -36,7 +36,7 @@
               <button
                 v-if="detailTask?.task_id || taskId"
                 type="button"
-                class="flex size-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                class="flex size-5 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 :aria-label="MONITOR_MESSAGES.copyTaskIdAria"
                 @click="copyToClipboard(detailTask?.task_id || taskId || '')"
               >
@@ -59,7 +59,7 @@
 
     <div
       v-if="loading"
-      class="flex min-h-40 items-center justify-center rounded-xl border border-border bg-muted/60 text-xs text-muted-foreground"
+      class="flex min-h-40 items-center justify-center rounded-panel border border-border bg-muted/60 text-xs text-muted-foreground"
       role="status"
     >
       {{ MONITOR_MESSAGES.detailLoading }}
@@ -94,7 +94,7 @@
           <span id="task-detail-identity">{{ MONITOR_MESSAGES.identityTitle }}</span>
         </div>
         <div
-          class="flex flex-col divide-y divide-border/60 rounded-xl border border-border bg-card px-3 py-1 text-xs"
+          class="flex flex-col divide-y divide-border/60 rounded-panel border border-border bg-card px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.userLabel }}</span>
@@ -104,7 +104,7 @@
               </span>
               <button
                 type="button"
-                class="flex size-4 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                class="flex size-4 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors hover:text-foreground"
                 :aria-label="MONITOR_MESSAGES.copyUserIdAria"
                 @click="copyToClipboard(String(detailTask.user_public_id))"
               >
@@ -160,7 +160,7 @@
           </button>
         </div>
         <div
-          class="max-h-[120px] overflow-y-auto rounded-xl border border-border bg-muted/60 p-2.5"
+          class="max-h-[120px] overflow-y-auto rounded-panel border border-border bg-muted/60 p-2.5"
         >
           <div
             class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground"
@@ -178,7 +178,7 @@
         </div>
         <div
           v-if="detailTask.routing"
-          class="flex flex-col divide-y divide-border/60 rounded-xl border border-border bg-card px-3 py-1 text-xs"
+          class="flex flex-col divide-y divide-border/60 rounded-panel border border-border bg-card px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingServiceLabel }}</span>
@@ -228,7 +228,7 @@
         </div>
         <div
           v-else
-          class="rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground"
+          class="rounded-panel border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground"
         >
           {{ MONITOR_MESSAGES.routingMissing }}
         </div>
@@ -242,12 +242,12 @@
         </div>
         <div
           v-if="resultImageUrl"
-          class="group relative overflow-hidden rounded-xl border border-border bg-muted/40 p-1.5 transition-colors hover:border-border-hover"
+          class="group relative overflow-hidden rounded-panel border border-border bg-muted/40 p-1.5 transition-colors hover:border-border-hover"
         >
           <img
             :src="resultImageUrl"
             :alt="MONITOR_MESSAGES.resultImageAlt"
-            class="block max-h-[240px] w-full rounded-lg object-contain"
+            class="block max-h-[240px] w-full rounded-control object-contain"
           />
           <AdminButton
             severity="secondary"
@@ -260,7 +260,7 @@
         </div>
         <div
           v-else
-          class="rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground"
+          class="rounded-panel border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground"
         >
           {{
             isResultImageDeletedByUser
@@ -288,7 +288,7 @@
           <article
             v-for="attempt in detailTask.execution_attempts"
             :key="attempt.attempt_no"
-            class="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-2.5 text-xs"
+            class="flex flex-col gap-1.5 rounded-panel border border-border bg-card p-2.5 text-xs"
           >
             <div class="flex items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-1.5">
@@ -352,7 +352,7 @@
         </div>
         <div
           v-else
-          class="rounded-xl border border-border bg-muted/50 py-3 text-center text-xs text-muted-foreground"
+          class="rounded-panel border border-border bg-muted/50 py-3 text-center text-xs text-muted-foreground"
         >
           {{ MONITOR_MESSAGES.attemptsEmpty }}
         </div>
@@ -377,7 +377,7 @@
           </span>
         </div>
         <div
-          class="flex flex-col divide-y divide-border/60 rounded-xl border border-border bg-card px-3 py-1 text-xs"
+          class="flex flex-col divide-y divide-border/60 rounded-panel border border-border bg-card px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingFeatureLabel }}</span>
@@ -441,7 +441,7 @@
           </button>
         </div>
         <div
-          class="max-h-[140px] overflow-x-auto rounded-xl border border-border bg-muted/60 p-2.5 font-mono text-xs"
+          class="max-h-[140px] overflow-x-auto rounded-panel border border-border bg-muted/60 p-2.5 font-mono text-xs"
         >
           <pre class="m-0 leading-relaxed text-foreground">{{
             resultSummaryText || MONITOR_MESSAGES.apiResultEmpty
@@ -451,7 +451,7 @@
         <!-- 原始调试详情 (脱敏) -->
         <div
           v-if="resultDebugText"
-          class="overflow-hidden rounded-xl border border-border bg-muted/40"
+          class="overflow-hidden rounded-panel border border-border bg-muted/40"
         >
           <button
             type="button"

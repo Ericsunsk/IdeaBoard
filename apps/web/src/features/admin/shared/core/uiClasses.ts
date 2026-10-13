@@ -12,27 +12,27 @@ export const adminSurfaceScrollContentClass =
   'app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain'
 
 export const adminEmptyStateClass =
-  'flex min-h-admin-empty-state flex-col items-center justify-center rounded-lg border border-border bg-card text-center text-muted-foreground'
+  'flex min-h-admin-empty-state flex-col items-center justify-center rounded-panel border border-border bg-card text-center text-muted-foreground'
 
 export const adminDashboardRootClass = 'flex max-w-full min-w-0 flex-col gap-4 p-0'
 
 // 数据表壳单源：任务监控事件表与定价表同壳（容器 + AdminTable 属性 + thead/tbody token），
 // 改表样式只改这里，两表一起变。
 export const adminTableCardClass =
-  'flex w-full flex-col overflow-hidden rounded-xl border border-border bg-background'
+  'flex w-full flex-col overflow-hidden rounded-panel border border-border bg-background'
 
 export const adminTableFrameClass = 'min-w-0'
 
 export const adminTableStyle = { minWidth: '100%' } as const
 
 export const adminTableClass =
-  'border-separate border-spacing-0 [&_thead]:bg-background [&_tbody]:bg-card [&_tbody_tr:first-child_td]:border-t [&_tbody_tr:first-child_td]:border-border [&_tbody_tr:first-child_td:first-child]:rounded-tl-xl [&_tbody_tr:first-child_td:last-child]:rounded-tr-xl [&_tbody_tr:last-child_td]:border-b-0'
+  'border-separate border-spacing-0 [&_thead]:bg-background [&_tbody]:bg-card [&_tbody_tr:first-child_td]:border-t [&_tbody_tr:first-child_td]:border-border [&_tbody_tr:first-child_td:first-child]:rounded-tl-panel [&_tbody_tr:first-child_td:last-child]:rounded-tr-panel [&_tbody_tr:last-child_td]:border-b-0'
 
 export const adminTableFooterClass =
   'flex items-center justify-between border-t border-border bg-background px-4 py-2.5'
 
 export const adminTableRowActionButtonClass =
-  'hit-target-control flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+  'hit-target-control flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
 
 export const adminSummaryGridClass = 'grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4'
 
@@ -41,25 +41,25 @@ export const adminChartGridClass = 'grid grid-cols-1 gap-3.5 xl:grid-cols-12'
 export const adminChartCanvasClass = 'h-full w-full min-w-0'
 
 export const adminToolbarMetricClass =
-  'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-admin-body font-bold text-foreground shadow-xs'
+  'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-pill border border-border bg-card px-3 py-1.5 text-admin-body font-bold text-foreground shadow-xs'
 
 const adminFramedIconButtonBaseClass =
   '!h-9 !w-9 !border !border-border !bg-card !text-muted-foreground hover:!bg-muted hover:!text-foreground disabled:!text-muted-foreground/40 transition-colors flex items-center justify-center p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
-export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-lg`
+export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-control`
 
 /**
  * 紧凑型独立控制按钮 (Compact Control Button)
  * 供 Events 折叠按钮、表格底栏翻页按钮等共享同一套视觉 Token
  */
 export const adminCompactIconButtonClass =
-  'hit-target-control flex !size-8 shrink-0 items-center justify-center !rounded-lg !border !border-border !bg-card !p-0 !text-muted-foreground transition-colors hover:!bg-muted hover:!text-foreground cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
+  'hit-target-control flex !size-8 shrink-0 items-center justify-center !rounded-control !border !border-border !bg-card !p-0 !text-muted-foreground transition-colors hover:!bg-muted hover:!text-foreground cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
 
 export const adminToolbarPageLabelClass =
-  'flex h-7 items-center justify-center rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground'
+  'flex h-7 items-center justify-center rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground'
 
 export const adminLogoButtonClass =
-  'control-state flex shrink-0 items-center justify-center rounded-xl border border-border bg-card shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
+  'control-state flex shrink-0 items-center justify-center rounded-control border border-border bg-card shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
 
 export const adminTextButtonClass = '!text-muted-foreground hover:!text-foreground'
 
@@ -85,7 +85,7 @@ export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center
 
 // 全局唯一 Admin 弹窗 chrome：使用标准语义卡片与边框。
 export const adminDialogChromeClass =
-  'rounded-admin-dialog border border-border bg-card text-card-foreground shadow-admin-dialog'
+  'rounded-overlay border border-border bg-card text-card-foreground shadow-admin-dialog'
 
 export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-card'
 
@@ -105,4 +105,4 @@ export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-for
 // 全局唯一输入框 chrome（AdminInput/AdminNumberInput/AdminTextarea 共用）：
 // 遵循标准 shadcn 输入栏规范，无 hover 杂效，focus 用柔光 ring；尺寸/字号由各组件按 size 追加覆盖。
 export const adminInputChromeClass =
-  'flex w-full rounded-md border border-input bg-background text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+  'flex w-full rounded-control border border-input bg-background text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'

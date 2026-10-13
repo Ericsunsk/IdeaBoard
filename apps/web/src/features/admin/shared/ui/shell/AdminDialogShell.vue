@@ -40,7 +40,7 @@
               type="button"
               aria-label="关闭"
               :class="[
-                '!bg-transparent !shadow-none inline-flex size-8 shrink-0 items-center justify-center rounded-lg border-0 p-0 hover:!bg-transparent focus:!outline-none focus-visible:!outline-none focus-visible:!shadow-none focus-visible:!ring-0 cursor-pointer transition-colors font-admin-strong',
+                '!bg-transparent !shadow-none inline-flex size-8 shrink-0 items-center justify-center rounded-control border-0 p-0 hover:!bg-transparent focus:!outline-none focus-visible:!outline-none focus-visible:!shadow-none focus-visible:!ring-0 cursor-pointer transition-colors font-admin-strong',
                 adminDialogChromeCloseClass,
               ]"
               @click="requestCloseFromControl"

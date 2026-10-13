@@ -26,7 +26,7 @@
                 type="button"
                 variant="ghost"
                 :is-disabled="props.isLoading"
-                class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                class="rounded-pill px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
                 @click="emit('update:isVisible', false)"
               >
                 {{ t('common.actions.cancel') }}
@@ -35,7 +35,7 @@
                 type="button"
                 :is-disabled="props.isLoading"
                 :class="[
-                  'rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50',
+                  'rounded-pill px-4 py-2 text-sm font-semibold disabled:opacity-50',
                   props.intent === 'danger'
                     ? 'bg-destructive text-destructive-foreground hover:bg-destructive-hover'
                     : 'bg-primary text-primary-foreground hover:bg-primary-hover',

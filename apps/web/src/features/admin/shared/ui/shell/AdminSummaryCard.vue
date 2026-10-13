@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex flex-col justify-between rounded-xl border border-border bg-card p-5 text-foreground"
+    class="flex flex-col justify-between rounded-panel border border-border bg-card p-5 text-foreground"
   >
     <div class="flex flex-col gap-1">
       <span class="text-admin-body font-medium text-muted-foreground tracking-normal">

@@ -97,10 +97,11 @@ Token ownership:
 - Stacking (`tokens/z.css`): native `--z-index-*` roles emitting `z-*`
   utilities (`z-admin-dialog`, `z-banner`, …); ascending numeric order is the
   contract.
-- Radius: single `--radius` master (0.625rem); every `--radius-*` role is a
-  `calc()` factor on the shared grid (`xs/sm/md/lg/xl/2xl/3xl/4xl` =
-  `0.2/0.4/0.8/1.2/1.6/2/2.4/2.8` → 2/4/8/12/16/20/24/28px at a 16px root);
-  `pill` stays independent.
+- Radius: shared `control`, `panel`, `overlay`, and `pill` roles for every
+  surface. Use `rounded-control` for controls and menu items, `rounded-panel`
+  for cards and popovers, `rounded-overlay` for dialogs, and `rounded-pill`
+  for fully rounded shapes. Canvas clipping and nested instrument geometry
+  may use local radii when required by their shape.
 - Shadows: Tier 2 resting/floating roles (`--shadow-focus-ring`,
   `--shadow-floating`, `--shadow-raised`, admin/board/auth tiers); mode-varying
   shadows carry explicit dark assignments.

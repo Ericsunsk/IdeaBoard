@@ -211,7 +211,7 @@ export const RETOUCH_SHARED_POLICIES: readonly RetouchSharedPolicy[] = [
     scenario: 'sources panel metrics from the Canvas surface contract',
     checks: [
       contains(PANEL_CSS, '--retouch-panel-inset: var(--canvas-tool-button-gap)'),
-      contains(PANEL_CSS, '--retouch-panel-control-radius: var(--canvas-radius-md)'),
+      contains(PANEL_CSS, '--retouch-panel-control-radius: var(--radius-control)'),
       contains(PANEL_CSS, '--retouch-panel-text-size: var(--canvas-font-size-caption)'),
       contains(PANEL_CSS, '.retouch-action-row'),
       contains(PANEL_CSS, 'repeat(5, var(--node-tool-button-size))'),

@@ -6,11 +6,11 @@
       <button
         type="button"
         disabled
-        class="relative flex size-9 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-border bg-card text-muted-foreground opacity-60"
+        class="relative flex size-9 shrink-0 cursor-not-allowed items-center justify-center rounded-control border border-border bg-card text-muted-foreground opacity-60"
         :title="MONITOR_MESSAGES.sidebarToggleTitle"
       >
         <SidebarCollapse class="size-4" />
-        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-info"></span>
+        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-pill bg-info"></span>
       </button>
 
       <!-- 数据集选择器 (样式占位，后续接功能) -->
@@ -18,7 +18,7 @@
         <button
           type="button"
           disabled
-          class="flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground opacity-60"
+          class="flex h-9 cursor-not-allowed items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-semibold text-foreground opacity-60"
         >
           <Table class="size-3.5 text-muted-foreground" />
           <span>Events</span>
@@ -43,7 +43,7 @@
       <!-- 实时按钮 -->
       <button
         type="button"
-        class="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+        class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
         @click="emit('liveRefresh')"
       >
         <Play class="size-3 fill-foreground text-foreground" />
@@ -71,7 +71,7 @@
       <!-- 更多按钮 (样式占位，后续接功能) -->
       <AdminButton
         variant="ghost"
-        class="size-9 rounded-lg border border-border bg-card p-0 text-muted-foreground"
+        class="size-9 rounded-control border border-border bg-card p-0 text-muted-foreground"
         :aria-label="MONITOR_MESSAGES.moreActionsAria"
         disabled
       >

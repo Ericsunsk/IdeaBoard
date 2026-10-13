@@ -3,7 +3,7 @@
     <PopoverAnchor v-if="anchorEl" :reference="anchorEl" />
     <PopoverPortal>
       <PopoverContent
-        class="z-admin-dialog w-[288px] max-w-[calc(100vw_-_48px)] rounded-admin-card border border-border bg-card p-3 text-foreground shadow-admin-popover outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+        class="z-admin-dialog w-[288px] max-w-[calc(100vw_-_48px)] rounded-panel border border-border bg-card p-3 text-foreground shadow-admin-popover outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
         :side-offset="6"
         align="start"
       >
@@ -29,7 +29,7 @@
               v-for="cat in ADMIN_BRAND_CATEGORIES"
               :key="cat.key"
               type="button"
-              class="shrink-0 cursor-pointer rounded-full px-2 py-0.5 text-admin-caption font-medium transition-colors"
+              class="shrink-0 cursor-pointer rounded-pill px-2 py-0.5 text-admin-caption font-medium transition-colors"
               :class="
                 currentCategory === cat.key
                   ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
@@ -49,7 +49,7 @@
               v-for="item in filteredLogos"
               :key="item.key"
               type="button"
-              class="control-state flex size-9 items-center justify-center rounded-lg border border-border bg-card p-1.5 cursor-pointer transition-colors hover:border-primary hover:bg-card data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card"
+              class="control-state flex size-9 items-center justify-center rounded-control border border-border bg-card p-1.5 cursor-pointer transition-colors hover:border-primary hover:bg-card data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card"
               :data-control-state="selectedKey === item.key ? 'selected' : 'idle'"
               :aria-label="item.label"
               :title="item.label"

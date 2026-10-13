@@ -17,7 +17,7 @@
         <div
           v-for="provider in oauthLoginProviders"
           :key="provider.value"
-          class="group relative flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-colors select-none"
+          class="group relative flex items-center justify-between rounded-panel border p-3 cursor-pointer transition-colors select-none"
           :class="
             selectedProvider === provider.value
               ? 'border-primary bg-primary-faint shadow-2xs'
@@ -28,7 +28,7 @@
           <div class="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card p-1.5 shadow-2xs"
+              class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card p-1.5 shadow-2xs"
               :aria-label="OAUTH_MESSAGES.oauthSelectLogoAria(provider.label)"
               @click.stop="openLogoPicker($event, provider.value)"
             >
@@ -73,11 +73,11 @@
       </AdminFormField>
 
       <!-- 2. 当前选中 Provider 的凭据与回调配置区 -->
-      <div class="flex flex-col gap-3.5 rounded-xl border border-border bg-card p-4 shadow-2xs">
+      <div class="flex flex-col gap-3.5 rounded-panel border border-border bg-card p-4 shadow-2xs">
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-muted p-1"
+            class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-muted p-1"
             :aria-label="OAUTH_MESSAGES.oauthSelectLogoAria(providerLabel)"
             @click="openLogoPicker($event, selectedProvider)"
           >

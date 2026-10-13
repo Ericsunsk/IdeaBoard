@@ -3,7 +3,7 @@
     <aside
       v-if="presentation === 'canvas' || open"
       v-show="open"
-      class="page-chrome-surface z-40 flex flex-col overflow-hidden rounded-[28px] p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      class="page-chrome-surface z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
       :aria-label="t('library.title')"
       @click="closeFolderMenu(false)"
@@ -18,7 +18,7 @@
             <h2 class="m-0 text-base font-semibold tracking-tight">{{ t('library.title') }}</h2>
             <button
               type="button"
-              class="grid size-6 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              class="grid size-6 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               :aria-label="
                 isHeaderCollapsed
                   ? t('library.actions.showFolders')
@@ -39,7 +39,7 @@
             <button
               v-if="!isCanvasPresentation"
               type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               :aria-label="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               :title="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               @click="isExpanded = !isExpanded"
@@ -49,7 +49,7 @@
             </button>
             <button
               type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               :aria-label="t('library.actions.close')"
               :title="t('library.actions.close')"
               @click="emit('close')"
@@ -65,7 +65,7 @@
           class="transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
         >
           <div v-if="workspace.foldersLoading.value" class="py-1">
-            <div class="h-7 w-full animate-pulse rounded-full bg-muted"></div>
+            <div class="h-7 w-full animate-pulse rounded-pill bg-muted"></div>
           </div>
           <div v-else class="py-1 shrink-0">
             <div
@@ -76,7 +76,7 @@
               <div
                 v-for="folder in workspace.folderTabs.value"
                 :key="folder.folderKey"
-                class="group/folder-pill inline-flex h-7 shrink-0 items-center rounded-full"
+                class="group/folder-pill inline-flex h-7 shrink-0 items-center rounded-pill"
                 @dragover.prevent.stop="handlePillDragOver($event, folder.folderKey)"
                 @dragleave.stop="handlePillDragLeave"
                 @drop.prevent.stop="handlePillDrop($event, folder)"
@@ -87,7 +87,7 @@
                   role="tab"
                   :aria-selected="workspace.selectedFolder.value === folder.folderKey"
                   :aria-haspopup="folder.isMutable ? 'menu' : undefined"
-                  class="h-7 rounded-full border px-2.5 text-xs font-medium transition-[transform,background-color,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                  class="h-7 rounded-pill border px-2.5 text-xs font-medium transition-[transform,background-color,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                   :class="[
                     workspace.selectedFolder.value === folder.folderKey
                       ? 'border-transparent bg-primary text-primary-foreground shadow-xs'
@@ -116,7 +116,7 @@
               <!-- + New Folder 极简微胶囊 -->
               <button
                 type="button"
-                class="h-7 shrink-0 rounded-full border border-dashed border-border bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary flex items-center gap-1 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="h-7 shrink-0 rounded-pill border border-dashed border-border bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary flex items-center gap-1 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 @click="folderDialogVisible = true"
               >
                 <Plus class="size-3" aria-hidden="true" />
@@ -130,13 +130,13 @@
       <!-- 错误状态提示 -->
       <div
         v-if="workspace.errorMessage.value"
-        class="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-card px-3 py-2 text-xs"
+        class="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-panel border border-destructive/40 bg-card px-3 py-2 text-xs"
         role="alert"
       >
         <span class="font-semibold">{{ workspace.errorMessage.value }}</span>
         <button
           type="button"
-          class="shrink-0 rounded-full bg-primary px-3 py-1.5 font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          class="shrink-0 rounded-pill bg-primary px-3 py-1.5 font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           @click="workspace.retry"
         >
           {{ t('common.actions.retry') }}

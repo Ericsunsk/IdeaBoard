@@ -23,7 +23,7 @@
         <div class="flex items-center gap-3">
           <button
             type="button"
-            :class="[adminLogoButtonClass, 'size-11 p-2 shrink-0 rounded-xl shadow-xs']"
+            :class="[adminLogoButtonClass, 'size-11 p-2 shrink-0 shadow-xs']"
             :title="STORAGE_MESSAGES.switchLogoTitle"
             :aria-label="STORAGE_MESSAGES.switchLogoAria"
             :data-control-state="activeLogoTargetId === form.id ? 'selected' : 'idle'"
@@ -62,7 +62,7 @@
           :key="vendor.key"
           :title="vendor.label"
           type="button"
-          class="group relative flex size-12 items-center justify-center rounded-xl border p-2 cursor-pointer transition-colors"
+          class="group relative flex size-12 items-center justify-center rounded-control border p-2 cursor-pointer transition-colors"
           :class="
             selectedVendorKey === vendor.key
               ? 'border-primary bg-card shadow-xs'
@@ -83,14 +83,14 @@
       <div v-if="textFields.length > 0">
         <nav
           :aria-label="STORAGE_MESSAGES.editorTabsAria"
-          class="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground"
+          class="inline-flex h-9 items-center justify-center rounded-control bg-muted p-1 text-muted-foreground"
         >
           <button
             v-for="tab in configTabOptions"
             :key="tab.value"
             type="button"
             :class="[
-              'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-1 text-admin-caption font-medium transition-colors cursor-pointer',
+              'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control px-3 py-1 text-admin-caption font-medium transition-colors cursor-pointer',
               activeConfigTab === tab.value
                 ? 'bg-card text-foreground shadow-xs font-semibold'
                 : 'hover:text-foreground text-muted-foreground',
@@ -191,7 +191,7 @@
                 v-for="domain in bucketDomains"
                 :key="domain"
                 type="button"
-                class="cursor-pointer rounded-md border border-border bg-card px-2 py-0.5 text-admin-caption font-mono font-medium text-primary hover:border-primary transition-colors"
+                class="cursor-pointer rounded-control border border-border bg-card px-2 py-0.5 text-admin-caption font-mono font-medium text-primary hover:border-primary transition-colors"
                 @click="updateConfigValue(field.key, `https://${domain}`)"
               >
                 https://{{ domain }}
@@ -207,7 +207,7 @@
           <div
             v-for="field in switchFields"
             :key="field.key"
-            class="flex items-center justify-between rounded-xl border border-border bg-muted/50 p-3"
+            class="flex items-center justify-between rounded-panel border border-border bg-muted/50 p-3"
           >
             <div class="flex flex-col">
               <span class="text-xs font-semibold text-foreground">{{ field.label }}</span>

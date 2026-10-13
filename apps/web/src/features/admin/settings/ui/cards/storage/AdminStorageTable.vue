@@ -29,7 +29,7 @@
               <button
                 v-if="!data.isPresetOnly && data.storage"
                 type="button"
-                :class="[adminLogoButtonClass, 'size-8 p-1.5 shrink-0 rounded-lg shadow-xs']"
+                :class="[adminLogoButtonClass, 'size-8 p-1.5 shrink-0 shadow-xs']"
                 :data-control-state="activeLogoTargetId === data.storage.id ? 'selected' : 'idle'"
                 :aria-expanded="activeLogoTargetId === data.storage.id ? 'true' : 'false'"
                 :title="STORAGE_MESSAGES.switchLogoTitle"
@@ -56,7 +56,7 @@
               </button>
               <div
                 v-else
-                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card p-1.5 shadow-xs"
+                class="flex size-8 shrink-0 items-center justify-center rounded-control border border-border bg-card p-1.5 shadow-xs"
               >
                 <img
                   v-if="data.vendorLogo"

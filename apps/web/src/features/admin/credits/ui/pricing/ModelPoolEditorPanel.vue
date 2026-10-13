@@ -8,7 +8,7 @@
       <li
         v-for="(entry, index) in draft"
         :key="entry.modelId"
-        class="flex flex-col gap-2 rounded-xl border border-border p-3"
+        class="flex flex-col gap-2 rounded-panel border border-border p-3"
       >
         <div class="flex min-w-0 items-center gap-2">
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
@@ -214,8 +214,8 @@ function addSelected() {
 
 function resolutionBadgeClass(on: boolean): string {
   return on
-    ? 'rounded px-1.5 py-0.5 font-mono text-admin-caption font-bold text-foreground bg-primary-faint-strong ring-1 ring-inset ring-primary-line-strong cursor-pointer'
-    : 'rounded px-1.5 py-0.5 font-mono text-admin-caption text-muted-foreground bg-muted cursor-pointer'
+    ? 'rounded-control px-1.5 py-0.5 font-mono text-admin-caption font-bold text-foreground bg-primary-faint-strong ring-1 ring-inset ring-primary-line-strong cursor-pointer'
+    : 'rounded-control px-1.5 py-0.5 font-mono text-admin-caption text-muted-foreground bg-muted cursor-pointer'
 }
 
 function checkPoolValidity(): boolean {

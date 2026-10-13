@@ -8,7 +8,7 @@ export const ibFormInputClass =
   // User-side form standard: h-10 everywhere (auth modal, account panes).
   // Follows standard shadcn focus ring (focus-visible:ring-1 focus-visible:ring-ring),
   // with clean outline-none and no hover border mutation.
-  'control-state [--control-disabled-opacity:0.7] h-10 w-full rounded-md border border-input bg-background px-3 text-admin-title-sm font-medium text-foreground shadow-xs outline-none transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground'
+  'control-state [--control-disabled-opacity:0.7] h-10 w-full rounded-control border border-input bg-background px-3 text-admin-title-sm font-medium text-foreground shadow-xs outline-none transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground'
 
 export const ibFormInputErrorClass =
   '!border-destructive bg-destructive/5 placeholder:text-destructive/75 focus:bg-destructive/5'

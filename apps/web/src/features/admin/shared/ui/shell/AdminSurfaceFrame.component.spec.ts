@@ -51,7 +51,7 @@ describe('Admin surface frame adapters', () => {
     expectClassContract(panel, adminSurfacePanelClass)
     expect(panel).not.toHaveClass(...classTokens(adminSurfacePanelViewportClass))
     expect(content).toHaveClass('px-6', 'pb-6')
-    expect(tableFrame).toHaveClass('min-w-0', 'overflow-hidden', 'rounded-lg')
+    expect(tableFrame).toHaveClass('min-w-0', 'overflow-hidden', 'rounded-panel')
     expect(tableFrame).not.toHaveClass('h-full')
     expect(screen.getByText('Table toolbar')).toBeInTheDocument()
   })

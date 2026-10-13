@@ -10,7 +10,7 @@
         <!-- 已选计数 -->
         <div class="flex items-center gap-2 pl-3 pr-2 border-r border-border">
           <div
-            class="size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-admin-caption font-bold font-mono"
+            class="size-5 rounded-pill bg-primary text-primary-foreground flex items-center justify-center text-admin-caption font-bold font-mono"
           >
             {{ selectedCount }}
           </div>
@@ -22,7 +22,7 @@
         <!-- 批量作为视觉搜索参考图 (Vision Search) -->
         <button
           type="button"
-          class="h-8 px-4 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-none transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="h-8 px-4 rounded-pill bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-none transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           @click="emit('vision-search')"
         >
           <Search class="size-3.5" aria-hidden="true" />
@@ -32,7 +32,7 @@
         <!-- 批量存入个人素材库 (Save All to Library) -->
         <button
           type="button"
-          class="h-8 px-3 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary hover:bg-primary/10 text-xs font-medium transition-[border-color,background-color,color] flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="h-8 px-3 rounded-pill border border-border text-muted-foreground hover:text-foreground hover:border-primary hover:bg-primary/10 text-xs font-medium transition-[border-color,background-color,color] flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           @click="emit('save-all')"
         >
           <Bookmark class="size-3.5 text-primary" aria-hidden="true" />

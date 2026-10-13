@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer disabled:opacity-50"
+    class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer disabled:opacity-50"
     :disabled="props.disabled || props.loading"
     :aria-label="props.ariaLabel"
     @click="emit('click')"

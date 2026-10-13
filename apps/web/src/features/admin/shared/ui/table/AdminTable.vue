@@ -50,7 +50,10 @@
                   :hoverable="false"
                 >
                   <AdminTableCell :colspan="columnCount">
-                    <div data-ui="skeleton" class="h-4 w-full animate-pulse rounded-md bg-muted" />
+                    <div
+                      data-ui="skeleton"
+                      class="h-4 w-full animate-pulse rounded-control bg-muted"
+                    />
                     <span v-if="skeletonIndex === 1" class="sr-only" role="status">正在加载</span>
                   </AdminTableCell>
                 </AdminTableRow>

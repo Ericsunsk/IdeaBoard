@@ -3,7 +3,7 @@
     :key="`${result.provider}:${result.id}`"
     :style="cardStyle"
     draggable="true"
-    class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-card/85 cursor-grab active:cursor-grabbing select-none"
+    class="group relative overflow-hidden rounded-panel bg-card/85 cursor-grab active:cursor-grabbing select-none"
     @dragstart="$emit('cardDragStart', $event)"
     @dragend="$emit('cardDragEnd')"
   >
@@ -40,7 +40,7 @@
       <div class="pointer-events-auto flex items-center justify-between">
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="
             isSelected
               ? '!bg-primary text-primary-foreground shadow-xs'
@@ -59,7 +59,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--blur-glass)] transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--blur-glass)] transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           :class="{
             '!bg-primary !text-primary-foreground shadow-xs': isUsedAsReference,
           }"
@@ -89,7 +89,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           :class="
             isSaved
               ? 'bg-emerald-700 text-white hover:bg-emerald-700/90'
@@ -116,7 +116,7 @@
       <span class="text-xs font-semibold text-muted-foreground">{{
         t('common.errors.imageLoadFailed')
       }}</span>
-      <Button variant="outline" size="sm" class="!rounded-full" @click="$emit('retryImage')">
+      <Button variant="outline" size="sm" class="!rounded-pill" @click="$emit('retryImage')">
         {{ t('common.actions.retry') }}
       </Button>
     </div>

@@ -101,7 +101,6 @@ const mergedClass = computed(() => {
   const effVariant = resolveEffectiveVariant()
   return cn(
     buttonChromeBaseClass,
-    uiSize.value !== 'action' && 'rounded-lg',
     buttonChromeSizeTypography(uiSize.value),
     actionColorClasses[effVariant],
     props.outlined &&

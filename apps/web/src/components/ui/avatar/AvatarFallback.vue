@@ -3,7 +3,7 @@
     :delay-ms="props.delayMs"
     :class="
       cn(
-        'flex size-full items-center justify-center rounded-full bg-muted font-medium',
+        'flex size-full items-center justify-center rounded-pill bg-muted font-medium',
         props.class,
       )
     "

@@ -28,7 +28,7 @@
           </DialogDescription>
           <DialogClose
             v-if="canDismiss('close-control')"
-            class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            class="cursor-pointer rounded-control p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             :aria-label="closeLabel"
           >
             <Xmark class="size-5" aria-hidden="true" />

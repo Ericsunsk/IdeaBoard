@@ -57,7 +57,6 @@ const requiredTokens = [
   ...['sticky', 'header', 'overlay', 'dialog'].map((role) => `--z-index-admin-${role}`),
   ...['content', 'popover', 'banner', 'lightbox'].map((role) => `--z-index-${role}`),
   ...['strong', 'emphasis', 'display'].map((role) => `--font-weight-admin-${role}`),
-  ...['card', 'control', 'chip'].map((role) => `--radius-admin-${role}`),
   ...['shell', 'popover', 'drawer', 'empty-state'].map((role) => `--spacing-admin-${role}`),
   '--color-overlay-btn-bg',
   '--color-overlay-btn-bg-hover',
@@ -134,10 +133,8 @@ const primitiveRequired = [
   ...['0', '50', '100', '800', '900', '950'].map((role) => `--primitive-neutral-${role}`),
   '--primitive-violet-500',
   '--primitive-violet-650',
-  ...['sm', 'md', 'lg'].flatMap((role) => [
-    `--primitive-radius-${role}`,
-    `--primitive-shadow-${role}`,
-  ]),
+  ...['8', '12', '16', 'pill'].map((role) => `--primitive-radius-${role}`),
+  ...['sm', 'md', 'lg'].map((role) => `--primitive-shadow-${role}`),
 ]
 const chromeConsumers = [
   'features/workspace/shell/components/WorkspaceNavigation.vue',

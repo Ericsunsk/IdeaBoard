@@ -1,7 +1,7 @@
 <template>
   <div
     ref="scrollAreaRef"
-    class="mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-board-dialog [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    class="mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-overlay [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     :aria-busy="isLoading"
     @scroll="emit('scroll')"
   >
@@ -11,13 +11,13 @@
       class="grid h-full min-h-40 grid-cols-2 gap-2 overflow-hidden"
       aria-busy="true"
     >
-      <div v-for="n in 6" :key="n" class="h-28 animate-pulse rounded-xl bg-muted"></div>
+      <div v-for="n in 6" :key="n" class="h-28 animate-pulse rounded-panel bg-muted"></div>
     </div>
 
     <!-- 空状态提示 -->
     <div
       v-else-if="!isLoading && assets.length === 0 && !errorMessage"
-      class="grid h-full min-h-40 place-items-center rounded-board-dialog border border-dashed border-border px-5 text-center"
+      class="grid h-full min-h-40 place-items-center rounded-overlay border border-dashed border-border px-5 text-center"
     >
       <div>
         <p class="m-0 text-sm font-semibold">{{ t('library.empty.noSavedReferences') }}</p>
@@ -42,7 +42,7 @@
           :data-asset-id="asset.id"
           :style="style"
           draggable="true"
-          class="group/libcard relative overflow-hidden rounded-xl bg-card/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
+          class="group/libcard relative overflow-hidden rounded-panel bg-card/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
           @dragstart="emit('asset-dragstart', $event, asset)"
         >
           <button
@@ -86,7 +86,7 @@
             <div class="flex justify-end gap-1.5 pointer-events-auto">
               <button
                 type="button"
-                class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-destructive transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-destructive transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 :aria-label="t('library.actions.removeSavedReference')"
                 :title="t('library.actions.removeSavedReference')"
                 @click="emit('remove-asset', asset)"
@@ -96,7 +96,7 @@
               <button
                 v-if="isCanvasPresentation"
                 type="button"
-                class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 :aria-label="t('library.actions.addToCanvas')"
                 :title="t('library.actions.addToCanvas')"
                 @click.stop="emit('add-to-canvas', toCanvasLibraryImportDescriptor(asset))"
@@ -106,7 +106,7 @@
               <button
                 v-else
                 type="button"
-                class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 :aria-label="t('library.actions.useAsSearchReference')"
                 :title="t('library.actions.useAsSearchReference')"
                 @click.stop="emit('select-reference', asset)"
@@ -135,7 +135,7 @@
       <button
         v-if="hasMore"
         type="button"
-        class="mx-auto my-3 block rounded-full border border-border bg-card/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer"
+        class="mx-auto my-3 block rounded-pill border border-border bg-card/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer"
         :disabled="isLoading"
         @click="emit('load-more')"
       >

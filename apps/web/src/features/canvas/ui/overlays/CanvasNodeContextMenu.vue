@@ -3,7 +3,7 @@
     <div
       v-if="isVisible"
       ref="menuRef"
-      class="canvas-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-[var(--canvas-radius-xl)] bg-[var(--canvas-glass-bg)] p-1.5 shadow-[var(--canvas-shadow-floating)] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-glass-border)]"
+      class="canvas-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-panel bg-[var(--canvas-glass-bg)] p-1.5 shadow-[var(--canvas-shadow-floating)] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-glass-border)]"
       :style="menuStyle"
       role="menu"
       :aria-label="t('canvas.contextMenu.label')"
@@ -17,7 +17,7 @@
         :key="item.key"
         type="button"
         role="menuitem"
-        class="h-[34px] w-full cursor-pointer rounded-[var(--canvas-radius-md)] border-0 bg-transparent px-2.5 text-left text-admin-body font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
+        class="h-[34px] w-full cursor-pointer rounded-control border-0 bg-transparent px-2.5 text-left text-admin-body font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
         @pointerdown.stop.prevent="emit('create', item.key)"
         @keydown.enter.stop.prevent="emit('create', item.key)"
         @keydown.space.stop.prevent="emit('create', item.key)"

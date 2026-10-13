@@ -14,18 +14,9 @@ import {
   adminSelectViewportClass,
 } from './adminSelectSkin'
 
-/**
- * Visual/layout contract for the shared Admin select skin.
- *
- * This is the one place the dropdown geometry is asserted. Component specs
- * cannot assert classes (see `checkTestGuardrails.ts`), and the previous setup
- * let five dropdowns disagree on radius, height, border, and focus ring —
- * `rounded-lg` vs `rounded-xl`, `h-9` vs `h-8`, and two popover-based dropdowns
- * with no focus indicator at all (WCAG 2.4.7, the same gap `PasswordInput` had).
- */
 describe('adminSelectSkin', () => {
   it('gives every trigger one radius, one height, and one border token', () => {
-    expect(adminSelectTriggerClass).toContain('rounded-lg')
+    expect(adminSelectTriggerClass).toContain('rounded-control')
     expect(adminSelectTriggerClass).toContain('h-9')
     expect(adminSelectTriggerClass).toContain('border-input')
   })
@@ -50,8 +41,8 @@ describe('adminSelectSkin', () => {
   })
 
   it('reuses the same radius for the content overlay and the panel', () => {
-    expect(adminSelectContentClass).toContain('rounded-lg')
-    expect(adminSelectPanelClass).toContain('rounded-lg')
+    expect(adminSelectContentClass).toContain('rounded-panel')
+    expect(adminSelectPanelClass).toContain('rounded-panel')
   })
 
   it('animates every overlay in and out', () => {
@@ -73,7 +64,7 @@ describe('adminSelectSkin', () => {
   })
 
   it('reuses one item skin, and only the compact variant differs', () => {
-    expect(adminSelectItemClass).toContain('rounded-lg')
+    expect(adminSelectItemClass).toContain('rounded-control')
     expect(adminSelectItemClass).toContain('focus:bg-muted')
     expect(adminSelectItemCompactClass).toContain('text-admin-meta')
     expect(adminSelectItemCompactClass).not.toContain('rounded-')

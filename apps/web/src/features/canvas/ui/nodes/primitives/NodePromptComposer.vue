@@ -1,6 +1,6 @@
 <template>
   <form
-    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] gap-[var(--node-tool-button-gap)] rounded-[var(--canvas-radius-xl)] bg-[var(--canvas-glass-bg)] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--node-tool-border-width)_solid_var(--canvas-glass-border)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
+    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] gap-[var(--node-tool-button-gap)] rounded-panel bg-[var(--canvas-glass-bg)] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--node-tool-border-width)_solid_var(--canvas-glass-border)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
     :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': hasText }"
     :style="{ '--node-prompt-composer-offset': offset }"
     @submit.prevent

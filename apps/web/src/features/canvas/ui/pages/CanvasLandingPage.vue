@@ -36,7 +36,7 @@
           <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
               data-home-hero-safe
-              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-primary px-10 text-admin-title-sm font-medium text-primary-foreground shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-focus-ring"
+              class="home-hero-cta h-[43px] cursor-pointer rounded-pill border-0 bg-primary px-10 text-admin-title-sm font-medium text-primary-foreground shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-focus-ring"
               @click="startJourney"
             >
               Get started
@@ -48,7 +48,7 @@
         <div class="home-hero-decorations pointer-events-none absolute inset-0 z-[5] h-full w-full">
           <div
             data-home-hero-safe
-            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] border border-[var(--color-home-note-border)] bg-[var(--color-home-note-bg)] px-8 py-7 text-admin-meta leading-[1.5] text-[var(--color-home-note-text)] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
+            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-overlay border border-[var(--color-home-note-border)] bg-[var(--color-home-note-bg)] px-8 py-7 text-admin-meta leading-[1.5] text-[var(--color-home-note-text)] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
             {{ projectName }} is an AI Canvas for Visual Designers to explore, compare, and refine
             image directions in one connected workspace.
@@ -72,7 +72,7 @@
             aria-hidden="true"
           />
           <div
-            class="home-hero-ring absolute left-[75.2%] top-[50.6%] h-[2.8%] w-[8.8%] rotate-[8deg] rounded-full border-[4px] border-white/95 shadow-[0_0_18px_rgba(255,255,255,0.86)]"
+            class="home-hero-ring absolute left-[75.2%] top-[50.6%] h-[2.8%] w-[8.8%] rotate-[8deg] rounded-pill border-[4px] border-white/95 shadow-[0_0_18px_rgba(255,255,255,0.86)]"
             aria-hidden="true"
           ></div>
           <img

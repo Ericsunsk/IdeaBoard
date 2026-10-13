@@ -2,7 +2,7 @@
   <div
     v-if="contextMenu"
     ref="menuRef"
-    :class="[surfaceClass, 'fixed z-popover min-w-40 rounded-xl p-1.5 backdrop-blur-md']"
+    :class="[surfaceClass, 'fixed z-popover min-w-40 rounded-panel p-1.5 backdrop-blur-md']"
     :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
     data-library-folder-menu
     role="menu"

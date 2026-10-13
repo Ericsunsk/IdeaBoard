@@ -7,7 +7,7 @@
   >
     <div class="flex flex-col gap-4">
       <div
-        class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border bg-muted/50 px-4 py-3"
+        class="flex min-h-12 items-center justify-between gap-4 rounded-panel border border-border bg-muted/50 px-4 py-3"
       >
         <div class="flex flex-col">
           <span class="text-admin-body font-bold text-foreground">

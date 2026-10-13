@@ -324,7 +324,7 @@ function getBlendWeightBadgeStyle(index: number) {
   height: auto;
   aspect-ratio: 1 / 1;
   border: 0;
-  border-radius: var(--canvas-radius-md);
+  border-radius: var(--radius-control);
   background: transparent;
   overflow: hidden;
   padding: 0;

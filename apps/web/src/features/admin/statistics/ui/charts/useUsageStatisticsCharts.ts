@@ -29,14 +29,21 @@ import { useUsageStatisticsSummaryMetrics } from '../../core/usageStatisticsSumm
 
 const warnedTrendTotalMismatchKeys = new Set<string>()
 
-export function useUsageStatisticsCharts(options: {
+type StatisticsChartSource = {
   adminStatistics: Ref<AdminStatistics | null>
   timeRange: Ref<GetAdminStatisticsRangeValue>
+}
+
+export function useUsageStatisticsCharts(options: {
+  overviewStatistics: Ref<AdminStatistics | null>
+  trend: StatisticsChartSource
+  quality: StatisticsChartSource
 }) {
+  const { trend } = options
   const trendData = computed(() => {
-    const trend = options.adminStatistics.value?.trend || []
-    const trendMap = new Map(trend.map((day) => [day.date, day]))
-    return buildAdminTimeRangeBuckets(options.timeRange.value).map((bucket) => {
+    const trendRows = trend.adminStatistics.value?.trend || []
+    const trendMap = new Map(trendRows.map((day) => [day.date, day]))
+    return buildAdminTimeRangeBuckets(trend.timeRange.value).map((bucket) => {
       const day = trendMap.get(bucket.date) || {
         date: bucket.date,
         label: bucket.label,
@@ -100,7 +107,7 @@ export function useUsageStatisticsCharts(options: {
     return shouldShowAdminTimeRangeTick({
       index,
       count: trendData.value.length,
-      range: options.timeRange.value,
+      range: trend.timeRange.value,
       label: trendData.value[index]?.date,
     })
   }
@@ -230,12 +237,12 @@ export function useUsageStatisticsCharts(options: {
     }),
   )
 
-  const summaryMetrics = useUsageStatisticsSummaryMetrics(options.adminStatistics)
+  const summaryMetrics = useUsageStatisticsSummaryMetrics(options.overviewStatistics)
   const { modelRiskChartData, modelRiskChartOptions } = useUsageStatisticsModelHealthCharts(
-    options.adminStatistics,
+    options.overviewStatistics,
   )
 
-  const qualityTrendCharts = useUsageStatisticsQualityTrendCharts(options)
+  const qualityTrendCharts = useUsageStatisticsQualityTrendCharts(options.quality)
 
   return {
     trendChartData,

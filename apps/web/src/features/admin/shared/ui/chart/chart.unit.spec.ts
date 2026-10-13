@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { useTheme } from '../../../../../theme/composables/useTheme'
 import { adminThemeTokenFallbacks } from '../../core/adminThemeTokens'
 import { adminChartTheme } from './chart'
 
 describe('adminChartTheme', () => {
   beforeEach(() => {
-    document.documentElement.classList.remove('dark')
+    useTheme().setTheme('light')
   })
 
   afterEach(() => {
-    document.documentElement.classList.remove('dark')
+    useTheme().setTheme('light')
   })
 
   it('uses standard light mode axis line and split line by default', () => {
@@ -17,7 +18,7 @@ describe('adminChartTheme', () => {
   })
 
   it('swaps axis line and split line colors in dark mode', () => {
-    document.documentElement.classList.add('dark')
+    useTheme().setTheme('dark')
 
     expect(adminChartTheme.axisLine).toBe('#3f3f46')
     expect(adminChartTheme.splitLine).toBe('#27272a')

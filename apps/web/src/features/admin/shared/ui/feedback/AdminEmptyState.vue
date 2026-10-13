@@ -5,7 +5,7 @@
     role="status"
   >
     <div
-      class="flex shrink-0 items-center justify-center rounded-2xl border border-border bg-muted/60 text-muted-foreground"
+      class="flex shrink-0 items-center justify-center rounded-overlay border border-border bg-muted/60 text-muted-foreground"
       :class="compact ? 'size-10 mb-2' : 'size-12 mb-3'"
     >
       <component :is="icon || EmptyPage" :class="compact ? 'size-5' : 'size-6'" />

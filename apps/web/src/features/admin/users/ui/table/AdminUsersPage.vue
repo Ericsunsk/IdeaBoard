@@ -88,16 +88,16 @@
                 v-if="user.avatarUrl"
                 :src="user.avatarUrl"
                 :alt="user.displayName"
-                class="size-9 rounded-full object-cover"
+                class="size-9 rounded-pill object-cover"
               />
               <div
                 v-else
-                class="flex size-9 items-center justify-center rounded-full bg-muted font-bold text-primary"
+                class="flex size-9 items-center justify-center rounded-pill bg-muted font-bold text-primary"
               >
                 {{ user.initial }}
               </div>
               <span
-                class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card"
+                class="absolute top-0 right-0 h-2.5 w-2.5 rounded-pill border-2 border-card"
                 :class="user.isActive ? 'bg-success' : 'bg-destructive'"
               />
             </div>

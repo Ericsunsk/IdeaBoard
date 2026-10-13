@@ -8,7 +8,7 @@
   background: var(--canvas-tooltip-bg);
   color: var(--canvas-tooltip-text);
   border: var(--canvas-control-border-width) solid var(--canvas-accent-tooltip-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 4px 8px;
   font-size: 11px;
   line-height: 1.2;

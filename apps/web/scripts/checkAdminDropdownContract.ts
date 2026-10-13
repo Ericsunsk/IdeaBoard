@@ -4,21 +4,6 @@ import { join, relative, sep } from 'node:path'
 /**
  * Guard: dropdowns must share one keyboard model and, per surface, one skin.
  *
- * The Admin surface used to carry five dropdown implementations that disagreed
- * on everything:
- *
- *   - AdminSelect          reka Select     h-9  rounded-lg  admin-border
- *   - AdminOptionFilter    Popover + hand-rolled role="listbox"
- *   - AdminFilterPopover   Popover         h-9  rounded-xl  (no focus ring)
- *   - native <select>      HTML            h-8  rounded-xl  admin-border-soft
- *   - native <select>      HTML            (Canvas retouch skin)
- *
- * The Popover-based option filter was the serious one: it declared
- * `role="listbox"` and `aria-haspopup="listbox"` on a plain Popover, advertising
- * a composite widget it did not implement. There was no arrow-key navigation,
- * no typeahead, and no Home/End — keyboard and screen-reader users could not
- * actually operate it.
- *
  * Structure and keyboard behaviour now live in `@/components/ui/select`; this
  * check makes sure surfaces keep mounting that primitive instead of drifting
  * back onto Popover, and that surface skins stay in their own module.
@@ -264,7 +249,7 @@ for (const file of skinConsumers) {
     const [, tag = 'dropdown', attributes = ''] = match
     if (/\brounded-(xl|2xl|md|full)\b/.test(attributes)) {
       violations.push(
-        `${rel}: <${tag}> re-inlines geometry (\`rounded-xl\` etc.) while importing the shared skin. Read it from adminSelectSkin instead.`,
+        `${rel}: <${tag}> re-inlines geometry (\`rounded-control\` etc.) while importing the shared skin. Read it from adminSelectSkin instead.`,
       )
     }
   }
@@ -274,7 +259,12 @@ for (const file of skinConsumers) {
 /* 4. The skin must actually carry the pieces that used to be missing   */
 /* ------------------------------------------------------------------ */
 
-const requiredSkinPieces = ['focus-visible:ring-2', 'rounded-lg', 'ADMIN_SELECT_SIDE_OFFSET']
+const requiredSkinPieces = [
+  'focus-visible:ring-2',
+  'rounded-control',
+  'rounded-panel',
+  'ADMIN_SELECT_SIDE_OFFSET',
+]
 for (const piece of requiredSkinPieces) {
   if (!skin.includes(piece)) {
     violations.push(

@@ -56,7 +56,7 @@
           <!-- 新增网关按钮 -->
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+            class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
             :aria-label="MODELS_MESSAGES.addGateway"
             @click="gatewayDialogVisible = true"
           >
@@ -67,7 +67,7 @@
           <!-- 主按钮：添加模型 (使用项目品牌紫 Token) -->
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover cursor-pointer"
+            class="flex h-9 items-center gap-1.5 rounded-control bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover cursor-pointer"
             :aria-label="MODELS_MESSAGES.createModel"
             @click="handleCreateModel"
           >
@@ -98,7 +98,7 @@
       <div
         v-for="model in filteredModels"
         :key="model.id"
-        class="group flex flex-col h-full overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary-line-emphasis"
+        class="group flex flex-col h-full overflow-hidden rounded-panel border border-border bg-card transition-colors hover:border-primary-line-emphasis"
       >
         <!-- 卡片主体区域 (Upper Section，含近 7 天观测区) -->
         <AdminModelCardBody
@@ -129,7 +129,7 @@
           <div class="flex items-center gap-1">
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+              class="inline-flex items-center gap-1 rounded-control px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
               :aria-label="MODELS_MESSAGES.copyIdAria(model.id)"
               @click="copyModelId(model.id)"
             >
@@ -142,7 +142,7 @@
 
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+              class="inline-flex items-center gap-1 rounded-control px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
               :aria-label="MODELS_MESSAGES.editAria(model.name)"
               @click="handleEditModel(model)"
             >
@@ -152,7 +152,7 @@
 
             <button
               type="button"
-              class="inline-flex items-center justify-center rounded-md p-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-destructive cursor-pointer transition-colors"
+              class="inline-flex items-center justify-center rounded-control p-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-destructive cursor-pointer transition-colors"
               :aria-label="MODELS_MESSAGES.deleteAria(model.name)"
               @click="handleDeleteModel(model)"
             >
@@ -182,7 +182,7 @@
         <button
           v-if="!hasActiveFilter && allModels.length === 0"
           type="button"
-          class="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover cursor-pointer"
+          class="flex h-8 items-center gap-1.5 rounded-control bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover cursor-pointer"
           :aria-label="MODELS_MESSAGES.emptyCreateAria"
           @click="handleCreateModel"
         >
@@ -192,7 +192,7 @@
         <button
           v-else
           type="button"
-          class="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+          class="flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
           @click="clearFilters"
         >
           <Xmark class="size-3.5" />

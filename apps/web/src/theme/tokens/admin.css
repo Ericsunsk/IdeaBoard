@@ -69,16 +69,6 @@
   --color-admin-chart-mist: var(--primitive-neutral-450);
   --color-admin-chart-olive: var(--primitive-olive-500);
 
-  /*
-   * Admin radii derive from the single master in the theme bridge
-   * (factors reproduce the current pixel radii at a 16px root).
-   */
-  --radius-admin-dialog: calc(var(--radius) * 1.4);
-  /* Admin chrome radii share the master scale. */
-  --radius-admin-card: calc(var(--radius) * 1.2);
-  --radius-admin-control: calc(var(--radius) * 0.8);
-  --radius-admin-chip: calc(var(--radius) * 0.6);
-
   /* Admin layout spacing (shell/popover/drawer/empty-state widths). */
   --spacing-admin-shell: var(--primitive-size-1600);
   --spacing-admin-popover: var(--primitive-size-340);

@@ -1,11 +1,11 @@
 <template>
   <section
     v-if="hasError && resultsCount === 0"
-    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
+    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-panel border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
   >
     <div class="flex max-w-sm flex-col items-center">
       <div
-        class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-card text-destructive shadow-xs ring-1 ring-border/70"
+        class="mb-4 flex size-14 items-center justify-center rounded-panel bg-card text-destructive shadow-xs ring-1 ring-border/70"
       >
         <WarningTriangle class="size-6 stroke-[1.75]" aria-hidden="true" />
       </div>
@@ -17,7 +17,7 @@
       </p>
       <div class="mt-6">
         <Button
-          class="!h-9 !rounded-full !border-0 !bg-primary !px-5 !text-xs !font-semibold !text-primary-foreground hover:!bg-primary-hover cursor-pointer shadow-xs"
+          class="!h-9 !rounded-pill !border-0 !bg-primary !px-5 !text-xs !font-semibold !text-primary-foreground hover:!bg-primary-hover cursor-pointer shadow-xs"
           @click="$emit('reload')"
         >
           {{ t('search.actions.retry') }}
@@ -28,11 +28,11 @@
 
   <section
     v-else-if="resultsCount === 0"
-    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
+    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-panel border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
   >
     <div class="flex max-w-sm flex-col items-center">
       <div
-        class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-card shadow-xs ring-1 ring-border/70 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105"
+        class="mb-4 flex size-14 items-center justify-center rounded-panel bg-card shadow-xs ring-1 ring-border/70 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105"
       >
         <Search
           v-if="hasActiveSearch"
@@ -58,7 +58,7 @@
         <button
           v-if="hasActiveSearch"
           type="button"
-          class="h-9 px-4 rounded-full border border-border bg-card text-xs font-medium text-foreground shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-primary hover:text-primary cursor-pointer flex items-center gap-1.5"
+          class="h-9 px-4 rounded-pill border border-border bg-card text-xs font-medium text-foreground shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-primary hover:text-primary cursor-pointer flex items-center gap-1.5"
           @click="$emit('clearSearch')"
         >
           <Xmark class="size-3.5" aria-hidden="true" />
@@ -68,7 +68,7 @@
         <template v-else>
           <button
             type="button"
-            class="h-9 px-4 rounded-full border border-border bg-card text-xs font-medium text-foreground shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-primary hover:text-primary cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+            class="h-9 px-4 rounded-pill border border-border bg-card text-xs font-medium text-foreground shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-primary hover:text-primary cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!canAddReference"
             @click="$emit('openFilePicker')"
           >
@@ -77,7 +77,7 @@
           </button>
           <button
             type="button"
-            class="h-9 px-4 rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition-[background-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary-hover hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
+            class="h-9 px-4 rounded-pill bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition-[background-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary-hover hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5"
             @click="$emit('startCreating')"
           >
             <Plus class="size-3.5 stroke-[2.5]" aria-hidden="true" />

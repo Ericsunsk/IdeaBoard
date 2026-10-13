@@ -4,7 +4,7 @@
       v-for="(url, index) in view.preview.urls"
       :key="url"
       type="button"
-      class="block size-8 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-border bg-muted"
+      class="block size-8 shrink-0 cursor-pointer overflow-hidden rounded-control border border-border bg-muted"
       :aria-label="MONITOR_MESSAGES.resultInspectAria(row.task_id, index + 1)"
       @click="emit('inspect', row)"
     >

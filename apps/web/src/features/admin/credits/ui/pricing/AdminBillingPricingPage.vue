@@ -3,19 +3,13 @@
     <!-- 1. 顶栏操作与搜索过滤工具条 (1:1 复刻模型管理页与系统提示词页规范) -->
     <div v-if="!errorMessage" class="flex w-full flex-col gap-3">
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
-        <!-- 左侧：搜索输入框与状态筛选器 -->
+        <!-- 左侧：搜索输入框 -->
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <AdminToolbarSearch
             v-model="searchKeyword"
             fluid
             :input-label="BILLING_PRICING_MESSAGES.searchLabel"
             :placeholder="BILLING_PRICING_MESSAGES.searchPlaceholder"
-          />
-
-          <AdminOptionFilter
-            v-model="statusFilter"
-            :options="statusFilterOptions"
-            :label="BILLING_PRICING_MESSAGES.filterLabel"
           />
         </div>
 
@@ -54,7 +48,7 @@
     <!-- 2. 加载中状态 (AdminSpinner 自带 role="progressbar") -->
     <div
       v-if="isLoading && items.length === 0"
-      class="flex min-h-admin-empty-state items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
+      class="flex min-h-admin-empty-state items-center justify-center rounded-panel border border-border bg-card text-muted-foreground"
       :aria-label="BILLING_PRICING_MESSAGES.loadingAria"
     >
       <AdminSpinner class="size-9 text-primary" />
@@ -91,7 +85,7 @@
         <button
           v-if="hasActiveFilter"
           type="button"
-          class="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+          class="flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
           @click="clearFilters"
         >
           <Xmark class="size-3.5" />
@@ -146,7 +140,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { Coins, Refresh, Search, Xmark } from '@iconoir/vue'
 import { AdminButton } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
-import { AdminOptionFilter } from '../../../shared'
 import { AdminRefreshButton } from '../../../shared'
 import { AdminSpinner } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
@@ -239,32 +232,19 @@ const deletePending = reactive<Record<string, boolean>>({})
 const toast = useAdminToast()
 const confirm = useAdminConfirm()
 
-// 搜索与状态筛选
 const searchKeyword = ref('')
-const statusFilter = ref('')
 
-const statusFilterOptions = [
-  { label: BILLING_PRICING_MESSAGES.statusAll, value: '' },
-  { label: BILLING_PRICING_MESSAGES.statusActive, value: 'active' },
-  { label: BILLING_PRICING_MESSAGES.statusUnpriced, value: 'unpriced' },
-  { label: BILLING_PRICING_MESSAGES.statusDisabled, value: 'disabled' },
-  { label: BILLING_PRICING_MESSAGES.statusArchived, value: 'archived' },
-]
-
-const hasActiveFilter = computed(() => Boolean(searchKeyword.value.trim() || statusFilter.value))
+const hasActiveFilter = computed(() => Boolean(searchKeyword.value.trim()))
 
 function clearFilters() {
   searchKeyword.value = ''
-  statusFilter.value = ''
 }
 
 // 过滤后的列表
 const filteredItems = computed(() => {
   const query = searchKeyword.value.trim().toLowerCase()
-  const filter = statusFilter.value
 
   return sortedItems.value.filter((item) => {
-    if (filter && item.status !== filter) return false
     if (!query) return true
 
     if (item.displayName.toLowerCase().includes(query)) return true

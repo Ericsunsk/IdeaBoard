@@ -22,7 +22,7 @@
     padding: 0;
     flex-shrink: 0;
     border: var(--round-control-border-width) solid var(--round-control-border);
-    border-radius: 9999px;
+    border-radius: var(--radius-pill);
     background: var(--round-control-bg);
     color: var(--round-control-color);
     box-shadow: var(--round-control-shadow);

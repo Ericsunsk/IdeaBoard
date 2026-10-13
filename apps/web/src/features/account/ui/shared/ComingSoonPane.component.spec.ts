@@ -25,7 +25,7 @@ describe('ComingSoonPane', () => {
 
     const capsule = screen.getByText(i18n.global.t('account.comingSoon'))
     const root = capsule.parentElement!
-    expect(root).toHaveClass('rounded-full', 'border', 'border-border')
+    expect(root).toHaveClass('rounded-pill', 'border', 'border-border')
     expect(root).toHaveClass('bg-card')
     expect(root.className.split(' ')).not.toContain('bg-muted')
     expect(root.querySelector('[aria-hidden="true"]')).toBeNull()

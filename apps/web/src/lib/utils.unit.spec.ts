@@ -16,4 +16,13 @@ describe('cn utility', () => {
     expect(cn('border-admin-border', 'border-page-chrome-border')).toBe('border-page-chrome-border')
     expect(cn('border-overlay-border', 'border-auth-input-border')).toBe('border-auth-input-border')
   })
+
+  it('lets shared radius overrides replace base geometry', () => {
+    expect(cn('rounded-control', 'rounded-pill')).toBe('rounded-pill')
+    expect(cn('rounded-panel', 'rounded-overlay')).toBe('rounded-overlay')
+    expect(cn('rounded-control', 'rounded-none')).toBe('rounded-none')
+    expect(cn('rounded-overlay', 'rounded-t-control', 'rounded-t-panel')).toBe(
+      'rounded-overlay rounded-t-panel',
+    )
+  })
 })

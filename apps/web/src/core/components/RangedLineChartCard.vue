@@ -19,7 +19,7 @@
           type="button"
           role="radio"
           :aria-checked="selectedRange === range.key"
-          class="hit-target-32-inline cursor-pointer rounded-md px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
+          class="hit-target-32-inline cursor-pointer rounded-control px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
           :class="selectedRange === range.key ? rangeSelectedClass : rangeUnselectedClass"
           @click="selectedRange = range.key"
         >
@@ -91,7 +91,7 @@ withDefaults(defineProps<RangedLineChartProps<TRange>>(), {
   cardClass: undefined,
   elevated: undefined,
   rangeGroupClass:
-    'inline-flex items-center rounded-lg border border-border bg-muted p-0.5 text-xs',
+    'inline-flex items-center rounded-control border border-border bg-muted p-0.5 text-xs',
   rangeSelectedClass: 'bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring',
   rangeUnselectedClass: 'text-muted-foreground hover:text-foreground focus-visible:ring-ring',
   rangeAriaLabel: undefined,

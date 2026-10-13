@@ -70,7 +70,7 @@
         <button
           v-if="hasActiveFilter"
           type="button"
-          class="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+          class="flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
           @click="clearFilters"
         >
           <Xmark class="size-3.5" />
@@ -155,7 +155,7 @@
                   <span
                     v-for="variable in rowView(data.slug).vars"
                     :key="variable.key"
-                    class="inline-flex items-center rounded bg-muted/80 px-1.5 py-0.5 font-mono text-admin-micro font-medium text-muted-foreground"
+                    class="inline-flex items-center rounded-control bg-muted/80 px-1.5 py-0.5 font-mono text-admin-micro font-medium text-muted-foreground"
                   >
                     {{ variable.key }}
                   </span>

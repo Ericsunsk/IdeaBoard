@@ -18,7 +18,7 @@
         type="button"
         variant="ghost"
         size="icon"
-        class="size-6 min-w-6 shrink-0 rounded-full border border-primary/35 bg-card p-0 text-primary shadow-none hover:border-primary/50 hover:bg-primary/10 active:border-primary/55 active:bg-primary/15 focus-visible:outline-none focus-visible:shadow-focus-ring disabled:cursor-wait disabled:opacity-70 md:size-[26px] md:min-w-[26px]"
+        class="size-6 min-w-6 shrink-0 rounded-pill border border-primary/35 bg-card p-0 text-primary shadow-none hover:border-primary/50 hover:bg-primary/10 active:border-primary/55 active:bg-primary/15 focus-visible:outline-none focus-visible:shadow-focus-ring disabled:cursor-wait disabled:opacity-70 md:size-[26px] md:min-w-[26px]"
         :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :is-disabled="stopImpersonatingLoading"

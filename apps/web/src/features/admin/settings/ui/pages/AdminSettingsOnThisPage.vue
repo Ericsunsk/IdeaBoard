@@ -11,7 +11,7 @@
       <!-- 滑动指示条：目录项统一单行 h-[var(--toc-item-step)]（32px），指示条位移共用同一变量，直接按 index 定位，无需测量 DOM；若将来出现可换行标题，此处需改回测量定位 -->
       <span
         aria-hidden="true"
-        class="absolute top-0 left-[-1px] h-[var(--toc-item-step)] w-0.5 rounded-full bg-primary transition-[transform,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-control-easing)]"
+        class="absolute top-0 left-[-1px] h-[var(--toc-item-step)] w-0.5 rounded-pill bg-primary transition-[transform,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-control-easing)]"
         :style="indicatorStyle"
       />
       <button

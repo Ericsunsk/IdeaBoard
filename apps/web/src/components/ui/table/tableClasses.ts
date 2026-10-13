@@ -37,4 +37,4 @@ export const tableCaptionClasses = 'mt-4 text-sm text-muted-foreground'
  * opt-in; the header row itself stays at `h-10`.
  */
 export const tableSortButtonClasses =
-  'inline-flex min-h-8 items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
+  'inline-flex min-h-8 items-center gap-1 rounded-control transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'

@@ -48,7 +48,7 @@
         <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
         <Select :model-value="sortMode" @update:model-value="onSortModeChange">
           <SelectTrigger :id="sortSelectId" :class="catalogClasses.sortSelectTrigger">
-            <SelectValue />
+            <SelectValue>{{ selectedSortLabel }}</SelectValue>
             <SelectIcon>
               <NavArrowDown :class="catalogClasses.sortSelectIcon" aria-hidden="true" />
             </SelectIcon>
@@ -338,6 +338,10 @@ const sortOptions = computed<Array<{ label: string; value: CatalogSortMode }>>((
   { label: t('board.sortRecent'), value: 'recent' },
   { label: t('board.sortName'), value: 'name' },
 ])
+
+const selectedSortLabel = computed(
+  () => sortOptions.value.find((option) => option.value === sortMode.value)?.label,
+)
 
 // Select emits a loose value; only accept one the option list actually offers so
 // a stray emission cannot put the catalog into a mode it has no label for.

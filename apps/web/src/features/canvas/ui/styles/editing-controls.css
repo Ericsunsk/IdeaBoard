@@ -17,7 +17,7 @@
   );
   --editing-controls-control-height: var(--canvas-control-size-sm);
   --editing-controls-compact-control-height: calc(var(--editing-controls-control-height) - 4px);
-  --editing-controls-control-radius: var(--canvas-radius-md);
+  --editing-controls-control-radius: var(--radius-control);
   --editing-controls-control-border-color: var(--canvas-accent-border);
   --editing-controls-control-hover-border-color: var(--canvas-accent);
   --editing-controls-control-focus-border-color: var(--focus-border-color);
@@ -42,7 +42,7 @@
 
 .editing-controls-panel {
   border: var(--editing-controls-border-width) solid var(--canvas-glass-border);
-  border-radius: var(--canvas-radius-xl);
+  border-radius: var(--radius-panel);
   background: var(--canvas-glass-bg);
   box-shadow: none;
   backdrop-filter: blur(var(--canvas-glass-blur));

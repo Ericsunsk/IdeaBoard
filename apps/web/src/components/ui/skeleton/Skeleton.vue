@@ -1,7 +1,7 @@
 <template>
   <div
     data-ui="skeleton"
-    :class="cn('animate-pulse rounded-md bg-muted', props.class)"
+    :class="cn('animate-pulse rounded-control bg-muted', props.class)"
     :style="skeletonStyle"
   />
 </template>

@@ -2,7 +2,7 @@
   <div
     :class="
       cn(
-        'rounded-xl border border-border bg-card text-card-foreground',
+        'rounded-panel border border-border bg-card text-card-foreground',
         elevated && 'shadow',
         props.class,
       )

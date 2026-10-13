@@ -33,6 +33,30 @@ describe('admin token closure', () => {
 })
 
 describe('tier role native utility emission', () => {
+  it('provides shared control, panel, overlay, and pill radii', async () => {
+    const roles = { control: 8, panel: 12, overlay: 16, pill: 9999 }
+    const css = await build(Object.keys(roles).map((role) => `rounded-${role}`))
+
+    for (const [role, pixels] of Object.entries(roles)) {
+      expect(css).toContain(`--primitive-radius-${role === 'pill' ? role : pixels}: ${pixels}px`)
+      expect(css).toContain(
+        `--radius-${role}: var(--primitive-radius-${role === 'pill' ? role : pixels})`,
+      )
+      expect(css).toMatch(
+        new RegExp(`\\.rounded-${role}\\s*\\{\\s*border-radius: var\\(--radius-${role}\\)`),
+      )
+    }
+  })
+
+  it('disables the framework radius size ladder', async () => {
+    const sizes = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl']
+    const css = await build(sizes.map((size) => `rounded-${size}`))
+
+    for (const size of sizes) {
+      expect(css).not.toMatch(new RegExp(`\\.rounded-${size}\\s*\\{`))
+    }
+  })
+
   it('emits app stacking utilities from --z-index-* without manual definitions', async () => {
     const css = await build(['z-banner', 'z-lightbox', 'z-content', 'z-popover'])
     for (const [utility, token] of [
@@ -49,8 +73,7 @@ describe('tier role native utility emission', () => {
 
   it('emits radius, shadow, and type utilities from their tier roles', async () => {
     const css = await build([
-      'rounded-board-dialog',
-      'rounded-admin-dialog',
+      'rounded-overlay',
       'shadow-board-dialog',
       'shadow-focus-ring',
       'shadow-floating',
@@ -60,8 +83,7 @@ describe('tier role native utility emission', () => {
       'bg-admin-card',
       'bg-chart-1',
     ])
-    expect(css).toMatch(/\.rounded-board-dialog\s*\{\s*border-radius: var\(--radius-board-dialog\)/)
-    expect(css).toMatch(/\.rounded-admin-dialog\s*\{\s*border-radius: var\(--radius-admin-dialog\)/)
+    expect(css).toMatch(/\.rounded-overlay\s*\{\s*border-radius: var\(--radius-overlay\)/)
     // Authored elevation recipes resolve through physical ingredients.
     expect(css).toMatch(
       /\.shadow-board-dialog\s*\{[^}]*--tw-shadow: var\(--primitive-shadow-22-58-soft\)/,

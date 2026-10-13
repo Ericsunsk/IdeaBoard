@@ -105,7 +105,7 @@
         </AdminAlert>
 
         <div
-          class="grid gap-3 rounded-lg border border-border bg-muted/50 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+          class="grid gap-3 rounded-panel border border-border bg-muted/50 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
         >
           <AdminFormField
             :label="SETTINGS_MESSAGES.mailTestRecipientLabel"
@@ -127,7 +127,7 @@
           </ActionButton>
         </div>
         <div
-          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 p-4"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-destructive/40 p-4"
           role="group"
           :aria-label="SETTINGS_MESSAGES.mailDangerZoneTitle"
         >
