@@ -17,7 +17,7 @@
     --foreground: var(--primitive-neutral-900);
     --card: var(--primitive-neutral-0);
     --card-foreground: var(--primitive-neutral-850);
-    --popover: var(--primitive-neutral-0-alpha-95);
+    --popover: var(--primitive-neutral-0);
     --popover-foreground: var(--primitive-neutral-850);
 
     /* ── Action & Accent Semantics ── */
@@ -121,7 +121,7 @@
     --foreground: var(--primitive-neutral-100);
     --card: var(--primitive-neutral-910-alpha-85);
     --card-foreground: var(--primitive-neutral-100);
-    --popover: var(--primitive-neutral-910-alpha-95);
+    --popover: var(--palette-dark-1);
     --popover-foreground: var(--primitive-neutral-100);
 
     /* ── Action & Accent Semantics ── */
@@ -237,7 +237,7 @@
 
     /* ── Page chrome, dots, overlays, scrims ── */
     --color-page-dot: var(--palette-dark-border);
-    --color-overlay-bg: var(--primitive-neutral-910-alpha-95);
+    --color-overlay-bg: var(--popover);
     --color-overlay-border: var(--palette-dark-border);
     --color-overlay-item: var(--palette-dark-text-2);
     --color-overlay-item-hover-bg: var(--palette-dark-surface-hover);

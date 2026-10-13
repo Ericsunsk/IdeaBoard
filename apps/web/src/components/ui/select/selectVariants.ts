@@ -12,7 +12,7 @@ import { type VariantProps, cva } from 'class-variance-authority'
  * `Popover`/`DropdownMenu` callers do. Do not add an Admin or Board token here.
  */
 export const selectTriggerVariants = cva(
-  'flex w-full items-center justify-between gap-2 rounded-control border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs outline-none transition-[color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
+  'flex w-full items-center justify-between gap-2 rounded-control border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap outline-none transition-[color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
   {
     variants: {
       size: {
@@ -33,7 +33,7 @@ export const selectTriggerVariants = cva(
  * varies by size, uses `cva()`.
  */
 export const selectContentVariants =
-  'relative z-50 max-h-96 min-w-32 overflow-hidden rounded-panel border border-border bg-popover text-popover-foreground shadow-md outline-none overlay-popover-motion'
+  'relative z-50 max-h-96 min-w-32 overflow-hidden rounded-panel border border-border bg-popover text-popover-foreground outline-none overlay-popover-motion'
 
 // Intentional exception: menu items (select + dropdown-menu) use focus:bg-accent
 // with no focus ring — avoids visual churn inside open menus, common practice.

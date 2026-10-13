@@ -4,7 +4,7 @@
       v-bind="cleanProps(props)"
       :class="
         cn(
-          'z-50 min-w-32 overflow-hidden rounded-panel border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none overlay-popover-motion',
+          'z-50 min-w-32 overflow-hidden rounded-panel border border-border bg-popover p-1 text-popover-foreground outline-none overlay-popover-motion',
           props.class,
         )
       "

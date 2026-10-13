@@ -129,9 +129,12 @@
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
   z-index: 43;
+  border: var(--node-tool-border-width) solid var(--canvas-glass-border);
+  border-radius: var(--radius-panel);
+  background: var(--popover);
 }
 
-/* Shared glass surface for floating node-tool panels and popovers. */
+/* Glass surface for floating node-tool panels. */
 .node-tool-glass-surface {
   border: var(--node-tool-border-width) solid var(--canvas-glass-border);
   border-radius: var(--radius-panel);

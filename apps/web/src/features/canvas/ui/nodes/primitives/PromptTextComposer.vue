@@ -189,12 +189,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
   border-color: var(--focus-border-color);
 }
 
-/*
- * The node variant is borderless by design, so it cannot signal focus through
- * a border stroke like the floating variant. A focus-within glow mirrors that
- * intent without touching layout (box-shadow only); the textarea keeps its own
- * ring as the primary indicator.
- */
 .prompt-text-composer.variant-node:focus-within {
   border-radius: var(--radius-control);
   box-shadow: 0 0 0 2px var(--focus-outline-color);

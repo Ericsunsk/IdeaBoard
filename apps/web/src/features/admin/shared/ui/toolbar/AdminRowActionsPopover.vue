@@ -3,7 +3,7 @@
     <PopoverAnchor v-if="anchorEl" :reference="anchorEl" />
     <PopoverPortal>
       <PopoverContent
-        class="z-admin-dialog min-w-[176px] rounded-panel border border-border bg-card p-1.5 text-foreground outline-none overlay-popover-motion"
+        class="z-admin-dialog min-w-[176px] rounded-panel border border-border bg-popover p-1.5 text-foreground outline-none overlay-popover-motion"
         :side-offset="4"
         align="end"
       >

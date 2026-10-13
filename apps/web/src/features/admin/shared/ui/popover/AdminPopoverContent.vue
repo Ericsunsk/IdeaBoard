@@ -6,7 +6,7 @@
       v-bind="$attrs"
       :class="
         cn(
-          'z-admin-dialog min-w-[160px] rounded-panel border border-border bg-card p-1 text-foreground outline-none overlay-popover-motion',
+          'z-admin-dialog min-w-[160px] rounded-panel border border-border bg-popover p-1 text-foreground outline-none overlay-popover-motion',
           props.class,
         )
       "

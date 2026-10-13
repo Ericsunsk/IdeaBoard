@@ -3,7 +3,7 @@
     <div
       v-if="isVisible"
       v-bind="$attrs"
-      class="node-tool-output-count-popover node-tool-glass-surface"
+      class="node-tool-output-count-popover"
       :class="layoutClass"
     >
       <slot />

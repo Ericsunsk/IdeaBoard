@@ -41,4 +41,4 @@ export const adminSelectItemCheckClass = 'size-4 text-primary'
 
 /** Overlay panels that host more than a plain option list. */
 export const adminSelectPanelClass =
-  'z-admin-dialog w-[260px] max-w-[calc(100vw_-_48px)] rounded-panel border border-border bg-card p-4 text-foreground outline-none overlay-popover-motion'
+  'z-admin-dialog w-[260px] max-w-[calc(100vw_-_48px)] rounded-panel border border-border bg-popover p-4 text-foreground outline-none overlay-popover-motion'

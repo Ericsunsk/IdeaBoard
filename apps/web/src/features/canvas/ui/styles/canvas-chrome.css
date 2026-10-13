@@ -193,7 +193,6 @@
   background: var(--color-overlay-bg);
   box-shadow: var(--shadow-overlay-menu);
   padding: 6px;
-  backdrop-filter: blur(var(--canvas-glass-blur));
   transform-origin: top left;
 }
 

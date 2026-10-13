@@ -102,7 +102,7 @@
   --color-page-chrome-focus-ring: var(--color-board-focus-ring);
   --shadow-page-chrome: none;
   --spacing-overlay-gutter: var(--primitive-size-10);
-  --color-overlay-bg: var(--primitive-neutral-0-alpha-98);
+  --color-overlay-bg: var(--popover);
   --color-overlay-border: var(--palette-light-border);
   --color-overlay-item: var(--palette-light-text-1);
   --color-overlay-item-hover-bg: var(--palette-light-hover);
