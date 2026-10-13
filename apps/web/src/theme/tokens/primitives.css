@@ -192,12 +192,15 @@
   --primitive-size-16: 16px;
   --primitive-size-32: 32px;
   --primitive-size-24: 24px;
+  --primitive-size-44: 44px;
   --primitive-blur-12: 12px;
   --primitive-radius-base: 0.625rem;
   --primitive-radius-rounded: 999px;
   --primitive-size-3: 3px;
-  --primitive-font-system-ui:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Inter's Latin face is declared in type.css; CJK uses the platform fallback chain. */
+  --primitive-font-inter-variable:
+    'Inter Variable', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --primitive-type-size-10: 10px;
   --primitive-type-size-11: 11px;
   --primitive-type-size-12: 12px;
@@ -213,7 +216,6 @@
   --primitive-font-weight-650: 650;
   --primitive-font-weight-680: 680;
   --primitive-font-weight-760: 760;
-  --primitive-font-satoshi: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
   --primitive-font-handwriting:
     'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
   --primitive-leading-tight: 1.2;

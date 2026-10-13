@@ -250,6 +250,12 @@ function resolveLayerIcon(layer: RetouchLayer): Component {
     color var(--motion-control-duration) var(--motion-control-easing);
 }
 
+@media (pointer: coarse) {
+  .retouch-layer-row {
+    min-height: var(--spacing-touch-target-coarse);
+  }
+}
+
 .retouch-layer-row:hover,
 .retouch-layer-row.active {
   border-color: var(--canvas-accent-outline);

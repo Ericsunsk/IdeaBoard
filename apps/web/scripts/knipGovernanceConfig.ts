@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import ts from 'typescript'
+import postcss from 'postcss'
 import { loadSeamInventory } from './seamInventory.ts'
 import { vueAutoImportCompiler } from '../node_modules/knip/dist/plugins/_vue/auto-import.js'
 
@@ -13,6 +14,26 @@ export type KnipGovernanceManifest = {
 }
 
 const REQUIRED_KNIP_VERSION = '6.32.3'
+
+/** Follow CSS imports and scoped package asset URLs in Knip's analysis input. */
+function cssDependencyCompiler(source: string): string {
+  const imports = new Set<string>()
+  const stylesheet = postcss.parse(source)
+  stylesheet.walkAtRules('import', (rule) => {
+    const specifier = rule.params.match(/^(?:url\(\s*)?(['"])(.*?)\1/)?.[2]
+    if (specifier && !/^(?:[a-z][\w+.-]*:|\/\/|\/|#)/i.test(specifier)) imports.add(specifier)
+  })
+  stylesheet.walkDecls((declaration) => {
+    for (const match of declaration.value.matchAll(
+      /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)]+))\s*\)/gi,
+    )) {
+      const specifier = match[1] ?? match[2] ?? match[3]
+      if (specifier && /^@[^/\s]+\/[^/\s]+\//.test(specifier))
+        imports.add(specifier.split(/[?#]/)[0]!)
+    }
+  })
+  return [...imports].map((specifier) => `import ${JSON.stringify(specifier)};`).join('\n')
+}
 
 export function assertClientCompatibilityAlias(source: string): void {
   const client = ts.createSourceFile('client.ts', source, ts.ScriptTarget.Latest, true)
@@ -562,6 +583,7 @@ export function createGovernanceConfig(
     },
     compilers: {
       ...parsed.config.compilers,
+      css: cssDependencyCompiler,
       ts: (source: string, file: string) => annotateKnipPublic(source, file, manifest, root),
       '.vue': (source: string, file: string) => annotateVue(source, file, manifest, root),
     },

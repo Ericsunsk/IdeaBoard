@@ -118,6 +118,62 @@ function withWorkspace(check: (workspace: string) => void) {
 }
 
 describe('Knip runtime and test graphs', () => {
+  test.each([false, true])(
+    'CSS package fonts remain checked in production=%s',
+    (isProduction) =>
+      withWorkspace((workspace) => {
+        const normalConfig = readConfig('knip.jsonc')
+        write(
+          workspace,
+          'knip.jsonc',
+          JSON.stringify({ ...normalConfig, entry: [...normalConfig.entry, 'src/app/main.ts'] }),
+        )
+        const packagePath = path.join(workspace, 'package.json')
+        const manifest = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
+        manifest.dependencies['@fixture/font'] = '1.0.0'
+        fs.writeFileSync(packagePath, JSON.stringify(manifest))
+        write(
+          workspace,
+          'node_modules/@fixture/font/package.json',
+          JSON.stringify({
+            name: '@fixture/font',
+            version: '1.0.0',
+            exports: { './files/latin.woff2': './files/latin.woff2' },
+          }),
+        )
+        write(workspace, 'node_modules/@fixture/font/files/latin.woff2', 'font fixture')
+        const entry = fs.readFileSync(path.join(workspace, 'src/app/main.ts'), 'utf8')
+        write(workspace, 'src/app/main.ts', `${entry}\nimport './style.css'\n`)
+        write(workspace, 'src/app/style.css', '@import "../theme/type.css";')
+        const face = '@font-face { src: url("@fixture/font/files/latin.woff2"); }'
+        write(workspace, 'src/theme/type.css', face)
+        const used = run(workspace, isProduction)
+        expect(runtimeIssues(used.report)).toEqual([])
+
+        delete manifest.dependencies['@fixture/font']
+        fs.writeFileSync(packagePath, JSON.stringify(manifest))
+        const unlisted = run(workspace, isProduction)
+        expect(unlisted.status).toBe(1)
+        expect(unlisted.report.issues.flatMap((row) => row.unlisted ?? [])).toContainEqual(
+          expect.objectContaining({ name: '@fixture/font' }),
+        )
+
+        manifest.dependencies['@fixture/font'] = '1.0.0'
+        fs.writeFileSync(packagePath, JSON.stringify(manifest))
+        write(
+          workspace,
+          'src/theme/type.css',
+          `/* ${face} */ .label::before { content: 'url("@fixture/font/files/latin.woff2")'; }`,
+        )
+        const unused = run(workspace, isProduction)
+        expect(unused.status).toBe(1)
+        expect(unused.report.issues.flatMap((row) => row.dependencies ?? [])).toContainEqual(
+          expect.objectContaining({ name: '@fixture/font' }),
+        )
+      }),
+    30_000,
+  )
+
   test(
     'normal and production gates report unused private exports and types without category filters',
     () =>

@@ -111,12 +111,12 @@
   --shadow-overlay-menu: none;
   --spacing-page-dot: var(--primitive-size-12);
   --spacing-page-chrome-inset: var(--primitive-size-16);
-  /* Touch-target floors: 32px default/fine and coarse profiles;
-     24px precision drag handles. */
+  /* Touch-target floors: 32px fine-pointer default, 24px precision drag
+     handles, 44px coarse-pointer ordinary controls. */
   --spacing-touch-target-min: var(--primitive-size-32);
   /* AA floor, drag handles only (see touch-target.css). */
   --spacing-touch-target-aa: var(--primitive-size-24);
-  --spacing-touch-target-coarse: var(--primitive-size-32);
+  --spacing-touch-target-coarse: var(--primitive-size-44);
 
   /* ── Marketing landing page tokens ───────────────────────── */
   --color-home-hero-text: var(--primitive-zinc-875);
@@ -241,8 +241,7 @@
   /* ── shadcn-vue standard theme mappings ─────────────────── */
 
   /*
-   * Radius roles derive from one master scale. Factors preserve their
-   * proportions; the pill radius is an independent physical ingredient.
+   * Radius roles derive from one master scale; the pill radius is independent.
    */
   --radius: var(--primitive-radius-base);
   --radius-control: calc(var(--radius) * 1);
@@ -273,12 +272,12 @@
   --shadow-auth-focus: 0 0 0 3px var(--color-auth-focus-ring);
   --radius-xs: calc(var(--radius) * 0.2);
   --radius-sm: calc(var(--radius) * 0.4);
-  --radius-md: calc(var(--radius) * 0.6);
-  --radius-lg: calc(var(--radius) * 0.8);
-  --radius-xl: calc(var(--radius) * 1.2);
-  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: calc(var(--radius) * 1.2);
+  --radius-xl: calc(var(--radius) * 1.6);
+  --radius-2xl: calc(var(--radius) * 2);
   --radius-3xl: calc(var(--radius) * 2.4);
-  --radius-4xl: calc(var(--radius) * 3.2);
+  --radius-4xl: calc(var(--radius) * 2.8);
 }
 
 /*

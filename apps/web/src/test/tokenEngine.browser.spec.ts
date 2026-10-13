@@ -42,6 +42,8 @@ describe('token engine paint equivalence (light)', () => {
     ['--border', 'border-color', 'rgb(228, 228, 231)'],
     ['--ring', 'color', 'rgba(122, 107, 213, 0.25)'],
     ['--destructive', 'color', 'rgb(220, 38, 38)'],
+    // Resting tool accent keeps white action text above 4.5:1.
+    ['--color-tool-accent', 'background-color', 'rgb(114, 95, 208)'],
     ['--color-canvas-workspace-bg', 'background-color', 'rgb(231, 231, 231)'],
     ['--color-admin-bg', 'background-color', 'rgb(251, 251, 251)'],
   ] as const)('%s paints %s', (token, property, expected) => {

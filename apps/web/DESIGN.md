@@ -88,15 +88,22 @@ Token ownership:
   reduced-motion stay in sync.
 - Type (`tokens/type.css` + `type-*` utilities in `theme.css`): family-only
   `--font-*`, size `--text-*` (full Admin variant ladder kept), explicit
-  `type-{display,title,body,caption,code}` shorthands.
+  `type-{display,title,body,caption,code}` shorthands. `--font-sans`/`--font-admin`/
+  `--font-display` resolve to Inter Variable (fontsource, Latin subset,
+  `font-display: swap`, declared in `tokens/type.css`) with the PingFang SC →
+  Microsoft YaHei → Noto Sans CJK SC → system chain; mono stays on the system
+  stack. Typography roles use 400/500/600; Admin strong/emphasis/display use
+  600, with their existing size and leading variants.
 - Stacking (`tokens/z.css`): native `--z-index-*` roles emitting `z-*`
   utilities (`z-admin-dialog`, `z-banner`, …); ascending numeric order is the
   contract.
 - Radius: single `--radius` master (0.625rem); every `--radius-*` role is a
-  `calc()` factor reproducing current pixels; `pill` stays independent.
+  `calc()` factor on the shared grid (`xs/sm/md/lg/xl/2xl/3xl/4xl` =
+  `0.2/0.4/0.8/1.2/1.6/2/2.4/2.8` → 2/4/8/12/16/20/24/28px at a 16px root);
+  `pill` stays independent.
 - Shadows: Tier 2 resting/floating roles (`--shadow-focus-ring`,
-  `--shadow-floating`, `--shadow-raised`, admin/board/auth tiers) with current
-  paint; mode-varying shadows carry explicit dark assignments.
+  `--shadow-floating`, `--shadow-raised`, admin/board/auth tiers); mode-varying
+  shadows carry explicit dark assignments.
 - `--color-admin-*`, `--text-admin-*`, `--leading-admin-*`: Admin.
 - `--color-canvas-*`: Canvas nodes, tools, overlays, image interactions.
 - `--color-board-*`: Boards.
@@ -280,13 +287,14 @@ Bind `:model-value` and forward through the command instead, the same shape
 (`readonly-controller` rule in `scripts/checkRetirementReplacements.ts`) fails if a
 `v-model` reappears there.
 
-## Touch Targets: 32px Floor, 24px For Drag Handles
+## Touch Targets: 32px Floor, 44px Coarse, 24px For Drag Handles
 
 WCAG 2.2 SC 2.5.8 (Target Size Minimum, AA) asks for 24x24 CSS px. This repo holds a
-stricter 32px floor, declared once as `--spacing-touch-target-min` in
+stricter 32px floor for fine-pointer controls and a 44px floor for ordinary
+coarse-pointer/mobile controls, declared once as `--spacing-touch-target-min` (32px)
+and `--spacing-touch-target-coarse` (44px) in
 `src/theme/theme.css` alongside the precision (`--spacing-touch-target-aa`,
-24px) and coarse (`--spacing-touch-target-coarse`, 32px)
-profiles, and enforced by `npm run lint:touch-target`
+24px) profile, and enforced by `npm run lint:touch-target`
 (`scripts/checkTouchTargetContract.ts`), which resolves CSS-owned profiles and verifies floors and pointer routing.
 
 Controls that are visually small by design do not inflate to 32px. Instead the _hit
@@ -300,10 +308,10 @@ area_ grows past the visual box through `src/theme/atoms/touch-target.css`:
 | `.hit-target-control`   | coarse profile     | real boxes in compact Admin icon and table row action families                 |
 
 The ordinary `32` overlays select the fine profile by default and the coarse
-profile under `(pointer: coarse)`; the inline variant grows the block axis
+profile under `(pointer: coarse)` (44px hit bounds on touch); the inline variant grows the block axis
 only. `.hit-target-control` applies the coarse profile as a real minimum box
-size so neighboring controls participate in layout. Both ordinary profiles
-are currently 32px; precision handles use an independent 24px profile.
+size so neighboring controls participate in layout. Precision handles use an
+independent 24px profile.
 
 The pseudo-element belongs to the control itself, so pointer and keyboard
 activation still route to the real element and the accessible name, role, and

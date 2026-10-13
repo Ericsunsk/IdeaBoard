@@ -58,6 +58,7 @@
     "lint:theme-contract": "tsx scripts/checkThemeContractRetirements.ts"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@iconoir/vue": "^7.12.1",
     "@tanstack/vue-query": "^5.102.8",
     "@tanstack/vue-virtual": "^3.13.39",

@@ -85,7 +85,9 @@
     --color-workspace-connection: var(--primitive-neutral-1000-alpha-20);
     --color-workspace-connection-selected: var(--primitive-neutral-1000-alpha-40);
     --color-workspace-connection-running: var(--primitive-neutral-1000-alpha-40);
-    --color-tool-accent: var(--primitive-violet-650);
+    /* Resting accent keeps white action text at AA: violet-675 clears 4.5:1
+       (4.93:1); hover/pressed use violet-700 for a visible delta. */
+    --color-tool-accent: var(--primitive-violet-675);
     --color-tool-accent-hover: var(--primitive-violet-700);
     --color-tool-accent-pressed: var(--primitive-violet-700);
     --color-tool-accent-soft: var(--primitive-violet-650-alpha-8);
@@ -279,6 +281,13 @@
     --color-auth-primary-text: var(--palette-dark-0);
     --color-auth-primary-shadow: transparent;
     --color-auth-primary-shadow-hover: transparent;
+    /*
+     * The dark auth primary is a near-white gradient
+     * on a near-black shell, so elevation already reads through luminance
+     * contrast plus the shell border. A white glow would halo into the shell
+     * and wash the dark action text; a violet glow would misrepresent the
+     * white-accent dark treatment, so the action uses no shadow.
+     */
     --shadow-auth-primary: none;
     --shadow-auth-primary-hover: none;
     --color-auth-link: var(--primitive-neutral-0);

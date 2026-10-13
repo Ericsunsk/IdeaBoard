@@ -33,7 +33,7 @@ afterEach(() => {
 describe('touch-target profile tokens', () => {
   it('pins the fine, precision, and coarse profiles', () => {
     const root = probe()
-    expect(tokensOf(root)).toEqual({ min: '32px', precision: '24px', coarse: '32px' })
+    expect(tokensOf(root)).toEqual({ min: '32px', precision: '24px', coarse: '44px' })
   })
 })
 

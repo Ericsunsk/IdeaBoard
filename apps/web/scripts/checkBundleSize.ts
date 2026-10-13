@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
-type AssetKind = 'js' | 'css'
+type AssetKind = 'js' | 'css' | 'font'
 
 type ManifestChunk = {
   file: string
@@ -31,6 +31,8 @@ const LOCALE_CHUNK_BUDGET_BYTES = 64_000
 // The layered token engine produces a ~213 KB largest CSS asset. Keep a
 // small margin for semantic declarations and their physical ingredients.
 const CSS_BUDGET = { totalBytes: 350_000, largestBytes: 225_000 }
+// Inter Variable's Latin woff2 is ~48 KB; allow a small margin for font updates.
+const FONT_BUDGET = { totalBytes: 70_000 }
 const TOTAL_GZIP_BUDGET_BYTES = 2_000_000
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
@@ -48,14 +50,15 @@ async function listAssetFiles(directory: string): Promise<string[]> {
       files.push(...(await listAssetFiles(entryPath)))
       continue
     }
-    if (entry.isFile() && /\.(js|css)$/.test(entry.name)) files.push(entryPath)
+    if (entry.isFile() && /\.(js|css|woff2?|ttf|otf)$/.test(entry.name)) files.push(entryPath)
   }
 
   return files
 }
 
 async function summarize(kind: AssetKind, files: string[]): Promise<AssetSummary> {
-  const matchingFiles = files.filter((file) => file.endsWith(`.${kind}`))
+  const suffix = kind === 'font' ? /\.(woff2?|ttf|otf)$/ : new RegExp(`\\.${kind}$`)
+  const matchingFiles = files.filter((file) => suffix.test(file))
   const sizes = await Promise.all(
     matchingFiles.map(async (file) => {
       const buffer = await readFile(file)
@@ -186,10 +189,16 @@ async function findOversizedJSChunks(
 async function main() {
   const [files, manifest] = await Promise.all([listAssetFiles(assetsDirectory), readManifest()])
 
-  const summaries = await Promise.all([summarize('js', files), summarize('css', files)])
+  const summaries = await Promise.all([
+    summarize('js', files),
+    summarize('css', files),
+    summarize('font', files),
+  ])
   const jsSummary = summaries.find((summary) => summary.kind === 'js')
   const cssSummary = summaries.find((summary) => summary.kind === 'css')
-  if (!jsSummary || !cssSummary) throw new Error('Unable to summarize build assets.')
+  const fontSummary = summaries.find((summary) => summary.kind === 'font')
+  if (!jsSummary || !cssSummary || !fontSummary)
+    throw new Error('Unable to summarize build assets.')
 
   const initialChunks = collectInitialChunks(manifest)
   const initialJsBytes = await sumChunkBytes(initialChunks)
@@ -226,6 +235,11 @@ async function main() {
   if (cssSummary.largest && cssSummary.largest.bytes > CSS_BUDGET.largestBytes) {
     failures.push(
       `CSS largest ${formatBytes(cssSummary.largest.bytes)} exceeds ${formatBytes(CSS_BUDGET.largestBytes)} (${path.relative(assetsDirectory, cssSummary.largest.file)})`,
+    )
+  }
+  if (fontSummary.bytes > FONT_BUDGET.totalBytes) {
+    failures.push(
+      `Font total ${formatBytes(fontSummary.bytes)} exceeds ${formatBytes(FONT_BUDGET.totalBytes)}`,
     )
   }
   failures.push(...(await findOversizedLocaleChunks(manifest)))

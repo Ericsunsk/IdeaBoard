@@ -278,7 +278,7 @@ describe('Search chrome style browser contract', () => {
       // Primitive default radius wins the cascade; the Search token class
       // rides along without redeclaring radius as an arbitrary value (which
       // tailwind-merge would keep alone, jumping the radius to 10px).
-      expect(contentStyle.borderRadius).toBe('6px')
+      expect(contentStyle.borderRadius).toBe('8px')
       // Decorative pseudo layers stay intact (never force-hidden).
       expect(window.getComputedStyle(content, '::before').display).not.toBe('none')
       expect(window.getComputedStyle(content, '::after').display).not.toBe('none')

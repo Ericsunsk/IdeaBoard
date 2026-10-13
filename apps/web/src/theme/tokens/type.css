@@ -10,8 +10,23 @@
  * reference physical family, size, leading and weight ingredients.
  */
 
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @theme {
-  --font-admin: var(--primitive-font-system-ui);
+  /* Sans and display share Inter Variable and the explicit CJK fallback.
+     Mono retains its system family. */
+  --font-sans: var(--primitive-font-inter-variable);
+  --font-admin: var(--primitive-font-inter-variable);
 
   --text-admin-micro: var(--primitive-type-size-10);
   --text-admin-caption: var(--primitive-type-size-11);
@@ -26,12 +41,12 @@
   --text-admin-modal-title: var(--primitive-type-size-26);
   --text-admin-modal-title-mobile: var(--primitive-type-size-22);
 
-  /* Admin display weights for optical one-offs between semibold and bold. */
-  --font-weight-admin-strong: var(--primitive-font-weight-650);
-  --font-weight-admin-emphasis: var(--primitive-font-weight-680);
-  --font-weight-admin-display: var(--primitive-font-weight-760);
+  /* Admin emphasis uses semibold; size and leading retain each role's intent. */
+  --font-weight-admin-strong: var(--primitive-font-weight-600);
+  --font-weight-admin-emphasis: var(--primitive-font-weight-600);
+  --font-weight-admin-display: var(--primitive-font-weight-600);
 
-  --font-display: var(--primitive-font-satoshi);
+  --font-display: var(--primitive-font-inter-variable);
   --font-hand: var(--primitive-font-handwriting);
   --leading-display: var(--primitive-leading-tight);
   --leading-title: var(--primitive-leading-heading);
