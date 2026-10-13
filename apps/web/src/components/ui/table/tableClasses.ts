@@ -21,7 +21,7 @@ export const tableBodyClasses = '[&_tr:last-child]:border-0'
 export const tableFooterClasses = 'border-t bg-muted/50 font-medium [&>tr]:last:border-b-0'
 
 export const tableRowClasses =
-  'border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted'
+  'border-b transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted/50 data-[state=selected]:bg-muted'
 
 export const tableHeadClasses =
   'h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]'
@@ -37,4 +37,4 @@ export const tableCaptionClasses = 'mt-4 text-sm text-muted-foreground'
  * opt-in; the header row itself stays at `h-10`.
  */
 export const tableSortButtonClasses =
-  'inline-flex min-h-8 items-center gap-1 rounded-control transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
+  'inline-flex min-h-8 items-center gap-1 rounded-control transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'

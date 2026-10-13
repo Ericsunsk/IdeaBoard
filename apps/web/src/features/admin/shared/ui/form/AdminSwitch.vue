@@ -20,7 +20,7 @@
     <SwitchThumb
       :class="
         cn(
-          'pointer-events-none block size-4 rounded-pill bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
+          'pointer-events-none block size-4 rounded-pill bg-background shadow-lg ring-0 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
         )
       "
     />

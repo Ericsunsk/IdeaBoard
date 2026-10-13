@@ -172,6 +172,39 @@ function styleOf(element: Element): CSSStyleDeclaration {
   return window.getComputedStyle(element)
 }
 
+// Chromium may serialize a resolved color token as `rgb(0 0 0 / 42%)`
+// while the stylesheet source reads `rgba(0, 0, 0, 0.42)`. Compare parsed
+// channels instead of raw strings so the contract asserts the token value,
+// not the engine's serialization.
+function parseColorChannels(value: string): [number, number, number, number] {
+  const match = value.match(/rgba?\(\s*(.+?)\s*\)/)
+  if (!match?.[1]) throw new Error(`unparseable color: ${value}`)
+  const [rgb = '', alpha = '1'] = match[1].split('/')
+  const channels = rgb
+    .trim()
+    .split(/[\s,]+/)
+    .filter((part) => part.length > 0)
+    .map(Number)
+  // Legacy `rgba(r, g, b, a)` syntax carries alpha as the fourth channel;
+  // modern `rgb(r g b / a)` syntax carries it after the slash.
+  let a: number
+  if (channels.length === 4) {
+    a = channels.pop() as number
+  } else {
+    const alphaText = alpha.trim()
+    a = alphaText.endsWith('%') ? Number(alphaText.slice(0, -1)) / 100 : Number(alphaText)
+  }
+  const [r = NaN, g = NaN, b = NaN] = channels
+  return [r, g, b, a]
+}
+
+function expectSameColor(actual: string, expected: string) {
+  const [ar, ag, ab, aa] = parseColorChannels(actual)
+  const [er, eg, eb, ea] = parseColorChannels(expected)
+  expect([ar, ag, ab]).toEqual([er, eg, eb])
+  expect(aa).toBeCloseTo(ea, 3)
+}
+
 function overlayButtons(container: Element): HTMLElement[] {
   return [...container.querySelectorAll('button')].filter((button) =>
     (button.getAttribute('class') ?? '').includes('search-overlay-btn-bg'),
@@ -310,8 +343,12 @@ describe('Search chrome style browser contract', () => {
   it('sources image overlay action fills from the app overlay-btn tokens', async () => {
     const rootStyle = styleOf(document.documentElement)
     // Search aliases resolve end to end to the canonical app token values.
-    expect(rootStyle.getPropertyValue('--search-overlay-btn-bg').trim()).toBe('rgba(0, 0, 0, 0.42)')
-    expect(rootStyle.getPropertyValue('--search-overlay-btn-bg-hover').trim()).toBe(
+    expectSameColor(
+      rootStyle.getPropertyValue('--search-overlay-btn-bg').trim(),
+      'rgba(0, 0, 0, 0.42)',
+    )
+    expectSameColor(
+      rootStyle.getPropertyValue('--search-overlay-btn-bg-hover').trim(),
       'rgba(0, 0, 0, 0.68)',
     )
     const rendered = renderWithUser(SearchResultCard, {
@@ -329,7 +366,7 @@ describe('Search chrome style browser contract', () => {
       const buttons = overlayButtons(rendered.container)
       expect(buttons.length).toBe(2)
       for (const button of buttons) {
-        expect(styleOf(button).backgroundColor).toBe('rgba(0, 0, 0, 0.42)')
+        expectSameColor(styleOf(button).backgroundColor, 'rgba(0, 0, 0, 0.42)')
       }
       const selectButton = buttons.find((button) =>
         (button.getAttribute('class') ?? '').includes('search-overlay-btn-bg-hover'),
@@ -340,15 +377,21 @@ describe('Search chrome style browser contract', () => {
       // a dropped var indirection) cannot satisfy this.
       document.documentElement.style.setProperty('--color-overlay-btn-bg', 'rgb(255, 0, 0)')
       try {
-        await expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgb(255, 0, 0)')
+        await expect
+          .poll(() => parseColorChannels(styleOf(selectButton!).backgroundColor))
+          .toEqual([255, 0, 0, 1])
       } finally {
         document.documentElement.style.removeProperty('--color-overlay-btn-bg')
       }
-      await expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgba(0, 0, 0, 0.42)')
+      await expect
+        .poll(() => parseColorChannels(styleOf(selectButton!).backgroundColor))
+        .toEqual([0, 0, 0, 0.42])
       await browserUser.hover(selectButton!)
       expect(selectButton!.matches(':hover')).toBe(true)
       // Hover fill rides the 160ms control transition; poll to its end state.
-      await expect.poll(() => styleOf(selectButton!).backgroundColor).toBe('rgba(0, 0, 0, 0.68)')
+      await expect
+        .poll(() => parseColorChannels(styleOf(selectButton!).backgroundColor))
+        .toEqual([0, 0, 0, 0.68])
     } finally {
       rendered.unmount()
     }

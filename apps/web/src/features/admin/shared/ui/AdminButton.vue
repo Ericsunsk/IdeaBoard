@@ -2,7 +2,7 @@
   <Button
     :as="href ? 'a' : 'button'"
     :variant="baseButtonVariant"
-    :size="baseButtonSize"
+    :size="props.size"
     :is-disabled="disabled || loading"
     :is-loading="loading"
     :type="!href ? type : undefined"
@@ -22,12 +22,11 @@
 
 <script setup lang="ts">
 import { computed, type Component, type HTMLAttributes } from 'vue'
-import { Button, type ButtonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   buttonChromeBaseClass,
   buttonChromeColorClasses as adminColorClasses,
   buttonChromeSizeTypography,
-  resolveButtonChromeUiVariant,
   resolveButtonChromeVariant,
   type ButtonChromeSeverity,
   type ButtonChromeVariant,
@@ -36,7 +35,7 @@ import { cn } from '@/lib/utils'
 
 export type AdminButtonVariant = ButtonChromeVariant
 
-export type AdminButtonSize = 'default' | 'small' | 'sm' | 'large' | 'lg' | 'icon'
+export type AdminButtonSize = 'default' | 'sm' | 'lg' | 'icon'
 
 const props = withDefaults(
   defineProps<{
@@ -83,26 +82,16 @@ function resolveEffectiveVariant(): AdminButtonVariant {
   })
 }
 
-const baseButtonVariant = computed<ButtonVariants['variant']>(() => {
-  return resolveButtonChromeUiVariant(resolveEffectiveVariant())
-})
-
-const baseButtonSize = computed<ButtonVariants['size']>(() => {
-  if (props.size === 'small' || props.size === 'sm') return 'compact'
-  if (props.size === 'large' || props.size === 'lg') return 'lg'
-  if (props.size === 'icon') return 'icon'
-  return 'default'
-})
+const baseButtonVariant = computed(resolveEffectiveVariant)
 
 const isDisabledOrLoading = computed(() => Boolean(props.disabled || props.loading))
 
 const computedClasses = computed(() => {
-  const effVariant = resolveEffectiveVariant()
   return cn(
     buttonChromeBaseClass,
     props.rounded && 'rounded-pill',
     buttonChromeSizeTypography(props.size),
-    adminColorClasses[effVariant],
+    adminColorClasses[baseButtonVariant.value],
     props.text &&
       props.severity === 'danger' &&
       'text-destructive hover:bg-destructive/10 active:bg-destructive/20',

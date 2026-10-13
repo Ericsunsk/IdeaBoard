@@ -9,7 +9,10 @@
         <Settings class="size-4 text-muted-foreground" />
         <span>{{ MODELS_MESSAGES.gatewayAdvancedTitle }}</span>
       </div>
-      <NavArrowDown class="size-4 transition-transform" :class="isOpen ? 'rotate-180' : ''" />
+      <NavArrowDown
+        class="size-4 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+        :class="isOpen ? 'rotate-180' : ''"
+      />
     </button>
 
     <div v-if="isOpen" class="mt-3 flex flex-col gap-3.5 border-t border-border pt-3">

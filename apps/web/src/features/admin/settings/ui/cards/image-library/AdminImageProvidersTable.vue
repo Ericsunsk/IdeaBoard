@@ -88,7 +88,9 @@
           <template #body="{ data }">
             <!-- 变色走过渡：Badge 本体自带 transition-colors，包一层把过渡带给圆点
                  span，test_state 翻转时不硬切。 -->
-            <div class="[&_span]:transition-colors">
+            <div
+              class="[&_span]:transition-colors [&_span]:duration-[var(--motion-control-duration)] [&_span]:ease-[var(--motion-control-easing)]"
+            >
               <AdminStatusPill
                 :label="testStateLabel(data.test_state)"
                 :variant="testStateVariant(data.test_state)"

@@ -77,7 +77,7 @@
             <span>{{ CREDIT_HEALTH_MESSAGES.staleNotice }}</span>
             <AdminButton
               variant="ghost"
-              size="small"
+              size="sm"
               :class="adminTextButtonClass"
               :loading="resource.query.isFetching.value"
               @click="resource.query.refetch()"

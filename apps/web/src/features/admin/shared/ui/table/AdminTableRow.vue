@@ -2,7 +2,7 @@
   <tr
     :class="
       cn(
-        'border-b border-border transition-colors data-[state=selected]:bg-muted',
+        'border-b border-border transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] data-[state=selected]:bg-muted',
         props.hoverable && 'hover:bg-muted/50',
         props.class,
       )

@@ -15,7 +15,7 @@ export const tabsListVariants =
   'inline-flex h-9 items-center justify-center rounded-control bg-muted p-1 text-muted-foreground'
 
 export const tabsTriggerVariants =
-  'inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-control px-3 py-1 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow'
+  'inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-control px-3 py-1 text-sm font-medium ring-offset-background transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow'
 
 export const tabsContentVariants =
   'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'

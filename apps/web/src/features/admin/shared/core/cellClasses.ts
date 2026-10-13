@@ -9,6 +9,6 @@ export const adminMonoClass = 'font-mono'
 export const adminNumericCellClass = 'tabular-nums whitespace-nowrap'
 
 export const adminInlineJumpClass =
-  'cursor-pointer rounded-control font-mono text-xs font-semibold tabular-nums whitespace-nowrap text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20'
+  'cursor-pointer rounded-control font-mono text-xs font-semibold tabular-nums whitespace-nowrap text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20'
 
 export const adminTruncateCellClass = 'truncate'

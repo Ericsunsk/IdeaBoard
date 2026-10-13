@@ -33,9 +33,9 @@ describe('Admin base control adapters', () => {
       expect(wrapper.classes()).toContain('bg-destructive')
     })
 
-    it('maps small size to compact typography', () => {
+    it('maps sm size to meta typography', () => {
       const wrapper = mount(AdminButton, {
-        props: { size: 'small', label: 'Small' },
+        props: { size: 'sm', label: 'Small' },
       })
       expect(wrapper.classes()).toContain('text-admin-meta')
     })

@@ -40,7 +40,7 @@
       <div class="pointer-events-auto flex items-center justify-between">
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="
             isSelected
               ? '!bg-primary text-primary-foreground shadow-xs'
@@ -59,7 +59,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--blur-glass)] transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--blur-glass)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           :class="{
             '!bg-primary !text-primary-foreground shadow-xs': isUsedAsReference,
           }"
@@ -89,10 +89,10 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill shadow-md transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           :class="
             isSaved
-              ? 'bg-emerald-700 text-white hover:bg-emerald-700/90'
+              ? 'bg-success text-success-foreground hover:bg-success-hover'
               : 'bg-primary text-primary-foreground hover:bg-primary-hover shadow-primary/30'
           "
           :aria-label="

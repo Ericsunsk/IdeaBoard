@@ -92,7 +92,7 @@
           v-for="link in PUBLIC_LEGAL_LINKS"
           :key="link.to"
           :to="link.to"
-          class="inline-flex min-h-8 items-center no-underline transition-colors hover:text-[var(--color-home-hero-text)] focus-visible:outline-none focus-visible:underline"
+          class="inline-flex min-h-8 items-center no-underline transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-home-hero-text)] focus-visible:outline-none focus-visible:underline"
         >
           {{ link.shortLabel }}
         </RouterLink>

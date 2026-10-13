@@ -86,7 +86,7 @@
             <div class="flex justify-end gap-1.5 pointer-events-auto">
               <button
                 type="button"
-                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-destructive transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-destructive transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 :aria-label="t('library.actions.removeSavedReference')"
                 :title="t('library.actions.removeSavedReference')"
                 @click="emit('remove-asset', asset)"
@@ -96,7 +96,7 @@
               <button
                 v-if="isCanvasPresentation"
                 type="button"
-                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 :aria-label="t('library.actions.addToCanvas')"
                 :title="t('library.actions.addToCanvas')"
                 @click.stop="emit('add-to-canvas', toCanvasLibraryImportDescriptor(asset))"
@@ -106,7 +106,7 @@
               <button
                 v-else
                 type="button"
-                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 :aria-label="t('library.actions.useAsSearchReference')"
                 :title="t('library.actions.useAsSearchReference')"
                 @click.stop="emit('select-reference', asset)"

@@ -64,6 +64,40 @@ describe('Motion Policy style guard', () => {
     ).toContain('missing-reduced-motion')
   })
 
+  it.each([
+    '[transition:opacity_200ms_ease]',
+    '[transition:transform_.2s_linear]',
+    '[transition:opacity_var(--motion-control-duration)_ease-in-out]',
+  ])('rejects encoded raw timing in %s', (utility) => {
+    expect(
+      findMotionPolicyViolations('src/features/admin/Control.vue', utility).map(
+        (violation) => violation.rule,
+      ),
+    ).toContain('raw-motion-timing')
+  })
+
+  it.each([
+    'transition-[all]',
+    '[transition-property:all]',
+    '[transition:all_var(--motion-control-duration)_var(--motion-control-easing)]',
+    '[transition:all]',
+  ])('rejects encoded broad properties in %s', (utility) => {
+    expect(
+      findMotionPolicyViolations('src/features/admin/Control.vue', utility).map(
+        (violation) => violation.rule,
+      ),
+    ).toContain('broad-transition')
+  })
+
+  it('accepts encoded CSS transitions with explicit properties and policy tokens', () => {
+    expect(
+      findMotionPolicyViolations(
+        'src/features/admin/Control.vue',
+        '[transition:opacity_var(--motion-control-duration)_var(--motion-control-easing)]',
+      ),
+    ).toEqual([])
+  })
+
   it('allows registered Canvas continuous motion with a local semantic and fallback', () => {
     expect(
       findMotionPolicyViolations(

@@ -106,14 +106,14 @@
                     <AdminButton
                       v-else-if="column.expander"
                       variant="ghost"
-                      size="small"
+                      size="sm"
                       :aria-expanded="isExpanded(row, rowIndex)"
                       :aria-label="isExpanded(row, rowIndex) ? '收起详情' : '展开详情'"
                       @click="toggleExpand(row, rowIndex)"
                     >
                       <template #icon>
                         <NavArrowDown
-                          class="size-4 transition-transform"
+                          class="size-4 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
                           :class="{ 'rotate-180': isExpanded(row, rowIndex) }"
                         />
                       </template>

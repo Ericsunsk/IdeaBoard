@@ -28,7 +28,6 @@ import {
   buttonChromeBaseClass,
   buttonChromeColorClasses as actionColorClasses,
   buttonChromeSizeTypography,
-  resolveButtonChromeUiVariant,
   resolveButtonChromeVariant,
   type ButtonChromeSeverity as ActionButtonSeverity,
   type ButtonChromeVariant as ActionButtonVariant,
@@ -37,7 +36,7 @@ import {
 // Shared action buttons reuse the Admin variant and severity contract.
 export type { ActionButtonSeverity, ActionButtonVariant }
 
-export type ActionButtonSize = 'default' | 'small' | 'sm' | 'large' | 'lg' | 'icon'
+export type ActionButtonSize = 'default' | 'sm' | 'lg' | 'icon'
 
 const props = withDefaults(
   defineProps<{
@@ -54,7 +53,7 @@ const props = withDefaults(
   }>(),
   {
     variant: 'default',
-    size: 'small',
+    size: 'sm',
     severity: undefined,
     outlined: false,
     label: undefined,
@@ -86,23 +85,17 @@ function resolveEffectiveVariant(): ActionButtonVariant {
   })
 }
 
-const uiVariant = computed<ButtonVariants['variant']>(() => {
-  return resolveButtonChromeUiVariant(resolveEffectiveVariant())
-})
+const uiVariant = computed(resolveEffectiveVariant)
 
 const uiSize = computed<NonNullable<ButtonVariants['size']>>(() => {
-  if (props.size === 'small' || props.size === 'sm') return 'action'
-  if (props.size === 'large' || props.size === 'lg') return 'lg'
-  if (props.size === 'icon') return 'icon'
-  return 'default'
+  return props.size === 'sm' ? 'action' : props.size
 })
 
 const mergedClass = computed(() => {
-  const effVariant = resolveEffectiveVariant()
   return cn(
     buttonChromeBaseClass,
     buttonChromeSizeTypography(uiSize.value),
-    actionColorClasses[effVariant],
+    actionColorClasses[uiVariant.value],
     props.outlined &&
       props.severity === 'danger' &&
       'border-destructive/30 text-destructive hover:bg-destructive/10',

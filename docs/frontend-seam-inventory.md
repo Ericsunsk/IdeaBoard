@@ -5996,7 +5996,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "buttonChromeColorClasses",
         "buttonChromeSizeTypography",
         "buttonVariants",
-        "resolveButtonChromeUiVariant",
         "resolveButtonChromeVariant"
       ],
       "targetFanOutTargets": [
@@ -22587,7 +22586,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/app/router/index.ts` | canonical | app | 1 | 1 → 1 | 13 → 13 |
 | `src/components/ui/avatar/index.ts` | canonical | design-system | 3 | 2 → 2 | 3 → 3 |
 | `src/components/ui/badge/index.ts` | canonical | design-system | 3 | 3 → 3 | 3 → 3 |
-| `src/components/ui/button/index.ts` | canonical | design-system | 10 | 25 → 25 | 6 → 6 |
+| `src/components/ui/button/index.ts` | canonical | design-system | 9 | 25 → 25 | 6 → 6 |
 | `src/components/ui/card/index.ts` | canonical | design-system | 6 | 2 → 2 | 4 → 4 |
 | `src/components/ui/dialog/index.ts` | canonical | design-system | 12 | 6 → 6 | 4 → 4 |
 | `src/components/ui/dropdown-menu/index.ts` | canonical | design-system | 14 | 4 → 4 | 4 → 4 |

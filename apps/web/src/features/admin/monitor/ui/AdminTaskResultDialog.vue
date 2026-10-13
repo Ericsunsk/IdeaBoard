@@ -36,7 +36,7 @@
               <button
                 v-if="detailTask?.task_id || taskId"
                 type="button"
-                class="flex size-5 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                class="flex size-5 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground"
                 :aria-label="MONITOR_MESSAGES.copyTaskIdAria"
                 @click="copyToClipboard(detailTask?.task_id || taskId || '')"
               >
@@ -104,7 +104,7 @@
               </span>
               <button
                 type="button"
-                class="flex size-4 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors hover:text-foreground"
+                class="flex size-4 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground"
                 :aria-label="MONITOR_MESSAGES.copyUserIdAria"
                 @click="copyToClipboard(String(detailTask.user_public_id))"
               >
@@ -152,7 +152,7 @@
           </div>
           <button
             type="button"
-            class="cursor-pointer text-admin-caption font-medium text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            class="cursor-pointer text-admin-caption font-medium text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
             :disabled="!detailTask.prompt"
             @click="copyToClipboard(detailTask.prompt || '')"
           >
@@ -242,7 +242,7 @@
         </div>
         <div
           v-if="resultImageUrl"
-          class="group relative overflow-hidden rounded-panel border border-border bg-muted/40 p-1.5 transition-colors hover:border-border-hover"
+          class="group relative overflow-hidden rounded-panel border border-border bg-muted/40 p-1.5 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-border-hover"
         >
           <img
             :src="resultImageUrl"
@@ -251,8 +251,8 @@
           />
           <AdminButton
             severity="secondary"
-            size="small"
-            class="!absolute !right-3 !bottom-3 !opacity-0 transition-opacity group-hover:!opacity-100 group-focus-within:!opacity-100 focus-visible:!opacity-100"
+            size="sm"
+            class="!absolute !right-3 !bottom-3 !opacity-0 transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:!opacity-100 group-focus-within:!opacity-100 focus-visible:!opacity-100"
             @click="openResultImage(resultImageUrl)"
           >
             {{ MONITOR_MESSAGES.openResultImage }}
@@ -433,7 +433,7 @@
           </div>
           <button
             type="button"
-            class="cursor-pointer text-admin-caption font-medium text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            class="cursor-pointer text-admin-caption font-medium text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
             :disabled="!hasResultPayload"
             @click="copyToClipboard(resultSummaryText)"
           >
@@ -455,7 +455,7 @@
         >
           <button
             type="button"
-            class="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+            class="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted"
             :aria-expanded="showDebugResult"
             aria-controls="task-result-debug-details"
             @click="showDebugResult = !showDebugResult"
@@ -465,7 +465,7 @@
               <span>{{ MONITOR_MESSAGES.debugToggle(showDebugResult) }}</span>
             </div>
             <NavArrowDown
-              class="size-3 text-muted-foreground transition-transform"
+              class="size-3 text-muted-foreground transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="showDebugResult ? 'rotate-180' : ''"
             />
           </button>

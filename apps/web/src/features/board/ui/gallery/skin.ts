@@ -53,9 +53,9 @@ export const catalogClasses = {
   deleteDialogDescription: 'mt-3 mb-0 text-admin-body leading-6 text-muted-foreground',
   deleteDialogFooter: 'mt-6 flex justify-end gap-2',
   deleteCancelButton:
-    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-pill border-0 bg-transparent px-3.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60',
+    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-pill border-0 bg-transparent px-3.5 text-sm font-bold text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60',
   deleteConfirmButton:
-    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-pill border-0 bg-destructive px-3.5 text-sm font-bold text-destructive-foreground transition-colors hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-70',
+    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-pill border-0 bg-destructive px-3.5 text-sm font-bold text-destructive-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-70',
 } as const
 // UiDialog 以 :class/cn() 组合造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
 export const catalogDeleteDialogContentClass =

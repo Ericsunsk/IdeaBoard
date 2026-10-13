@@ -11,7 +11,7 @@
       <!-- 滑动指示条：目录项统一单行 h-[var(--toc-item-step)]（32px），指示条位移共用同一变量，直接按 index 定位，无需测量 DOM；若将来出现可换行标题，此处需改回测量定位 -->
       <span
         aria-hidden="true"
-        class="absolute top-0 left-[-1px] h-[var(--toc-item-step)] w-0.5 rounded-pill bg-primary transition-[transform,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-control-easing)]"
+        class="absolute top-0 left-[-1px] h-[var(--toc-item-step)] w-0.5 rounded-pill bg-primary transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
         :style="indicatorStyle"
       />
       <button
@@ -19,7 +19,7 @@
         :key="item.id"
         type="button"
         :aria-current="activeId === item.id ? 'true' : undefined"
-        class="group relative -ml-[2px] flex h-[var(--toc-item-step)] min-h-8 items-center gap-2 px-3 py-1.5 text-left text-admin-caption transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="group relative -ml-[2px] flex h-[var(--toc-item-step)] min-h-8 items-center gap-2 px-3 py-1.5 text-left text-admin-caption transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :class="[
           activeId === item.id
             ? 'border-l-2 border-transparent font-medium text-foreground'
@@ -30,7 +30,7 @@
         <component
           :is="item.icon"
           v-if="item.icon"
-          class="size-3.5 shrink-0 transition-colors"
+          class="size-3.5 shrink-0 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
           :class="
             activeId === item.id
               ? 'text-primary'

@@ -3,7 +3,7 @@
     <!-- 头部：品牌图标 + 模型名称 -->
     <div class="flex items-center min-w-0">
       <div
-        class="flex size-7 shrink-0 items-center justify-center rounded-control mr-2.5 overflow-hidden transition-colors"
+        class="flex size-7 shrink-0 items-center justify-center rounded-control mr-2.5 overflow-hidden transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
         :class="brandLogo ? 'bg-muted/60 border border-border/60' : 'bg-primary-faint text-primary'"
       >
         <img
@@ -17,7 +17,7 @@
         <Cube v-else class="size-4" />
       </div>
       <div
-        class="text-base font-semibold text-foreground line-clamp-1 flex-1 transition-colors"
+        class="text-base font-semibold text-foreground line-clamp-1 flex-1 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
         :class="hoverable ? 'group-hover:text-primary' : ''"
       >
         {{ model.name }}

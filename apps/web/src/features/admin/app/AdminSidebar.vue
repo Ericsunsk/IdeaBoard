@@ -30,7 +30,7 @@
             :to="ADMIN_DEFAULT_PATH"
             :aria-label="brandAriaLabel"
             :title="effectiveCollapsed ? projectName || 'IdeaBoard' : undefined"
-            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-control whitespace-nowrap transition-colors hover:bg-muted active:scale-[0.98]"
+            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-control whitespace-nowrap transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted active:scale-[0.98]"
           >
             <span
               class="flex size-10 shrink-0 items-center justify-center transition-transform duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] group-hover:scale-105"
@@ -106,7 +106,7 @@
               :title="effectiveCollapsed ? `${group.title} · ${item.label}` : item.label"
               :aria-label="item.label"
               :aria-current="activeKey === item.key ? 'page' : undefined"
-              class="group flex h-10 w-full items-center overflow-hidden rounded-control text-sm font-medium whitespace-nowrap text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+              class="group flex h-10 w-full items-center overflow-hidden rounded-control text-sm font-medium whitespace-nowrap text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted active:scale-[0.98]"
               @click="drawerOpen = false"
             >
               <span class="flex size-10 shrink-0 items-center justify-center">
@@ -114,7 +114,7 @@
                   :is="item.icon"
                   :class="[
                     navIconSizeClass,
-                    'text-muted-foreground transition-transform group-hover:scale-110',
+                    'text-muted-foreground transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:scale-110',
                     activeKey === item.key && 'text-primary scale-105 font-bold',
                   ]"
                 />
@@ -143,11 +143,11 @@
           type="button"
           :aria-label="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
           :title="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
-          class="group flex size-10 items-center justify-center rounded-control text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
+          class="group flex size-10 items-center justify-center rounded-control text-muted-foreground transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
           @click="toggleCollapsed"
         >
           <SidebarCollapseIcon
-            class="size-[18px] transition-transform"
+            class="size-[18px] transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
             :class="isCollapsed ? 'rotate-180' : 'rotate-0'"
           />
         </button>

@@ -47,7 +47,7 @@
           <span>{{ REWARD_CODES_MESSAGES.redemptionsLoadFailed }}</span>
           <AdminButton
             variant="ghost"
-            size="small"
+            size="sm"
             :class="adminTextButtonClass"
             :loading="loading"
             @click="refreshRedemptions"
@@ -62,7 +62,7 @@
           <span>{{ REWARD_CODES_MESSAGES.redemptionsStaleNotice }}</span>
           <AdminButton
             variant="ghost"
-            size="small"
+            size="sm"
             :class="adminTextButtonClass"
             :loading="loading"
             @click="refreshRedemptions"
@@ -135,7 +135,7 @@
                 <span>{{ REWARD_CODES_MESSAGES.redemptionsDetailLoadFailed }}</span>
                 <AdminButton
                   variant="ghost"
-                  size="small"
+                  size="sm"
                   :class="adminTextButtonClass"
                   :loading="detailLoading"
                   @click="loadRedemptionDetail(data.id)"

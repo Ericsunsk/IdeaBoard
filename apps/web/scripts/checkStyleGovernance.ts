@@ -32,6 +32,8 @@ const srcRoot = path.join(webRoot, 'src')
 const sourceExtensions = new Set(['.css', '.ts', '.vue'])
 
 export const primitiveReferencePattern = /var\(\s*--(?:primitive|palette)-[a-z0-9-]+(?=\s*[,)])/g
+export const rawMotionUtilityPattern =
+  /(?:duration-\[(?!var\(--motion-(?:control|enter|exit|feedback)-duration\)\])|ease-\[(?!var\(--motion-(?:control|enter|exit|feedback)-easing\)\])|animate-\[)[^\]]+\]/g
 
 const styleCountRules = [
   {
@@ -52,7 +54,7 @@ const styleCountRules = [
   },
   {
     id: 'raw-motion',
-    pattern: /(?:duration|ease|transition|animate)-\[[^\]]+\]|transition\s*:/g,
+    pattern: rawMotionUtilityPattern,
     message: 'Use motion tokens/helpers instead of adding raw motion values.',
   },
 ] as const satisfies readonly CountRule<string>[]
@@ -81,20 +83,6 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason:
       'Task metric chart colors resolve from adminThemeTokenFallbacks; the allowance stays registered so reintroducing inline hex is caught as an overage rather than silently allowed.',
-  },
-  'src/features/admin/app/AdminSidebar.vue': {
-    counts: {
-      'raw-motion': 30,
-    },
-    reason:
-      'Sidebar shell motion (width/max-height choreography) uses Motion Policy var() tokens; color/transform feedback inside the shell uses plain Tailwind transition utilities.',
-  },
-  'src/features/admin/settings/ui/pages/AdminSettingsOnThisPage.vue': {
-    counts: {
-      'raw-motion': 3,
-    },
-    reason:
-      'On-this-page sliding indicator animates transform/opacity via Motion Policy var() tokens; the allowance stays registered so additional raw motion is caught as an overage.',
   },
 }
 

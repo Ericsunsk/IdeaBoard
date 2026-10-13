@@ -45,7 +45,7 @@
           <div class="flex h-9 items-center rounded-control border border-border bg-muted/40 p-1">
             <button
               type="button"
-              class="flex-1 rounded-control py-1 text-xs font-medium transition-colors cursor-pointer text-center"
+              class="flex-1 rounded-control py-1 text-xs font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_CLOUDFLARE
                   ? 'bg-card text-success shadow-xs font-semibold'
@@ -57,7 +57,7 @@
             </button>
             <button
               type="button"
-              class="flex-1 rounded-control py-1 text-xs font-medium transition-colors cursor-pointer text-center"
+              class="flex-1 rounded-control py-1 text-xs font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_THIRD_PARTY
                   ? 'bg-card text-foreground shadow-xs font-semibold'

@@ -32,7 +32,7 @@ export const adminTableFooterClass =
   'flex items-center justify-between border-t border-border bg-background px-4 py-2.5'
 
 export const adminTableRowActionButtonClass =
-  'hit-target-control flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+  'hit-target-control flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground'
 
 export const adminSummaryGridClass = 'grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4'
 
@@ -44,7 +44,7 @@ export const adminToolbarMetricClass =
   'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-pill border border-border bg-card px-3 py-1.5 text-admin-body font-bold text-foreground shadow-xs'
 
 const adminFramedIconButtonBaseClass =
-  '!h-9 !w-9 !border !border-border !bg-card !text-muted-foreground hover:!bg-muted hover:!text-foreground disabled:!text-muted-foreground/40 transition-colors flex items-center justify-center p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  '!h-9 !w-9 !border !border-border !bg-card !text-muted-foreground hover:!bg-muted hover:!text-foreground disabled:!text-muted-foreground/40 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center justify-center p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-control`
 
@@ -53,7 +53,7 @@ export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !ro
  * 供 Events 折叠按钮、表格底栏翻页按钮等共享同一套视觉 Token
  */
 export const adminCompactIconButtonClass =
-  'hit-target-control flex !size-8 shrink-0 items-center justify-center !rounded-control !border !border-border !bg-card !p-0 !text-muted-foreground transition-colors hover:!bg-muted hover:!text-foreground cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
+  'hit-target-control flex !size-8 shrink-0 items-center justify-center !rounded-control !border !border-border !bg-card !p-0 !text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:!bg-muted hover:!text-foreground cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
 
 export const adminToolbarPageLabelClass =
   'flex h-7 items-center justify-center rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground'
@@ -105,4 +105,4 @@ export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-for
 // 全局唯一输入框 chrome（AdminInput/AdminNumberInput/AdminTextarea 共用）：
 // 遵循标准 shadcn 输入栏规范，无 hover 杂效，focus 用柔光 ring；尺寸/字号由各组件按 size 追加覆盖。
 export const adminInputChromeClass =
-  'flex w-full rounded-control border border-input bg-background text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+  'flex w-full rounded-control border border-input bg-background text-foreground shadow-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'

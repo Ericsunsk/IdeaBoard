@@ -41,7 +41,7 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
 const legacyMotionTokenPattern =
   /--(?:canvas-motion-(?:fast|standard|panel|dock|ease)|duration-ib-[\w-]+|ease-ib-[\w-]+)\b/g
 const broadTransitionPattern =
-  /\btransition-all\b|\btransition(?:-property)?\s*:\s*all(?:\s|;|!|$)/g
+  /\btransition-all\b|\btransition-\[all\]|\btransition(?:-property)?\s*:\s*all(?:\s|;|!|\]|$)/g
 const nonZeroCssTimeSource = String.raw`(?:[1-9]\d*(?:\.\d+)?|0?\.\d*[1-9]\d*)(?:ms|s)\b`
 const rawTransitionTimingPattern = new RegExp(
   String.raw`\btransition(?:-(?:duration|delay|timing-function))?\s*:[^;{}]*(?:${nonZeroCssTimeSource}|cubic-bezier\(|\bease(?:-in|-out|-in-out)?\b)[^;{}]*;?`,
@@ -56,7 +56,7 @@ const rawTailwindDurationPattern =
 const rawTailwindEasingPattern =
   /\bease-(?:linear|in-out|in|out|\[(?!var\()[^\]]*(?:ease|cubic-bezier)[^\]]*\])(?=\s|["'`])/g
 const rawArbitraryTransitionPattern = new RegExp(
-  String.raw`\[transition:[^\]]*(?:${nonZeroCssTimeSource}|cubic-bezier\(|\bease(?:-in|-out|-in-out)?\b)[^\]]*\]`,
+  String.raw`\[transition:[^\]]*(?:${nonZeroCssTimeSource}|cubic-bezier\(|\blinear\b|\bease(?:-in|-out|-in-out)?\b)[^\]]*\]`,
   'g',
 )
 const rawCustomTimingPattern = new RegExp(
@@ -78,6 +78,9 @@ export function findMotionPolicyViolations(
   const allowance = localMotionAllowances[sourcePath]
   const violations: MotionPolicyViolation[] = []
   const utilitySource = getUtilitySource(sourcePath, content)
+  const transitionSource = content.replace(/\[transition(?:-property)?:[^\]]+\]/g, (utility) =>
+    utility.replaceAll('_', ' '),
+  )
 
   pushPatternViolation(
     violations,
@@ -88,7 +91,7 @@ export function findMotionPolicyViolations(
   )
   pushPatternViolation(
     violations,
-    content,
+    transitionSource,
     broadTransitionPattern,
     'broad-transition',
     'List intentional transition properties instead of using transition-all.',
@@ -99,7 +102,7 @@ export function findMotionPolicyViolations(
     ...findMatches(content, rawAnimationDurationPattern),
     ...findMatches(utilitySource, rawTailwindDurationPattern),
     ...findMatches(utilitySource, rawTailwindEasingPattern),
-    ...findMatches(content, rawArbitraryTransitionPattern),
+    ...findMatches(transitionSource, rawArbitraryTransitionPattern),
   ]
   if (rawTimingMatches.length > 0) {
     violations.push({

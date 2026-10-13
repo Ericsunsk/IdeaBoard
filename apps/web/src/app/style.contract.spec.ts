@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { compile } from 'tailwindcss'
+import { parse } from 'postcss'
 import { describe, expect, it } from 'vitest'
 
 const stylesheet = readFileSync(resolve(process.cwd(), 'src/app/style.css'), 'utf8')
@@ -33,6 +34,45 @@ describe('admin token closure', () => {
 })
 
 describe('tier role native utility emission', () => {
+  it('emits named overlay animations for Presence and disables them under reduced motion', async () => {
+    const css = parse(await build([]))
+    const animations = new Map<string, string>()
+    const keyframes = new Set<string>()
+    let hasReducedMotion = false
+
+    css.walkRules((rule) => {
+      if (!rule.selector.includes('.overlay-dialog-motion')) return
+      rule.walkDecls('animation', (declaration) => {
+        if (rule.selector.includes("[data-state='open']")) {
+          animations.set('enter', declaration.value)
+        }
+        if (rule.selector.includes("[data-state='closed']")) {
+          animations.set('exit', declaration.value)
+        }
+      })
+    })
+    css.walkAtRules('keyframes', (rule) => {
+      keyframes.add(rule.params)
+    })
+    css.walkAtRules('media', (rule) => {
+      if (rule.params !== '(prefers-reduced-motion: reduce)') return
+      rule.walkRules((motionRule) => {
+        if (!motionRule.selector.includes('.overlay-dialog-motion')) return
+        motionRule.walkDecls('animation', (declaration) => {
+          hasReducedMotion ||= declaration.value === 'none'
+        })
+      })
+    })
+
+    for (const intent of ['enter', 'exit']) {
+      expect(keyframes.has(`overlay-${intent}`)).toBe(true)
+      expect(animations.get(intent)).toBe(
+        `overlay-${intent} var(--motion-${intent}-duration) var(--motion-${intent}-easing) both`,
+      )
+    }
+    expect(hasReducedMotion).toBe(true)
+  })
+
   it('provides shared control, panel, overlay, and pill radii', async () => {
     const roles = { control: 8, panel: 12, overlay: 16, pill: 9999 }
     const css = await build(Object.keys(roles).map((role) => `rounded-${role}`))

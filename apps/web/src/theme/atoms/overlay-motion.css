@@ -1,0 +1,91 @@
+@layer components {
+  :is(
+    .overlay-mask-motion,
+    .overlay-dialog-motion,
+    .overlay-popover-motion,
+    .overlay-drawer-motion
+  ) {
+    --overlay-motion-from-x: 0;
+    --overlay-motion-from-y: 0;
+    --overlay-motion-from-scale: 1;
+    --overlay-motion-from-opacity: 0;
+  }
+
+  :is(.overlay-dialog-motion, .overlay-popover-motion) {
+    --overlay-motion-from-scale: 0.95;
+  }
+
+  .overlay-popover-motion[data-side='bottom'] {
+    --overlay-motion-from-y: -0.5rem;
+  }
+
+  .overlay-popover-motion[data-side='top'] {
+    --overlay-motion-from-y: 0.5rem;
+  }
+
+  .overlay-popover-motion[data-side='left'] {
+    --overlay-motion-from-x: 0.5rem;
+  }
+
+  .overlay-popover-motion[data-side='right'] {
+    --overlay-motion-from-x: -0.5rem;
+  }
+
+  .overlay-drawer-motion {
+    --overlay-motion-from-x: 100%;
+    --overlay-motion-from-opacity: 1;
+  }
+
+  :is(
+    .overlay-mask-motion,
+    .overlay-dialog-motion,
+    .overlay-popover-motion,
+    .overlay-drawer-motion
+  )[data-state='open'] {
+    animation: overlay-enter var(--motion-enter-duration) var(--motion-enter-easing) both;
+  }
+
+  :is(
+    .overlay-mask-motion,
+    .overlay-dialog-motion,
+    .overlay-popover-motion,
+    .overlay-drawer-motion
+  )[data-state='closed'] {
+    animation: overlay-exit var(--motion-exit-duration) var(--motion-exit-easing) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(
+      .overlay-mask-motion,
+      .overlay-dialog-motion,
+      .overlay-popover-motion,
+      .overlay-drawer-motion
+    )[data-state] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes overlay-enter {
+  from {
+    opacity: var(--overlay-motion-from-opacity);
+    transform: translate(var(--overlay-motion-from-x), var(--overlay-motion-from-y))
+      scale(var(--overlay-motion-from-scale));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes overlay-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: var(--overlay-motion-from-opacity);
+    transform: translate(var(--overlay-motion-from-x), var(--overlay-motion-from-y))
+      scale(var(--overlay-motion-from-scale));
+  }
+}

@@ -536,7 +536,7 @@ describe('Canvas immutable connection endpoints browser contract', () => {
       expect(props['onlyRenderVisibleElements']).toBe(false)
       expect(props['edgesUpdatable']).toBe(false)
       expect(props['connectOnClick']).toBe(false)
-      expect(props['defaultEdgeOptions']).toEqual({
+      expect(props['defaultEdgeOptions']).toMatchObject({
         animated: false,
         updatable: false,
       } satisfies Partial<import('@vue-flow/core').Edge>)

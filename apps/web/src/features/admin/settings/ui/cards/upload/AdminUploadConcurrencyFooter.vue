@@ -21,14 +21,14 @@
     </div>
     <div class="flex shrink-0 items-center gap-2">
       <ActionButton
-        size="small"
+        size="sm"
         :disabled="isMediaUploadLoading || isMediaUploadSaving || !mediaUploadIsDirty"
         @click="resetMediaUpload"
       >
         {{ SETTINGS_MESSAGES.reset }}
       </ActionButton>
       <ActionButton
-        size="small"
+        size="sm"
         :disabled="
           isMediaUploadLoading ||
           isMediaUploadSaving ||

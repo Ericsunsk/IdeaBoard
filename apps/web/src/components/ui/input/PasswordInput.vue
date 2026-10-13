@@ -19,7 +19,7 @@
       type="button"
       :aria-label="toggleAriaLabel"
       :title="toggleAriaLabel"
-      class="control-state absolute right-0 top-0 flex h-full items-center justify-center px-3 text-muted-foreground hover:text-foreground"
+      class="control-state absolute right-0 top-0 flex h-full cursor-pointer items-center justify-center px-3 text-muted-foreground hover:text-foreground"
       @click="showPassword = !showPassword"
     >
       <EyeClosed v-if="showPassword" class="h-4 w-4" />

@@ -91,7 +91,7 @@
             <AdminButton
               v-if="isRefundableCharge(data)"
               :label="t('admin.wallet.refund')"
-              size="small"
+              size="sm"
               variant="ghost"
               class="text-destructive hover:text-destructive/80"
               :disabled="commandPending"

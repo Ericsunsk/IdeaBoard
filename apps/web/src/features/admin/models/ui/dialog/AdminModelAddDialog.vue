@@ -33,7 +33,7 @@
         <!-- 重新探测按钮 -->
         <button
           type="button"
-          class="inline-flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
+          class="inline-flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
           :disabled="loading"
           @click="loadDetectedModels"
         >
@@ -111,7 +111,7 @@
               <tr
                 v-for="model in filteredModels"
                 :key="model.id"
-                class="transition-colors hover:bg-muted/40 cursor-pointer"
+                class="transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted/40 cursor-pointer"
                 :class="{
                   'bg-primary-faintest': selectedModelIds.has(model.id),
                   'opacity-60 bg-muted/20 cursor-not-allowed': isModelExisting(model.id),

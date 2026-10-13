@@ -85,7 +85,7 @@
           <template #header-extra>
             <button
               type="button"
-              class="-my-1 inline-flex min-h-8 items-center border-0 bg-transparent px-1 text-admin-caption font-semibold text-primary transition-colors hover:text-primary/90 hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
+              class="-my-1 inline-flex min-h-8 items-center border-0 bg-transparent px-1 text-admin-caption font-semibold text-primary transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-primary/90 hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
               :disabled="loading"
               @click="resetMode = true"
             >
@@ -130,7 +130,7 @@
         >
         <button
           type="button"
-          class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-primary transition-colors hover:text-primary/90 hover:underline cursor-pointer disabled:opacity-60"
+          class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-primary transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-primary/90 hover:underline cursor-pointer disabled:opacity-60"
           :disabled="loading"
           @click="resetMode = false"
         >

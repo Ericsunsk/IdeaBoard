@@ -17,7 +17,7 @@
         <div
           v-for="provider in oauthLoginProviders"
           :key="provider.value"
-          class="group relative flex items-center justify-between rounded-panel border p-3 cursor-pointer transition-colors select-none"
+          class="group relative flex items-center justify-between rounded-panel border p-3 cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] select-none"
           :class="
             selectedProvider === provider.value
               ? 'border-primary bg-primary-faint shadow-2xs'

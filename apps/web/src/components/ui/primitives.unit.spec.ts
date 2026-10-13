@@ -12,13 +12,12 @@ describe('Standard shadcn-vue primitives', () => {
     expect(buttonVariants({ variant: 'outline' })).toContain('border-input')
     expect(buttonVariants({ variant: 'destructive' })).toContain('bg-destructive')
     expect(buttonVariants({ size: 'sm' })).toContain('h-8')
-    expect(buttonVariants({ size: 'compact' })).toContain('h-8')
     expect(buttonVariants({ size: 'icon' })).toContain('h-9 w-9')
   })
 
-  it('renders standard Button component with loading and compact size', () => {
+  it('renders standard Button component with loading and sm size', () => {
     const wrapper = mount(Button, {
-      props: { variant: 'outline', size: 'compact', isLoading: true },
+      props: { variant: 'outline', size: 'sm', isLoading: true },
       slots: { default: 'Click me' },
     })
     expect(wrapper.text()).toBe('Click me')
@@ -28,9 +27,9 @@ describe('Standard shadcn-vue primitives', () => {
     expect(wrapper.attributes('disabled')).toBeDefined()
   })
 
-  it('renders standard Input component with model value, compact size and invalid aria state', async () => {
+  it('renders standard Input component with model value, sm size and invalid aria state', async () => {
     const wrapper = mount(Input, {
-      props: { modelValue: 'hello', size: 'compact', invalid: true },
+      props: { modelValue: 'hello', size: 'sm', invalid: true },
     })
     const input = wrapper.find('input')
     expect(input.element.value).toBe('hello')
@@ -40,14 +39,14 @@ describe('Standard shadcn-vue primitives', () => {
 
   it('renders standard Badge component with variants', () => {
     expect(badgeVariants({ variant: 'destructive' })).toContain('bg-destructive')
-    expect(badgeVariants({ variant: 'success' })).toContain('text-emerald-700')
+    expect(badgeVariants({ variant: 'success' })).toContain('text-success')
     const wrapper = mount(Badge, {
       props: { variant: 'success', rounded: true },
       slots: { default: 'Active' },
     })
     expect(wrapper.text()).toBe('Active')
     expect(wrapper.classes()).toContain('rounded-pill')
-    expect(wrapper.classes()).toContain('text-emerald-700')
+    expect(wrapper.classes()).toContain('text-success')
   })
 
   it('renders standard Avatar compound component', () => {

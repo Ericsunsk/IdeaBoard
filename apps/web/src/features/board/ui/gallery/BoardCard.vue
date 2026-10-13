@@ -1,6 +1,6 @@
 <template>
   <article
-    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-panel border border-border bg-card text-left transition-colors hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-panel border border-border bg-card text-left hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     role="button"
     tabindex="0"
     :aria-label="board.name"

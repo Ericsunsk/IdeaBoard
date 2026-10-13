@@ -7,7 +7,7 @@
         <button
           type="button"
           aria-label="切换导航菜单"
-          class="flex size-9 shrink-0 items-center justify-center rounded-control border border-border text-foreground transition-colors hover:bg-muted lg:hidden"
+          class="flex size-9 shrink-0 items-center justify-center rounded-control border border-border text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted lg:hidden"
           @click="drawerOpen = !drawerOpen"
         >
           <MenuIcon v-if="!drawerOpen" class="size-5" />
@@ -17,7 +17,7 @@
         <button
           type="button"
           title="回到顶部"
-          class="hidden min-h-8 min-w-0 items-center gap-2 text-left transition lg:flex"
+          class="hidden min-h-8 min-w-0 items-center gap-2 text-left transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] lg:flex"
           :class="
             stickyTitleVisible
               ? 'translate-y-0 opacity-100'
@@ -78,7 +78,7 @@
                   v-for="item in anomalies"
                   :key="item.id"
                   type="button"
-                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-panel px-3 py-3 text-left transition-colors hover:bg-muted"
+                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-panel px-3 py-3 text-left transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted"
                   @click="handleAnomalySelect(item)"
                 >
                   <span
@@ -188,9 +188,9 @@ const { anomalies, anomalyCount, hasAnomalies } = useAnomalyRadar({
 })
 
 const notificationButtonClass =
-  'relative flex size-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted'
+  'relative flex size-9 items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted'
 const userAvatarButtonClass =
-  'relative flex size-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted cursor-pointer'
+  'relative flex size-9 items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted cursor-pointer'
 const userAvatarImageClass = 'size-6 rounded-pill object-cover'
 const userAvatarPlaceholderClass =
   'flex size-full items-center justify-center text-muted-foreground'

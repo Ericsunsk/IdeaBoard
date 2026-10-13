@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { h } from 'vue'
+import { h, nextTick } from 'vue'
 import { renderWithUser, screen, within } from '../../../../../test/render'
 import AdminDialogShell from './AdminDialogShell.vue'
 
@@ -167,7 +167,21 @@ describe('AdminDialogShell', () => {
     expect(onVisibleUpdate).not.toHaveBeenCalled()
   })
 
-  it('restores focus to the trigger after the dialog has closed', async () => {
+  it('restores focus only after the exit animation finishes', async () => {
+    const readStyle = getComputedStyle
+    const styleSpy = vi.spyOn(globalThis, 'getComputedStyle').mockImplementation((element) => {
+      const style = readStyle(element)
+      if (!element.classList.contains('overlay-dialog-motion')) return style
+      return new Proxy(style, {
+        get(target, property) {
+          if (property === 'animationName') {
+            return element.getAttribute('data-state') === 'open' ? 'overlay-enter' : 'overlay-exit'
+          }
+          const value = Reflect.get(target, property, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+    })
     const trigger = document.createElement('button')
     trigger.textContent = '打开配置'
     document.body.append(trigger)
@@ -177,11 +191,27 @@ describe('AdminDialogShell', () => {
     try {
       const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
       dialog.focus()
+      dialog.dispatchEvent(
+        Object.assign(new Event('animationstart'), { animationName: 'overlay-enter' }),
+      )
       await result.user.keyboard('{Escape}')
       await result.rerender({ visible: false, header: '编辑配置' })
+      await nextTick()
 
+      expect(dialog).toBeInTheDocument()
+      expect(dialog).toHaveAttribute('data-state', 'closed')
+      expect(trigger).not.toHaveFocus()
+      dialog.dispatchEvent(
+        Object.assign(new Event('animationcancel'), { animationName: 'overlay-enter' }),
+      )
+      expect(dialog).toBeInTheDocument()
+      dialog.dispatchEvent(
+        Object.assign(new Event('animationend'), { animationName: 'overlay-exit' }),
+      )
+      await vi.waitFor(() => expect(dialog).not.toBeInTheDocument())
       await vi.waitFor(() => expect(trigger).toHaveFocus())
     } finally {
+      styleSpy.mockRestore()
       trigger.remove()
     }
   })

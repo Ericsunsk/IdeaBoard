@@ -1782,7 +1782,6 @@
     "buttonChromeColorClasses",
     "buttonChromeSizeTypography",
     "buttonVariants",
-    "resolveButtonChromeUiVariant",
     "resolveButtonChromeVariant"
   ],
   "src/components/ui/card/index.ts": [

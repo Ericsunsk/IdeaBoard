@@ -3,7 +3,7 @@
     role="alert"
     :class="
       cn(
-        'relative w-full rounded-panel border px-4 py-3 text-admin-body transition-colors flex items-start gap-3',
+        'relative w-full rounded-panel border px-4 py-3 text-admin-body transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-start gap-3',
         variantClasses,
         props.class,
       )

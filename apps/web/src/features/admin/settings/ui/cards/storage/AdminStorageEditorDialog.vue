@@ -62,7 +62,7 @@
           :key="vendor.key"
           :title="vendor.label"
           type="button"
-          class="group relative flex size-12 items-center justify-center rounded-control border p-2 cursor-pointer transition-colors"
+          class="group relative flex size-12 items-center justify-center rounded-control border p-2 cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
           :class="
             selectedVendorKey === vendor.key
               ? 'border-primary bg-card shadow-xs'
@@ -74,7 +74,7 @@
           <img
             :src="vendor.logoSrc"
             :alt="vendor.label"
-            class="size-full object-contain transition-transform group-hover:scale-105"
+            class="size-full object-contain transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:scale-105"
           />
         </button>
       </div>
@@ -90,7 +90,7 @@
             :key="tab.value"
             type="button"
             :class="[
-              'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control px-3 py-1 text-admin-caption font-medium transition-colors cursor-pointer',
+              'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control px-3 py-1 text-admin-caption font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer',
               activeConfigTab === tab.value
                 ? 'bg-card text-foreground shadow-xs font-semibold'
                 : 'hover:text-foreground text-muted-foreground',
@@ -156,7 +156,7 @@
               <AdminButton
                 v-if="field.key === 'access_domain' && selectedProviderMeta?.supports_bucket_info"
                 text
-                size="small"
+                size="sm"
                 :class="[adminTextButtonClass, '!text-xs font-medium']"
                 :disabled="fetching"
                 @click="emit('fetch-bucket-domains')"
@@ -191,7 +191,7 @@
                 v-for="domain in bucketDomains"
                 :key="domain"
                 type="button"
-                class="cursor-pointer rounded-control border border-border bg-card px-2 py-0.5 text-admin-caption font-mono font-medium text-primary hover:border-primary transition-colors"
+                class="cursor-pointer rounded-control border border-border bg-card px-2 py-0.5 text-admin-caption font-mono font-medium text-primary hover:border-primary transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
                 @click="updateConfigValue(field.key, `https://${domain}`)"
               >
                 https://{{ domain }}

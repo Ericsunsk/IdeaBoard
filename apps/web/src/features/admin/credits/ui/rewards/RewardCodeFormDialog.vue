@@ -137,7 +137,7 @@
               v-for="preset in expirationPresets"
               :key="preset.label"
               type="button"
-              class="rounded-control px-2.5 py-1 text-xs font-semibold transition-colors"
+              class="rounded-control px-2.5 py-1 text-xs font-semibold transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
                 isPresetActive(preset.days)
                   ? 'bg-primary text-primary-foreground shadow-xs'

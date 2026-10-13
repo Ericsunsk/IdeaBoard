@@ -3,7 +3,7 @@
     <DialogPortal>
       <DialogOverlay
         data-admin-drawer-mask
-        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion"
         @click="requestCloseFromMask"
       />
       <DialogContent
@@ -12,7 +12,7 @@
         aria-modal="true"
         :aria-busy="hasAriaBusy"
         data-admin-drawer
-        class="fixed inset-y-0 right-0 z-admin-dialog flex h-full w-admin-drawer flex-col border-l border-border bg-card shadow-admin-drawer transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
+        class="fixed inset-y-0 right-0 z-admin-dialog flex h-full w-admin-drawer flex-col border-l border-border bg-card shadow-admin-drawer overlay-drawer-motion"
         @escape-key-down="handleEscape"
         @pointer-down-outside="blockOutsideDismiss"
       >
@@ -28,7 +28,7 @@
           </DialogDescription>
           <DialogClose
             v-if="canDismiss('close-control')"
-            class="cursor-pointer rounded-control p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            class="cursor-pointer rounded-control p-1.5 text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground"
             :aria-label="closeLabel"
           >
             <Xmark class="size-5" aria-hidden="true" />

@@ -51,7 +51,7 @@
             :key="opt.value"
             type="button"
             :aria-pressed="activeTab === opt.value"
-            class="rounded-control px-3 py-1 font-medium transition-colors cursor-pointer"
+            class="rounded-control px-3 py-1 font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer"
             :class="
               activeTab === opt.value
                 ? 'bg-card text-foreground font-semibold shadow-xs'

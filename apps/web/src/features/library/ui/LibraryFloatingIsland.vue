@@ -18,7 +18,7 @@
             <h2 class="m-0 text-base font-semibold tracking-tight">{{ t('library.title') }}</h2>
             <button
               type="button"
-              class="grid size-6 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              class="grid size-6 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               :aria-label="
                 isHeaderCollapsed
                   ? t('library.actions.showFolders')
@@ -39,7 +39,7 @@
             <button
               v-if="!isCanvasPresentation"
               type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               :aria-label="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               :title="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               @click="isExpanded = !isExpanded"
@@ -49,7 +49,7 @@
             </button>
             <button
               type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               :aria-label="t('library.actions.close')"
               :title="t('library.actions.close')"
               @click="emit('close')"
@@ -116,7 +116,7 @@
               <!-- + New Folder 极简微胶囊 -->
               <button
                 type="button"
-                class="h-7 shrink-0 rounded-pill border border-dashed border-border bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary flex items-center gap-1 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                class="h-7 shrink-0 rounded-pill border border-dashed border-border bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-primary hover:text-primary flex items-center gap-1 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 @click="folderDialogVisible = true"
               >
                 <Plus class="size-3" aria-hidden="true" />

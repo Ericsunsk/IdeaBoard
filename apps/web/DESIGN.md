@@ -86,6 +86,9 @@ Token ownership:
 - Motion (`tokens/motion.css` + `core/motion/motionPolicy.ts`): single
   control/enter/exit/feedback policy (160/220/220/160ms); CSS, JS, and
   reduced-motion stay in sync.
+  Reka overlays share the mask/dialog/popover/drawer classes in
+  `theme/atoms/overlay-motion.css`; distinct enter/exit keyframes retain
+  content until exit finishes and disable animations under reduced motion.
 - Type (`tokens/type.css` + `type-*` utilities in `theme.css`): family-only
   `--font-*`, size `--text-*` (full Admin variant ladder kept), explicit
   `type-{display,title,body,caption,code}` shorthands. `--font-sans`/`--font-admin`/

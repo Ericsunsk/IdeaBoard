@@ -46,7 +46,7 @@
           v-for="link in legalLinks"
           :key="link.to"
           :to="link.to"
-          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-focus-ring"
+          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-focus-ring"
         >
           {{ link.label }}
         </RouterLink>

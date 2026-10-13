@@ -45,11 +45,9 @@ describe('adminSelectSkin', () => {
     expect(adminSelectPanelClass).toContain('rounded-panel')
   })
 
-  it('animates every overlay in and out', () => {
+  it('uses shared presence motion for every overlay', () => {
     for (const overlay of [adminSelectContentClass, adminSelectPanelClass]) {
-      expect(overlay).toContain('data-[state=open]:animate-in')
-      expect(overlay).toContain('data-[state=closed]:animate-out')
-      expect(overlay).toContain('data-[state=open]:fade-in-0')
+      expect(overlay).toContain('overlay-popover-motion')
     }
   })
 

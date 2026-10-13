@@ -43,7 +43,7 @@
       <!-- 实时按钮 -->
       <button
         type="button"
-        class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+        class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted cursor-pointer"
         @click="emit('liveRefresh')"
       >
         <Play class="size-3 fill-foreground text-foreground" />

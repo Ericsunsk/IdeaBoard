@@ -4,7 +4,6 @@ export {
   buttonChromeBaseClass,
   buttonChromeColorClasses,
   buttonChromeSizeTypography,
-  resolveButtonChromeUiVariant,
   resolveButtonChromeVariant,
   type ButtonChromeSeverity,
   type ButtonChromeVariant,

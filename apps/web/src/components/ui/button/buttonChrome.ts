@@ -1,40 +1,34 @@
 import type { ClassValue } from 'clsx'
 import type { ButtonVariants } from './buttonVariants'
 
-// Shared variant, severity, and typography rules for AdminButton and ActionButton.
-export type ButtonChromeVariant =
-  | 'default'
-  | 'primary'
-  | 'secondary'
-  | 'destructive'
-  | 'danger'
-  | 'outline'
-  | 'ghost'
-  | 'link'
-  | 'success'
+// Variant names derive from the single source of truth (buttonVariants):
+// `primary`/`danger` are aliases of the canonical `default`/`destructive`.
+export type ButtonChromeVariant = NonNullable<ButtonVariants['variant']>
 
 export type ButtonChromeSeverity = 'primary' | 'secondary' | 'danger' | 'success' | 'info' | 'warn'
 
+// One definition per treatment; `primary`/`danger` alias the canonical paint.
+const buttonChromePrimaryTreatment =
+  'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed shadow-xs'
+const buttonChromeDestructiveTreatment =
+  'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed shadow-xs'
+
 export const buttonChromeColorClasses: Record<ButtonChromeVariant, string> = {
-  default:
-    'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed shadow-xs',
-  primary:
-    'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed shadow-xs',
+  default: buttonChromePrimaryTreatment,
+  primary: buttonChromePrimaryTreatment,
   secondary:
     'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70 border border-border',
-  destructive:
-    'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed shadow-xs',
-  danger:
-    'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed shadow-xs',
+  destructive: buttonChromeDestructiveTreatment,
+  danger: buttonChromeDestructiveTreatment,
   outline:
     'border border-input bg-card text-card-foreground hover:bg-muted active:bg-muted/80 shadow-xs',
   ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80',
   link: 'text-primary underline-offset-4 hover:underline',
-  success: 'bg-emerald-700 text-white hover:bg-emerald-700/90 shadow-xs',
+  success: 'bg-success text-success-foreground hover:bg-success-hover shadow-xs',
 }
 
 export const buttonChromeBaseClass =
-  'focus-visible:ring-2 focus-visible:ring-ring/20 select-none cursor-pointer'
+  'focus-visible:ring-2 focus-visible:ring-ring/20 select-none cursor-pointer disabled:cursor-not-allowed'
 
 export function resolveButtonChromeVariant(
   variant: ButtonChromeVariant | undefined,
@@ -63,38 +57,14 @@ export function resolveButtonChromeVariant(
 }
 
 export function buttonChromeSizeTypography(size: string | undefined): ClassValue {
-  if (size === 'small' || size === 'sm') {
+  if (size === 'sm') {
     return 'text-admin-meta'
   }
-  if (size === 'large' || size === 'lg') {
+  if (size === 'lg') {
     return 'text-admin-title-sm'
   }
   if (!size || size === 'default') {
     return 'text-admin-body'
   }
   return false
-}
-
-export function resolveButtonChromeUiVariant(
-  variant: ButtonChromeVariant,
-): ButtonVariants['variant'] {
-  if (variant === 'destructive' || variant === 'danger') {
-    return 'destructive'
-  }
-  if (variant === 'outline') {
-    return 'outline'
-  }
-  if (variant === 'secondary') {
-    return 'secondary'
-  }
-  if (variant === 'ghost') {
-    return 'ghost'
-  }
-  if (variant === 'link') {
-    return 'link'
-  }
-  if (variant === 'success') {
-    return 'success'
-  }
-  return 'default'
 }

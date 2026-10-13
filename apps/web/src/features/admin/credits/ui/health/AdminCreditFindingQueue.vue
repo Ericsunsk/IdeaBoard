@@ -15,7 +15,7 @@
             v-for="opt in statusOptions"
             :key="opt.value"
             type="button"
-            class="rounded-control px-3 py-1 text-xs font-semibold transition-colors cursor-pointer"
+            class="rounded-control px-3 py-1 text-xs font-semibold transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer"
             :class="
               status === opt.value
                 ? 'bg-card text-foreground shadow-xs'
@@ -49,7 +49,7 @@
           <span>{{ CREDIT_HEALTH_MESSAGES.queueStaleNotice }}</span>
           <AdminButton
             variant="ghost"
-            size="small"
+            size="sm"
             :class="adminTextButtonClass"
             :loading="loading"
             @click="refreshFindings"
@@ -100,7 +100,7 @@
               @click="openFinding(data)"
             >
               <span
-                class="font-semibold text-foreground group-hover:text-primary transition-colors"
+                class="font-semibold text-foreground group-hover:text-primary transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               >
                 {{ getFindingTypePresentation(data.finding_type).title }}
               </span>

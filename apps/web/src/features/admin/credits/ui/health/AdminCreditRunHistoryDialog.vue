@@ -47,7 +47,7 @@
           <AdminButton
             :label="CREDIT_HEALTH_MESSAGES.retryRefresh"
             severity="secondary"
-            size="small"
+            size="sm"
             variant="ghost"
             :class="adminTextButtonClass"
             :loading="runsLoading"

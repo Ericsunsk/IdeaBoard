@@ -24,7 +24,7 @@
         <div v-if="folderFactsReady && canCreateFromQuery" class="my-0.5 px-1">
           <button
             type="button"
-            class="flex w-full cursor-pointer items-center justify-between rounded-control border-none bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
+            class="flex w-full cursor-pointer items-center justify-between rounded-control border-none bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary/20"
             :disabled="saving || !folderFactsReady"
             @click="handleEnterCreate"
           >
@@ -51,7 +51,7 @@
           <button
             v-if="showQuickSaves"
             type="button"
-            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-control border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-foreground transition hover:bg-muted hover:text-primary disabled:opacity-50"
+            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-control border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-foreground transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-primary disabled:opacity-50"
             :disabled="saving || !folderFactsReady"
             @click="saveTo()"
           >
@@ -65,13 +65,13 @@
             v-for="folder in filteredFolders"
             :key="folder.id"
             type="button"
-            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-control border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-foreground transition hover:bg-muted hover:text-primary disabled:opacity-50"
+            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-control border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-foreground transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-primary disabled:opacity-50"
             :disabled="saving || !folderFactsReady"
             @click="saveTo(folder.id)"
           >
             <div class="flex min-w-0 items-center gap-2">
               <Folder
-                class="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/fitem:text-primary"
+                class="size-3.5 shrink-0 text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/fitem:text-primary"
                 aria-hidden="true"
               />
               <span class="truncate font-medium">{{ folder.name }}</span>

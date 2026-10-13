@@ -18,7 +18,7 @@
           <span>{{ error }}</span>
           <AdminButton
             variant="ghost"
-            size="small"
+            size="sm"
             :class="adminTextButtonClass"
             :disabled="busy"
             @click="emit('retry')"

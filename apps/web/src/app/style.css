@@ -7,6 +7,7 @@
 @import '../theme/theme.css';
 @import '../theme/base.css';
 @import '../theme/atoms/interactive-control-state.css';
+@import '../theme/atoms/overlay-motion.css';
 @import '../theme/atoms/touch-target.css';
 @import '../theme/atoms/brand-mark.css';
 @import '../theme/atoms/board-page-background.css';

@@ -1116,10 +1116,6 @@
         "kind": "canonical-origin",
         "evidence": ["src/components/ui/button/index.ts#buttonChromeSizeTypography"]
       },
-      "resolveButtonChromeUiVariant": {
-        "kind": "canonical-origin",
-        "evidence": ["src/components/ui/button/index.ts#resolveButtonChromeUiVariant"]
-      },
       "resolveButtonChromeVariant": {
         "kind": "canonical-origin",
         "evidence": ["src/components/ui/button/index.ts#resolveButtonChromeVariant"]
@@ -1180,12 +1176,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/components/ui/button/index.ts#buttonVariants"
-        ]
-      },
-      "resolveButtonChromeUiVariant": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/components/ui/button/index.ts#resolveButtonChromeUiVariant"
         ]
       },
       "resolveButtonChromeVariant": {

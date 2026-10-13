@@ -10,7 +10,7 @@
         <span class="font-semibold">{{ MONITOR_MESSAGES.detailFailedTitle }}</span>
         <button
           type="button"
-          class="h-5 cursor-pointer rounded-control border border-destructive/30 px-1.5 text-admin-caption font-medium text-destructive transition-colors hover:bg-destructive/10"
+          class="h-5 cursor-pointer rounded-control border border-destructive/30 px-1.5 text-admin-caption font-medium text-destructive transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-destructive/10"
           @click="$emit('retry')"
         >
           {{ MONITOR_MESSAGES.retry }}
