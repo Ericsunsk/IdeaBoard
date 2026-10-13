@@ -10,7 +10,7 @@ import {
   type CanvasGraphEditingUploadAdapter,
 } from '../../graph-editing'
 import type { CanvasImageWorkflowUiAdapter } from '../../image-workflow'
-import { createCanvasTaskLifecycle } from '../../execution/task-lifecycle'
+import { createCanvasTaskLifecycle } from '../../execution/task-lifecycle/canvasTaskLifecycle'
 import { cancelCanvasWorkspaceTask } from '../../execution'
 import type { CanvasWorkspaceRuntime } from '../model.ts'
 import { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'

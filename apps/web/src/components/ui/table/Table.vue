@@ -1,6 +1,6 @@
 <template>
-  <div data-ui="table-wrapper" :class="cn(tableWrapperClasses, props.wrapperClass)">
-    <table data-ui="table" :class="cn(tableClasses, props.class)">
+  <div data-ui="table-wrapper" :class="cn('relative w-full overflow-auto', props.wrapperClass)">
+    <table data-ui="table" :class="cn('w-full caption-bottom text-sm', props.class)">
       <slot />
     </table>
   </div>
@@ -9,7 +9,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
-import { tableClasses, tableWrapperClasses } from './tableClasses'
 
 const props = withDefaults(
   defineProps<{

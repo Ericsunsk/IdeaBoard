@@ -11,13 +11,13 @@ type CanvasTaskFinalFailure = {
   error: unknown
 }
 
-export type CanvasTaskLifecycleOptions = {
+type CanvasTaskLifecycleOptions = {
   cancel: CanvasTaskCancelAdapter['cancel']
   scheduleRetry?: CanvasTaskRetryScheduler
   onFinalFailure?: (failure: CanvasTaskFinalFailure) => void
 }
 
-export type CanvasTaskLifecycle = {
+type CanvasTaskLifecycle = {
   cancelTasks: (taskIds: readonly string[]) => void
 }
 

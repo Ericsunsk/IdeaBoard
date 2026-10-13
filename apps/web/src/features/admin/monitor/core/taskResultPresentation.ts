@@ -6,6 +6,7 @@ import {
 import { i18n } from '../../../../core/i18n'
 import { adminTaskStatuses } from './status'
 import { getSafeTaskResultImageUrl, getSafeTaskResultImageUrls } from './taskResultImages'
+import { isRecord } from '../../../../core/utils/guards'
 import type { AdminMonitorDetailModel, AdminMonitorListItemModel } from '../resource'
 
 const RESULT_MAX_STRING_LENGTH = 300
@@ -143,10 +144,6 @@ function parseResultSafely(str: string): unknown | null {
   } catch {
     return null
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function truncateString(value: string, maxLength = RESULT_MAX_STRING_LENGTH): string {

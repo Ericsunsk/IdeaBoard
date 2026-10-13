@@ -8,8 +8,10 @@ import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '../'
 import { i18n } from '../../../../../core/i18n'
 import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
-import { deserializeImageRetouchPlan, type RetouchFinalRenderModule } from '../../retouch/testing'
-import type { MaskPaintingCanvasModule } from '../../inpaint/testing'
+import { deserializeImageRetouchPlan } from '../../retouch/core/recipe'
+
+type RetouchFinalRenderModule = typeof import('../../retouch/session/stage/runtime/finalRender')
+type MaskPaintingCanvasModule = typeof import('../../inpaint/session/maskPaintingCanvas')
 import * as mediaAssetDelivery from '../../../../../api/mediaAssetDelivery'
 import {
   resetMediaWorkspaceIdResolver,

@@ -2558,6 +2558,7 @@
     "adminFramedIconButtonClass",
     "adminInputChromeClass",
     "adminLogoButtonClass",
+    "adminOverlayMaskClass",
     "adminSummaryGridClass",
     "adminSurfacePanelClass",
     "adminSurfacePanelViewportClass",
@@ -2571,6 +2572,7 @@
     "adminTableRowActionButtonClass",
     "adminTableStyle",
     "adminTextButtonClass",
+    "adminToolbarButtonClass",
     "adminToolbarMetricClass",
     "adminToolbarPageLabelClass"
   ],
@@ -2722,6 +2724,7 @@
     "adminLogoButtonClass",
     "adminMonoClass",
     "adminNumericCellClass",
+    "adminOverlayMaskClass",
     "adminSelectContentClass",
     "adminSelectItemCheckClass",
     "adminSelectItemClass",
@@ -2747,6 +2750,7 @@
     "adminTableStyle",
     "adminTextButtonClass",
     "adminThemeTokenFallbacks",
+    "adminToolbarButtonClass",
     "adminToolbarMetricClass",
     "adminToolbarPageLabelClass",
     "adminTruncateCellClass",
@@ -2985,7 +2989,6 @@
   ],
   "src/features/board/index.ts": [
     "BOARD_DOCUMENT_REPLACE_COALESCE_MS",
-    "BOARD_PREVIEW_RENDERER_VERSION",
     "BOARD_STATE_SCHEMA_VERSION",
     "BoardCommandDependencies",
     "BoardCommands",
@@ -3272,6 +3275,7 @@
     "addRemoteBoardFixture",
     "createMockWorkspaceBoardApiRequest",
     "createMockWorkspaceBoardApiState",
+    "makeBoardMeta",
     "makeBoardSnapshot",
     "makeBoardState",
     "makePendingImageNodeSnapshot",
@@ -3467,11 +3471,6 @@
     "PendingImageSupersededExecution",
     "createPendingImageExecutionCore"
   ],
-  "src/features/canvas/session/execution/task-lifecycle/index.ts": [
-    "CanvasTaskLifecycle",
-    "CanvasTaskLifecycleOptions",
-    "createCanvasTaskLifecycle"
-  ],
   "src/features/canvas/session/flow-adapter/index.ts": [
     "CanvasFlowViewportControls",
     "CanvasNodeDragChange",
@@ -3608,16 +3607,6 @@
     "useInpaintChromeActions",
     "useInpaintChromeState"
   ],
-  "src/features/canvas/tools/inpaint/session/fabric/index.ts": [
-    "MaskPainter",
-    "MaskPainterClientPoint",
-    "MaskPainterCommit",
-    "MaskPainterDrawMode",
-    "MaskPainterOptions",
-    "MaskPainterViewport",
-    "loadFabricMaskPainter"
-  ],
-  "src/features/canvas/tools/inpaint/testing/index.ts": ["MaskPaintingCanvasModule"],
   "src/features/canvas/tools/retouch/index.ts": [
     "ImageRetouchKind",
     "ImageRetouchRenderSource",
@@ -3659,11 +3648,6 @@
   "src/features/canvas/tools/retouch/testing/browser.ts": [
     "CurveGraph",
     "normalizeCurveChannelPoints"
-  ],
-  "src/features/canvas/tools/retouch/testing/index.ts": [
-    "RetouchFinalRenderModule",
-    "RetouchWebglEngineModule",
-    "deserializeImageRetouchPlan"
   ],
   "src/features/canvas/ui/chrome/components/index.ts": [
     "CanvasChrome",
@@ -3744,7 +3728,6 @@
     "CanvasInteractionKey",
     "useFlowCanvasInteractionState"
   ],
-  "src/features/legal/contacts.ts": ["SUPPORT_EMAIL"],
   "src/features/legal/index.ts": [
     "AcceptableUsePage",
     "LEGAL_CONTACTS",

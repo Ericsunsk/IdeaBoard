@@ -6,11 +6,7 @@ import type { User } from './sessionUserType'
 // facts (storage namespace, status, timestamps).
 // Better Auth owns email; it stays outside this view.
 
-function asTrimmedString(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed ? trimmed : undefined
-}
+import { asTrimmedString } from '../core/utils/guards'
 
 export function toSessionUser(raw: unknown): User | null {
   if (!raw || typeof raw !== 'object') return null

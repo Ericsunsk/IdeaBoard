@@ -1,6 +1,7 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { requireContractData } from '../../../../api/contractKernel'
+import { withSignal } from '../../../../core/utils/request'
 import { keepPrevious, STALE_TIME_MS } from '../../../../core/query/queryDefaults'
 import { getControlStatistics } from '../../../../api/generated-query/control/control-platform/control-platform'
 import type { GetControlStatisticsParams } from '../../../../api/generated-query/control/model'
@@ -156,9 +157,10 @@ export function useAdminStatisticsResource(
   const query = useQuery<ApiResponseAdminStatistics, Error, AdminStatistics>({
     queryKey: adminStatisticsQueryKeys.byParams(params),
     queryFn: ({ signal }) =>
-      getControlStatistics(statisticsParams(toValue(params)), {
-        ...(signal == null ? {} : { signal }),
-      }) as Promise<ApiResponseAdminStatistics>,
+      getControlStatistics(
+        statisticsParams(toValue(params)),
+        withSignal(signal),
+      ) as Promise<ApiResponseAdminStatistics>,
     select: selectAdminStatistics,
     staleTime: options.staleTime ?? ADMIN_STATISTICS_STALE_TIME_MS,
     refetchIntervalInBackground: options.refetchIntervalInBackground ?? false,

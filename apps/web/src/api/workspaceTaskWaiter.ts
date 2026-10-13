@@ -28,6 +28,7 @@ import {
   TASK_POLL_MAX_DELAY_MS,
 } from '../core/config/timing'
 import { subscribeWorkspaceEvent } from './workspaceEventStream'
+import { withSignal } from '../core/utils/request'
 
 const WORKSPACE_TASK_WAIT_TYPES = [
   'task.created',
@@ -72,7 +73,7 @@ export function waitWorkspaceTaskTerminal(
   }
   const readOptions = {
     ...(options?.requestId == null ? {} : { requestId: options.requestId }),
-    ...(options?.signal == null ? {} : { signal: options.signal }),
+    ...withSignal(options?.signal),
   }
   if (typeof EventSource === 'undefined') {
     return pollWorkspaceTaskTerminal(workspace, task, deadlineAt, pollOptions, readOptions)

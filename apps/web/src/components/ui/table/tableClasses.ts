@@ -10,10 +10,6 @@
  * a *function*, and `cn()`/`clsx()` silently drops functions — the base
  * classes would never reach the DOM.
  */
-export const tableWrapperClasses = 'relative w-full overflow-auto'
-
-export const tableClasses = 'w-full caption-bottom text-sm'
-
 export const tableHeaderClasses = '[&_tr]:border-b'
 
 export const tableBodyClasses = '[&_tr:last-child]:border-0'

@@ -2,6 +2,7 @@ import { computed, onMounted, onScopeDispose, reactive, ref, toRef } from 'vue'
 import { useAsyncAction } from '../../../../core/composables/useAsyncAction'
 import type { Service } from '../../../../core/contracts/imageServices'
 import { getServicePromptVariables, type ServicePromptVariable } from '../core/promptVariables'
+import { withSignal } from '../../../../core/utils/request'
 import type { AdminPromptConfigFeedback } from './usePromptConfigFeedback'
 import {
   createAdminPromptConfigResource,
@@ -90,7 +91,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       () =>
         refreshPromptData({
           preserveDirtyDraft: input.preserveDirtyDraft ?? true,
-          ...(input.signal == null ? {} : { signal: input.signal }),
+          ...withSignal(input.signal),
         }),
       {
         isLoading,

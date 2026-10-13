@@ -3,7 +3,7 @@
     <DialogPortal>
       <DialogOverlay
         data-admin-drawer-mask
-        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion"
+        :class="adminOverlayMaskClass"
         @click="requestCloseFromMask"
       />
       <DialogContent
@@ -63,6 +63,7 @@ import {
   DialogTitle,
 } from 'reka-ui'
 import { useAdminDialogInteraction } from '../../session/overlay/useAdminDialogInteraction'
+import { adminOverlayMaskClass } from '../../core/uiClasses'
 
 const props = withDefaults(
   defineProps<{

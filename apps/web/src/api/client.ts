@@ -2,6 +2,7 @@ import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
 import { handleAuthFailure, handleSilentAuthFailure } from '../core/utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../core/config/runtimeUrls'
 import { i18n } from '../core/i18n'
+import { withSignal } from '../core/utils/request'
 
 export type ApiClientError = Error & {
   code?: number | string | undefined
@@ -150,7 +151,7 @@ async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T>
   const { signal, authFailure, ...rest } = config ?? {}
   const normalizedConfig = {
     ...rest,
-    ...(signal == null ? {} : { signal }),
+    ...withSignal(signal),
     ...(authFailure == null ? {} : { authFailure }),
   }
   try {

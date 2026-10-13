@@ -1,4 +1,5 @@
 import { api, type ApiClientError, type ApiRequestConfig, type AuthFailureMode } from './client'
+import { withSignal } from '../core/utils/request'
 
 type OrvalRequestConfig = Omit<RequestInit, 'signal'> & {
   timeout?: number
@@ -15,7 +16,7 @@ function toApiRequestConfig(options?: OrvalRequestConfig): ApiRequestConfig | un
   const { body, signal, authFailure, ...rest } = options
   return {
     ...rest,
-    ...(signal == null ? {} : { signal }),
+    ...withSignal(signal),
     ...(authFailure == null ? {} : { authFailure }),
     ...(body == null ? {} : { body: body as ApiRequestConfig['body'] }),
   }

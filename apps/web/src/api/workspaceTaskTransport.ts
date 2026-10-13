@@ -32,6 +32,7 @@ import {
   type WorkspaceTaskOutputRef,
   type WorkspaceTasksRequestOptions,
 } from './workspaceTaskContract'
+import { withSignal } from '../core/utils/request'
 
 function toGeneratedOptions(options: WorkspaceTasksRequestOptions | undefined): {
   headers: Record<string, string>
@@ -42,7 +43,7 @@ function toGeneratedOptions(options: WorkspaceTasksRequestOptions | undefined): 
       requestId: options?.requestId?.trim() ? options.requestId.trim() : newRequestId(),
       ...(options?.idempotencyKey == null ? {} : { idempotencyKey: options.idempotencyKey }),
     }),
-    ...(options?.signal == null ? {} : { signal: options.signal }),
+    ...withSignal(options?.signal),
   }
 }
 

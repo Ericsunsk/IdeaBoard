@@ -1,8 +1,7 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '../../test/render'
-import { SUPPORT_EMAIL } from './contacts'
-import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from './documents'
+import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS, SUPPORT_EMAIL } from './documents'
 import { PUBLIC_LEGAL_LINKS } from './legalLinks'
 import TermsPage from './pages/TermsPage.vue'
 import {

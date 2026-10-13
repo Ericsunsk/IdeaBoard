@@ -1,12 +1,12 @@
 <template>
-  <tbody :class="cn('[&_tr:last-child]:border-0', props.class)">
+  <TableBody :class="props.class">
     <slot />
-  </tbody>
+  </TableBody>
 </template>
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { cn } from '@/lib/utils'
+import TableBody from '@/components/ui/table/TableBody.vue'
 
 const props = defineProps<{
   class?: HTMLAttributes['class'] | undefined

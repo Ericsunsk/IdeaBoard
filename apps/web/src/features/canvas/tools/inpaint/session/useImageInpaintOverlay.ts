@@ -19,8 +19,8 @@ import type {
   MaskPainterClientPoint,
   MaskPainterOptions,
   MaskPainterViewport,
-} from './fabric/index.ts'
-import { loadFabricMaskPainter } from './fabric/index.ts'
+} from '../core/painter.ts'
+import { loadFabricMaskPainter } from './fabric/loader'
 import type { RetouchImageRect } from '../../retouch'
 
 type MaskPainterFactory = (

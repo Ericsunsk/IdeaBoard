@@ -3,6 +3,7 @@ import {
   listControlRewardRedemptions,
 } from '../../../../../api/generated-query/control/control-credits/control-credits'
 import { requireContractData } from '../../../../../api/contractKernel'
+import { withSignal } from '../../../../../core/utils/request'
 import { createControlError } from '../../../shared'
 import type {
   ControlAdminRedemption,
@@ -71,9 +72,7 @@ async function listRewardCodeRedemptions(
   const params: { before_id?: number; limit?: number } = {}
   if (input.beforeId != null) params.before_id = input.beforeId
   if (input.limit != null) params.limit = input.limit
-  const body = await listControlRewardRedemptions(rewardCodeId, params, {
-    ...(input.signal == null ? {} : { signal: input.signal }),
-  })
+  const body = await listControlRewardRedemptions(rewardCodeId, params, withSignal(input.signal))
   const page = requireContractData<ControlAdminRedemptionPage>(body, '加载兑换记录失败')
   if (!Array.isArray(page.redemptions)) {
     throw createControlError('control_failed', '加载兑换记录失败')
@@ -90,9 +89,11 @@ async function getRewardCodeRedemption(
   redemptionId: number,
   input: { signal?: AbortSignal } = {},
 ): Promise<RewardCodeRedemptionDetail> {
-  const body = await getControlRewardRedemption(rewardCodeId, redemptionId, {
-    ...(input.signal == null ? {} : { signal: input.signal }),
-  })
+  const body = await getControlRewardRedemption(
+    rewardCodeId,
+    redemptionId,
+    withSignal(input.signal),
+  )
   const detail = requireContractData<ControlAdminRedemptionDetail>(body, '加载兑换详情失败')
   return {
     ...normalizeRedemption(detail),

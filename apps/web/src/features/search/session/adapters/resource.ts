@@ -1,5 +1,6 @@
 import type { SearchPage } from '../../core/models'
 import { api } from '../../../../api/client'
+import { withSignal } from '../../../../core/utils/request'
 import { resolveContractData, type ContractSuccessEnvelope } from '../../../../api/contractKernel'
 import { stripUndefined } from '../../../../api/stripUndefined'
 import { i18n } from '../../../../core/i18n'
@@ -72,7 +73,7 @@ export async function searchInspiration(input: {
       searchInspirationUrl({ q: input.query, cursor: input.cursor, limit: input.limit }),
       {
         method: 'GET',
-        ...(input.signal == null ? {} : { signal: input.signal }),
+        ...withSignal(input.signal),
       },
     ),
     i18n.global.t('search.loadFailed'),

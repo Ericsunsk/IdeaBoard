@@ -7010,12 +7010,6 @@
       }
     },
     "src/features/board/index.ts": {
-      "BOARD_PREVIEW_RENDERER_VERSION": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#BOARD_PREVIEW_RENDERER_VERSION"
-        ]
-      },
       "BOARD_STATE_SCHEMA_VERSION": {
         "kind": "canonical-public",
         "evidence": [
@@ -8796,7 +8790,7 @@
     "src/features/board/session/preview/boardPreviewVersion.ts": {
       "BOARD_PREVIEW_RENDERER_VERSION": {
         "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#BOARD_PREVIEW_RENDERER_VERSION"]
+        "evidence": ["src/features/board/ports/canvas.ts#BOARD_PREVIEW_RENDERER_VERSION"]
       }
     },
     "src/features/board/session/share-join/joinSharedBoardWorkflow.ts": {
@@ -9929,44 +9923,6 @@
         "kind": "test-contract",
         "evidence": [
           "src/features/canvas/session/execution/task-lifecycle/canvasTaskLifecycle.unit.spec.ts"
-        ]
-      },
-      "CanvasTaskLifecycle": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/session/execution/task-lifecycle/index.ts#CanvasTaskLifecycle"
-        ]
-      },
-      "CanvasTaskLifecycleOptions": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/session/execution/task-lifecycle/index.ts#CanvasTaskLifecycleOptions"
-        ]
-      },
-      "createCanvasTaskLifecycle": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/session/execution/task-lifecycle/index.ts#createCanvasTaskLifecycle"
-        ]
-      }
-    },
-    "src/features/canvas/session/execution/task-lifecycle/index.ts": {
-      "CanvasTaskLifecycle": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/session/execution/task-lifecycle/index.ts#CanvasTaskLifecycle"
-        ]
-      },
-      "CanvasTaskLifecycleOptions": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/session/execution/task-lifecycle/index.ts#CanvasTaskLifecycleOptions"
-        ]
-      },
-      "createCanvasTaskLifecycle": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/session/execution/task-lifecycle/index.ts#createCanvasTaskLifecycle"
         ]
       }
     },
@@ -11884,38 +11840,6 @@
         "evidence": ["src/features/canvas/tools/inpaint/index.ts#ImageMaskDrawMode"]
       }
     },
-    "src/features/canvas/tools/inpaint/core/painter.ts": {
-      "MaskPainter": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainter"]
-      },
-      "MaskPainterClientPoint": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterClientPoint"
-        ]
-      },
-      "MaskPainterCommit": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterCommit"]
-      },
-      "MaskPainterDrawMode": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterDrawMode"
-        ]
-      },
-      "MaskPainterOptions": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterOptions"]
-      },
-      "MaskPainterViewport": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterViewport"
-        ]
-      }
-    },
     "src/features/canvas/tools/inpaint/index.ts": {
       "ImageInpaintChrome": {
         "kind": "canonical-public",
@@ -11951,58 +11875,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/index.ts#useInpaintChromeState"
-        ]
-      }
-    },
-    "src/features/canvas/tools/inpaint/session/fabric/index.ts": {
-      "MaskPainter": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainter"
-        ]
-      },
-      "MaskPainterClientPoint": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterClientPoint"
-        ]
-      },
-      "MaskPainterCommit": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterCommit"
-        ]
-      },
-      "MaskPainterDrawMode": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterDrawMode"
-        ]
-      },
-      "MaskPainterOptions": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterOptions"
-        ]
-      },
-      "MaskPainterViewport": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#MaskPainterViewport"
-        ]
-      },
-      "loadFabricMaskPainter": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/canvas/tools/inpaint/session/fabric/index.ts#loadFabricMaskPainter"
-        ]
-      }
-    },
-    "src/features/canvas/tools/inpaint/session/fabric/loader.ts": {
-      "loadFabricMaskPainter": {
-        "kind": "canonical-origin",
-        "evidence": [
-          "src/features/canvas/tools/inpaint/session/fabric/index.ts#loadFabricMaskPainter"
         ]
       }
     },
@@ -12605,15 +12477,11 @@
         "evidence": ["src/features/canvas/tools/retouch/index.ts#useRetouchSession"]
       }
     },
-    "src/features/legal/contacts.ts": {
-      "SUPPORT_EMAIL": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/legal/contacts.ts#SUPPORT_EMAIL"
-        ]
-      }
-    },
     "src/features/legal/documents.ts": {
+      "SUPPORT_EMAIL": {
+        "kind": "test-contract",
+        "evidence": ["src/features/legal/routePreservation.contract.spec.ts"]
+      },
       "LEGAL_CONTACTS": {
         "kind": "canonical-origin",
         "evidence": ["src/features/legal/index.ts#LEGAL_CONTACTS"]
@@ -17535,7 +17403,7 @@
     },
     "src/components/ui/table/tableClasses.ts": {
       "kind": "retained-public-or-test-support",
-      "evidence": ["src/components/ui/table/Table.vue"]
+      "evidence": ["src/components/ui/table/TableRow.vue"]
     },
     "src/components/ui/tabs/Tabs.vue": {
       "kind": "retained-public-or-test-support",
@@ -17949,14 +17817,6 @@
     "src/features/board/ports/testing.ts": {
       "kind": "test-support",
       "evidence": ["src/features/canvas/ui/pages/CanvasPage.component.spec.ts"]
-    },
-    "src/features/canvas/tools/inpaint/testing/index.ts": {
-      "kind": "test-support",
-      "evidence": ["src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts"]
-    },
-    "src/features/canvas/tools/retouch/testing/index.ts": {
-      "kind": "test-support",
-      "evidence": ["src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts"]
     },
     "src/features/canvas/tools/retouch/testing/browser.ts": {
       "kind": "test-support",

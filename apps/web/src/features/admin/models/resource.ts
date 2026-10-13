@@ -17,6 +17,7 @@ import {
   type ControlMutationOptions,
 } from '../shared'
 import { withControlCopy } from '../shared'
+import { isRecord } from '../../../core/utils/guards'
 import type {
   AdminModelItem,
   ModelObservedSkuMargin,
@@ -568,7 +569,3 @@ async function testGatewayConnection(
 }
 
 // withControlCopy is shared — see admin/shared/core/controlCopy.ts.
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}

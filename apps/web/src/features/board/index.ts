@@ -58,7 +58,6 @@ export {
 } from './session/preview/boardPreviewRefreshQueue'
 export { renderBoardPreviewDataUrl } from './session/preview/boardPreviewSerializer'
 export { blankBoardPreviewSurfaceClass } from './session/preview/boardPreviewStyle'
-export { BOARD_PREVIEW_RENDERER_VERSION } from './session/preview/boardPreviewVersion'
 // Catalog presentation composition (route-level public surface).
 export type {
   CatalogEntry,

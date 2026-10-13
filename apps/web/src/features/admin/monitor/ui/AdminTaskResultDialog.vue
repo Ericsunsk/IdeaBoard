@@ -36,7 +36,7 @@
               <button
                 v-if="detailTask?.task_id || taskId"
                 type="button"
-                class="flex size-5 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground"
+                :class="[copyBtnClass, 'size-5 hover:bg-muted']"
                 :aria-label="MONITOR_MESSAGES.copyTaskIdAria"
                 @click="copyToClipboard(detailTask?.task_id || taskId || '')"
               >
@@ -104,7 +104,7 @@
               </span>
               <button
                 type="button"
-                class="flex size-4 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground"
+                :class="[copyBtnClass, 'size-4']"
                 :aria-label="MONITOR_MESSAGES.copyUserIdAria"
                 @click="copyToClipboard(String(detailTask.user_public_id))"
               >
@@ -576,6 +576,9 @@ const {
 function handleVisibleUpdate(visible: boolean) {
   emit('update:visible', visible)
 }
+
+const copyBtnClass =
+  'flex cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-foreground'
 
 const eligibleModelsText = computed(() => {
   const models = props.task?.routing?.eligible_models ?? []

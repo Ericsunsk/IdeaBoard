@@ -33,11 +33,13 @@ import {
   isOpaqueId,
   newRequestId,
   opaqueIdPrefix,
-  parseContractEnvelope,
+  requireContractData,
 } from '../../../api/contractKernel'
 import { workspaceCreationIdempotencyKey } from '../../../api/idempotencyKey'
 import { normalizePageSize, PAGE_SIZES } from '../../../core/config/pagination'
 import type { AuthFailureMode } from '../../../api/client'
+import { withSignal } from '../../../core/utils/request'
+import { asTrimmedString, isRecord } from '../../../core/utils/guards'
 import { resolveApiUrl } from '../../../core/config/runtimeUrls'
 
 export type WorkspaceSummary = {
@@ -67,16 +69,6 @@ export type WorkspaceAccessKind = 'hidden' | 'forbidden'
 export const WORKSPACE_PAGE_SIZE_DEFAULT = PAGE_SIZES.standard
 export const WORKSPACE_PAGE_SIZE_MAX = PAGE_SIZES.max
 export const WORKSPACE_NAME_MAX_LENGTH = 120
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function asTrimmedString(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  return trimmed ? trimmed : null
-}
 
 function requireOpaqueId(value: unknown, prefix: 'usr' | 'org' | 'ws', what: string): string {
   if (typeof value !== 'string' || !isOpaqueId(value) || opaqueIdPrefix(value) !== prefix) {
@@ -114,41 +106,24 @@ export function parseWorkspaceItem(raw: unknown): WorkspaceSummary {
 }
 
 export function parseWorkspacePage(payload: unknown): WorkspaceListPage {
-  const parsed = parseContractEnvelope<unknown>(payload)
-  if (!parsed.ok) {
-    const error = new Error(parsed.error.message || 'Invalid workspace list response') as Error & {
-      code?: string | undefined
-      requestId?: string | undefined
-    }
-    error.code = parsed.error.code
-    error.requestId = parsed.error.request_id
-    throw error
-  }
-  if (!Array.isArray(parsed.data)) throw new Error('Invalid workspace list response')
-  const items = parsed.data.map(parseWorkspaceItem)
-  const meta = isRecord(parsed.meta) ? parsed.meta : null
+  const data = requireContractData<unknown>(payload, 'Invalid workspace list response')
+  if (!Array.isArray(data)) throw new Error('Invalid workspace list response')
+  const items = data.map(parseWorkspaceItem)
+  const metaRaw = isRecord(payload) ? payload.meta : null
+  const meta = isRecord(metaRaw) ? metaRaw : null
   const nextCursor = typeof meta?.next_cursor === 'string' ? meta.next_cursor : null
   const hasMore = meta?.has_more === true
   return { items, nextCursor, hasMore }
 }
 
 export function parsePrincipal(payload: unknown): PrincipalSummary {
-  const parsed = parseContractEnvelope<unknown>(payload)
-  if (!parsed.ok) {
-    const error = new Error(parsed.error.message || 'Invalid principal response') as Error & {
-      code?: string | undefined
-      requestId?: string | undefined
-    }
-    error.code = parsed.error.code
-    error.requestId = parsed.error.request_id
-    throw error
-  }
-  if (!isRecord(parsed.data)) throw new Error('Invalid principal response')
+  const data = requireContractData<unknown>(payload, 'Invalid principal response')
+  if (!isRecord(data)) throw new Error('Invalid principal response')
   // Agreed shape carries `public_id`/`display_name`; the kernel stub `User`
   // only has `id` so far.
-  const publicId = requireOpaqueId(parsed.data.public_id ?? parsed.data.id, 'usr', 'principal')
-  const displayName = typeof parsed.data.display_name === 'string' ? parsed.data.display_name : ''
-  const avatar = asTrimmedString(parsed.data.avatar) ?? undefined
+  const publicId = requireOpaqueId(data.public_id ?? data.id, 'usr', 'principal')
+  const displayName = typeof data.display_name === 'string' ? data.display_name : ''
+  const avatar = asTrimmedString(data.avatar)
   return {
     publicId,
     displayName,
@@ -228,7 +203,7 @@ function toRequestConfig(options: WorkspaceRequestOptions | undefined): {
   authFailure?: AuthFailureMode | undefined
 } {
   return {
-    ...(options?.signal == null ? {} : { signal: options.signal }),
+    ...withSignal(options?.signal),
     headers: buildContractRequestHeaders({
       requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
     }),
@@ -293,7 +268,7 @@ export async function provisionWorkspace(
       },
     },
     {
-      ...(options?.signal == null ? {} : { signal: options.signal }),
+      ...withSignal(options?.signal),
       headers: buildWorkspaceCreateHeaders({
         ...(options?.idempotencyKey === undefined
           ? {}
@@ -302,17 +277,8 @@ export async function provisionWorkspace(
       }),
     },
   )
-  const parsed = parseContractEnvelope<unknown>(response)
-  if (!parsed.ok) {
-    const error = new Error(parsed.error.message || 'Workspace creation failed') as Error & {
-      code?: string | undefined
-      requestId?: string | undefined
-    }
-    error.code = parsed.error.code
-    error.requestId = parsed.error.request_id
-    throw error
-  }
-  return parseWorkspaceItem(parsed.data)
+  const data = requireContractData<unknown>(response, 'Workspace creation failed')
+  return parseWorkspaceItem(data)
 }
 
 // Canonical agreed-contract URLs, centralized on runtimeUrls. Transport still

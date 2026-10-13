@@ -676,6 +676,7 @@ async function writeFanReport(): Promise<void> {
         record.undeclaredDeepImports.length ||
         record.undeclaredConsumers.length ||
         record.missingConsumers.length ||
+        record.missingDeepImports.length ||
         record.advisories.fanInTargetMismatch ||
         record.advisories.fanOutTargetMismatch ||
         record.advisories.newFanOutTargets.length ||

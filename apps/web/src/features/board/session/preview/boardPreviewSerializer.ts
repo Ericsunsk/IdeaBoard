@@ -19,6 +19,7 @@ import {
 } from './boardPreviewStyle'
 import { isDarkModeActive } from '../../../../theme/composables/useTheme'
 import { clamp } from '../../../../core/utils/number'
+import { isRecord } from '../../../../core/utils/guards'
 import { withAlpha } from '../../../../core/lib/chartPrimitives'
 
 interface BoardPreviewFrame {
@@ -100,10 +101,6 @@ const PREVIEW_EDGE_STROKE_DARK = 'rgba(255, 255, 255, 0.22)'
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object'
 }
 
 function toAbsolutePreviewUrl(url: string): string {

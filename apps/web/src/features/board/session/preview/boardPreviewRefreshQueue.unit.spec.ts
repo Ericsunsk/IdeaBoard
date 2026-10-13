@@ -6,16 +6,7 @@ import {
   createBoardPreviewRefreshQueue,
   type BoardPreviewRefreshQueueDependencies,
 } from './boardPreviewRefreshQueue'
-import type { BoardMeta } from '../catalog/boards'
-
-function makeBoard(id: string): BoardMeta {
-  return {
-    id,
-    name: id,
-    createdAt: 1,
-    updatedAt: 100,
-  }
-}
+import { makeBoardMeta as makeBoard } from '../../testing'
 
 function makeState(overrides: Partial<BoardState> = {}): BoardState {
   return {
@@ -122,7 +113,7 @@ describe('boardPreviewRefreshQueue', () => {
     }
     const deps = makeDeps(states)
     const queue = createBoardPreviewRefreshQueue(deps)
-    const boards = Object.keys(states).map(makeBoard)
+    const boards = Object.keys(states).map((id) => makeBoard(id))
 
     queue.reloadFromLocal(boards)
     queue.schedule(boards)

@@ -1,20 +1,13 @@
 <template>
-  <tr
-    :class="
-      cn(
-        'border-b border-border transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] data-[state=selected]:bg-muted',
-        props.hoverable && 'hover:bg-muted/50',
-        props.class,
-      )
-    "
-  >
+  <TableRow :class="cn('border-border', !props.hoverable && 'hover:bg-transparent', props.class)">
     <slot />
-  </tr>
+  </TableRow>
 </template>
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
+import TableRow from '@/components/ui/table/TableRow.vue'
 
 const props = withDefaults(
   defineProps<{

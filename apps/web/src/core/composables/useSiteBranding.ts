@@ -2,6 +2,7 @@ import { useQuery, type QueryClient } from '@tanstack/vue-query'
 import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 import { api } from '../../api/client'
+import { withSignal } from '../utils/request'
 import {
   createContractDataSelector,
   resolveContractData,
@@ -58,7 +59,7 @@ async function fetchSiteBrandingEnvelope(
   return api.request<ApiResponseBrandingSetting>('/settings/branding', {
     method: 'GET',
     authFailure: 'silent',
-    ...(signal == null ? {} : { signal }),
+    ...withSignal(signal),
   })
 }
 

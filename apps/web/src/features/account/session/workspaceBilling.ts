@@ -1,6 +1,6 @@
 import { formatDisplayErrorMessage } from '../../../core/utils/errorMessages'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../core/utils/workspaceId'
-import { parseContractEnvelope, requireContractData } from '../../../api/contractKernel'
+import { requireContractData } from '../../../api/contractKernel'
 import { i18n } from '../../../core/i18n'
 
 // Workspace billing seam for the account surface (W2 transports).
@@ -57,10 +57,9 @@ export async function resolveWorkspaceBillingData<T>(
 // callers read the whole body instead of unwrapping it. Contract error
 // envelopes still throw with their safe message.
 export function readContractListBody<T>(body: unknown, fallback: string): T {
-  const parsed = parseContractEnvelope<unknown>(body)
-  if (!parsed.ok) {
-    const error = new Error(parsed.error.message || fallback) as Error & { code?: string }
-    error.code = parsed.error.code
+  try {
+    requireContractData<unknown>(body, fallback)
+  } catch (error) {
     throw asWorkspaceBillingError(error, fallback)
   }
   return body as T

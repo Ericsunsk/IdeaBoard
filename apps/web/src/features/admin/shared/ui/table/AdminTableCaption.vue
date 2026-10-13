@@ -1,12 +1,13 @@
 <template>
-  <caption :class="cn('mt-4 text-xs text-muted-foreground', props.class)">
+  <TableCaption :class="cn('text-xs', props.class)">
     <slot />
-  </caption>
+  </TableCaption>
 </template>
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
+import TableCaption from '@/components/ui/table/TableCaption.vue'
 
 const props = defineProps<{
   class?: HTMLAttributes['class'] | undefined

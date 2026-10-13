@@ -23,6 +23,7 @@ import {
   requireWorkspaceId as requireSharedWorkspaceId,
 } from '../../../core/utils/workspaceId'
 import { opaqueIdPattern } from '../../../core/utils/opaqueIds'
+import { isRecord } from '../../../core/utils/guards'
 
 const LIBRARY_ID_RE = opaqueIdPattern(['lfolder', 'lasset'])
 
@@ -63,10 +64,6 @@ export function assertLibraryFolderId(value: string): string {
 
 export function assertLibraryAssetId(value: string): string {
   return assertLibraryId(value, LIBRARY_ASSET_PREFIXES, 'library asset id', 'lasset')
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function requiredString(raw: unknown, field: string): string {

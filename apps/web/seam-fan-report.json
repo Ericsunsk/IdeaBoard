@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "b25d4c9298c1452e2e6b9e99157d25c0181a35ac",
+  "checkpointSha": "25a4f453dab1fb639d2dee9fc70d6ec4240927c1",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 277, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 272, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -60,12 +60,13 @@
         }
       ],
       "fanIn": 12,
-      "fanOut": 4,
+      "fanOut": 5,
       "fanOutTargets": [
         "node_modules/ofetch/dist/node.cjs",
         "src/core/config/runtimeUrls.ts",
         "src/core/i18n/index.ts",
-        "src/core/utils/auth.ts"
+        "src/core/utils/auth.ts",
+        "src/core/utils/request.ts"
       ],
       "outboundEdges": [
         {
@@ -75,13 +76,15 @@
         },
         { "from": "src/api/client.ts", "to": "src/core/config/runtimeUrls.ts", "kind": "runtime" },
         { "from": "src/api/client.ts", "to": "src/core/i18n/index.ts", "kind": "runtime" },
-        { "from": "src/api/client.ts", "to": "src/core/utils/auth.ts", "kind": "runtime" }
+        { "from": "src/api/client.ts", "to": "src/core/utils/auth.ts", "kind": "runtime" },
+        { "from": "src/api/client.ts", "to": "src/core/utils/request.ts", "kind": "runtime" }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 12,
-      "targetFanOut": 4,
+      "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -292,12 +295,21 @@
         }
       ],
       "fanIn": 40,
-      "fanOut": 2,
-      "fanOutTargets": ["src/core/utils/errorMessages.ts", "src/core/utils/opaqueIds.ts"],
+      "fanOut": 3,
+      "fanOutTargets": [
+        "src/core/utils/errorMessages.ts",
+        "src/core/utils/guards.ts",
+        "src/core/utils/opaqueIds.ts"
+      ],
       "outboundEdges": [
         {
           "from": "src/api/contractKernel.ts",
           "to": "src/core/utils/errorMessages.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/contractKernel.ts",
+          "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
         {
@@ -309,8 +321,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 40,
-      "targetFanOut": 2,
+      "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -382,6 +395,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -460,6 +474,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
@@ -533,6 +548,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -661,6 +677,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 14,
       "targetFanOut": 4,
       "advisories": {
@@ -729,6 +746,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -807,6 +825,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
@@ -872,6 +891,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 0,
       "targetFanOut": 7,
       "advisories": {
@@ -904,6 +924,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -941,6 +962,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -973,6 +995,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -1007,6 +1030,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -1045,6 +1069,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -2101,6 +2126,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 18,
       "targetFanOut": 157,
       "advisories": {
@@ -2138,6 +2164,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -2181,6 +2208,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -2249,6 +2277,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -2338,6 +2367,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 0,
       "targetFanOut": 11,
       "advisories": {
@@ -2394,6 +2424,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 2,
       "advisories": {
@@ -2445,6 +2476,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -3980,6 +4012,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 19,
       "targetFanOut": 236,
       "advisories": {
@@ -4058,6 +4091,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 4,
       "advisories": {
@@ -4146,6 +4180,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 4,
       "advisories": {
@@ -4219,6 +4254,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -4287,6 +4323,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -4360,6 +4397,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -4428,6 +4466,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -4506,6 +4545,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 12,
       "targetFanOut": 0,
       "advisories": {
@@ -4684,6 +4724,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 26,
       "targetFanOut": 4,
       "advisories": {
@@ -4736,6 +4777,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -4828,6 +4870,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
@@ -4905,6 +4948,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
@@ -4963,7 +5007,7 @@
         }
       ],
       "fanIn": 10,
-      "fanOut": 7,
+      "fanOut": 9,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
@@ -4971,7 +5015,9 @@
         "src/api/generated-query/public/workspace-media/workspace-media.ts",
         "src/api/idempotencyKey.ts",
         "src/core/i18n/index.ts",
-        "src/core/utils/opaqueIds.ts"
+        "src/core/utils/guards.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/core/utils/request.ts"
       ],
       "outboundEdges": [
         { "from": "src/api/upload.ts", "to": "src/api/contractKernel.ts", "kind": "runtime" },
@@ -4992,13 +5038,16 @@
         },
         { "from": "src/api/upload.ts", "to": "src/api/idempotencyKey.ts", "kind": "runtime" },
         { "from": "src/api/upload.ts", "to": "src/core/i18n/index.ts", "kind": "runtime" },
-        { "from": "src/api/upload.ts", "to": "src/core/utils/opaqueIds.ts", "kind": "runtime" }
+        { "from": "src/api/upload.ts", "to": "src/core/utils/guards.ts", "kind": "runtime" },
+        { "from": "src/api/upload.ts", "to": "src/core/utils/opaqueIds.ts", "kind": "runtime" },
+        { "from": "src/api/upload.ts", "to": "src/core/utils/request.ts", "kind": "runtime" }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
-      "targetFanOut": 7,
+      "targetFanOut": 9,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -5023,11 +5072,12 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 3,
+      "fanOut": 4,
       "fanOutTargets": [
         "src/api/generated-query/public/user/user.ts",
         "src/api/sessionUserType.ts",
-        "src/core/i18n/index.ts"
+        "src/core/i18n/index.ts",
+        "src/core/utils/guards.ts"
       ],
       "outboundEdges": [
         {
@@ -5040,13 +5090,15 @@
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
         },
-        { "from": "src/api/userSession.ts", "to": "src/core/i18n/index.ts", "kind": "runtime" }
+        { "from": "src/api/userSession.ts", "to": "src/core/i18n/index.ts", "kind": "runtime" },
+        { "from": "src/api/userSession.ts", "to": "src/core/utils/guards.ts", "kind": "runtime" }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 3,
+      "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -5143,6 +5195,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
       "targetFanOut": 4,
       "advisories": {
@@ -5201,6 +5254,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 2,
       "advisories": {
@@ -5252,13 +5306,14 @@
         }
       ],
       "fanIn": 7,
-      "fanOut": 5,
+      "fanOut": 6,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts",
         "src/api/workspaceTaskContract.ts",
-        "src/core/config/pagination.ts"
+        "src/core/config/pagination.ts",
+        "src/core/utils/request.ts"
       ],
       "outboundEdges": [
         {
@@ -5285,13 +5340,19 @@
           "from": "src/api/workspaceTaskTransport.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceTaskTransport.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 7,
-      "targetFanOut": 5,
+      "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -5316,13 +5377,14 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 5,
+      "fanOut": 6,
       "fanOutTargets": [
         "src/api/workspaceEventStream.ts",
         "src/api/workspaceTaskContract.ts",
         "src/api/workspaceTaskTransport.ts",
         "src/core/config/timing.ts",
-        "src/core/utils/polling.ts"
+        "src/core/utils/polling.ts",
+        "src/core/utils/request.ts"
       ],
       "outboundEdges": [
         {
@@ -5349,13 +5411,19 @@
           "from": "src/api/workspaceTaskWaiter.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/api/workspaceTaskWaiter.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 5,
+      "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -5411,6 +5479,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -5552,6 +5621,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 13,
       "advisories": {
@@ -5634,6 +5704,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -5691,6 +5762,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -5876,6 +5948,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 25,
       "targetFanOut": 6,
       "advisories": {
@@ -5985,6 +6058,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -6178,6 +6252,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 4,
       "advisories": {
@@ -6421,6 +6496,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
@@ -6570,6 +6646,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 5,
       "advisories": {
@@ -6684,6 +6761,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
       "targetFanOut": 5,
       "advisories": {
@@ -6776,6 +6854,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -7011,6 +7090,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 6,
       "advisories": {
@@ -7074,6 +7154,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -7147,6 +7228,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 8,
       "targetFanOut": 2,
       "advisories": {
@@ -7174,6 +7256,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 0,
       "advisories": {
@@ -7228,6 +7311,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 4,
       "advisories": {
@@ -7280,6 +7364,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -7333,6 +7418,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -7375,6 +7461,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -7433,6 +7520,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -7636,6 +7724,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 31,
       "targetFanOut": 4,
       "advisories": {
@@ -7679,6 +7768,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -7722,6 +7812,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -7779,6 +7870,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -7827,6 +7919,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 1,
       "advisories": {
@@ -7889,6 +7982,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -7956,6 +8050,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 3,
       "advisories": {
@@ -8037,6 +8132,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 7,
       "advisories": {
@@ -8074,6 +8170,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -8136,6 +8233,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -8174,6 +8272,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -8243,6 +8342,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 5,
       "advisories": {
@@ -8275,6 +8375,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -8322,6 +8423,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -8435,6 +8537,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 17,
       "targetFanOut": 1,
       "advisories": {
@@ -8543,6 +8646,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 16,
       "targetFanOut": 1,
       "advisories": {
@@ -8596,6 +8700,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -8629,6 +8734,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -8702,6 +8808,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 9,
       "targetFanOut": 1,
       "advisories": {
@@ -8753,13 +8860,14 @@
         }
       ],
       "fanIn": 7,
-      "fanOut": 5,
+      "fanOut": 6,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/vue/index.js",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
-        "src/core/config/runtimeUrls.ts"
+        "src/core/config/runtimeUrls.ts",
+        "src/core/utils/request.ts"
       ],
       "outboundEdges": [
         {
@@ -8791,13 +8899,19 @@
           "from": "src/core/composables/useSiteBranding.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/core/composables/useSiteBranding.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 7,
-      "targetFanOut": 5,
+      "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -8901,6 +9015,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 9,
       "targetFanOut": 6,
       "advisories": {
@@ -8944,6 +9059,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -9041,6 +9157,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 15,
       "targetFanOut": 0,
       "advisories": {
@@ -9149,6 +9266,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 18,
       "targetFanOut": 0,
       "advisories": {
@@ -9201,6 +9319,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -9248,6 +9367,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -9330,6 +9450,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 12,
       "targetFanOut": 0,
       "advisories": {
@@ -9477,6 +9598,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 23,
       "targetFanOut": 0,
       "advisories": {
@@ -9644,6 +9766,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 29,
       "targetFanOut": 0,
       "advisories": {
@@ -9822,6 +9945,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 30,
       "targetFanOut": 1,
       "advisories": {
@@ -9960,6 +10084,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 21,
       "targetFanOut": 2,
       "advisories": {
@@ -10631,6 +10756,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 123,
       "targetFanOut": 5,
       "advisories": {
@@ -10678,6 +10804,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -10757,6 +10884,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 5,
       "advisories": {
@@ -10794,6 +10922,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -10826,6 +10955,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -10858,6 +10988,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -10890,6 +11021,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -11023,6 +11155,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 21,
       "targetFanOut": 1,
       "advisories": {
@@ -11168,6 +11301,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 17,
       "targetFanOut": 6,
       "advisories": {
@@ -11235,6 +11369,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 9,
       "targetFanOut": 0,
       "advisories": {
@@ -11267,6 +11402,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -11304,6 +11440,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -11406,6 +11543,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 12,
       "targetFanOut": 3,
       "advisories": {
@@ -11443,6 +11581,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -11480,6 +11619,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -11560,6 +11700,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 6,
       "advisories": {
@@ -11602,6 +11743,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -11690,6 +11832,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 12,
       "targetFanOut": 1,
       "advisories": {
@@ -11753,6 +11896,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -11801,6 +11945,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -11834,6 +11979,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -11881,6 +12027,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
@@ -11944,6 +12091,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -12043,6 +12191,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 15,
       "targetFanOut": 1,
       "advisories": {
@@ -12155,6 +12304,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 18,
       "targetFanOut": 0,
       "advisories": {
@@ -12223,6 +12373,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 8,
       "targetFanOut": 1,
       "advisories": {
@@ -12275,6 +12426,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -12368,6 +12520,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 13,
       "targetFanOut": 1,
       "advisories": {
@@ -12406,6 +12559,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -12439,6 +12593,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -12609,6 +12764,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 25,
       "targetFanOut": 4,
       "advisories": {
@@ -12652,6 +12808,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -12715,6 +12872,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 2,
       "advisories": {
@@ -12792,6 +12950,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
@@ -12834,6 +12993,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -12911,6 +13071,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
@@ -12979,6 +13140,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 7,
       "targetFanOut": 2,
       "advisories": {
@@ -13076,6 +13238,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 15,
       "targetFanOut": 0,
       "advisories": {
@@ -13134,6 +13297,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 8,
       "targetFanOut": 0,
       "advisories": {
@@ -13176,6 +13340,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -13260,6 +13425,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
@@ -13328,6 +13494,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 8,
       "targetFanOut": 1,
       "advisories": {
@@ -13364,7 +13531,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 78,
+      "fanOut": 79,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -13428,6 +13595,7 @@
         "src/core/utils/errorMessages.ts",
         "src/core/utils/formValidation.ts",
         "src/core/utils/ids.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
@@ -13802,6 +13970,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/payments/resource.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/payments/resource.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -13934,6 +14107,11 @@
         {
           "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/rewards/resource.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -15065,8 +15243,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 78,
+      "targetFanOut": 79,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -15148,6 +15327,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 9,
       "advisories": {
@@ -15286,6 +15466,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 14,
       "advisories": {
@@ -15327,6 +15508,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -15379,6 +15561,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -15427,6 +15610,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -15525,6 +15709,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 14,
       "targetFanOut": 1,
       "advisories": {
@@ -15562,6 +15747,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -15594,6 +15780,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -15637,6 +15824,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -15679,6 +15867,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -15737,6 +15926,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -15784,6 +15974,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 3,
       "advisories": {
@@ -15816,6 +16007,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -15854,6 +16046,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -15887,6 +16080,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -15919,6 +16113,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -15962,6 +16157,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -15978,6 +16174,11 @@
       "consumerEdges": [
         {
           "from": "src/features/admin/shared/index.ts",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
           "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
@@ -16003,6 +16204,11 @@
         },
         {
           "from": "src/features/admin/shared/ui/shell/AdminDialogShell.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
           "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
@@ -16037,6 +16243,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/shared/ui/toolbar/AdminResourceToolbar.vue",
           "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
@@ -16047,14 +16258,15 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 17,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "targetFanIn": 14,
+      "missingDeepImports": [],
+      "targetFanIn": 17,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -16735,7 +16947,7 @@
         }
       ],
       "fanIn": 120,
-      "fanOut": 46,
+      "fanOut": 53,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -16759,6 +16971,13 @@
         "src/components/ui/input/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/components/ui/table/TableBody.vue",
+        "src/components/ui/table/TableCaption.vue",
+        "src/components/ui/table/TableCell.vue",
+        "src/components/ui/table/TableFooter.vue",
+        "src/components/ui/table/TableHead.vue",
+        "src/components/ui/table/TableHeader.vue",
+        "src/components/ui/table/TableRow.vue",
         "src/core/assets/oauth/discord.svg",
         "src/core/assets/oauth/google.svg",
         "src/core/components/ActionButton.vue",
@@ -17712,13 +17931,18 @@
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableBody.vue",
-          "to": "src/lib/utils.ts",
+          "to": "src/components/ui/table/TableBody.vue",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableCaption.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTableCaption.vue",
+          "to": "src/components/ui/table/TableCaption.vue",
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableCaption.vue",
@@ -17729,6 +17953,11 @@
           "from": "src/features/admin/shared/ui/table/AdminTableCell.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTableCell.vue",
+          "to": "src/components/ui/table/TableCell.vue",
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableCell.vue",
@@ -17749,6 +17978,11 @@
           "from": "src/features/admin/shared/ui/table/AdminTableFooter.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTableFooter.vue",
+          "to": "src/components/ui/table/TableFooter.vue",
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableFooter.vue",
@@ -17759,6 +17993,11 @@
           "from": "src/features/admin/shared/ui/table/AdminTableHead.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTableHead.vue",
+          "to": "src/components/ui/table/TableHead.vue",
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableHead.vue",
@@ -17769,6 +18008,11 @@
           "from": "src/features/admin/shared/ui/table/AdminTableHeader.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTableHeader.vue",
+          "to": "src/components/ui/table/TableHeader.vue",
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableHeader.vue",
@@ -17784,6 +18028,11 @@
           "from": "src/features/admin/shared/ui/table/AdminTableRow.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminTableRow.vue",
+          "to": "src/components/ui/table/TableRow.vue",
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/ui/table/AdminTableRow.vue",
@@ -17989,8 +18238,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 120,
-      "targetFanOut": 46,
+      "targetFanOut": 53,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -18051,6 +18301,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 3,
       "advisories": {
@@ -18189,6 +18440,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 14,
       "advisories": {
@@ -18253,6 +18505,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -18305,6 +18558,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -18358,6 +18612,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 4,
       "advisories": {
@@ -18398,6 +18653,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -18441,6 +18697,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -18484,6 +18741,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -18517,6 +18775,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -18555,6 +18814,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -18673,6 +18933,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 17,
       "targetFanOut": 2,
       "advisories": {
@@ -18731,6 +18992,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 1,
       "advisories": {
@@ -18777,6 +19039,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -18836,6 +19099,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -18888,6 +19152,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -18970,6 +19235,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 8,
       "targetFanOut": 3,
       "advisories": {
@@ -19007,6 +19273,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {
@@ -19059,6 +19326,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -19107,6 +19375,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -19145,6 +19414,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -19178,6 +19448,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -19253,6 +19524,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 6,
       "advisories": {
@@ -19296,6 +19568,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -19327,9 +19600,10 @@
         }
       ],
       "fanIn": 3,
-      "fanOut": 3,
+      "fanOut": 4,
       "fanOutTargets": [
         "node_modules/reka-ui/dist/index.cjs",
+        "src/features/admin/shared/core/uiClasses.ts",
         "src/features/admin/shared/session/feedback/toast.ts",
         "src/features/admin/shared/session/feedback/useAdminConfirm.ts"
       ],
@@ -19337,6 +19611,11 @@
         {
           "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
           "to": "node_modules/reka-ui/dist/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         },
         {
@@ -19353,8 +19632,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
-      "targetFanOut": 3,
+      "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -19391,6 +19671,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -19434,6 +19715,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -19477,6 +19759,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -19551,6 +19834,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 5,
       "advisories": {
@@ -19603,6 +19887,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -19667,6 +19952,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 5,
       "advisories": {
@@ -19729,6 +20015,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -19781,6 +20068,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 3,
       "advisories": {
@@ -19827,6 +20115,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -19897,6 +20186,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 6,
       "advisories": {
@@ -19935,6 +20225,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -19987,6 +20278,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -20025,6 +20317,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -20087,6 +20380,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 3,
       "advisories": {
@@ -20128,6 +20422,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -20174,6 +20469,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -20248,6 +20544,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 5,
       "advisories": {
@@ -20274,10 +20571,11 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 3,
+      "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/reka-ui/dist/index.cjs",
+        "src/features/admin/shared/core/uiClasses.ts",
         "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts"
       ],
       "outboundEdges": [
@@ -20293,6 +20591,11 @@
         },
         {
           "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/shell/AdminDrawer.vue",
           "to": "src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts",
           "kind": "runtime"
         }
@@ -20300,8 +20603,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 3,
+      "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -20338,6 +20642,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -20415,6 +20720,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 8,
       "advisories": {
@@ -20474,6 +20780,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -20521,6 +20828,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 3,
       "advisories": {
@@ -20548,6 +20856,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 0,
       "advisories": {
@@ -20660,6 +20969,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 13,
       "advisories": {
@@ -20706,6 +21016,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -20765,6 +21076,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 5,
       "advisories": {
@@ -20816,6 +21128,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -20868,6 +21181,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -20894,20 +21208,29 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 1,
-      "fanOutTargets": ["node_modules/@iconoir/vue/dist/index.js"],
+      "fanOut": 2,
+      "fanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "src/features/admin/shared/core/uiClasses.ts"
+      ],
       "outboundEdges": [
         {
           "from": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/toolbar/AdminRefreshButton.vue",
+          "to": "src/features/admin/shared/core/uiClasses.ts",
           "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 1,
+      "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -20944,6 +21267,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -20987,6 +21311,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -21039,6 +21364,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -21900,6 +22226,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 28,
       "targetFanOut": 46,
       "advisories": {
@@ -22176,7 +22503,7 @@
         }
       ],
       "fanIn": 50,
-      "fanOut": 49,
+      "fanOut": 52,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -22211,15 +22538,18 @@
         "src/core/query/queryClient.ts",
         "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
+        "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/canvas/session/board-session/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
+        "src/test/deferred.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
@@ -22312,6 +22642,11 @@
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -22457,6 +22792,11 @@
         {
           "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
+          "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
         {
@@ -22905,6 +23245,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/controller.unit.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/format.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
@@ -22948,8 +23293,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 50,
-      "targetFanOut": 49,
+      "targetFanOut": 52,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -23454,7 +23800,7 @@
         }
       ],
       "fanIn": 94,
-      "fanOut": 49,
+      "fanOut": 52,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -23489,15 +23835,18 @@
         "src/core/query/queryClient.ts",
         "src/core/query/queryDefaults.ts",
         "src/core/utils/auth.ts",
+        "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/canvas/session/board-session/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/lib/utils.ts",
+        "src/test/deferred.ts",
         "src/test/factories/index.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
@@ -23590,6 +23939,11 @@
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -23735,6 +24089,11 @@
         {
           "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
           "to": "src/core/lib/chartPrimitives.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
+          "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
         {
@@ -24183,6 +24542,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/controller.unit.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/format.ts",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
@@ -24226,8 +24590,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 94,
-      "targetFanOut": 49,
+      "targetFanOut": 52,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -24279,6 +24644,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -24314,6 +24680,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/catalog/commands.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/catalog/repositoryQueryIntegration.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -24329,6 +24700,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -24340,6 +24716,11 @@
         },
         {
           "from": "src/features/board/session/sync/boardDraftOverlay.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardFocusControls.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         },
@@ -24362,14 +24743,25 @@
           "from": "src/features/board/session/sync/boardSync.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/controller.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 14,
-      "fanOut": 4,
+      "fanIn": 19,
+      "fanOut": 5,
       "fanOutTargets": [
         "src/core/utils/auth.ts",
         "src/features/board/core/document/latestBoardState.ts",
         "src/features/board/core/document/nodes.ts",
+        "src/features/board/session/catalog/boards.ts",
         "src/features/workspace/index.ts"
       ],
       "outboundEdges": [
@@ -24382,6 +24774,11 @@
           "from": "src/features/board/testing/factories.ts",
           "to": "src/features/board/core/document/nodes.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/testing/factories.ts",
+          "to": "src/features/board/session/catalog/boards.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/board/testing/syncFixtures.ts",
@@ -24402,8 +24799,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
-      "targetFanIn": 14,
-      "targetFanOut": 4,
+      "missingDeepImports": [],
+      "targetFanIn": 19,
+      "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -24453,6 +24851,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -24485,6 +24884,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -24556,12 +24956,18 @@
         }
       ],
       "fanIn": 11,
-      "fanOut": 2,
+      "fanOut": 3,
       "fanOutTargets": [
+        "src/core/utils/guards.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts"
       ],
       "outboundEdges": [
+        {
+          "from": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
         {
           "from": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
           "to": "src/features/board/ports/canvas.ts",
@@ -24576,8 +24982,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 11,
-      "targetFanOut": 2,
+      "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -24907,9 +25314,10 @@
         }
       ],
       "fanIn": 63,
-      "fanOut": 3,
+      "fanOut": 4,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
+        "src/core/utils/guards.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts"
       ],
@@ -25016,6 +25424,11 @@
         },
         {
           "from": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/core/graph/canvasGroupGeometry.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -25038,8 +25451,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 63,
-      "targetFanOut": 3,
+      "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -25101,6 +25515,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 7,
       "targetFanOut": 1,
       "advisories": {
@@ -25154,6 +25569,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -25461,6 +25877,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 9,
       "targetFanOut": 18,
       "advisories": {
@@ -25548,6 +25965,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 13,
       "targetFanOut": 0,
       "advisories": {
@@ -26788,6 +27206,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 31,
       "targetFanOut": 46,
       "advisories": {
@@ -26924,6 +27343,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 14,
       "targetFanOut": 7,
       "advisories": {
@@ -26934,39 +27354,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/session/execution/pending-execution/core.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/features/canvas/session/execution/task-lifecycle/index.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
-          "to": "src/features/canvas/session/execution/task-lifecycle/index.ts",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 1,
-      "fanOut": 1,
-      "fanOutTargets": ["node_modules/vitest/dist/index.js"],
-      "outboundEdges": [
-        {
-          "from": "src/features/canvas/session/execution/task-lifecycle/canvasTaskLifecycle.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "targetFanIn": 1,
-      "targetFanOut": 1,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/canvas/session/execution/task-lifecycle/"],
       "impureRuntimePaths": []
     },
     "src/features/canvas/session/flow-adapter/index.ts": {
@@ -28259,6 +28646,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 61,
       "targetFanOut": 28,
       "advisories": {
@@ -28297,6 +28685,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -29420,6 +29809,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 12,
       "targetFanOut": 34,
       "advisories": {
@@ -29756,6 +30146,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 22,
       "advisories": {
@@ -29788,6 +30179,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 0,
       "advisories": {
@@ -29840,6 +30232,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -29891,7 +30284,7 @@
         "src/features/canvas/core/nodes/canvasNodeUi.ts",
         "src/features/canvas/session/board-session/index.ts",
         "src/features/canvas/session/execution/index.ts",
-        "src/features/canvas/session/execution/task-lifecycle/index.ts",
+        "src/features/canvas/session/execution/task-lifecycle/canvasTaskLifecycle.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
         "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/session/image-workflow/index.ts",
@@ -30032,7 +30425,7 @@
         },
         {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
-          "to": "src/features/canvas/session/execution/task-lifecycle/index.ts",
+          "to": "src/features/canvas/session/execution/task-lifecycle/canvasTaskLifecycle.ts",
           "kind": "runtime"
         },
         {
@@ -30314,6 +30707,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 20,
       "advisories": {
@@ -30397,6 +30791,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
       "targetFanOut": 2,
       "advisories": {
@@ -30430,6 +30825,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -30496,7 +30892,7 @@
         }
       ],
       "fanIn": 10,
-      "fanOut": 18,
+      "fanOut": 20,
       "fanOutTargets": [
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -30511,9 +30907,11 @@
         "src/features/canvas/session/flow-adapter/index.ts",
         "src/features/canvas/session/workspace/useCanvasFeedback.ts",
         "src/features/canvas/tools/inpaint/index.ts",
-        "src/features/canvas/tools/inpaint/testing/index.ts",
+        "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
+        "src/features/canvas/tools/retouch/core/recipe.ts",
         "src/features/canvas/tools/retouch/index.ts",
-        "src/features/canvas/tools/retouch/testing/index.ts",
+        "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
+        "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
         "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
         "src/test/render.ts"
       ],
@@ -30715,8 +31113,13 @@
         },
         {
           "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
-          "to": "src/features/canvas/tools/inpaint/testing/index.ts",
-          "kind": "type-only"
+          "to": "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
+          "to": "src/features/canvas/tools/retouch/core/recipe.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
@@ -30725,7 +31128,7 @@
         },
         {
           "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
-          "to": "src/features/canvas/tools/retouch/testing/index.ts",
+          "to": "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
           "kind": "runtime"
         },
         {
@@ -30790,8 +31193,8 @@
         },
         {
           "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
-          "to": "src/features/canvas/tools/retouch/testing/index.ts",
-          "kind": "type-only"
+          "to": "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
@@ -30817,8 +31220,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
-      "targetFanOut": 18,
+      "targetFanOut": 20,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -30855,6 +31259,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
@@ -30888,6 +31293,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 1,
       "advisories": {
@@ -31147,6 +31553,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 8,
       "targetFanOut": 15,
       "advisories": {
@@ -31157,139 +31564,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/tools/inpaint/"],
-      "impureRuntimePaths": []
-    },
-    "src/features/canvas/tools/inpaint/session/fabric/index.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/canvas/tools/inpaint/session/useImageInpaintOverlay.ts",
-          "to": "src/features/canvas/tools/inpaint/session/fabric/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/useImageInpaintOverlay.ts",
-          "to": "src/features/canvas/tools/inpaint/session/fabric/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/useImageInpaintOverlay.unit.spec.ts",
-          "to": "src/features/canvas/tools/inpaint/session/fabric/index.ts",
-          "kind": "type-only"
-        }
-      ],
-      "fanIn": 2,
-      "fanOut": 6,
-      "fanOutTargets": [
-        "node_modules/fabric/index.ts",
-        "node_modules/vitest/dist/index.js",
-        "src/core/utils/number.ts",
-        "src/features/canvas/tools/inpaint/core/constants.ts",
-        "src/features/canvas/tools/inpaint/core/painter.ts",
-        "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts"
-      ],
-      "outboundEdges": [
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.ts",
-          "to": "node_modules/fabric/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.ts",
-          "to": "node_modules/fabric/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.ts",
-          "to": "src/core/utils/number.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.ts",
-          "to": "src/features/canvas/tools/inpaint/core/constants.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.ts",
-          "to": "src/features/canvas/tools/inpaint/core/painter.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.ts",
-          "to": "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.unit.spec.ts",
-          "to": "src/features/canvas/tools/inpaint/core/constants.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/adapter.unit.spec.ts",
-          "to": "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/index.ts",
-          "to": "src/features/canvas/tools/inpaint/core/painter.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/tools/inpaint/session/fabric/loader.ts",
-          "to": "src/features/canvas/tools/inpaint/core/painter.ts",
-          "kind": "type-only"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "targetFanIn": 2,
-      "targetFanOut": 6,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/canvas/tools/inpaint/session/fabric/"],
-      "impureRuntimePaths": []
-    },
-    "src/features/canvas/tools/inpaint/testing/index.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
-          "to": "src/features/canvas/tools/inpaint/testing/index.ts",
-          "kind": "type-only"
-        }
-      ],
-      "fanIn": 1,
-      "fanOut": 1,
-      "fanOutTargets": ["src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts"],
-      "outboundEdges": [
-        {
-          "from": "src/features/canvas/tools/inpaint/testing/index.ts",
-          "to": "src/features/canvas/tools/inpaint/session/maskPaintingCanvas.ts",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "targetFanIn": 1,
-      "targetFanOut": 1,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/canvas/tools/inpaint/testing/index.ts"],
       "impureRuntimePaths": []
     },
     "src/features/canvas/tools/retouch/index.ts": {
@@ -32274,6 +32548,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 16,
       "targetFanOut": 30,
       "advisories": {
@@ -32327,6 +32602,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 4,
       "advisories": {
@@ -32337,58 +32613,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/tools/retouch/testing/browser.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/features/canvas/tools/retouch/testing/index.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/canvas/tools/image-tools/session/useCanvasImageTools.unit.spec.ts",
-          "to": "src/features/canvas/tools/retouch/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/image-tools/ui/StagePresentation.component.spec.ts",
-          "to": "src/features/canvas/tools/retouch/testing/index.ts",
-          "kind": "type-only"
-        }
-      ],
-      "fanIn": 2,
-      "fanOut": 3,
-      "fanOutTargets": [
-        "src/features/canvas/tools/retouch/core/recipe.ts",
-        "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
-        "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts"
-      ],
-      "outboundEdges": [
-        {
-          "from": "src/features/canvas/tools/retouch/testing/index.ts",
-          "to": "src/features/canvas/tools/retouch/core/recipe.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/retouch/testing/index.ts",
-          "to": "src/features/canvas/tools/retouch/session/stage/runtime/finalRender.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/tools/retouch/testing/index.ts",
-          "to": "src/features/canvas/tools/retouch/session/stage/runtime/webglEngine.ts",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "targetFanIn": 2,
-      "targetFanOut": 3,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/canvas/tools/retouch/testing/index.ts"],
       "impureRuntimePaths": []
     },
     "src/features/canvas/ui/chrome/components/index.ts": {
@@ -32495,6 +32719,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 12,
       "advisories": {
@@ -32647,6 +32872,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 8,
       "advisories": {
@@ -33819,6 +34045,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 38,
       "advisories": {
@@ -34268,6 +34495,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 14,
       "targetFanOut": 20,
       "advisories": {
@@ -34350,6 +34578,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 8,
       "advisories": {
@@ -34701,6 +34930,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 22,
       "advisories": {
@@ -34929,6 +35159,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 9,
       "targetFanOut": 14,
       "advisories": {
@@ -35028,6 +35259,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 10,
       "advisories": {
@@ -35091,6 +35323,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
@@ -35743,6 +35976,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 43,
       "advisories": {
@@ -35796,6 +36030,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 1,
       "advisories": {
@@ -35844,6 +36079,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 1,
       "advisories": {
@@ -35854,38 +36090,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/features/legal/contacts.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/legal/documents.ts",
-          "to": "src/features/legal/contacts.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/legal/routePreservation.contract.spec.ts",
-          "to": "src/features/legal/contacts.ts",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 2,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "targetFanIn": 2,
-      "targetFanOut": 0,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/legal/contacts.ts"],
       "impureRuntimePaths": []
     },
     "src/features/legal/index.ts": {
@@ -35935,6 +36139,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 0,
       "targetFanOut": 6,
       "advisories": {
@@ -35978,6 +36183,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 1,
       "advisories": {
@@ -36024,6 +36230,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -36070,6 +36277,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -36116,6 +36324,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 2,
       "advisories": {
@@ -36167,6 +36376,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 2,
       "advisories": {
@@ -36209,6 +36419,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -36340,7 +36551,7 @@
         }
       ],
       "fanIn": 22,
-      "fanOut": 38,
+      "fanOut": 40,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -36368,8 +36579,10 @@
         "src/core/i18n/index.ts",
         "src/core/interaction/menuKeyboardNavigation.ts",
         "src/core/router/queryParams.ts",
+        "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/opaqueIds.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/workspaceId.ts",
         "src/lib/utils.ts",
         "src/test/msw.ts",
@@ -36395,6 +36608,11 @@
         {
           "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/core/validators.ts",
+          "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
         {
@@ -36453,6 +36671,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/session/libraryUseCases.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/session/resource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
@@ -36480,6 +36703,11 @@
         {
           "from": "src/features/library/session/resource.ts",
           "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -36776,8 +37004,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 22,
-      "targetFanOut": 38,
+      "targetFanOut": 40,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -36802,7 +37031,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 40,
+      "fanOut": 42,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-virtual/dist/cjs/index.cjs",
@@ -36831,8 +37060,10 @@
         "src/core/i18n/userIdeaCurrency.ts",
         "src/core/media/visionIngressPolicy.ts",
         "src/core/router/queryParams.ts",
+        "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/opaqueIds.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/auth/index.ts",
@@ -36923,6 +37154,11 @@
         },
         {
           "from": "src/features/search/session/adapters/authContinuation.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/authContinuation.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
@@ -36997,6 +37233,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/search/session/adapters/resource.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/session/adapters/resource.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -37009,6 +37250,11 @@
         {
           "from": "src/features/search/session/adapters/visionBillingResource.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/visionBillingResource.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -37063,7 +37309,17 @@
         },
         {
           "from": "src/features/search/session/adapters/workspace.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/opaqueIds.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/workspace.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -37535,8 +37791,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 40,
+      "targetFanOut": 42,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -37651,7 +37908,7 @@
         }
       ],
       "fanIn": 20,
-      "fanOut": 50,
+      "fanOut": 52,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -37685,6 +37942,8 @@
         "src/core/query/queryDefaults.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/auth.ts",
+        "src/core/utils/guards.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/features/account/index.ts",
         "src/features/account/ui/chrome/UserAccountMenu.vue",
@@ -37981,6 +38240,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
           "kind": "runtime"
@@ -38214,8 +38483,9 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 20,
-      "targetFanOut": 50,
+      "targetFanOut": 52,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -38402,6 +38672,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 32,
       "targetFanOut": 1,
       "advisories": {
@@ -38525,6 +38796,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 14,
       "advisories": {
@@ -38645,6 +38917,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 5,
       "targetFanOut": 11,
       "advisories": {
@@ -38702,6 +38975,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 2,
       "targetFanOut": 3,
       "advisories": {
@@ -38805,6 +39079,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 15,
       "targetFanOut": 1,
       "advisories": {
@@ -38857,6 +39132,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -38895,6 +39171,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 1,
       "targetFanOut": 2,
       "advisories": {
@@ -38937,6 +39214,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 4,
       "targetFanOut": 0,
       "advisories": {
@@ -39025,6 +39303,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
       "targetFanOut": 3,
       "advisories": {
@@ -39077,6 +39356,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
@@ -39149,6 +39429,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 10,
       "targetFanOut": 0,
       "advisories": {
@@ -39186,6 +39467,7 @@
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
+      "missingDeepImports": [],
       "targetFanIn": 3,
       "targetFanOut": 0,
       "advisories": {

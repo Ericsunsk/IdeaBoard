@@ -8,7 +8,7 @@ import {
   INPAINT_MAX_PENDING_STROKES_PER_NODE,
   INPAINT_MAX_POINTS_PER_STROKE,
 } from '../core/constants'
-import type { MaskPainter, MaskPainterClientPoint, MaskPainterViewport } from './fabric/index.ts'
+import type { MaskPainter, MaskPainterClientPoint, MaskPainterViewport } from '../core/painter.ts'
 import type { ImageInpaintCommittedData } from '../core/model.ts'
 import { useImageInpaintOverlay } from './useImageInpaintOverlay'
 

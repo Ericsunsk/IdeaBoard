@@ -8,6 +8,7 @@ import type {
   WorkspaceRewardRedemptionHistoryItem,
 } from '../../../../api/generated-query/public/model'
 import { buildContractRequestHeaders, newRequestId } from '../../../../api/contractKernel'
+import { withSignal } from '../../../../core/utils/request'
 import { workspaceRewardsRedeemIdempotencyKey } from '../../../../api/idempotencyKey'
 import { i18n } from '../../../../core/i18n'
 import {
@@ -99,7 +100,7 @@ export async function fetchRewardRedemptions(
         ...(params.cursor === undefined ? {} : { cursor: params.cursor }),
         ...(params.page_size === undefined ? {} : { page_size: params.page_size }),
       },
-      { ...(signal == null ? {} : { signal }) },
+      withSignal(signal),
     )
   } catch (error) {
     throw asWorkspaceBillingError(error, fallback)

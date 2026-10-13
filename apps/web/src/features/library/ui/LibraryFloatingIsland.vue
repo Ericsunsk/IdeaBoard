@@ -18,7 +18,7 @@
             <h2 class="m-0 text-base font-semibold tracking-tight">{{ t('library.title') }}</h2>
             <button
               type="button"
-              class="grid size-6 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              :class="[islandIconButtonClass, 'size-6']"
               :aria-label="
                 isHeaderCollapsed
                   ? t('library.actions.showFolders')
@@ -39,7 +39,7 @@
             <button
               v-if="!isCanvasPresentation"
               type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              :class="[islandIconButtonClass, 'size-8']"
               :aria-label="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               :title="isExpanded ? t('library.actions.collapse') : t('library.actions.expand')"
               @click="isExpanded = !isExpanded"
@@ -49,7 +49,7 @@
             </button>
             <button
               type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              :class="[islandIconButtonClass, 'size-8']"
               :aria-label="t('library.actions.close')"
               :title="t('library.actions.close')"
               @click="emit('close')"
@@ -257,6 +257,9 @@ const emit = defineEmits<{
 
 const isExpanded = defineModel<boolean>('expanded', { default: false })
 const { t } = useI18n()
+
+const islandIconButtonClass =
+  'grid shrink-0 place-items-center rounded-pill bg-muted text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer'
 
 const isCanvasPresentation = computed(() => props.presentation === 'canvas')
 const searchIslandClass = computed(() =>

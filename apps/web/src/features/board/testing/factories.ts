@@ -10,6 +10,7 @@ import {
   type ImageNodeItem,
   type ImageNodeOutputItem,
 } from '../core/document/nodes'
+import type { BoardMeta } from '../session/catalog/boards'
 
 export type MockBoardRecordFixture = {
   board: Record<string, unknown>
@@ -343,4 +344,8 @@ export function makeBoardState(overrides: Partial<BoardState> = {}): BoardState 
     },
     'test-fixture-state',
   )
+}
+
+export function makeBoardMeta(id: string, name = id, updatedAt = 1): BoardMeta {
+  return { id, name, createdAt: 1, updatedAt }
 }

@@ -56,7 +56,7 @@
           <!-- 新增网关按钮 -->
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted cursor-pointer"
+            :class="adminToolbarButtonClass"
             :aria-label="MODELS_MESSAGES.addGateway"
             @click="gatewayDialogVisible = true"
           >
@@ -240,6 +240,7 @@ import { AdminAlert } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import ActionButton from '../../../../../core/components/ActionButton.vue'
 import { adminDashboardRootClass } from '../../../shared'
+import { adminToolbarButtonClass } from '../../../shared'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'
 import AdminModelEditDialog from '../dialog/AdminModelEditDialog.vue'
 import AdminGatewayConfigDialog from '../dialog/AdminGatewayConfigDialog.vue'

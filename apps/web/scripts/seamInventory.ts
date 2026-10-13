@@ -25,6 +25,8 @@ export type SeamRecord = {
   publicExports: string[]
   targetFanOutTargets: string[]
   purity?: 'pure'
+  /** Exact external imports into private ownership, checked for additions and removals. */
+  allowedDeepImports?: ConsumerEdge[]
 }
 
 export type ConsumerEdge = { from: string; to: string; kind: 'runtime' | 'type-only' }
@@ -96,6 +98,18 @@ function validateContract(record: SeamRecord): void {
     keys.push(edgeKey(edge))
   }
   validateStrings(keys, `${record.path}.allowedConsumers`)
+  const deepKeys: string[] = []
+  for (const edge of record.allowedDeepImports ?? []) {
+    if (!isRecord(edge)) fail(`${record.path}: invalid deep import edge`)
+    validatePath(edge.from)
+    validatePath(edge.to)
+    if (!['runtime', 'type-only'].includes(edge.kind))
+      fail(`${record.path}: invalid deep import kind`)
+    if (isOwned(edge.from, record.ownershipScope) || !isOwned(edge.to, record.ownershipScope))
+      fail(`${record.path}: deep import must cross from outside into the ownershipScope`)
+    deepKeys.push(edgeKey(edge))
+  }
+  validateStrings(deepKeys, `${record.path}.allowedDeepImports`)
   if (new Set(record.allowedConsumers.map((edge) => edge.from)).size !== record.targetFanIn)
     fail(`${record.path}: targetFanIn disagrees with consumers`)
   if (record.targetFanOutTargets.length !== record.targetFanOut)
@@ -206,6 +220,15 @@ export function measureSeam(seam: SeamRecord, edges: ConsumerEdge[], publicEntri
   )
   const fanOutTargets = [...new Set(outboundEdges.map((edge) => edge.to))].sort()
   const allowed = new Set(seam.allowedConsumers.map(edgeKey))
+  const allowedDeep = new Set((seam.allowedDeepImports ?? []).map(edgeKey))
+  const deepImports = edges.filter(
+    (edge) =>
+      !isOwned(edge.from, seam.ownershipScope) &&
+      isOwned(edge.to, seam.ownershipScope) &&
+      edge.to !== seam.path &&
+      !publicEntries.has(edge.to),
+  )
+  const deepImportKeys = new Set(deepImports.map(edgeKey))
   return {
     consumerEdges,
     fanIn: new Set(consumerEdges.map((edge) => edge.from)).size,
@@ -216,12 +239,9 @@ export function measureSeam(seam: SeamRecord, edges: ConsumerEdge[], publicEntri
     missingConsumers: seam.allowedConsumers.filter(
       (edge) => !consumerEdges.some((actual) => edgeKey(actual) === edgeKey(edge)),
     ),
-    undeclaredDeepImports: edges.filter(
-      (edge) =>
-        !isOwned(edge.from, seam.ownershipScope) &&
-        isOwned(edge.to, seam.ownershipScope) &&
-        edge.to !== seam.path &&
-        !publicEntries.has(edge.to),
+    undeclaredDeepImports: deepImports.filter((edge) => !allowedDeep.has(edgeKey(edge))),
+    missingDeepImports: (seam.allowedDeepImports ?? []).filter(
+      (edge) => !deepImportKeys.has(edgeKey(edge)),
     ),
   }
 }
@@ -271,6 +291,24 @@ function runSelfTests(): void {
     (value) => {
       value.seams[0]!.targetFanOutTargets = ['', '']
     },
+    (value) => {
+      value.seams[0]!.allowedDeepImports = [
+        { from: '../escape.ts', to: 'src/ok.ts', kind: 'runtime' },
+      ]
+    },
+    (value) => {
+      const scope = value.seams[0]!.ownershipScope[0]!
+      value.seams[0]!.allowedDeepImports = [
+        { from: 'src/outside.ts', to: `${scope}../escape.ts`, kind: 'runtime' },
+      ]
+    },
+    (value) => {
+      const scope = value.seams[0]!.ownershipScope[0]!
+      value.seams[0]!.allowedDeepImports = [
+        { from: 'src/b.ts', to: `${scope}b.ts`, kind: 'runtime' },
+        { from: 'src/a.ts', to: `${scope}a.ts`, kind: 'runtime' },
+      ]
+    },
   ]
   invalid.forEach((mutate) => assert.throws(() => loadSeamInventory(fixture(mutate))))
   const seam = {
@@ -312,6 +350,13 @@ function runSelfTests(): void {
     path: 'src/features/canvas/session/projection/index.ts',
     ownershipScope: ['src/features/canvas/session/projection/'],
     allowedConsumers: [],
+    allowedDeepImports: [
+      {
+        from: 'src/features/canvas/ui/Node.vue',
+        to: 'src/features/canvas/session/projection/internal.ts',
+        kind: 'runtime' as const,
+      },
+    ],
   }
   const nestedEdges: ConsumerEdge[] = [
     {
@@ -327,8 +372,25 @@ function runSelfTests(): void {
   ]
   assert.deepEqual(
     measureSeam(nestedSeam, nestedEdges, new Set([nestedSeam.path])).undeclaredDeepImports,
-    nestedEdges,
+    [nestedEdges[1]],
   )
+  assert.deepEqual(
+    measureSeam(nestedSeam, nestedEdges, new Set([nestedSeam.path])).missingDeepImports,
+    [],
+  )
+  for (const [edges, publicEntries] of [
+    [nestedEdges.slice(1), new Set([nestedSeam.path])],
+    [nestedEdges, new Set([nestedSeam.path, nestedEdges[0]!.to])],
+    [
+      [{ ...nestedEdges[0]!, kind: 'type-only' as const }, nestedEdges[1]!],
+      new Set([nestedSeam.path]),
+    ],
+  ] as const) {
+    assert.deepEqual(
+      measureSeam(nestedSeam, [...edges], publicEntries).missingDeepImports,
+      nestedSeam.allowedDeepImports,
+    )
+  }
   console.log(
     `✓ Seam schema: 1 valid / ${invalid.length} invalid fixtures; external runtime/type/deep-edge and nested ownership (including tests) passed.`,
   )

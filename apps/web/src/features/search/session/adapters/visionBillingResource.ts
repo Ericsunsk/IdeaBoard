@@ -1,4 +1,5 @@
 import { createWorkspaceBillingQuote } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
+import { withSignal } from '../../../../core/utils/request'
 import { i18n } from '../../../../core/i18n'
 
 // Vision search pricing boundary (issue #809).
@@ -22,7 +23,7 @@ export async function fetchVisionSearchPrice(
   const envelope = await createWorkspaceBillingQuote(
     id,
     { data: { sku: VISION_SEARCH_SKU } },
-    { authFailure: 'silent', ...(signal == null ? {} : { signal }) },
+    { authFailure: 'silent', ...withSignal(signal) },
   )
   const total = (envelope?.data as { total_credits?: unknown } | undefined)?.total_credits
   if (typeof total !== 'number' || !Number.isFinite(total)) {

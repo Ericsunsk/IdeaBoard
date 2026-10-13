@@ -1,4 +1,5 @@
 import type { CanvasGroup } from '../../../board/ports/canvas'
+import { isRecord } from '../../../../core/utils/guards'
 import {
   isCanvasGraphNodeId,
   type CanvasGraphGroupId,
@@ -73,10 +74,6 @@ export type CanvasSelectionGroupGeometryAction =
 type FlowNodeSize = {
   width: number
   height: number
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object'
 }
 
 function readPositiveNumber(value: unknown): number | null {

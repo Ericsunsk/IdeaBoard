@@ -7,16 +7,7 @@ import type {
   BoardRenameResult,
 } from './commands'
 import { createBoardCommands } from './commands'
-import type { BoardMeta } from './boards'
-
-function makeBoard(id: string, name = 'Board'): BoardMeta {
-  return {
-    id,
-    name,
-    createdAt: 100,
-    updatedAt: 200,
-  }
-}
+import { makeBoardMeta as makeBoard } from '../../testing'
 
 function makeDeps(): BoardCommandDependencies {
   return {

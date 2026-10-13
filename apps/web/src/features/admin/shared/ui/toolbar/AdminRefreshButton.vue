@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted cursor-pointer disabled:opacity-50"
+    :class="[adminToolbarButtonClass, 'disabled:opacity-50']"
     :disabled="props.disabled || props.loading"
     :aria-label="props.ariaLabel"
     @click="emit('click')"
@@ -13,6 +13,7 @@
 
 <script setup lang="ts">
 import { Refresh } from '@iconoir/vue'
+import { adminToolbarButtonClass } from '../../core/uiClasses'
 
 const props = withDefaults(
   defineProps<{

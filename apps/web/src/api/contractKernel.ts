@@ -10,6 +10,7 @@
 //
 import { formatDisplayErrorMessage } from '../core/utils/errorMessages'
 import { opaqueIdPattern } from '../core/utils/opaqueIds'
+import { isRecord } from '../core/utils/guards'
 
 export type ContractMeta = {
   request_id?: string | undefined
@@ -44,10 +45,6 @@ export type ContractParseOk<T> = {
 export type ContractParseErr = {
   ok: false
   error: ContractErrorBody
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function asOptionalString(value: unknown): string | undefined {
@@ -254,21 +251,27 @@ export function getETag(headers: ReadableHeaders): string | null {
   return readFirstHeader(headers, ['etag'])
 }
 
+function trimmedOrEmpty(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function singleHeader(name: string, value: string): Record<string, string> {
+  return value ? { [name]: value } : {}
+}
+
 export function buildConditionalHeaders(etag?: string | null): Record<string, string> {
-  const trimmed = typeof etag === 'string' ? etag.trim() : ''
-  return trimmed ? { 'If-None-Match': trimmed } : {}
+  return singleHeader('If-None-Match', trimmedOrEmpty(etag))
 }
 
 // SSE resume: native EventSource cannot set request headers, so fetch-based
 // transports resume with `?last_event_id=` while header transports use
 // `Last-Event-ID`.
 export function buildSseResumeHeaders(lastEventId?: string | null): Record<string, string> {
-  const trimmed = typeof lastEventId === 'string' ? lastEventId.trim() : ''
-  return trimmed ? { 'Last-Event-ID': trimmed } : {}
+  return singleHeader('Last-Event-ID', trimmedOrEmpty(lastEventId))
 }
 
 export function withSseResumeParam(url: string, lastEventId?: string | null): string {
-  const trimmed = typeof lastEventId === 'string' ? lastEventId.trim() : ''
+  const trimmed = trimmedOrEmpty(lastEventId)
   if (!trimmed) return url
   const separator = url.includes('?') ? '&' : '?'
   return `${url}${separator}last_event_id=${encodeURIComponent(trimmed)}`

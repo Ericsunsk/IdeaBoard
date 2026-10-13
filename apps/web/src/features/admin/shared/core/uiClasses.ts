@@ -34,6 +34,9 @@ export const adminTableFooterClass =
 export const adminTableRowActionButtonClass =
   'hit-target-control flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground'
 
+export const adminToolbarButtonClass =
+  'flex h-9 items-center gap-1.5 rounded-control border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted cursor-pointer'
+
 export const adminSummaryGridClass = 'grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4'
 
 export const adminChartGridClass = 'grid grid-cols-1 gap-3.5 xl:grid-cols-12'
@@ -84,6 +87,9 @@ export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
 export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center justify-end gap-2'
 
 // 全局唯一 Admin 弹窗 chrome：使用标准语义卡片与边框。
+export const adminOverlayMaskClass =
+  'fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion'
+
 export const adminDialogChromeClass =
   'rounded-overlay border border-border bg-card text-card-foreground shadow-admin-dialog'
 

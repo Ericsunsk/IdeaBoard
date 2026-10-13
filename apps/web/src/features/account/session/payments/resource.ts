@@ -16,6 +16,7 @@ import type {
   WorkspaceRechargeHistoryItem,
 } from '../../../../api/generated-query/public/model'
 import { buildContractRequestHeaders, newRequestId } from '../../../../api/contractKernel'
+import { withSignal } from '../../../../core/utils/request'
 import { workspaceBillingPendingOrderIdempotencyKey } from '../../../../api/idempotencyKey'
 import { i18n } from '../../../../core/i18n'
 import { subscribeWorkspaceEvent } from '../../../../api/workspaceEventStream'
@@ -164,7 +165,7 @@ export const paymentsResource: PaymentsResource = {
   getPurchaseOptions: async (workspaceId, signal) => {
     const id = requireAccountWorkspaceId(workspaceId)
     const options = await resolveWorkspaceBillingData<WorkspacePurchaseOptions>(
-      getWorkspacePurchaseOptions(id, { ...(signal == null ? {} : { signal }) }),
+      getWorkspacePurchaseOptions(id, withSignal(signal)),
       i18n.global.t('account.errors.optionsLoadFailed'),
     )
     return toPurchaseOptions(options)
@@ -204,7 +205,7 @@ export const paymentsResource: PaymentsResource = {
   listPendingOrders: async (workspaceId, signal) => {
     const id = requireAccountWorkspaceId(workspaceId)
     const list = await resolveWorkspaceBillingData<WorkspacePendingOrderList>(
-      listWorkspacePendingOrders(id, { ...(signal == null ? {} : { signal }) }),
+      listWorkspacePendingOrders(id, withSignal(signal)),
       i18n.global.t('account.errors.pendingOrdersLoadFailed'),
     )
     if (!Array.isArray(list?.items))
@@ -245,7 +246,7 @@ export const paymentsResource: PaymentsResource = {
     if (params.limit != null) query.page_size = params.limit
     let body: unknown
     try {
-      body = await listWorkspaceRecharges(id, query, { ...(signal == null ? {} : { signal }) })
+      body = await listWorkspaceRecharges(id, query, withSignal(signal))
     } catch (error) {
       throw asWorkspaceBillingError(error, fallback)
     }

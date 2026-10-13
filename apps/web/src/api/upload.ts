@@ -8,7 +8,9 @@ import {
 import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/user/user'
 import type { CompleteUploadRequest, CreateUploadRequest } from './generated-query/public/model'
 import { buildContractRequestHeaders, newRequestId, requireContractData } from './contractKernel'
+import { withSignal } from '../core/utils/request'
 import { assertOpaqueId } from '../core/utils/opaqueIds'
+import { isRecord } from '../core/utils/guards'
 import { workspaceUploadIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../core/i18n'
 
@@ -193,10 +195,6 @@ export function workspaceMediaAssetDerivativeSuffix(
   return `${workspaceMediaAssetSuffix(workspaceId, assetId)}/derivatives/${encodeId(variant)}`
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function requiredString(raw: unknown, field: string): string {
   if (typeof raw !== 'string' || !raw.trim()) throw new Error(`Invalid upload payload: ${field}`)
   return raw
@@ -360,7 +358,7 @@ export const workspaceUploadApi = {
       { data },
       {
         headers: workspaceRequestHeaders(options),
-        ...(options.signal == null ? {} : { signal: options.signal }),
+        ...withSignal(options.signal),
       },
     )
     return toWorkspaceUploadSession(
@@ -381,7 +379,7 @@ export const workspaceUploadApi = {
       assertUploadId(uploadId),
       {
         headers: workspaceRequestHeaders(options),
-        ...(options.signal == null ? {} : { signal: options.signal }),
+        ...withSignal(options.signal),
       },
     )
     return toWorkspaceUploadSession(
@@ -414,7 +412,7 @@ export const workspaceUploadApi = {
       { data },
       {
         headers: workspaceRequestHeaders(options),
-        ...(options.signal == null ? {} : { signal: options.signal }),
+        ...withSignal(options.signal),
       },
     )
     const result = requireContractData<Record<string, unknown>>(
@@ -452,7 +450,7 @@ export const workspaceUploadApi = {
           ...workspaceRequestHeaders(options),
           ...(options.contentType?.trim() ? { 'Content-Type': options.contentType.trim() } : {}),
         },
-        ...(options.signal == null ? {} : { signal: options.signal }),
+        ...withSignal(options.signal),
       },
     )
     return toWorkspaceUploadSession(
@@ -475,7 +473,7 @@ export const workspaceMediaApi = {
       assertWorkspaceAssetId(assetId),
       {
         headers: workspaceRequestHeaders(options),
-        ...(options.signal == null ? {} : { signal: options.signal }),
+        ...withSignal(options.signal),
       },
     )
     return toWorkspaceMediaAsset(

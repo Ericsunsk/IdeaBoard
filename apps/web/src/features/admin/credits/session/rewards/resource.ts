@@ -12,6 +12,7 @@ import type {
   ControlUpdatedRewardCode,
 } from '../../../../../api/generated-query/control/model'
 import { requireContractData } from '../../../../../api/contractKernel'
+import { withSignal } from '../../../../../core/utils/request'
 import { controlCreditIdempotencyKey } from '../../../../../api/idempotencyKey'
 import {
   buildControlMutationHeaders,
@@ -152,9 +153,7 @@ async function searchRewardCodes(input: SearchRewardCodesInput): Promise<RewardC
   if (input.status != null) criteria.status = input.status
   if (input.beforeId != null) criteria.before_id = input.beforeId
   if (input.limit != null) criteria.limit = input.limit
-  const body = await searchControlRewardCodes(criteria, {
-    ...(input.signal == null ? {} : { signal: input.signal }),
-  })
+  const body = await searchControlRewardCodes(criteria, withSignal(input.signal))
   const page = requireContractData<ControlRewardCodePage>(body, '加载兑换码失败')
   if (!Array.isArray(page.reward_codes) || typeof page.total !== 'number') {
     throw createControlError('control_failed', '加载兑换码失败')

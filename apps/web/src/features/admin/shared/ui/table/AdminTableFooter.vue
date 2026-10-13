@@ -1,16 +1,13 @@
 <template>
-  <tfoot
-    :class="
-      cn('border-t border-border bg-background font-medium [&>tr]:last:border-b-0', props.class)
-    "
-  >
+  <TableFooter :class="cn('border-border bg-background', props.class)">
     <slot />
-  </tfoot>
+  </TableFooter>
 </template>
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
+import TableFooter from '@/components/ui/table/TableFooter.vue'
 
 const props = defineProps<{
   class?: HTMLAttributes['class'] | undefined

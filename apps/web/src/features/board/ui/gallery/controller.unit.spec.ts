@@ -1,11 +1,13 @@
 import { computed, nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBoardRepository, type BoardRepository } from '../../session/catalog/repository'
+import { makeBoardMeta as makeBoard } from '../../testing'
 import type { BoardMeta } from '../../session/catalog/boards'
 import type { BoardPreviewRefreshQueue } from '../../session/preview/boardPreviewRefreshQueue'
 import type { CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 import { createGalleryController } from './controller'
+import { createDeferred } from '../../../../test/deferred'
 
 const disposeControllers: (() => void)[] = []
 
@@ -13,20 +15,6 @@ afterEach(() => {
   disposeControllers.splice(0).forEach((dispose) => dispose())
   vi.restoreAllMocks()
 })
-
-function makeBoard(id: string, name = id, updatedAt = 1): BoardMeta {
-  return { id, name, createdAt: 1, updatedAt }
-}
-
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve
-    reject = promiseReject
-  })
-  return { promise, resolve, reject }
-}
 
 function createHarness(
   initialBoards: BoardMeta[] = [makeBoard('board-1')],
@@ -175,7 +163,7 @@ describe('createGalleryController', () => {
   it('keeps the delete target recoverable after failure and always releases the pending guard', async () => {
     const harness = createHarness()
     const board = makeBoard('board-1')
-    const firstDelete = deferred<
+    const firstDelete = createDeferred<
       | { isOk: true; isRemoteWasMissing: boolean }
       | { isOk: false; reason: 'sync-failed'; error: unknown }
     >()
@@ -474,8 +462,10 @@ describe('createGalleryController', () => {
   it.each(['failure', 'rejection'] as const)(
     'ignores old workspace %s after focus refresh while the repository queues the new workspace hydrate',
     async (completion) => {
-      const oldRefresh = deferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
-      const newRefresh = deferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
+      const oldRefresh =
+        createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
+      const newRefresh =
+        createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
       let currentScope = 'workspace-a'
       let changeScope!: (scope: string) => void
       const hydrate = vi
@@ -525,8 +515,8 @@ describe('createGalleryController', () => {
 
   it('keeps the initial loading state until the current workspace hydrate completes', async () => {
     const harness = createHarness()
-    const oldRefresh = deferred<{ isOk: true }>()
-    const newRefresh = deferred<{ isOk: true }>()
+    const oldRefresh = createDeferred<{ isOk: true }>()
+    const newRefresh = createDeferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(newRefresh.promise)
@@ -545,8 +535,8 @@ describe('createGalleryController', () => {
 
   it('hydrates a workspace that becomes ready while an obsolete initial load is pending', async () => {
     const harness = createHarness()
-    const oldRefresh = deferred<{ isOk: true }>()
-    const newRefresh = deferred<{ isOk: true }>()
+    const oldRefresh = createDeferred<{ isOk: true }>()
+    const newRefresh = createDeferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(newRefresh.promise)
@@ -567,8 +557,8 @@ describe('createGalleryController', () => {
 
   it('preserves a current workspace failure and reports its exception after an old success', async () => {
     const harness = createHarness()
-    const oldRefresh = deferred<{ isOk: true }>()
-    const newRefresh = deferred<{ isOk: true }>()
+    const oldRefresh = createDeferred<{ isOk: true }>()
+    const newRefresh = createDeferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(newRefresh.promise)
@@ -590,8 +580,9 @@ describe('createGalleryController', () => {
   it('ignores a focus refresh superseded by another focus refresh in the same workspace', async () => {
     const harness = createHarness()
     await harness.controller.commands.initialize()
-    const oldRefresh = deferred<{ isOk: true }>()
-    const latestRefresh = deferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
+    const oldRefresh = createDeferred<{ isOk: true }>()
+    const latestRefresh =
+      createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
     vi.mocked(harness.catalog.commands.hydrate)
       .mockReturnValueOnce(oldRefresh.promise)
       .mockReturnValueOnce(latestRefresh.promise)
@@ -619,7 +610,7 @@ describe('createGalleryController', () => {
       error: new Error('initial failure'),
     })
     await harness.controller.commands.initialize()
-    const oldRetry = deferred<{ isOk: true }>()
+    const oldRetry = createDeferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate).mockReturnValueOnce(oldRetry.promise)
     const retry = harness.controller.commands.reloadCatalog()
     vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({
@@ -629,7 +620,7 @@ describe('createGalleryController', () => {
     harness.scope.value = 'workspace-b'
     await nextTick()
     await harness.controller.commands.initialize()
-    const newRetry = deferred<{ isOk: true }>()
+    const newRetry = createDeferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate).mockReturnValueOnce(newRetry.promise)
     const currentRetry = harness.controller.commands.reloadCatalog()
     oldRetry.resolve({ isOk: true })
@@ -650,7 +641,7 @@ describe('createGalleryController', () => {
       error: new Error('initial failure'),
     })
     await harness.controller.commands.initialize()
-    const retryResult = deferred<{ isOk: true }>()
+    const retryResult = createDeferred<{ isOk: true }>()
     vi.mocked(harness.catalog.commands.hydrate).mockReturnValueOnce(retryResult.promise)
     const retry = harness.controller.commands.reloadCatalog()
     harness.controller.dispose()
@@ -678,8 +669,9 @@ describe('createGalleryController', () => {
       harness.controller.commands.startRename(board)
       await harness.controller.commands.commitRename()
       harness.warn.mockClear()
-      const oldReload = deferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
-      const newRefresh = deferred<{ isOk: true }>()
+      const oldReload =
+        createDeferred<Awaited<ReturnType<BoardRepository['commands']['hydrate']>>>()
+      const newRefresh = createDeferred<{ isOk: true }>()
       vi.mocked(harness.catalog.commands.hydrate)
         .mockReturnValueOnce(oldReload.promise)
         .mockReturnValueOnce(newRefresh.promise)

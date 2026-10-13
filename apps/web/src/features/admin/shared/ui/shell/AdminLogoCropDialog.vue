@@ -16,7 +16,7 @@
         <Cropper
           v-if="sourceURL"
           ref="cropperRef"
-          class="h-[340px] max-h-[52vh] min-h-[260px] w-full overflow-hidden rounded-control bg-white"
+          class="h-[340px] max-h-[52vh] min-h-[260px] w-full overflow-hidden rounded-control bg-card"
           boundaries-class="overflow-hidden rounded-control"
           :canvas="true"
           :src="sourceURL"
@@ -27,7 +27,7 @@
           @error="handleCropperError"
         />
         <div
-          class="absolute bottom-3 left-3 flex items-center gap-1 rounded-control border border-border/80 bg-white/90 p-1 backdrop-blur"
+          class="absolute bottom-3 left-3 flex items-center gap-1 rounded-control border border-border/80 bg-card/90 p-1 backdrop-blur"
         >
           <AdminButton
             variant="ghost"

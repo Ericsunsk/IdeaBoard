@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { requireContractData } from '../../../api/contractKernel'
+import { withSignal } from '../../../core/utils/request'
 import { getControlMonitor } from '../../../api/generated-query/control/control-platform/control-platform'
 import {
   cancelControlTask,
@@ -564,10 +565,7 @@ export function useAdminMonitorResource(options?: NestedQueryOptions) {
   return useQuery<ApiResponseMonitor, Error, MonitorResponse>({
     ...(options?.query ?? {}),
     queryKey: ADMIN_MONITOR_QUERY_KEY,
-    queryFn: ({ signal }) =>
-      getControlMonitor({
-        ...(signal == null ? {} : { signal }),
-      }) as Promise<ApiResponseMonitor>,
+    queryFn: ({ signal }) => getControlMonitor(withSignal(signal)) as Promise<ApiResponseMonitor>,
     select: selectAdminMonitor,
   })
 }

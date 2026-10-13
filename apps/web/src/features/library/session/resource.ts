@@ -34,6 +34,7 @@ import {
 } from '../../../api/generated-query/public/workspace-library/workspace-library'
 import { buildContractRequestHeaders, requireContractData } from '../../../api/contractKernel'
 import type { AuthFailureMode } from '../../../api/client'
+import { withSignal } from '../../../core/utils/request'
 import { createUniqueId } from '../../../core/utils/ids'
 import { i18n } from '../../../core/i18n'
 import {
@@ -87,7 +88,7 @@ function toGeneratedOptions(options: WorkspaceLibraryRequestOptions): {
 } {
   return {
     headers: workspaceLibraryHeaders(options),
-    ...(options.signal == null ? {} : { signal: options.signal }),
+    ...withSignal(options.signal),
     ...(options.authFailure == null ? {} : { authFailure: options.authFailure }),
   }
 }

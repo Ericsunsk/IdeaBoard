@@ -3,7 +3,7 @@
     <DialogPortal>
       <DialogOverlay
         data-admin-dialog-mask
-        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion"
+        :class="adminOverlayMaskClass"
         @click="requestCloseFromMask"
       />
       <DialogContent
@@ -100,6 +100,7 @@ import {
   adminDialogHeaderSplitClass,
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
+  adminOverlayMaskClass,
 } from '../../core/uiClasses'
 
 export type AdminDialogSize = 'slim' | 'compact' | 'form' | 'medium' | 'wide'

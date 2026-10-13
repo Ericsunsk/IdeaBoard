@@ -16,6 +16,7 @@ import { type ExternalImageProvider } from '../../../core/contracts/externalImag
 // `retryLibraryImport` / `resumePending`) owns the retry.
 
 import { getWorkspaceMediaAssetMetadata } from '../../../api/mediaAssetDelivery'
+import { withSignal } from '../../../core/utils/request'
 import { PAGE_SIZES } from '../../../core/config/pagination'
 import { resolveAssetUrl } from '../../../core/config/runtimeUrls'
 import { i18n } from '../../../core/i18n'
@@ -208,9 +209,11 @@ async function resolveMaterializedMedia(
 ): Promise<LibraryMaterializedMedia> {
   const fallback = i18n.global.t('library.errors.importAssetFailed')
   if (!assetId) throw new Error(fallback)
-  const metadata = await getWorkspaceMediaAssetMetadata(workspaceId, assetId, {
-    ...(options.signal == null ? {} : { signal: options.signal }),
-  })
+  const metadata = await getWorkspaceMediaAssetMetadata(
+    workspaceId,
+    assetId,
+    withSignal(options.signal),
+  )
   const originalUrl = metadata.original?.url?.trim() ? metadata.original.url.trim() : ''
   const previewUrl = metadata.derivatives['large-preview']?.url?.trim()
     ? metadata.derivatives['large-preview'].url.trim()

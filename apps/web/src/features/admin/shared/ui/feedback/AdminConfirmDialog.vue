@@ -1,9 +1,7 @@
 <template>
   <AlertDialogRoot :open="Boolean(activeAdminConfirm?.open)">
     <AlertDialogPortal>
-      <AlertDialogOverlay
-        class="fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion"
-      />
+      <AlertDialogOverlay :class="adminOverlayMaskClass" />
       <AlertDialogContent
         class="fixed top-[50%] left-[50%] z-admin-dialog grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-overlay border border-border bg-card text-card-foreground p-6 shadow-admin-dialog overlay-dialog-motion"
       >
@@ -54,6 +52,7 @@ import {
   AlertDialogTitle,
 } from 'reka-ui'
 import { activeAdminConfirm } from '../../session/feedback/useAdminConfirm'
+import { adminOverlayMaskClass } from '../../core/uiClasses'
 import { formatAdminDisplayError, useAdminToast } from '../../session/feedback/toast'
 
 const toast = useAdminToast()

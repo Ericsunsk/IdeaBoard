@@ -1,9 +1,6 @@
 import { computed, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-function makeBoard(id: string, name = id, updatedAt = 1) {
-  return { id, name, createdAt: 1, updatedAt }
-}
+import { makeBoardMeta as makeBoard } from '../../testing'
 
 describe('Boards Catalog public interface', () => {
   afterEach(() => {

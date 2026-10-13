@@ -12,6 +12,7 @@ import {
 import type { Board } from '../../../../api/generated-query/public/model/board'
 import type { BoardDocument } from '../../../../api/generated-query/public/model/boardDocument'
 import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
+import { withSignal } from '../../../../core/utils/request'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../core/utils/workspaceId'
 import { PAGE_SIZES } from '../../../../core/config/pagination'
 import { getWorkspaceSelectionStore } from '../../../workspace'
@@ -108,7 +109,7 @@ function requestConfig(
   const signal = options?.signal ?? undefined
   return {
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
-    ...(signal == null ? {} : { signal }),
+    ...withSignal(signal),
   }
 }
 

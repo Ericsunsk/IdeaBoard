@@ -7,9 +7,11 @@ import {
   searchWorkspace as searchWorkspaceTransport,
 } from '../../../../api/generated-query/public/workspace-search/workspace-search'
 import { buildContractRequestHeaders, requireContractData } from '../../../../api/contractKernel'
+import { withSignal } from '../../../../core/utils/request'
 import { i18n } from '../../../../core/i18n'
 import { assertWorkspaceId } from '../../../../core/utils/workspaceId'
 import { assertOpaqueId, isOpaqueIdWithPrefix } from '../../../../core/utils/opaqueIds'
+import { isRecord } from '../../../../core/utils/guards'
 import { normalizeSearchQuery } from '../../core/queryPolicy'
 
 // Workspace-scoped search resource (issue #806).
@@ -49,12 +51,8 @@ function toGeneratedOptions(options: WorkspaceSearchRequestOptions): {
 } {
   return {
     headers: workspaceSearchHeaders(options),
-    ...(options.signal == null ? {} : { signal: options.signal }),
+    ...withSignal(options.signal),
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function requiredString(raw: unknown, field: string): string {

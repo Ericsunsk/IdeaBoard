@@ -56,7 +56,7 @@ vi.mock('./createCanvasWorkspaceImageWorkflow', () => ({
   createCanvasWorkspaceImageWorkflow: mocks.createCanvasWorkspaceImageWorkflow,
 }))
 
-vi.mock('../../execution/task-lifecycle', () => ({
+vi.mock('../../execution/task-lifecycle/canvasTaskLifecycle', () => ({
   createCanvasTaskLifecycle: mocks.createCanvasTaskLifecycle,
 }))
 

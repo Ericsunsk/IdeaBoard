@@ -10,6 +10,7 @@ import type { BoardRepository } from '../catalog/repository'
 import type { BoardMeta } from '../catalog/boards'
 import type { BoardPreviewRefreshQueue } from '../preview/boardPreviewRefreshQueue'
 import { createGalleryController } from '../../ui/gallery/controller'
+import { makeBoardMeta as makeBoard } from '../../testing'
 import { createBoardAutosavePolicy, useBoardAutosave } from '../../../canvas/session/board-session'
 
 const disposeControllers: (() => void)[] = []
@@ -18,10 +19,6 @@ afterEach(() => {
   disposeControllers.splice(0).forEach((dispose) => dispose())
   vi.restoreAllMocks()
 })
-
-function makeBoard(id: string, name = id, updatedAt = 1): BoardMeta {
-  return { id, name, createdAt: 1, updatedAt }
-}
 
 function createHarness() {
   const boards = ref<readonly BoardMeta[]>([makeBoard('board-1')])

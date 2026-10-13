@@ -6,6 +6,7 @@ import {
   removeSessionStorageItem,
   writeSessionStorageItem,
 } from '../../../../core/utils/storage'
+import { isRecord } from '../../../../core/utils/guards'
 
 const ANONYMOUS_QUERY_GATE_KEY = 'ideaboard:search:anonymous-query-gate'
 const PENDING_ACTION_KEY = 'ideaboard:search:pending-auth-action'
@@ -15,10 +16,6 @@ let pendingAction: SearchAuthAction | null = null
 
 function isPersistableAction(action: SearchAuthAction): boolean {
   return action.kind !== 'vision-search'
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object'
 }
 
 function isLibrarySearchReference(value: unknown): value is LibrarySearchReference {
