@@ -4,18 +4,18 @@ AIGateway is the operating context for the sole AI egress: gateway connection, m
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| Gateway | Cloudflare AI Gateway connection quadruple (base URL, account ID, gateway ID, token); least-privilege token with budget cap |
-| ResolvedGateway | Effective resolved connection; management surfaces only a `token_configured` boolean, never the secret |
-| Service Model Pool | Service/resolution routing belongs to Tasking (#848), outside this gateway configuration context |
-| Vision Mapping | Vision-search-only mapping under the bare key `vision`, stored as `ai_gateway_vision_model`, isolated from Service routing |
-| Route Preview | Dry-run routing for a model ID plus custom params (namespace, path, source rule, chat judgment); shares `dialects.Resolve` (single resolve-then-shape seam) with execution so preview and execution never diverge |
-| Connection Probe | Direct probe at the primary gateway (bypasses fallback topology), single-shot (`cf-aig-max-attempts: 1`), cache-skipped, results logged only |
-| Model Detection | Union of control-plane configured providers with the LiteLLM community catalog and the models.dev catalog over one shared attribution; same keys dedupe with models.dev winning metadata, relay partitions never match; LiteLLM failure stays fail-closed, models.dev failure degrades to LiteLLM-only |
-| Configured Provider | Control-plane-attested provider slug; Workers AI carries no key so it never appears there — availability probing admits it when alive |
-| Receipt | Gateway acknowledgement headers (model, provider, step, cache status, log/event ID); operations observability and attempt facts only, never billing snapshots |
-| Cache Policy | Gateway-global cache stays off; per-request explicit declarations only (opt-in TTL for deterministic text, skip for images) |
+| Term                | Meaning                                                                                                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Gateway             | Cloudflare AI Gateway connection quadruple (base URL, account ID, gateway ID, token); least-privilege token with budget cap                                                                                                                                                                            |
+| ResolvedGateway     | Effective resolved connection; management surfaces only a `token_configured` boolean, never the secret                                                                                                                                                                                                 |
+| Service Model Pool  | The Models eligible for an image Service; owned by Generation, outside gateway configuration.                                                                                                                                                                                                          |
+| Vision Mapping      | Vision-search-only mapping under the bare key `vision`, stored as `ai_gateway_vision_model`, isolated from Service routing                                                                                                                                                                             |
+| Route Preview       | Dry-run routing for a model ID plus custom params (namespace, path, source rule, chat judgment); shares `dialects.Resolve` (single resolve-then-shape seam) with execution so preview and execution never diverge                                                                                      |
+| Connection Probe    | Direct probe at the primary gateway (bypasses fallback topology), single-shot (`cf-aig-max-attempts: 1`), cache-skipped, results logged only                                                                                                                                                           |
+| Model Detection     | Union of control-plane configured providers with the LiteLLM community catalog and the models.dev catalog over one shared attribution; same keys dedupe with models.dev winning metadata, relay partitions never match; LiteLLM failure stays fail-closed, models.dev failure degrades to LiteLLM-only |
+| Configured Provider | Control-plane-attested provider slug; Workers AI carries no key so it never appears there — availability probing admits it when alive                                                                                                                                                                  |
+| Receipt             | Gateway acknowledgement headers (model, provider, step, cache status, log/event ID); operations observability and attempt facts only, never billing snapshots                                                                                                                                          |
+| Cache Policy        | Gateway-global cache stays off; per-request explicit declarations only (opt-in TTL for deterministic text, skip for images)                                                                                                                                                                            |
 
 ## Public Seams
 

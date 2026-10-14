@@ -21,25 +21,27 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 
 ## Domain Language
 
-| Term               | Meaning                                                                                                                                                                                |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Credit             | Indivisible integer currency unit; floating point is forbidden                                                                                                                         |
-| Credit Wallet      | Account boundary of a single user inside the Credits context                                                                                                                           |
-| Wallet Restriction | Reason-coded spending limit, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source                                   |
-| Credit Account     | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Wallet                                                                                |
-| Ledger Transaction | One immutable accounting fact with at least two Postings under the same asset                                                                                                          |
-| Posting            | Signed delta on one Credit Account; the sum within one Transaction must be 0                                                                                                           |
-| Balance Projection | O(1) cache of `credit_accounts.balance`, updated only by the Posting trigger, never an independent fact source                                                                         |
-| Grant              | System Issuance → User Available                                                                                                                                                       |
-| Hold               | User Available → User Reserved                                                                                                                                                         |
-| Capture            | User Reserved → System Revenue                                                                                                                                                         |
-| Release            | User Reserved → User Available                                                                                                                                                         |
-| Refund             | System Revenue → User Available; cumulative total must never exceed the original Charge                                                                                                |
-| Purchase Credit    | `System Issuance → User Available` for verified external payment; called by Payments with a fixed actor/source/reference, never a discretionary Grant                                  |
-| Purchase Refund    | `User Reserved → System Issuance` for a verified Stripe Refund; must link the Refund Hold created by Payments, idempotent terminal settlement                                          |
-| Reconciliation Run | Full consistency scan started by a `manual` or `scheduled` trigger and executed asynchronously by River; manual persists the authenticated Admin, scheduled persists the schedule slot |
-| Finding            | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject                                                                                                |
-| Finding Type       | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely                                           |
+| Term                      | Meaning                                                                                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Credit                    | Indivisible integer currency unit; floating point is forbidden                                                                                        |
+| Credit Wallet             | Account boundary of a single user inside the Credits context                                                                                          |
+| Wallet Restriction        | Reason-coded spending limit, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source  |
+| Credit Account            | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Wallet                                               |
+| Ledger Transaction        | One immutable accounting fact with at least two Postings under the same asset                                                                         |
+| Posting                   | Signed delta on one Credit Account; the sum within one Transaction must be 0                                                                          |
+| Balance Projection        | O(1) cache of `credit_accounts.balance`, updated only by the Posting trigger, never an independent fact source                                        |
+| Grant                     | System Issuance → User Available                                                                                                                      |
+| Hold                      | User Available → User Reserved                                                                                                                        |
+| Capture                   | User Reserved → System Revenue                                                                                                                        |
+| Release                   | User Reserved → User Available                                                                                                                        |
+| Refund                    | Return of previously captured Credits from System Revenue to User Available, linked to the original Capture and bounded by its amount.                |
+| Purchase Credit           | `System Issuance → User Available` for verified external payment; called by Payments with a fixed actor/source/reference, never a discretionary Grant |
+| Purchase Refund           | `User Reserved → System Issuance` for a verified Stripe Refund; must link the Refund Hold created by Payments, idempotent terminal settlement         |
+| Credit Reconciliation Run | One Credit Ledger consistency check and its outcome; distinct from Payment Reconciliation.                                                            |
+| Finding                   | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject                                                               |
+| Finding Type              | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely          |
+
+A Refund reverses a Capture; a Purchase Refund settles an external-payment refund. They are distinct accounting operations. Wallet lifecycle controls the account lifecycle; Wallet Restrictions express independently releasable spending constraints.
 
 ## Public Seams
 
@@ -71,7 +73,7 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 - Admin HTTP: single-user Wallet/Ledger read, Grant, Deduction,
   linked Refund, and Correction.
   No set-balance; no Ledger history update/delete.
-  Ledger reads return the Hold/Charge reference explicitly, so Admins never
+  Ledger reads return the Hold/Capture reference explicitly, so Admins never
   infer settlement state from bare association IDs.
 
 ## Invariants

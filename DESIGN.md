@@ -38,11 +38,13 @@ flowchart TB
     Worker --> AI["Cloudflare AI Gateway<br>sole egress"]
     Worker --> Storage["Local / S3-compatible Storage"]
     Worker --> NATS
-    Uploads --> Storage
+    API --> Storage
+    API --> Imgproxy["imgproxy<br>internal image rendering"]
+    Imgproxy --> Storage
     NATS --> API
 ```
 
-生产推荐形态是 Cloudflare Pages 托管 Web，VPS 反代 API/Auth/Uploads，Docker Compose 运行 Go API、Auth、PostgreSQL、NATS JetStream 和 worker runtime。
+生产推荐形态是 Cloudflare Pages 托管 Web，VPS 反代 API/Auth，Docker Compose 运行 Go API、Auth、PostgreSQL、NATS JetStream、imgproxy 和 worker runtime。
 
 ## 核心设计契约
 
@@ -134,6 +136,8 @@ Better Auth Service 负责登录、注册、session、身份侧字段和凭据�
 
 Media context 拥有 object storage provider/profile、upload serving、upload authorization、media references、image format validation 和 bundled business assets。Local 与 S3-compatible storage 是同一抽象下的 provider choice。
 
+Library Asset 是外部图片收藏引用；Media Asset 是 Workspace 内具有稳定 identity 与原图事实的受管素材；Stored Object 是存储中的图片 bytes。Library materialization 通过 Media 建立受管素材，不把收藏记录、素材 identity 和 Object Key 混为一体。Workspace Media 固定使用 `builtin-local`；Avatar 与 Branding Logo 使用 active Storage Profile。Browser 的原图与 Display Tier 经同源 API 获取，imgproxy 的签名地址仅供内部渲染请求使用。
+
 上传结果、provider output 和用户素材都必须通过 Media/Storage 边界进入业务语义。不要让无关 feature 直接拼接 storage secret、bucket URL 或本地文件路径。
 
 Task input 使用不可变 `TaskInputManifest`；Browser 通过 typed、same-origin `MediaRef` 获取素材。Shipping API/Web source 不得包含 `original_image_url`，Web source/env 不得定义 `VITE_PUBLIC_ASSET_BASE_URL`，Web source 不得构造 `"/uploads/` URL，Workflow/Worker 不得直接导入 `internal/media/storage`。`scripts/ci-media-package-boundary.sh` 和 `scripts/ci-legacy-media-zero-scan.sh` 在 CI 检查这些边界；Tests 可组合 concrete adapters。
@@ -182,7 +186,6 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Tasking                                                       | `internal/tasking`                                    | task model、submission、queueing、runtime state、task billing、statistics                                                                         |
 | Identity                                                      | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                                   |
 | Tenancy                                                       | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、workspace billing account 绑定；不拥有账务写入                                          |
-| AccountPool（已退役，见 ADR-0009）                            | —                                                     | Account/endpoint rows remain for historical references; credential material is purged. AI egress belongs to Cloudflare AI Gateway                 |
 | [AI Gateway](./apps/api/internal/aigateway/CONTEXT.md)        | `internal/aigateway`                                  | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
 | Boards                                                        | `internal/boards`                                     | board ownership、access checks、board management API                                                                                              |
 | Media                                                         | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                                 |

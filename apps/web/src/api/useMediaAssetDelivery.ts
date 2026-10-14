@@ -36,8 +36,7 @@ function normalizeTier(value: unknown): MediaAssetDeliveryTier {
   return value === 'original' ||
     value === 'thumb' ||
     value === 'preview' ||
-    value === 'large-preview' ||
-    value === 'processing-input'
+    value === 'large-preview'
     ? value
     : 'preview'
 }

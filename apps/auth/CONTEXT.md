@@ -4,6 +4,16 @@ Auth owns login, registration, session, identity-side fields, credentials, trans
 
 ## Domain Language
 
+**Auth Identity**: The authentication identity that owns credentials, verified identifiers, and sessions. Its linked Business User is owned by the Go Identity context.
+
+**Auth Session**: An authenticated login lifetime for one Auth Identity; not a frontend cached profile or a Workspace membership.
+
+**Verified Identity**: A registration identifier whose ownership has been confirmed; the trusted identity used to provision a Business User and claim its Welcome Grant.
+
+**Impersonation**: An Admin's temporary authenticated session acting as a target user, preserving the original actor identity.
+
+## Module Responsibilities
+
 | Term               | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AuthEnvironment    | Sole typed env contract from `infrastructure/env.ts` `loadEnv(source)`; both entrypoints (`src/index.ts` runtime, `src/migrate.ts` migrations) load it and pass it down. Never read `process.env` past the entrypoint.                                                                                                                                                                                                                                                                                                |

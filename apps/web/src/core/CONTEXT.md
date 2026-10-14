@@ -11,7 +11,7 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Error Catalog  | Stable-`code` errors go through `core/errors/errorCatalog.ts` (`userFacingErrorCopy`); no prose matching or scattered copy; only backend `msg` marked `message_safe` is shown through.                                      |
 | Query Client   | The single TanStack Query singleton (`stale 5s` / `gc 10m` / `retry 1` / no refocus); identity change clears all via `clearAuthScopedQueryCache`; features never build their own `QueryClient`.                             |
-| MediaRef       | Canonical media fact (`assetId + tier + format`); URLs are runtime-delivery details via `buildMediaBrowserURL` and are never persisted; Canvas facts never store URLs.                                                      |
+| MediaRef       | A Media Asset identity paired with a browser display derivative tier (`thumb`, `preview`, or `large-preview`); processing input profiles are not display tiers. URL construction is a delivery concern, not media identity. |
 | Control State  | Interactive control quad-state (`idle` / `selected` / `disabled` / `loading` + `aria-busy` / `aria-pressed`), resolved by `core/interaction`; styles consume, never define.                                                 |
 | Theme Contract | Single source for standard UI primitives and CSS tokens (`src/components/ui` + `theme`); overlay/dialog/round-control styles must consume tokens; contract specs reverse-check canvas/search/board/library/workspace usage. |
 | Locale Parity  | `en` resident, `zh` lazy; `en` / `zh-CN` / `es` / `ko` keys must match (`localeParity` contract); locale switch atomically updates i18n + `<html lang>` + storage, and writes nothing on failure.                           |
@@ -28,7 +28,7 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 - `core/i18n` i18n singleton, atomic locale switch, `"N Idea(s)"` currency format; never conflicts with feature-private keys.
 - `core/interaction` quad-state resolution; never depends on concrete component styles.
 - `core/lib` dependency-free pure functions (brand, page chrome, chart primitives); never depends on DOM/Query.
-- `core/media` MediaRef and upload pipeline (magic-byte sniffing, HEIC-to-JPEG, compression thresholds, fail-back-to-original); never stores URLs in Canvas facts.
+- `core/media` MediaRef and upload pipeline (magic-byte sniffing, HEIC-to-JPEG, compression thresholds, fail-back-to-original); keeps stable Asset identity separate from transient delivery URLs.
 - `core/motion` duration/easing tokens plus dialog/popover/chart presets (`motionPolicyGuard.spec` guards hard-codes); never depends on business logic.
 - `core/query` queryClient singleton, task-result normalization (only `role=image + asset_id`), user-credits invalidation pub/sub; `queryDefaults` presets (`noRetry` / `accountScoped` / `adminPolling` / `keepPrevious`) own all freshness/polling overrides; credits invalidation must use this channel.
 - `theme` PT single source + CSS tokens; never depends on feature-authored overlay/dialog styles.
@@ -49,7 +49,7 @@ Horizontal roots have zero runtime or type-only imports of concrete features. Co
 ## Feedback Factory Map (per-surface split, intentional)
 
 - User surfaces own one `*Feedback` factory each over `useAppToast` + locale keys: account `useProfileFeedback`, auth `useAuthFeedback`, board `createBoardFeedback`/`useBoardFeedback`, canvas `createCanvasFeedback`/`useCanvasFeedback`, library delete/remove confirmations in `components/confirmations.ts` over `useUserConfirmDialog`.
-- Admin verticals own one factory each over `useAdminToast` + colocated zh messages: credits billing ops, reward codes, model catalog/gateway config, monitor task result/cancellation, admin login, stripe settings/payment orders, prompt config, settings (branding/access/media-upload/outbound/mail/search-provider/logo-file/storage/payment), users.
+- Admin verticals own one factory each over `useAdminToast` + colocated zh messages: credits billing ops, reward codes, model catalog/gateway config, monitor task result/cancellation, stripe settings/payment orders, prompt config, settings (branding/access/media-upload/outbound/mail/search-provider/logo-file/storage/payment), users.
 - Factories never cross surfaces (no shared generic factory, no user-copy in admin factories, no zh literals in user factories); confirm dialogs split the same way (`UserConfirmDialog` + `useUserConfirmDialog` for user surfaces, `AdminConfirmDialog` for admin).
 
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)
@@ -75,8 +75,8 @@ The `governance/query-placement` rule in ESLint enforces the following: Canvas p
 - Auth, retry, correlation, and error classification live centrally in `api` and `core/auth`; features never roll their own.
 - Never call generated APIs from pages directly; never hand-edit wrappers; never add a second fetcher.
 - Never match errors by string; never leak unsafe messages.
-- Never build per-feature clients; never cache session identity.
-- Never persist provider URLs; never use tier-less asset refs.
+- Never build per-feature clients or a second session cache; Auth owns the bounded session snapshot.
+- Managed Canvas media persists Asset identity, never a provider URL as a substitute. Library and Search may retain external references within their own contracts.
 - Never define per-component disabled logic; never ship controls without busy semantics.
 - Never hand-author overlay CSS; never hard-code motion durations.
 - Never ship partial translations or half-switched locales.

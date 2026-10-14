@@ -24,39 +24,43 @@ empty eligible pool.
    - `GenerationRequest { service, resolution, size, prompt }` is the only
      user-facing routing input. Model identity is never a user choice.
    - `RoutingSnapshot { service, requested_resolution, eligible_models,
-     selected_model, retry_candidate, selection_seed, pool_version }` is the
+selected_model, retry_candidate, selection_seed, pool_version }` is the
      immutable submit-time routing fact pinned per task.
    - `GenerationTask { request, routing_snapshot, billing_snapshot,
-     execution_attempts }`. Billing keys on `Service + resolution +
-     quantity`; the `ai-image:<service>` SKU namespace is retained with the
+execution_attempts }`. Billing keys on `Service + resolution +
+quantity`; the `ai-image:<service>` SKU namespace is retained with the
      local key tracking the Service slug.
    - `ExecutionAttempt { task_id, attempt_no, execution_token, river_job_id,
-     service, requested_model, resolved_model, provider, retry_layer,
-     gateway_retry_count, status, failure_stage, failure_category,
-     started_at, completed_at }` is a durable PostgreSQL fact. It is append-only
+service, requested_model, resolved_model, provider, retry_layer,
+gateway_retry_count, status, failure_stage, failure_category,
+started_at, completed_at }` is a durable PostgreSQL fact. It is append-only
      by `(task_id, attempt_no)` for task attempts; each row is inserted once and
      its terminal fields are completed atomically with the task transition.
      `retry_layer` is exactly `gateway`,
      `model_fallback`, or `river_task`, and the fact never contains prompt,
      provider payload, credentials, or storage URLs.
-2a. **Responsibilities.** The cross-context ownership is fixed as follows:
-   - **Catalog/configuration** owns Service and Model identities, pool entries,
-     capability validation, enabled state, and the per-Service pool version.
-   - **Routing** owns eligibility, deterministic selection, retry-candidate
+     2a. **Responsibilities.** The cross-context ownership is fixed as follows:
+   - **Workflow** owns executable Service identities and parameter contracts.
+   - **AI Gateway** owns Model catalog identity and gateway metadata.
+   - **Generation Catalog** owns pool entries, capability validation,
+     enabled state, and the per-Service pool version.
+   - **Generation Routing** owns eligibility, deterministic selection, retry-candidate
      derivation, and construction of the immutable `RoutingSnapshot`.
-   - **Quote/Billing** owns SKU lookup, price version, quantity, hold, and
-     settlement keyed by `Service + resolution + quantity`; it never selects a
-     Model.
-   - **Task lifecycle** owns idempotency, the atomic hold/task/River enqueue
-     transaction, `ExecutionAttempt` facts, terminal convergence, and River
-     retry policy.
+   - **Billing** owns SKU lookup, price versions, quantity, and Quote keyed by
+     `Service + resolution + quantity`; it neither selects a Model nor writes
+     the Ledger.
+   - **Credits** owns Hold, Capture, Release, and all Ledger writes through
+     transaction-bound Commands.
+   - **Task lifecycle** orchestrates idempotency, the atomic Quote/Hold/task/
+     snapshot/River enqueue transaction, `ExecutionAttempt` facts, and terminal
+     convergence. Platform `riverpolicy` defines the River retry bounds.
    - **Provider execution** translates canonical resolution and size into the
      gateway request and executes only the pinned Model from the snapshot.
    - **Observability** reads durable task/routing/attempt facts and emits
      bounded metrics/traces; telemetry failure cannot change task or billing
      state.
-   `RoutingResolver` is the sole cross-context routing seam; these owners may
-   consume its result but may not perform a second live Model lookup.
+     `RoutingResolver` is the sole cross-context routing seam; these owners may
+     consume its result but may not perform a second live Model lookup.
 3. **Canonical resolutions.** The contract speaks exactly `1k`, `2k`, and
    `4k`.
    There is no `default` request, billing, or pool capability value. A
@@ -66,7 +70,7 @@ empty eligible pool.
    same three values as their capability set.
 4. **Eligibility.** For a requested resolution, the eligible set is exactly:
    entries with `enabled == true` AND `requested_resolution ∈
-   supported_resolutions`. Disabled entries are invisible to routing (they
+supported_resolutions`. Disabled entries are invisible to routing (they
    stay editable/displayable in Admin). An enabled entry MUST list at least
    one resolution; a Service with zero enabled entries is unavailable, not
    validatable.
@@ -75,7 +79,7 @@ empty eligible pool.
    canonical catalog reference. At submit, the resolver generates and persists
    a 128-bit cryptographically random `selection_seed`; it selects
    `SHA-256(selection_seed || U64BE(pool_version) || 0x00 || UTF8(service) ||
-   0x00 || UTF8(resolution))` modulo the sorted candidate count. The next sorted candidate wraps as the single
+0x00 || UTF8(resolution))` modulo the sorted candidate count. The next sorted candidate wraps as the single
    `retry_candidate`, or is empty when only one candidate exists. This gives
    uniform selection across independent seeds and deterministic replay for the
    same snapshot; the algorithm is part of this contract, not an implementation
@@ -129,7 +133,7 @@ empty eligible pool.
 12. **Launched resolutions stay visible.** The frontend keeps showing launched
     `1K/2K/4K` options and MUST NOT depend on a dynamic
     `available_resolutions` list. An empty runtime pool surfaces as the `422
-    service_resolution_unavailable` toast; it never hides launched options
+service_resolution_unavailable` toast; it never hides launched options
     and never creates a task or hold.
 13. **Technology boundary.** Routing uses PostgreSQL/pgx/sqlc, River,
     gateway, contract/error, OpenAPI, Vue Query, and Valibot primitives.

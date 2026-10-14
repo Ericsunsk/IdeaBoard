@@ -5,6 +5,21 @@ execution, terminal convergence, media references, and task statistics. It does
 not own provider implementations, media storage, the Credits ledger, or HTTP
 transport details.
 
+## Domain Language
+
+| Term                    | Meaning                                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Task                    | A durable request to execute one Service in a Workspace, with inputs, outputs, lifecycle, and billing facts.           |
+| Submission Action       | One intentional user request; transport retries belong to the same action, while an intentional rerun is a new action. |
+| Execution Attempt       | One claimed execution of a Task, with its execution identity, timing, and outcome.                                     |
+| Execution Token         | The identity fencing a claimed Task execution from stale workers.                                                      |
+| Task Input Manifest     | The immutable ordered media references and roles accepted for a Task's inputs.                                         |
+| Task Output             | An ordered result attributed to a Task; an image result references a Media Asset.                                      |
+| Task Billing Snapshot   | Immutable price, quantity, and amount facts accepted for a Task.                                                       |
+| Task Billing Settlement | The Task's accounting outcome: free, held, captured, or released.                                                      |
+
+An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Snapshot belongs to [Generation](../generation/catalog/CONTEXT.md); Tasking persists it and execution consumes it. Neither a River job nor a gateway request is the Task itself.
+
 ## Package map
 
 - `domain`: task identity, payload, status, manifest, and lifecycle facts.
@@ -35,8 +50,7 @@ transport details.
   keyed `UNIQUE (execution_token)` so the claim and the attempt fact can
   never disagree about which execution they describe. A retry mints a fresh
   token, which is how stale workers lose the race. There is no account,
-  provider endpoint, or credential dimension in the fence — ADR-0009
-  retired that quadruple; do not reintroduce it.
+  provider endpoint, credential, or gateway-request-ID dimension in the fence.
 - Application packages depend on interfaces/contracts, never on concrete
   infrastructure adapters.
 

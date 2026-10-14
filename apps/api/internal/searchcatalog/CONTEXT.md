@@ -1,19 +1,19 @@
 # SearchCatalog Context
 
-SearchCatalog is the image-search context with two subdomains: web image search (Unsplash/Pexels provider key lifecycle) and vision AI search (gateway-backed image understanding plus independent billing). Layout follows the split: `domain` (shared vocabulary and types), `application` (search, vision and settlement services), `infrastructure` (settings repository, supplier HTTP adapters), `interfaces/http` (routes and multipart input), `ports` (gateway and testing contracts). The River reconciliation worker lives in `runtime/interfaces/worker/visionbilling`. No Prometheus metrics remain in this context (trimmed per ai-gateway T10).
+SearchCatalog is the image-search context with two subdomains: web image search (Unsplash/Pexels provider key lifecycle) and vision AI search (gateway-backed image understanding plus independent billing). Layout follows the split: `domain` (shared vocabulary and types), `application` (search, vision and settlement services), `infrastructure` (settings repository, supplier HTTP adapters), `interfaces/http` (routes and multipart input), `ports` (gateway and testing contracts). The River reconciliation worker lives in `runtime/interfaces/worker/visionbilling`.
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| Provider | Web image search supplier; only `unsplash` / `pexels`. Vision never enters this vocabulary |
-| ProviderConfig | A provider's operational config (key configured flag, model, enabled, test state, failure info) |
-| TestState | Connection-test lifecycle `never` / `passed` / `failed`; enabling requires a non-empty key plus `passed` |
-| FailureCategory | Test failure class `credentials` / `quota_or_permission` / `network_timeout` / `response_format` / `unknown` |
-| VisionExtraction | Normalized vision understanding result (query text) |
-| VisionInput | Validated vision request: up to 4 images (10MB each and total, format triple-checked) plus free text |
-| Vision Model | Vision-only model mapping, isolated from Service Model Pool routing under the bare key `vision` |
-| Vision Billing | Per-call vision billing (SKU `ai-search:vision`; callers reuse one idempotency key across retries; hold/capture via credits) |
+| Term             | Meaning                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Search Provider  | An external image-search supplier: Unsplash or Pexels; distinct from an AI model provider.                                   |
+| ProviderConfig   | A Search Provider's credentials, enabled intent, and connection-test facts.                                                  |
+| TestState        | Connection-test lifecycle `never` / `passed` / `failed`; enabling requires a non-empty key plus `passed`                     |
+| FailureCategory  | Test failure class `credentials` / `quota_or_permission` / `network_timeout` / `response_format` / `unknown`                 |
+| VisionExtraction | Normalized vision understanding result (query text)                                                                          |
+| VisionInput      | Validated vision request: up to 4 images (10MB each and total, format triple-checked) plus free text                         |
+| Vision Model     | Vision-only model mapping, isolated from Service Model Pool routing under the bare key `vision`                              |
+| Vision Billing   | Per-call vision billing (SKU `ai-search:vision`; callers reuse one idempotency key across retries; hold/capture via credits) |
 
 ## Public Seams
 

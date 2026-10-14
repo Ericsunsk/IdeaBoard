@@ -1,7 +1,7 @@
 import { resolveMediaAssetDerivativeURL } from '../../api/mediaAssetDelivery'
 
 /** Immutable browser-safe reference to a concrete Media derivative. */
-export type MediaRefDerivativeTier = 'thumb' | 'preview' | 'large-preview' | 'processing-input'
+export type MediaRefDerivativeTier = 'thumb' | 'preview' | 'large-preview'
 
 export interface MediaRef {
   assetId: string
@@ -32,10 +32,5 @@ export function mediaRefEquals(
 }
 
 function isDerivativeTier(value: unknown): value is MediaRefDerivativeTier {
-  return (
-    value === 'thumb' ||
-    value === 'preview' ||
-    value === 'large-preview' ||
-    value === 'processing-input'
-  )
+  return value === 'thumb' || value === 'preview' || value === 'large-preview'
 }

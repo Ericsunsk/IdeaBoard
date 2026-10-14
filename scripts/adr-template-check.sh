@@ -41,7 +41,6 @@ heading_allowlist=(
   # decided before ## Status was part of the skeleton. Do not retrofit history.
   "0001-postgresql-credits-ledger.md:Status"
   "0003-payments-ddd-package-boundaries.md:Status"
-  "0004-no-projection-gateway.md:Status"
   # Metadata-style records: status/owner live in header lines (0005) or YAML
   # front matter (0006), predating the four-heading skeleton. Rewriting these
   # records into the skeleton is a docs edit, not this guard's job.

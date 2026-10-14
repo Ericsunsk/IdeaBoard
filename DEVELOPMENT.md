@@ -146,6 +146,21 @@ Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），�
 
 ESLint 直接执行治理规则。Canvas 高频交互态禁用 Query 为 error；其余治理规则的 severity 以 `eslint.config.js` 为准。boolean-prefix 使用 TypeScript type-aware ESLint，现有例外保存在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线，`npm run lint` 以 `--max-warnings=0` 拒绝任何 warning。自有 boolean fields 与仓内消费者直接使用 predicate names，不保留旧名 alias。DOM、第三方 SDK 与 generated DTO 字段按真实类型契约检查；自有 wire/persisted DTO 用 `@externalContract` 标明外部契约，仅豁免该契约的字段。显式 dictionary 的 keys 是 identities，显式声明的自有 fields 仍受命名检查。`no-barrel-import` 提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。
 
+### Frontend 开发约定
+
+新增 feature 的 ownership、zones 与 public seams 遵循 [DESIGN.md](./DESIGN.md)；UI 实现遵循 [apps/web/DESIGN.md](./apps/web/DESIGN.md)。在 feature 的 `CONTEXT.md` 记录领域术语与独有规则。额外 public subpath 必须登记在 [Seam inventory](./docs/frontend-seam-inventory.md)，Admin verticals 不需要统一根 barrel。
+
+Specs 与被测 module/control colocate，使用四种 suffix：
+
+- `unit`：确定性的纯逻辑。
+- `contract`：无真实 Backend 的 API shape、含正反例的 architecture policy fixtures、通过 `toBe` 验证的公开 Seam/singleton identity。
+- `component`：通过 `src/test/render` 验证 SFC 的可观察行为。
+- `browser`：必须由真实 Browser 验证的 geometry。
+
+`describe` 按 Seam 分组，`test` 描述可观察行为，不断言私有实现。新测试统一使用 `test`，现有 `it` 无需仅为命名修改。UI queries 优先 Role；TestId 和 class assertions 只用于已有约定允许的 visual/layout contract。新 factory 使用 `buildX(overrides?)`，现有 `makeX` 保持原契约。新增 cached server state 的 Query 使用范围遵循 [core CONTEXT](./apps/web/src/core/CONTEXT.md) 并在 feature `CONTEXT.md` 说明。
+
+Composable 有两个或更多参数时使用 options object，单个必填参数保持 positional。`create*Feedback` factory 保持 `toast` 为第一个 positional 参数。
+
 ### 显式负载 harness
 
 两条百万流水命令都是 `CREDITS_LOAD_TEST=1` 门控的显式 harness，不在默认 suite 内：
@@ -310,6 +325,7 @@ sqlc:
 - Atlas migrations 位于 `apps/api/internal/db/migrations/`，由 `apps/api/atlas.hcl` 与 `atlas.sum` 管理。
 - Atlas migration 生成使用 `atlas migrate diff`；完整性与 Fresh replay 使用 `scripts/atlas-migration-check.sh`。CI 先在隔离 database 执行 `atlas migrate validate`，再在集成 database 执行 Fresh apply 与 incremental idempotency apply；不要把 Atlas Pro-only 的 `atlas migrate lint` 加入流水线。
 - API schema 由独立 `api-migrate` image 执行 Atlas versioned migrations，再执行 `finalize-migrate` 完成 River 与 runtime privilege setup。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 Atlas revisions 表。
+- 新增数据库表及相关 sequence 时，必须同步 [runtime privilege policy](./apps/api/internal/platform/database/runtime_privileges.go) 与 [启动权限断言](./apps/api/internal/runtime/composition/database_wiring_db_test.go)，按 runtime 实际用途授予最小权限。
 - Schema source 的唯一 lifecycle 是 `schema-release`：修改 domain fragment 或 manifest 后先用 `--write-artifact` 生成 `schema.sql`，再运行默认 check；CI 和 release gate 只运行默认 check。
 - clean-break release 只支持 Fresh Database。旧数据库必须先导出需要保留的数据，再重建并按当前 baseline 初始化；不能使用旧 migration binary 做跨 baseline 升级或回滚。
 - `api-migrate` 在 `atlas migrate apply` 之前会比对数据库记录的 Atlas revisions 与镜像内 `internal/db/migrations/` 的版本集合。出现缺失版本（错误的 image digest、回滚到旧 image、migration 文件被改名或删除、CI 变量错配）时 migrator **不会**自动清库，而是以 `clean break reset is not allowed` 失败，并列出缺失的 version。确认是预期的 pre-launch clean break、且已导出需要保留的数据后，才在 migration 容器上设置 `ATLAS_CLEAN_BREAK_ALLOW_RESET=true` 重跑：这是唯一的 opt-in 开关，值非法时按 `false` 处理并计入 `Config.InvalidEnv`。drop 前会把 `current_database()`、缺失 version 与 public schema 行数摘要写入结构化日志。

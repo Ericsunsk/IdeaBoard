@@ -12,7 +12,7 @@ It is not a business context and must never decay into a wiring package; no busi
 - `application/orchestration`: dependency-graph startup plan (`ExecuteStartup`). Interrupted task recovery is owned by River redelivery and the tasking Worker lease fence.
 - `composition`: the process-wide sole dependency assembly root and CLI command dispatcher; loads config, builds the database pool and services, and constructs the lifecycle-managed `App`.
 - `infrastructure`: PostgreSQL and River, NATS, HTTP, config, and RED metrics adapters under `config/`, `database/`, `http/`, `metrics/`, and `nats/`.
-- `interfaces/http`: HTTP REST transport adapter with route registration, Session and Auth middleware, rate limiting, and static-asset proxying.
+- `interfaces/http`: HTTP REST transport adapter with route registration, Session and Auth middleware, rate limiting, and authenticated or public media response adaptation.
 - `interfaces/worker`: external AI Provider adapters and background periodic reconciliation tasks. Workspace task queue consumption lives in `internal/tasking/interfaces/worker`.
 - `adapters/billingregistry`: runtime assembly mapping from Workflow capabilities to Billing item definitions.
 - `adapters/webdist`: static-asset adapter embedding the compiled frontend SPA build.

@@ -1,8 +1,7 @@
 # Media Derivatives Context
 
-`internal/media/derivatives` owns the tier catalogue, provider-neutral input
-profiles, and on-demand rendering for
-image derivative tiers (thumbnails, previews, processing inputs).
+`internal/media/derivatives` owns display-tier geometry, provider-neutral input
+profiles, and on-demand image rendering.
 It covers only transformed views of original media assets,
 never the originals themselves.
 No production implementation lives at the package root;
@@ -27,12 +26,14 @@ and asset readiness.
 
 ## Domain Language
 
-| Term           | Meaning                                                                                               |
-| -------------- | ----------------------------------------------------------------------------------------------------- |
-| Tier           | Named dimension/resolution boundary (`thumb`, `preview`, `large-preview`, `processing-input`)         |
-| TierSpec       | Max-side geometry for one tier; display tiers resolve on demand, never pre-generated                  |
-| InputProfile   | Bounded, provider-neutral image contract required before sending assets to external processing models |
-| Rendered Image | Validated image bytes and MIME returned by pull rendering; independent of HTTP response policy        |
+| Term             | Meaning                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| Display Tier     | A named display-size class: `thumb`, `preview`, or `large-preview`.                                   |
+| Input Profile    | Provider-neutral bounds on an image's dimensions, pixel count, and byte size for external processing. |
+| Processing Input | An image supplied for external model processing under an Input Profile; not a Display Tier.           |
+| Rendered Image   | A transformed view of an Original Image; not a new Media Asset.                                       |
+
+Use Display Tier for display sizing and Input Profile for processing limits. Neither is a Service's Output Resolution (`1k`, `2k`, `4k`) or a CSS Token Tier.
 
 ## Public Seams
 

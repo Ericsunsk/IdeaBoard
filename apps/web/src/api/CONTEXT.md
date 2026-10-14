@@ -35,7 +35,7 @@ Orval output (`public/` + `control/` per `apps/web/orval.config.ts`) lives under
 - Transport-DTO to feature-model translation happens in adapter/resource layers; domain code never imports Vue, router, Query, or generated DTOs.
 - Auth, retry, correlation, and error classification live centrally in `api` and `core/auth`; features never roll their own.
 - Never call generated APIs from pages directly; never hand-edit wrappers; never add a second fetcher.
-- Never build per-feature clients; never cache session identity.
+- Never build per-feature clients or a second session cache; Auth owns the bounded session snapshot.
 
 ## Non-goals
 

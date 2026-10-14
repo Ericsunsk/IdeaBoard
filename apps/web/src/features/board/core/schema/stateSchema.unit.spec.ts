@@ -24,6 +24,34 @@ describe('boardStateSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it.each(['thumb', 'preview', 'large-preview'])('accepts %s MediaRefs', (derivativeTier) => {
+    const state = {
+      ...makeBoardState(),
+      imageNodes: [
+        {
+          ...makePendingImageNodeSnapshot(),
+          sourceMediaRef: { assetId: 'asset_42', derivativeTier },
+        },
+      ],
+    }
+
+    expect(v.safeParse(boardStateSchema, state).success).toBe(true)
+  })
+
+  it('rejects provider input profiles in persisted MediaRefs', () => {
+    const state = {
+      ...makeBoardState(),
+      imageNodes: [
+        {
+          ...makePendingImageNodeSnapshot(),
+          sourceMediaRef: { assetId: 'asset_42', derivativeTier: 'processing-input' },
+        },
+      ],
+    }
+
+    expect(v.safeParse(boardStateSchema, state).success).toBe(false)
+  })
+
   it('accepts the minimum shape for every node type', () => {
     const parsed = v.safeParse(
       boardStateSchema,

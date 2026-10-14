@@ -7,6 +7,18 @@ media-assets content/derivatives, public avatar/logo routes): nothing is
 served statically. It does not own image derivative generation, prompt
 orchestration, task scheduling, or billing ledger facts.
 
+## Domain Language
+
+| Term                   | Meaning                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Storage Profile        | A configured storage location and its access policy, independent of the media's business identity.                       |
+| Active Storage Profile | The selected Storage Profile for operations that follow the active location, including Avatar and Branding Logo storage. |
+| Stored Object          | Image bytes at one Object Key in a Storage Profile; not a Library Asset or an independently identified Media Asset.      |
+| Object Key             | A storage-relative locator for a Stored Object; not a public URL.                                                        |
+| Original Image         | The validated source image from which display renditions are produced.                                                   |
+| Avatar                 | A user's profile image.                                                                                                  |
+| Branding Logo          | The site's configured brand image.                                                                                       |
+
 ## Package Map
 
 - `domain`: pure storage entities, storage profile models,
@@ -43,6 +55,7 @@ orchestration, task scheduling, or billing ledger facts.
 
 ## Invariants
 
+- Workspace Media uses the fixed `builtin-local` profile. Avatar and Branding Logo use the active Storage Profile; changing that profile does not move existing objects.
 - Third-party storage SDKs (MinIO, AWS) and raw credentials
   (`SecretAccessKey`) must NEVER leak into `domain`, `ports`, or `application`.
 - Storage profile secret rotation must protect past revisions until

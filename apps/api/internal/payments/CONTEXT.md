@@ -5,22 +5,22 @@ It does not own platform Idea balances or the ledger; Wallet, the double-entry L
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| Current Stripe Configuration | Currently effective Stripe Credential Generation, Product Tax Code, and purchase switch; publishing runs only a short transaction |
+| Term                         | Meaning                                                                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Current Stripe Configuration | Currently effective Stripe Credential Generation, Product Tax Code, and purchase switch; publishing runs only a short transaction                                                     |
 | Stripe Credential Generation | Immutable Stripe account, encrypted Secret, Payment Method Configuration, and provider resource references; each Payment Order permanently references the generation used at creation |
-| Stripe Gateway | Adapter seam through which Payments calls the Stripe API; domain services never depend on Stripe SDK types |
-| Webhook Inbox | Minimal receipt fact deduplicated globally by Stripe Event ID; stores only routing and processing metadata, never the raw payload |
-| Ignored Event | Validly signed event that Payments does not recognize; recorded as `ignored` and acknowledged successfully with no business state change |
-| Payment Admin Action | Append-only audit of Stripe configuration operations, including actor, outcome, and redacted error summary |
-| Payment Order | Durable, idempotent intent and final payment fact for one user top-up; the public token is only for authenticated user queries, never a payment fact |
-| Checkout Return | UI navigation signal from the Stripe browser return; the server must re-read the Stripe Checkout Session, and only a paid canonical Stripe fact may credit |
-| Purchase Credit | `System Issuance → User Available` Credits command triggered by a verified Stripe Payment Order; not an Admin Grant |
-| Payment Reconciliation | River periodic flow that reads durable Payment Orders, verifies against Stripe, and converges lost webhooks and transient faults |
-| Reconciliation Claim | One-to-one Payment Order recovery state; token plus generation fence guards a short lease, and Stripe I/O always happens outside the claim transaction |
-| Payment Refund | Durable refund fact initiated by Admin or the Stripe Dashboard; locally reserves unconsumed Ideas first, then idempotently settles or releases by canonical Stripe status |
-| Purchase Refund Hold | Standalone Credits typed Command reserving unconsumed Ideas from User Available to User Reserved; it is not spending and may run under an active Restriction |
-| Purchase Refund | Standalone Credits typed Command settling the refund hold from User Reserved back to System Issuance; does not reuse Admin Refund |
+| Stripe Gateway               | Adapter seam through which Payments calls the Stripe API; domain services never depend on Stripe SDK types                                                                            |
+| Webhook Inbox                | Minimal receipt fact deduplicated globally by Stripe Event ID; stores only routing and processing metadata, never the raw payload                                                     |
+| Ignored Event                | Validly signed event that Payments does not recognize; recorded as `ignored` and acknowledged successfully with no business state change                                              |
+| Payment Admin Action         | Append-only audit of Stripe configuration operations, including actor, outcome, and redacted error summary                                                                            |
+| Payment Order                | A user's durable intent to buy Ideas and the resulting external-payment facts; distinct from a Task or a Credit Ledger Transaction.                                                   |
+| Checkout Return              | UI navigation signal from the Stripe browser return; the server must re-read the Stripe Checkout Session, and only a paid canonical Stripe fact may credit                            |
+| Purchase Credit              | Credit issuance owed for a verified external payment, distinct from a discretionary Grant.                                                                                            |
+| Payment Reconciliation       | Recovery of unresolved external-payment facts against Stripe; distinct from a Credit Ledger consistency check.                                                                        |
+| Reconciliation Claim         | One-to-one Payment Order recovery state; token plus generation fence guards a short lease, and Stripe I/O always happens outside the claim transaction                                |
+| Payment Refund               | Durable refund fact initiated by Admin or the Stripe Dashboard; locally reserves unconsumed Ideas first, then idempotently settles or releases by canonical Stripe status             |
+| Purchase Refund Hold         | Standalone Credits typed Command reserving unconsumed Ideas from User Available to User Reserved; it is not spending and may run under an active Restriction                          |
+| Purchase Refund              | Return of reserved, unconsumed Ideas to System Issuance for a verified external refund, distinct from a Credits Refund.                                                               |
 
 ## Public Seams
 
@@ -50,7 +50,7 @@ It does not own platform Idea balances or the ledger; Wallet, the double-entry L
 - The Payment Order lifecycle uses `creating → checkout_open → async_payment_pending` for unfinished checkouts, `cancelled|expired|payment_failed` for unpaid terminal states, and `paid_pending_credit → credited` from confirmed payment to Ledger credit; a confirmed late paid fact may promote an unpaid terminal state to `paid_pending_credit`, no other terminal state regresses, and all transitions are database-constrained.
 - One user with one Idea quantity may hold only one unpaid active Checkout; before reusing `checkout_open` or resuming `creating`, read or converge the Stripe canonical state and never return a completed or expired Checkout URL, and only after confirmed completion or expiry may the client rotate the Idempotency Key, while unknown-outcome provider failures keep the original key; Checkout create, continue, and abandon serialize per user without holding a database transaction across Stripe network calls, each user keeps at most 3 unpaid active Checkouts of different quantities, and `paid_pending_credit` is already a payment fact that consumes no unpaid slot.
 - Only a paid Checkout Session with verified identity binding, learned from a signed Webhook or a server-side query, may credit; browser URLs, public tokens, and unpaid or failed Sessions never credit, the Stripe paid fact is first made durable alone as `paid_pending_credit`, and `purchase_credit` with `paid_pending_credit → credited` then commits atomically in one PostgreSQL transaction, idempotent to replay and concurrency.
-- User recharge history returns only the current user's final `credited` minimal facts from the latest 12 calendar months in opaque-cursor pages (default limit 50, max 200 per the shared pagination standard); no payer PII, provider secrets, or internal Stripe metadata, and cursors are length-bounded before decoding.
+- User recharge history returns only the current user's credited and user-abandoned order facts, with fully refunded credited orders projected as `refunded`, from the latest 12 calendar months in opaque-cursor pages (default limit 50, max 200 per the shared pagination standard); no payer PII, provider secrets, or internal Stripe metadata, and cursors are length-bounded before decoding.
 - Dispute Webhooks trigger only a canonical Stripe Retrieve; open or lost Disputes create a reasoned Restriction, run a bounded `payment_dispute_debit`, and persist the unrecovered amount in one transaction under the fixed Payment Order to Wallet lock order, while `won` and `lost → won` restore exactly this Dispute's actual debit and release exactly its Restriction.
 - User SSE is isolated by user ID with heartbeat and cleanup over the connection lifetime; it notifies only `processing`/`credited`/`failed`/`refund_updated`/`dispute_updated` and never replaces Stripe or PostgreSQL as the payment fact source.
 - The 5-minute River reconciliation only claims unconverged orders older than 2 minutes, at most 100 per batch; the claim lease outlives the worker timeout, token plus generation blocks stale workers from overwriting newer results, and multi-worker correctness never depends on queue concurrency.

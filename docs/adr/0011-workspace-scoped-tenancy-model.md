@@ -2,14 +2,9 @@
 
 ## Context
 
-Phase 3b (#809) removed the legacy user-scoped data access (tasks keyed by
-`user_id`, library/media keyed by owner) and Phase 4 (#818–#821) restored
-each module on workspace-scoped tables (`tasks`, `library_folders`,
-`library_assets`, `upload_sessions`, and `media_assets` carry `workspace_id`;
-`task_outputs` has no tenancy column of its own and inherits tenancy through
-its `task_id` foreign key; see `DESIGN.md` §2 and the Backend Context Map).
-This ADR records the tenancy rules every restored module follows so future
-changes stay convergent.
+Workspace 是 Boards、Tasks、Library Assets 与 Media Assets 的租户隔离边界。
+业务用户身份、Workspace membership 与计费 identity 各有职责；共享素材与协作操作
+必须保持 Workspace 隔离，同时保留跨域 transaction 的原子性。
 
 ## Decision
 
@@ -18,58 +13,31 @@ changes stay convergent.
    events (`users.public_id` stays the public identity; `users.id` is Join-only).
 2. Membership gating lives at the HTTP handler layer
    (`RequireWorkspaceCapability`): hidden workspaces and cross-workspace ids
-   converge to 404 (never 403, never a distinct status), following Baseline 4
-   anti-enumeration. Stores additionally key every statement by resolved
+   converge to 404 for anti-enumeration. Visible Workspaces with insufficient
+   capabilities may return 403. Stores additionally key every statement by resolved
    `workspace_id`, so a missed gate still cannot leak a cross-workspace row.
 3. Each module owns its workspace-scoped persistence behind a narrow seam
    (`WorkspaceLibraryStore`, `WorkspaceMediaStore`,
    `workspacetasks.WorkspaceTaskStore`); repository methods take
    `context.Context` first and use the `dbWithContext` pattern.
-4. At the time this ADR was accepted, task submission settled Quote → Hold →
-   Insert → Enqueue with compensating rollback (Release + Delete); a single
-   shared PostgreSQL transaction across all four participants was the documented
-   follow-up. The current atomicity rule is recorded in ADR-0012 and in this
-   ADR's Status section below.
+4. Tasking owns the submission transaction: submission claim, routing selection,
+   Quote, Credit Hold, Task insert, Routing Snapshot persistence, and River
+   enqueue commit together. Missing transaction seams fail closed. Terminal
+   Task transitions converge Capture/Release in the same transaction.
 5. Library assets store provider URL + source metadata only (never bytes);
-   media owns bytes. Task outputs reference media by `asset_…` public id or
+   Media owns managed bytes and materialization. Task outputs reference Media Assets by `asset_…` public id or
    by the explicit remote-output contract (URL + checksum, no storage internals).
 
 ## Consequences
 
-Convergent 404 behavior and per-module seams make workspace isolation testable
-per module and composable across modules (#821 proves four cross-module
-scenarios). Task submission now performs the billing hold, task insert, routing
-snapshot pin, and River enqueue in one PostgreSQL transaction. The workspace
-worker consumes the pinned snapshot, and the derivative renderer runs in the
-workspace execution path. Library materialization remains intentionally
-internal-only and returns the documented 503 when its durable service is not
-available; it does not create a partial job or silently fall back to a legacy
-path.
+Workspace 隔离由 HTTP membership/capability 检查与持久化查询的 scope 共同保证。
+Task submission 与结算依赖同一 PostgreSQL transaction，不能拆成跨库 dual write。
+Library 保存外部引用不等于 Media 已准备完成；materialization 由 Media 完成原图入库，
+Display Tier 在读取时渲染。Workspace worker 只消费已固定的 Routing Snapshot。
 
 ## Status
 
-Accepted (updated 2026-10-08). Decisions 1–3 and 5 remain the current tenancy
-contract. Decision 4 is superseded by ADR-0012 rule 2a and the production
-settlement implementation:
-
-- `apps/api/internal/tasking/workspacetasks/settle_tx.go` runs Claim → Resolve →
-  Quote → Hold → Insert → RoutingSnapshot pin → Enqueue on one `pgx.Tx`.
-- `TxEnqueuer.EnqueueInTx` commits the `river_job` row with the business task
-  row. Missing transaction wiring fails closed with `ErrSettlementUnavailable`.
-- `workspace_task_execute` is consumed by the registered workspace worker, and
-  the derivative renderer persists workspace-scoped media assets.
-- The compensating path remains only in test fixtures; it is not a production
-  fallback.
-
-The still-valid materialization residual is `ErrV1MaterializationUnavailable`:
-the internal-only materialization service returns 503 rather than partially
-persisting a job. Resolving that residual requires a separate contract change.
-
-Current contract for the atomicity rule: `DESIGN.md` §3 "Tasking 的事实源是
-PostgreSQL + River" and `apps/api/internal/tasking/CONTEXT.md`. ADR-0012 rule 2a
-restates the same ownership ("Task lifecycle owns idempotency, the atomic
-hold/task/River enqueue transaction") and its rule 9 requires the
-`RoutingSnapshot` to be pinned inside that same submit transaction.
-
-ADR-0012 supersedes Decision 4 only. It is a routing ADR, not a tenancy ADR,
-so this record stays Accepted rather than Superseded.
+Accepted。Task transaction 契约见 [DESIGN.md](../../DESIGN.md) §3 与
+[Tasking Context](../../apps/api/internal/tasking/CONTEXT.md)；Routing Snapshot
+契约见 [ADR-0012](./0012-service-model-pool-routing-contract.md)，Media delivery
+契约见 [ADR-0007](./0007-media-delivery-pull-model.md)。

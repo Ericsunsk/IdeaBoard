@@ -49,7 +49,7 @@ const canvasGroupNodeIdSchema = v.pipe(
 
 const mediaRefSchema = v.strictObject({
   assetId: nonEmptyStringSchema,
-  derivativeTier: v.picklist(['thumb', 'preview', 'large-preview', 'processing-input']),
+  derivativeTier: v.picklist(['thumb', 'preview', 'large-preview']),
 })
 
 const imageNodeOutputItemSchema = v.strictObject({

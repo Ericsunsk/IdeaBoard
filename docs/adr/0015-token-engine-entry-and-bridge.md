@@ -16,7 +16,7 @@ Runtime values 与 Tailwind utility keys 的职责不同。Standard semantic uti
 
 1. `src/theme/theme.css` 是唯一 Tailwind entry，拥有唯一的
    `@import 'tailwindcss'`、按依赖顺序排列的 token imports
-   （primitives → semantic → canvas → dark）、
+   （primitives → semantic → admin → canvas → motion → type → z）、
    `@custom-variant dark (&:where(.dark, .dark *))` 和 namespace bridge。
    `src/app/style.css` 是 `components.json` 指定的 entry，负责导入 theme、base 和
    atoms，并拥有 app-wide utilities、reduced-motion overrides、toast styling 和
@@ -26,7 +26,8 @@ Runtime values 与 Tailwind utility keys 的职责不同。Standard semantic uti
    对应的 `--color-*` utility keys 使用 `@theme inline` 映射到 runtime roles，
    使 `bg-primary` 输出 `var(--primary)`，在两种 mode 和 subtree 中跟随有效的
    base-layer value。Domain utility values 使用 plain `@theme`；Canvas declarations
-   和 domain dark mode overrides 分别由 `tokens/canvas.css`、`tokens/dark.css` 拥有。
+   由 `tokens/canvas.css` 拥有；domain dark assignments 归 `tokens/semantic.css`，
+   Admin dark assignments 归 `tokens/admin.css`。各 Tier 的归属见 [ADR-0016](./0016-tier-completion-and-token-contracts.md)。
 3. Consumers 直接使用 canonical runtime names，不保留 compatibility aliases 或
    shims。TS fallback bridges（`adminThemeTokens.ts`、`taskMetricTokens.ts`）与 CSS
    使用相同名称。

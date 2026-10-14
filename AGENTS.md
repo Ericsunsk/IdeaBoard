@@ -66,10 +66,8 @@ If you cannot run a relevant check, say so and explain the residual risk.
 
 Issues and PRDs are tracked in GitHub Issues for `Ericsunsk/IdeaBoard`; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
 
-### Triage labels
-
-Use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
-
 ### Domain docs
 
-This is a multi-context repo: use `DESIGN.md` as the context map, then read the relevant local `CONTEXT.md` and ADRs. See `docs/agents/domain.md`.
+Use `DESIGN.md` as the system context map, then read the relevant local `CONTEXT.md` and ADRs under `docs/adr/`.
+Use the owning context's canonical terms; record missing terminology there rather than creating a parallel glossary or context map.
+Update the owning context when domain language changes. Surface conflicts with an accepted ADR before changing its contract.

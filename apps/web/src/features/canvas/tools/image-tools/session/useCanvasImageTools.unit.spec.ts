@@ -460,13 +460,6 @@ describe('useCanvasImageTools image retouch final apply', () => {
         size_bytes: 100,
         content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
         original: { status: 'ready', url: '/api/original.jpg' },
-        derivatives: {
-          'processing-input': {
-            status: 'ready',
-            format: 'webp',
-            url: '/api/processing-input.webp',
-          },
-        },
       },
     })
     renderLayerStackFileMock.mockResolvedValue(
@@ -509,13 +502,6 @@ describe('useCanvasImageTools image retouch final apply', () => {
         size_bytes: 100,
         content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
         original: { status: 'ready', url: '/api/original.jpg' },
-        derivatives: {
-          'processing-input': {
-            status: 'ready',
-            format: 'webp',
-            url: '/api/processing-input.webp',
-          },
-        },
       },
     })
     renderLayerStackFileMock.mockResolvedValue(
@@ -562,13 +548,6 @@ describe('useCanvasImageTools image retouch final apply', () => {
         size_bytes: 100,
         content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
         original: { status: 'ready', url: '/api/original.jpg' },
-        derivatives: {
-          'processing-input': {
-            status: 'ready',
-            format: 'webp',
-            url: '/api/processing-input.webp',
-          },
-        },
       },
     })
     renderLayerStackFileMock.mockResolvedValue(

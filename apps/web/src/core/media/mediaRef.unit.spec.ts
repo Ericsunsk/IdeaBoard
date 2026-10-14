@@ -31,6 +31,14 @@ describe('MediaRef', () => {
     expect(isMediaRef({ assetId: 'asset_42', derivativeTier: 'original' })).toBe(false)
   })
 
+  it('rejects provider input profiles at the browser delivery boundary', () => {
+    expect(isMediaRef({ assetId: 'asset_42', derivativeTier: 'processing-input' })).toBe(false)
+    expect(() =>
+      // @ts-expect-error Provider input profiles are not browser display tiers.
+      buildMediaBrowserURL({ assetId: 'asset_42', derivativeTier: 'processing-input' }),
+    ).toThrow('buildMediaBrowserURL: valid MediaRef is required')
+  })
+
   it('compares asset identity and tier', () => {
     expect(mediaRefEquals(preview, { ...preview })).toBe(true)
     expect(mediaRefEquals(preview, { ...preview, derivativeTier: 'thumb' })).toBe(false)

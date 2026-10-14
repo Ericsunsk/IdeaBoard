@@ -184,8 +184,7 @@ export function workspaceMediaAssetContentSuffix(workspaceId: string, assetId: s
   return `${workspaceMediaAssetSuffix(workspaceId, assetId)}/content`
 }
 
-export type WorkspaceMediaDerivativeVariant =
-  'thumb' | 'preview' | 'large-preview' | 'processing-input'
+export type WorkspaceMediaDerivativeVariant = 'thumb' | 'preview' | 'large-preview'
 
 export function workspaceMediaAssetDerivativeSuffix(
   workspaceId: string,

@@ -34,11 +34,6 @@ import {
 //   order, same asset DTOs as the single read) through
 //   `getWorkspaceMediaAssetMetadataBatch` below; results hydrate the same
 //   cache the delivery composable feeds.
-// - TODO(2026-09-26, processing-input tier gap): v1 has no
-//   `processing-input` derivative tier in the generated `MediaAsset` DTO,
-//   so that metadata lookup stays strict (throws
-//   `MediaAssetDerivativeNotReadyError`) so generation inputs never
-//   silently change.
 // - Invalidation rides the versioned workspace stream
 //   (`media.asset_ready` / `media.asset_archived`); the deleted
 //   `/api/user/events` legacy stream is gone (backend #809 hard cut).

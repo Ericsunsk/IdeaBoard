@@ -6,17 +6,17 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 
 ## Domain Language
 
-| Term                          | Meaning                                                                                                                                                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Board Document                | Immutable pure-data snapshot (`BoardState` with `schemaVersion`, `imageNodes`, `promptNodes`, `fusionNodes`, `connections`, `groups`, `mediaRefs`); owned by `core/document`.                              |
-| Schema Versioning & Migration | Strict snapshot validation via Valibot `stateSchema`; deterministic forward-compatible migration when loading historic versions.                                                                           |
-| Board State Envelope          | Safe transport/persistence envelope `BoardStateEnvelope`; unified by `core/schema/boardStateEnvelopeContract.ts`.                                                                                          |
-| Media Reference Extraction    | Extraction of persisted media-asset refs from canvas nodes on save; feeds backend refcount and GC lock.                                                                                                    |
-| Board Repository              | Sole catalog fact source (`session/catalog/repository.ts`): local catalog state plus CRUD commands plus server hydrate facade.                                                                             |
-| Board Sync & Revision         | Optimistic-lock sync protocol (`session/sync/boardSync.ts`): document PUT carries `If-Match` with the observed revision; the response document supplies the new `revision`; 409 enters rollback/reconcile. |
-| Share Join                    | Share-collaboration join use case (`session/share-join/joinSharedBoardWorkflow.ts`): token validation, join, hydrate.                                                                                      |
-| Board Preview                 | Thumbnail generator (`session/preview`): lightweight preview snapshot data URL from node layout and key renders for gallery cards.                                                                         |
-| Catalog Gallery               | Gallery UI (`ui/gallery`): `BoardsPage` / `BoardCard`, gallery controller, command handlers, feedback, skin; pure view orchestration over repository data.                                                 |
+| Term                       | Meaning                                                                                                                                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Board Document             | Immutable pure-data snapshot (`BoardState` with `schemaVersion`, `imageNodes`, `promptNodes`, `fusionNodes`, `connections`, `groups`, `mediaRefs`); owned by `core/document`.                              |
+| Schema Version             | The version of the persisted document format; distinct from Board Revision, which orders document writes.                                                                                                  |
+| Board State Envelope       | Safe transport/persistence envelope `BoardStateEnvelope`; unified by `core/schema/boardStateEnvelopeContract.ts`.                                                                                          |
+| Media Reference Extraction | Extraction of persisted media-asset refs from canvas nodes on save; feeds backend refcount and GC lock.                                                                                                    |
+| Board Repository           | Sole catalog fact source (`session/catalog/repository.ts`): local catalog state plus CRUD commands plus server hydrate facade.                                                                             |
+| Board Sync & Revision      | Optimistic-lock sync protocol (`session/sync/boardSync.ts`): document PUT carries `If-Match` with the observed revision; the response document supplies the new `revision`; 409 enters rollback/reconcile. |
+| Share Join                 | Share-collaboration join use case (`session/share-join/joinSharedBoardWorkflow.ts`): token validation, join, hydrate.                                                                                      |
+| Board Preview              | Thumbnail generator (`session/preview`): lightweight preview snapshot data URL from node layout and key renders for gallery cards.                                                                         |
+| Catalog Gallery            | Gallery UI (`ui/gallery`): `BoardsPage` / `BoardCard`, gallery controller, command handlers, feedback, skin; pure view orchestration over repository data.                                                 |
 
 ## Public Seams
 
@@ -28,7 +28,7 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `getBoardSyncConflictKind` / `isBoardSyncConflictError` — sync conflict classifiers in `session/sync` (revision/idempotency vs ordinary failure; archived is separate via `isBoardArchivedError`). v1 has no board-name uniqueness: only local `isBoardNameTaken` gates names.
 - `joinSharedBoardByToken` — share-join workflow entry in `session/share-join`.
 - `boardsResource.ts` — sole generated-query `public/boards` adapter in `session/adapters`: `fetchWorkspaceBoards`, `fetchWorkspaceBoardDocument`, `createWorkspaceBoard`, `saveWorkspaceBoard` (document-only PUT with `If-Match`), `renameWorkspaceBoard` (explicit PATCH rename, no document write), `archiveWorkspaceBoard` / `restoreWorkspaceBoard`, `joinWorkspaceBoardByShareToken`, plus fail-closed `requireBoardWorkspaceId` (selection store, personal default; no selection throws `BoardWorkspaceUnavailableError` before any network call).
-- `serializeBoardState` / `parseBoardState` — serialization and version-migration adapters (via `session/persistence/index.ts`) in `session/persistence`.
+- `serializeBoardState` / `parseBoardState` — serialization and current-schema validation adapters (via `session/persistence/index.ts`) in `session/persistence`.
 - `renderBoardPreviewDataUrl` / `createBoardPreviewRefreshQueue` — preview generation and refresh queue in `session/preview`.
 - `createCatalog` / `useCatalog` / `BoardsPage` — gallery page, controller, and views (via root `board/index.ts`) in `ui/gallery`.
 - Gallery copy keys are canonical under `board.*` in the locale bundles (including the h1: `board.title`). New callers use `board.*`; existing `workspace.boards.*` aliases have matching locale values.
@@ -70,7 +70,7 @@ Current production server catalog/document snapshots live in TanStack Query unde
 - Board ids/revisions are server-minted: create/duplicate POST first, register the minted identity locally, then PUT the document. There is no PUT-upsert and no hard delete (delete archives).
 - Canvas saves are transactionally consistent snapshots; image refs must first persist to `mediaAssetId`.
 - Sync writes must carry `revision`; conflicts follow domain rollback/reconcile policy, never silent last-write-wins.
-- Schema evolution keeps load-migration functions for historic versions (e.g. `latestBoardState.ts`); never break old board data in place.
+- `latestBoardState.ts` validates the current strict schema; unsupported versions fail validation. Schema evolution requires an explicit persistence-contract change, not an assumed load migration.
 - Board state containing `retouchStack` is unsupported.
 - Protected contracts (persisted schema, API semantics, storage keys, route URLs, serialization semantics) live in code and specs; no silent changes during restructuring.
 - Never store a Vue Flow runtime instance as the document; never send dirty objects with runtime UI state to the backend.

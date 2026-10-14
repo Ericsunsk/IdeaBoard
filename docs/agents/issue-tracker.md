@@ -31,6 +31,18 @@ Do not include pull requests in the `triage` queue. If this repository later acc
 - "Publish to the issue tracker" means create a GitHub issue.
 - "Fetch the relevant ticket" means view the GitHub issue and its comments.
 
+## Triage Labels
+
+| Label             | Meaning                        |
+| ----------------- | ------------------------------ |
+| `needs-triage`    | Maintainer evaluation required |
+| `needs-info`      | Waiting on reporter            |
+| `ready-for-agent` | Fully specified and AFK-ready  |
+| `ready-for-human` | Requires human implementation  |
+| `wontfix`         | Will not be actioned           |
+
+Apply these tracker labels exactly when a skill names the corresponding triage role.
+
 ## Wayfinding Operations
 
 The `wayfinder` skill uses one map issue with child issues as tickets.

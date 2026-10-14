@@ -35,8 +35,7 @@ export function requireMediaWorkspaceId(explicit?: string | null): string {
 /** Canonical delivery identity: string `asset_...`. No numeric legacy. */
 export type MediaAssetId = string
 
-export type MediaAssetDeliveryTier =
-  'thumb' | 'preview' | 'large-preview' | 'processing-input' | 'original'
+export type MediaAssetDeliveryTier = WorkspaceMediaDerivativeVariant | 'original'
 
 export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {
   const normalized = assetId.trim()
@@ -51,15 +50,11 @@ export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {
  */
 export function resolveMediaAssetDerivativeURL(
   assetId: MediaAssetId,
-  tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input' = 'large-preview',
+  tier: WorkspaceMediaDerivativeVariant = 'large-preview',
 ): string {
   const normalized = assetId.trim()
   return resolveApiUrl(
-    workspaceMediaAssetDerivativeSuffix(
-      requireMediaWorkspaceId(),
-      normalized,
-      tier as WorkspaceMediaDerivativeVariant,
-    ),
+    workspaceMediaAssetDerivativeSuffix(requireMediaWorkspaceId(), normalized, tier),
   )
 }
 

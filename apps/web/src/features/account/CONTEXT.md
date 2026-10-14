@@ -5,13 +5,13 @@ It does NOT own the server-side ledger, the Stripe gateway itself, or pricing po
 
 ## Domain Language
 
-| Term              | Meaning                                                                                                                                                                                                        |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Idea / Credit     | User-visible copy is always `Idea`/`Ideas`; code, core models, schemas, and transport stay `Credit`/`credits`.                                                                                                 |
-| Wallet Balance    | Credit account state (`balance`, `held`, `available = balance - held`); source of truth is the server PostgreSQL ledger, synced via `fetchCreditWallet` / `creditsQueryKeys` in `session/credits/resource.ts`. |
-| Recharge Session  | Stripe recharge state machine: pick a package (`PurchaseCard`) -> start checkout (Stripe Checkout Session) -> external redirect -> return polling (`ReturnStatus`).                                            |
-| Reward Redemption | Reward-code flow via `redeemRewardCode` with instance- and IP-level rate limits; safe to retry on 409.                                                                                                         |
-| Account Overlay   | Global dialog host singleton in `session/overlay.ts` for tabs (`profile` / `recharge` / `usage` / `billing` / `rewards` / `security`), rendered by `AccountDialogHost.vue`.                                    |
+| Term              | Meaning                                                                                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Idea / Credit     | User-visible copy is always `Idea`/`Ideas`; code, core models, schemas, and transport stay `Credit`/`credits`.                                                              |
+| Wallet Balance    | Available and reserved Ideas reported by Credits; UI values are projections of the server Ledger, not a separate balance.                                                   |
+| Recharge Session  | The user-facing top-up flow from quantity selection through hosted Checkout and confirmation of the resulting Payment Order.                                                |
+| Reward Redemption | A user's successful RewardCode claim and credited award; retrying the same claim must not issue another award.                                                              |
+| Account Overlay   | Global dialog host singleton in `session/overlay.ts` for tabs (`profile` / `recharge` / `usage` / `billing` / `rewards` / `security`), rendered by `AccountDialogHost.vue`. |
 
 ## Public Seams
 
