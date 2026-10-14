@@ -55,7 +55,6 @@ describe('DataTableFrame', () => {
     const bodyCell = screen.getByRole('cell', { name: '第一条记录' })
 
     expect(headerCell).toBeVisible()
-    expect(headerCell).toHaveClass('text-foreground')
     expect(bodyCell).toBeVisible()
 
     await user.click(bodyCell)

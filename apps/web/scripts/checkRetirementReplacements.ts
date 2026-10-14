@@ -141,7 +141,6 @@ const chromeConsumers = [
   'features/search/ui/pages/SearchPage.vue',
   'features/search/ui/components/SearchBatchActionDock.vue',
   'features/board/ui/gallery/skin.ts',
-  'features/library/ui/LibraryFloatingIsland.vue',
   'features/canvas/ui/chrome/components/CanvasChrome.vue',
   'features/canvas/ui/chrome/components/CanvasChromeBoardHeader.vue',
   'features/canvas/ui/chrome/CanvasMiniMap.vue',

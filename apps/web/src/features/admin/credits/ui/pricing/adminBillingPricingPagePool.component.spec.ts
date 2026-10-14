@@ -128,7 +128,7 @@ describe('AdminBillingPricingPage model pools', () => {
     const { user } = renderPricingPage()
 
     // 抠图是 active 状态，其操作列按钮为“调整”
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
     })
@@ -163,7 +163,7 @@ describe('AdminBillingPricingPage model pools', () => {
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
     const toggleButton = screen.getByRole('button', { name: 'a/first4K分辨率已支持' })
     await user.click(toggleButton)
@@ -189,7 +189,7 @@ describe('AdminBillingPricingPage model pools', () => {
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
 
@@ -242,7 +242,7 @@ describe('AdminBillingPricingPage model pools', () => {
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
 
     // 1. 修改价格
@@ -309,7 +309,7 @@ describe('AdminBillingPricingPage model pools', () => {
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
     await user.clear(screen.getByRole('spinbutton', { name: '1K' }))
     await user.type(screen.getByRole('spinbutton', { name: '1K' }), '5')
@@ -364,7 +364,7 @@ describe('AdminBillingPricingPage model pools', () => {
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
     await user.clear(screen.getByRole('spinbutton', { name: '1K' }))
     await user.type(screen.getByRole('spinbutton', { name: '1K' }), '5')
@@ -415,7 +415,7 @@ describe('AdminBillingPricingPage model pools', () => {
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(await findCutoutSettingsButton())
     expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
     await user.clear(screen.getByRole('spinbutton', { name: '1K' }))
     await user.type(screen.getByRole('spinbutton', { name: '1K' }), '5')
@@ -435,6 +435,11 @@ describe('AdminBillingPricingPage model pools', () => {
     expect(replaceRequests).toBe(1)
   })
 })
+
+async function findCutoutSettingsButton() {
+  const row = (await screen.findByText('cutout')).closest('tr')!
+  return within(row).getByRole('button', { name: '调整' })
+}
 
 function renderPricingPage() {
   const queryClient = new QueryClient({

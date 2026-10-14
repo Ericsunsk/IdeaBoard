@@ -27,6 +27,7 @@ describe('AdminFormField', () => {
     const errorEl = screen.getByText('API Key 不能为空')
     expect(errorEl).toBeInTheDocument()
     expect(errorEl).not.toHaveClass('sr-only')
+    expect(errorEl).toBeVisible()
     expect(screen.queryByText('请输入有效的密钥')).not.toBeInTheDocument()
   })
 

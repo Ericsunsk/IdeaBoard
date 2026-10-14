@@ -7,7 +7,8 @@ const Harness = defineComponent({
   setup() {
     return useAdminStickyTitle()
   },
-  template: '<main><h1>  Orders\n  &amp; Billing </h1></main>',
+  template:
+    '<main><h1>  Orders\n  &amp; Billing </h1><div v-if="showStickyTitle" role="status">{{ dynamicTitle }}</div></main>',
 })
 
 describe('useAdminStickyTitle', () => {
@@ -28,20 +29,20 @@ describe('useAdminStickyTitle', () => {
 
   it('hides at the threshold and extracts the heading after scrolling', async () => {
     const wrapper = mount(Harness, { attachTo: document.body })
-    expect(wrapper.vm.showStickyTitle).toBe(false)
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
 
     window.scrollY = 11
     window.dispatchEvent(new Event('scroll'))
     await nextTick()
 
-    expect(wrapper.vm.showStickyTitle).toBe(true)
-    expect(wrapper.vm.dynamicTitle).toBe('Orders & Billing')
+    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+    expect(wrapper.get('[role="status"]').text()).toBe('Orders & Billing')
     expect(raf).toHaveBeenCalledTimes(1)
 
     window.scrollY = 10
     window.dispatchEvent(new Event('scroll'))
     await nextTick()
-    expect(wrapper.vm.showStickyTitle).toBe(false)
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -50,11 +51,11 @@ describe('useAdminStickyTitle', () => {
     window.scrollY = 20
     window.dispatchEvent(new Event('scroll'))
     await nextTick()
-    expect(wrapper.vm.dynamicTitle).toBe('Orders & Billing')
+    expect(wrapper.get('[role="status"]').text()).toBe('Orders & Billing')
 
     wrapper.vm.reset()
-    expect(wrapper.vm.showStickyTitle).toBe(false)
-    expect(wrapper.vm.dynamicTitle).toBe('')
+    await nextTick()
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
 
     wrapper.unmount()
     const rafCallsBeforeDetachedScroll = raf.mock.calls.length

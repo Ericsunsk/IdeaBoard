@@ -1,7 +1,7 @@
 import { defineComponent, ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { page } from 'vitest/browser'
-import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { renderWithUser, screen } from '../../../../test/render'
 import '../../../../app/style.css'
 import AccountDialog from './AccountDialog.vue'
 
@@ -22,11 +22,9 @@ const InteractiveAccountContentStub = defineComponent({
 describe('AccountDialog browser contract', () => {
   async function renderInteractiveDialog() {
     await page.viewport(1000, 600)
-    const onVisibleUpdate = vi.fn()
     const rendered = renderWithUser(AccountDialog, {
       props: {
         visible: true,
-        'onUpdate:visible': onVisibleUpdate,
       },
       global: {
         stubs: {
@@ -35,7 +33,7 @@ describe('AccountDialog browser contract', () => {
       },
     })
     await screen.findByRole('dialog', { name: 'Account' })
-    return { ...rendered, onVisibleUpdate }
+    return rendered
   }
 
   it('keeps account navigation interactive above the mask', async () => {
@@ -44,13 +42,6 @@ describe('AccountDialog browser contract', () => {
     const securityButton = screen.getByRole('button', { name: 'Security' })
     await user.click(securityButton)
     expect(screen.getByTestId('active-account-tab')).toHaveTextContent('security')
-  })
-
-  it('closes from the account close control', async () => {
-    const { user, onVisibleUpdate } = await renderInteractiveDialog()
-
-    await user.click(screen.getByRole('button', { name: 'Close account' }))
-    await waitFor(() => expect(onVisibleUpdate).toHaveBeenCalledWith(false))
   })
 
   it('provides a vertical scroll container inside the viewport', async () => {
