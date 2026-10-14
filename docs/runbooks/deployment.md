@@ -535,6 +535,14 @@ Rewards 没有 Feature Flag。发生需要立即停止兑换或管理写入的�
 <a id="upgrade-and-rollback"></a>
 ## 升级与回滚
 
+### 回滚决策
+
+生产事故先停止受影响的写入：支付事故关闭充值，Rewards 事故按本手册阻断相关路由，注册事故关闭公开注册。止血生效后再选择 image rollback 或向前修复，恢复写入前完成对应 smoke。
+
+Image rollback 只替换容器镜像与前端静态资源，不撤销 PostgreSQL schema、River job 或已持久化的业务事实。回滚前确认 previous manifest 的 image 能处理当前 schema 与已有数据；不兼容时部署修复版本与新 migration，禁止盲目执行 destructive down migration。Clean-break 的数据库恢复规则见 [API 业务库 baseline](#api-database-baseline)。
+
+涉及 River job 参数变化时，停止相关 enqueue，并在切换 worker 前确认在飞任务已结束、等待与重试 job 可由目标版本处理。结合 [backend-metrics.md](./backend-metrics.md) 的 queue depth/lag 与数据库中的 River job 状态检查，不能仅凭等待队列为空认定 worker 已排空。NATS JetStream 只有 7 天 retention；支付、Credits 和 Task 事实以 PostgreSQL 与 canonical provider 查询为准，不依赖 Webhook 或 SSE replay 做数据库恢复。
+
 ### Media storage cutover
 
 Media 统一使用 `media_assets.storage_profile_id` + `storage_key` 作为对象定位；业务表和 Canvas 只持久化 Media Asset API URL。切换 Local / S3-compatible profile 时按以下顺序执行：

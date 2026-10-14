@@ -115,21 +115,30 @@ func checkReusableWorkflows(root string) {
 	}
 
 	api := loadWorkflow(root, "api.yml")
+	rejectKey(object(api, "jobs"), "schema", "Schema semantics must run once in the migration gate")
+	rejectKey(object(object(object(api, "on"), "workflow_call"), "inputs"), "run_schema", "Schema verification must not require an optional input")
 	requireEqual(object(api, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "API workflow must not upload Docker build records")
 	apiTestStep := requireStep(object(object(api, "jobs"), "tests"), "Test race shard")
 	requireEqual(object(apiTestStep, "env")["TEST_MODE"], "race", "API tests must run in race mode")
+	migrationGate := object(object(api, "jobs"), "migration-gate")
+	rejectKey(migrationGate, "if", "API migration verification must run on every invocation")
+	semanticCheck := requireStep(migrationGate, "Compare migration replay with schema snapshot")
+	requireEqual(semanticCheck["working-directory"], "apps/api", "Migration semantics must use the API project root")
+	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"`, "Migration gate must compare migration replay and snapshot semantics")
+	requireStep(migrationGate, "Test snapshot fixtures and NATS integration")
 
 	auth := loadWorkflow(root, "auth.yml")
 	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")
 
 	web := loadWorkflow(root, "web.yml")
-	webGenerated := requireStep(object(object(web, "jobs"), "quality"), "Generated API drift")
+	checkWebVerification(root, web)
+	webGenerated := requireStep(object(object(web, "jobs"), "build"), "Generated API drift")
 	requireEqual(webGenerated["working-directory"], "apps/web", "Web generated drift must run from the canonical Web root")
 	requireEqual(webGenerated["run"], "npm run api:check-generated", "Web generated drift must use the isolated canonical API client checker")
 	webSmokeContract := requireStep(object(object(web, "jobs"), "smoke"), "Anonymous smoke API contract")
 	requireEqual(webSmokeContract["working-directory"], "apps/web", "Anonymous smoke API contract must run from the Web root")
 	requireEqual(webSmokeContract["run"], "npx tsx --test scripts/smokeSupport.contract.spec.ts", "Web smoke must execute the standalone anonymous API contract")
-	webAudit := requireStep(object(object(web, "jobs"), "quality"), "Production dependency audit")
+	webAudit := requireStep(object(object(web, "jobs"), "build"), "Production dependency audit")
 	requireEqual(webAudit["run"], "npm audit --omit=dev --audit-level=high", "Web audit must reject high production vulnerabilities")
 
 	migration := loadWorkflow(root, "migration-integration.yml")
@@ -155,6 +164,20 @@ func checkReusableWorkflows(root string) {
 	manifestBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-all-self-tests.sh"))
 	failIf(err)
 	requireContains(string(manifestBytes), "*-test.sh", "Self-test manifest must glob scripts/*-test.sh")
+}
+
+func checkWebVerification(root string, web workflow) {
+	ci := loadWorkflow(root, "ci.yml")
+	caller := object(object(ci, "jobs"), "web")
+	requireEqual(object(caller, "permissions")["pull-requests"], "write", "Web caller must authorize bundle comment permissions")
+	jobs := object(web, "jobs")
+	comment := object(jobs, "bundle-comment")
+	requireContains(stringValue(comment["if"]), "github.event.pull_request.head.repo.full_name == github.repository", "Bundle comments must skip read-only fork PRs")
+	for _, name := range []string{"unit", "browser"} {
+		upload := requireStep(object(jobs, name), "Upload shard blob report")
+		requireEqual(object(upload, "with")["include-hidden-files"], true, name+" reports must include the hidden report directory")
+	}
+	requireStepRun(object(jobs, "typecheck-node"), "npm run test:typecheck")
 }
 
 func checkRelease(root string, release workflow) {

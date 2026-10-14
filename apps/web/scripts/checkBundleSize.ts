@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
@@ -39,6 +39,10 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
 const distDirectory = path.resolve(scriptDirectory, '../dist')
 const assetsDirectory = path.resolve(scriptDirectory, '../dist/assets')
 const manifestPath = path.resolve(distDirectory, '.vite/manifest.json')
+// Write the CI budget report on both success and failure.
+const reportPath =
+  process.env.BUNDLE_REPORT_PATH?.trim() ||
+  path.resolve(scriptDirectory, '../node_modules/.cache/bundle-report.md')
 
 async function listAssetFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -138,12 +142,25 @@ async function sumChunkBytes(chunks: ManifestChunk[]): Promise<number> {
   return sizes.reduce((total, bytes) => total + bytes, 0)
 }
 
-async function findOversizedLocaleChunks(manifest: ViteManifest): Promise<string[]> {
+type JsChunkCheck = {
+  largest: { file: string; bytes: number } | null
+  optionalLazy: { file: string; bytes: number; budgetBytes: number } | null
+  failures: string[]
+}
+
+type LocaleChunkCheck = {
+  largest: { file: string; bytes: number } | null
+  failures: string[]
+}
+
+async function checkLocaleChunks(manifest: ViteManifest): Promise<LocaleChunkCheck> {
   const failures: string[] = []
+  let largest: LocaleChunkCheck['largest'] = null
 
   for (const [source, chunk] of Object.entries(manifest)) {
     if (!/^src\/shared\/i18n\/locales\/(?!en\/)[^/]+\/index\.ts$/.test(source)) continue
     const bytes = (await stat(path.resolve(distDirectory, chunk.file))).size
+    if (!largest || bytes > largest.bytes) largest = { file: chunk.file, bytes }
     if (bytes > LOCALE_CHUNK_BUDGET_BYTES) {
       failures.push(
         `Locale chunk ${source} is ${formatBytes(bytes)}, exceeding ${formatBytes(LOCALE_CHUNK_BUDGET_BYTES)} (${chunk.file})`,
@@ -151,19 +168,21 @@ async function findOversizedLocaleChunks(manifest: ViteManifest): Promise<string
     }
   }
 
-  return failures
+  return { largest, failures }
 }
 
-async function findOversizedJSChunks(
+async function checkJavascriptChunks(
   files: string[],
   manifest: ViteManifest,
   initialChunks: ManifestChunk[],
-): Promise<string[]> {
+): Promise<JsChunkCheck> {
   const failures: string[] = []
   const manifestSourceByFile = new Map(
     Object.entries(manifest).map(([source, chunk]) => [chunk.file, source]),
   )
   const initialFiles = new Set(initialChunks.map((chunk) => chunk.file))
+  let largest: JsChunkCheck['largest'] = null
+  let optionalLazy: JsChunkCheck['optionalLazy'] = null
 
   for (const file of files.filter((candidate) => candidate.endsWith('.js'))) {
     const relativeFile = path.relative(distDirectory, file)
@@ -174,8 +193,16 @@ async function findOversizedJSChunks(
       continue
     }
 
-    const budget = optionalLazyBudget ?? LARGEST_JS_CHUNK_BUDGET_BYTES
     const bytes = (await stat(file)).size
+    if (optionalLazyBudget !== undefined) {
+      if (!optionalLazy || bytes > optionalLazy.bytes) {
+        optionalLazy = { file: relativeFile, bytes, budgetBytes: optionalLazyBudget }
+      }
+    } else if (!largest || bytes > largest.bytes) {
+      largest = { file: relativeFile, bytes }
+    }
+
+    const budget = optionalLazyBudget ?? LARGEST_JS_CHUNK_BUDGET_BYTES
     if (bytes > budget) {
       failures.push(
         `JS chunk ${formatBytes(bytes)} exceeds ${formatBytes(budget)} (${path.relative(assetsDirectory, file)})`,
@@ -183,7 +210,7 @@ async function findOversizedJSChunks(
     }
   }
 
-  return failures
+  return { largest, optionalLazy, failures }
 }
 
 async function main() {
@@ -226,7 +253,8 @@ async function main() {
       `Total gzip output ${formatBytes(totalGzipBytes)} exceeds ${formatBytes(TOTAL_GZIP_BUDGET_BYTES)}`,
     )
   }
-  failures.push(...(await findOversizedJSChunks(files, manifest, initialChunks)))
+  const jsChunkCheck = await checkJavascriptChunks(files, manifest, initialChunks)
+  failures.push(...jsChunkCheck.failures)
   if (cssSummary.bytes > CSS_BUDGET.totalBytes) {
     failures.push(
       `CSS total ${formatBytes(cssSummary.bytes)} exceeds ${formatBytes(CSS_BUDGET.totalBytes)}`,
@@ -242,11 +270,129 @@ async function main() {
       `Font total ${formatBytes(fontSummary.bytes)} exceeds ${formatBytes(FONT_BUDGET.totalBytes)}`,
     )
   }
-  failures.push(...(await findOversizedLocaleChunks(manifest)))
+  const localeChunkCheck = await checkLocaleChunks(manifest)
+  failures.push(...localeChunkCheck.failures)
+
+  await writeReport({
+    jsChunkCheck,
+    cssSummary,
+    fontSummary,
+    localeChunkCheck,
+    totalGzipBytes,
+    initialJsBytes,
+    failures,
+  })
 
   if (failures.length > 0) {
     throw new Error(
       `Bundle size budget exceeded:\n${failures.map((failure) => `- ${failure}`).join('\n')}`,
+    )
+  }
+}
+
+type ReportInput = {
+  jsChunkCheck: JsChunkCheck
+  cssSummary: AssetSummary
+  fontSummary: AssetSummary
+  localeChunkCheck: LocaleChunkCheck
+  totalGzipBytes: number
+  initialJsBytes: number
+  failures: string[]
+}
+
+function reportRow(label: string, actual: string, budget: string, ok: boolean): string {
+  return `| ${label} | ${actual} | ${budget} | ${ok ? 'pass' : 'BREACH'} |`
+}
+
+function actualBytes(largest: { file: string; bytes: number } | null): string {
+  return largest ? `${formatBytes(largest.bytes)} (${largest.file})` : 'n/a'
+}
+
+async function writeReport(input: ReportInput): Promise<void> {
+  const {
+    jsChunkCheck,
+    cssSummary,
+    fontSummary,
+    localeChunkCheck,
+    totalGzipBytes,
+    initialJsBytes,
+    failures,
+  } = input
+  const lines = [
+    '## Bundle budget',
+    '',
+    `Status: ${failures.length === 0 ? 'pass' : 'BREACH'} (${failures.length} breach(es))`,
+    '',
+    '| Check | Actual | Budget | Result |',
+    '| --- | --- | --- | --- |',
+    reportRow(
+      'Initial JS',
+      formatBytes(initialJsBytes),
+      formatBytes(INITIAL_JS_BUDGET_BYTES),
+      initialJsBytes <= INITIAL_JS_BUDGET_BYTES,
+    ),
+    reportRow(
+      'Total gzip',
+      formatBytes(totalGzipBytes),
+      formatBytes(TOTAL_GZIP_BUDGET_BYTES),
+      totalGzipBytes <= TOTAL_GZIP_BUDGET_BYTES,
+    ),
+    reportRow(
+      'CSS total',
+      formatBytes(cssSummary.bytes),
+      formatBytes(CSS_BUDGET.totalBytes),
+      cssSummary.bytes <= CSS_BUDGET.totalBytes,
+    ),
+    reportRow(
+      'CSS largest',
+      cssSummary.largest ? formatBytes(cssSummary.largest.bytes) : 'n/a',
+      formatBytes(CSS_BUDGET.largestBytes),
+      !cssSummary.largest || cssSummary.largest.bytes <= CSS_BUDGET.largestBytes,
+    ),
+    reportRow(
+      'Font total',
+      formatBytes(fontSummary.bytes),
+      formatBytes(FONT_BUDGET.totalBytes),
+      fontSummary.bytes <= FONT_BUDGET.totalBytes,
+    ),
+    reportRow(
+      'JS chunks (largest)',
+      actualBytes(jsChunkCheck.largest),
+      `largest ${formatBytes(LARGEST_JS_CHUNK_BUDGET_BYTES)}`,
+      !jsChunkCheck.largest || jsChunkCheck.largest.bytes <= LARGEST_JS_CHUNK_BUDGET_BYTES,
+    ),
+    // Optional lazy converters are exempt from the per-chunk budget above and
+    // carry their own cap (vite.config.ts chunkSizeWarningLimit parity).
+    reportRow(
+      'Optional lazy chunks (largest)',
+      jsChunkCheck.optionalLazy
+        ? `${formatBytes(jsChunkCheck.optionalLazy.bytes)} (${jsChunkCheck.optionalLazy.file})`
+        : 'n/a',
+      jsChunkCheck.optionalLazy
+        ? `largest ${formatBytes(jsChunkCheck.optionalLazy.budgetBytes)}`
+        : 'n/a',
+      !jsChunkCheck.optionalLazy ||
+        jsChunkCheck.optionalLazy.bytes <= jsChunkCheck.optionalLazy.budgetBytes,
+    ),
+    reportRow(
+      'Locale chunks (largest)',
+      actualBytes(localeChunkCheck.largest),
+      `largest ${formatBytes(LOCALE_CHUNK_BUDGET_BYTES)}`,
+      !localeChunkCheck.largest || localeChunkCheck.largest.bytes <= LOCALE_CHUNK_BUDGET_BYTES,
+    ),
+    '',
+  ]
+  if (failures.length > 0) {
+    lines.push('### Breaches', '', ...failures.map((failure) => `- ${failure}`), '')
+  }
+  try {
+    await mkdir(path.dirname(reportPath), { recursive: true })
+    await writeFile(reportPath, `${lines.join('\n')}\n`)
+    console.log(`Bundle report: ${path.relative(process.cwd(), reportPath)}`)
+  } catch (error) {
+    // Never mask the gate: a report write failure is diagnostic only.
+    console.error(
+      `Unable to write bundle report to ${reportPath}: ${error instanceof Error ? error.message : error}`,
     )
   }
 }

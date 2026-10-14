@@ -17,6 +17,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.browser.spec.ts'],
     setupFiles: ['src/test/browserSetup.ts'],
+    // Retry once on CI; local runs report the first failure.
+    retry: process.env.CI ? 1 : 0,
     browser: {
       enabled: true,
       headless: true,

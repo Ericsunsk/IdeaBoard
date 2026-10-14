@@ -11,10 +11,249 @@ on:
 permissions:
   contents: read
 
+# Lint and type checks run independently; npm run lint remains the local entry.
+# Unit and browser shards produce unique blob reports for their merge jobs.
+# Bundle reports are generated on budget success or failure for PR comments.
+
 jobs:
-  quality:
-    name: Web Quality
+  lint-eslint-fast:
+    name: Web ESLint Fast
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Restore ESLint cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: apps/web/node_modules/.cache/eslint
+          key: web-eslint-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json', 'apps/web/eslint.config.js', 'apps/web/scripts/eslint-*.mjs') }}
+          restore-keys: |
+            web-eslint-${{ runner.os }}-
+      - name: ESLint (cached)
+        working-directory: apps/web
+        run: npm run lint:eslint:fast
+      - name: Stylelint
+        working-directory: apps/web
+        run: npm run lint:style
+
+  lint-import:
+    name: Web Import Boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Type-aware and import-heavy rules
+        working-directory: apps/web
+        run: npm run lint:import
+
+  typecheck-app:
+    name: Web Typecheck App
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Restore tsBuildInfoFile
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: apps/web/node_modules/.tmp
+          key: web-tsbuildinfo-app-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json', 'apps/web/tsconfig*.json') }}
+          restore-keys: |
+            web-tsbuildinfo-app-${{ runner.os }}-
+      - name: Typecheck app project
+        working-directory: apps/web
+        run: npm run typecheck:app
+
+  typecheck-node:
+    name: Web Typecheck Node
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Restore tsBuildInfoFile
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: apps/web/node_modules/.tmp
+          key: web-tsbuildinfo-node-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json', 'apps/web/tsconfig*.json') }}
+          restore-keys: |
+            web-tsbuildinfo-node-${{ runner.os }}-
+      - name: Typecheck node project
+        working-directory: apps/web
+        run: npm run typecheck:node
+      - name: Typecheck tests
+        working-directory: apps/web
+        run: npm run test:typecheck
+
+  lint-governance:
+    name: Web Governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Governance scripts
+        working-directory: apps/web
+        run: npm run lint:governance
+
+  unit:
+    name: Web Unit (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Unit tests (shard)
+        working-directory: apps/web
+        run: npm run test:run -- --shard="${{ matrix.shard }}/4" --reporter=blob --reporter=default "--outputFile.blob=./.vitest-reports/blob-shard-${{ matrix.shard }}.json"
+      - name: Upload shard blob report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vitest-blob-unit-${{ matrix.shard }}-of-4
+          path: apps/web/.vitest-reports
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  unit-merge:
+    name: Web Unit Report
+    needs: [unit]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Download shard blob reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: vitest-blob-unit-*-of-4
+          path: apps/web/.vitest-merge/unit
+          merge-multiple: true
+      - name: Merge shard reports
+        working-directory: apps/web
+        run: npm run test:merge-reports -- ./.vitest-merge/unit
+
+  browser:
+    name: Web Browser (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Browser tests (shard)
+        working-directory: apps/web
+        run: npm run test:browser -- --shard="${{ matrix.shard }}/2" --reporter=blob --reporter=default "--outputFile.blob=./.vitest-reports/blob-shard-${{ matrix.shard }}.json"
+      - name: Upload shard blob report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vitest-blob-browser-${{ matrix.shard }}-of-2
+          path: apps/web/.vitest-reports
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  browser-merge:
+    name: Web Browser Report
+    needs: [browser]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Download shard blob reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: vitest-blob-browser-*-of-2
+          path: apps/web/.vitest-merge/browser
+          merge-multiple: true
+      - name: Merge shard reports
+        working-directory: apps/web
+        run: npm run test:browser:merge -- ./.vitest-merge/browser
+
+  build:
+    name: Web Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -28,15 +267,6 @@ jobs:
       - name: Generated API drift
         working-directory: apps/web
         run: npm run api:check-generated
-      - name: ESLint
-        working-directory: apps/web
-        run: npm run lint
-      - name: Stylelint
-        working-directory: apps/web
-        run: npm run lint:style
-      - name: Test typecheck
-        working-directory: apps/web
-        run: npm run test:typecheck
       - name: Production dependency audit
         if: inputs.audit_dependencies
         working-directory: apps/web
@@ -44,14 +274,64 @@ jobs:
       - name: Build
         working-directory: apps/web
         run: npm run build
-  unit:
-    name: Web Unit (${{ matrix.shard }})
+      - name: Upload bundle report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: web-bundle-report
+          path: apps/web/node_modules/.cache/bundle-report.md
+          if-no-files-found: warn
+          retention-days: 7
+
+  bundle-comment:
+    name: Web Bundle Comment
+    needs: [build]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        shard: ["1/2", "2/2"]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Download bundle report
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: web-bundle-report
+          path: bundle-report
+      - name: Upsert sticky bundle comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          set -euo pipefail
+          marker='<!-- ideaboard-bundle-budget -->'
+          report_file='bundle-report/bundle-report.md'
+          if [[ -f "${report_file}" ]]; then
+            report="$(cat "${report_file}")"
+          else
+            report="Bundle report unavailable: the build job (${BUILD_RESULT}) finished before bundle:size:check wrote it."
+          fi
+          body="${marker}
+          ## Web bundle budget (${BUILD_RESULT})
+
+          ${report}
+
+          _Updated by the Web lane; one comment per PR (edited in place)._"
+          existing_id="$(gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" --jq "[.[] | select(.body | contains(\"${marker}\")) | .id] | last // empty")"
+          if [[ -n "${existing_id}" ]]; then
+            gh api -X PATCH "repos/${REPOSITORY}/issues/comments/${existing_id}" -f body="${body}" --jq '.html_url'
+          else
+            gh pr comment "${PR_NUMBER}" --repo "${REPOSITORY}" --body "${body}"
+          fi
+
+  visual:
+    name: Web Visual Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -62,14 +342,14 @@ jobs:
       - uses: ./.github/actions/npm-ci
         with:
           working-directory: apps/web
-      - name: Unit tests
+      - name: Route visual self-check
         working-directory: apps/web
-        env:
-          TEST_SHARD: ${{ matrix.shard }}
-        run: npm run test:run -- --shard="${TEST_SHARD}"
+        run: npm run test:routes-visual:check
+
   smoke:
     name: Web Browser Smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10

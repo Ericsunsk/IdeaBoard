@@ -21,7 +21,6 @@ jobs:
       web: ${{ steps.classify.outputs.web }}
       api: ${{ steps.classify.outputs.api }}
       auth: ${{ steps.classify.outputs.auth }}
-      schema: ${{ steps.classify.outputs.schema }}
       migration_integration: ${{ steps.classify.outputs.migration_integration }}
       docker: ${{ steps.classify.outputs.docker }}
       ops: ${{ steps.classify.outputs.ops }}
@@ -52,6 +51,9 @@ jobs:
           ./scripts/ci-change-classifier.sh < "${RUNNER_TEMP}/changed-paths.txt" | tee -a "${GITHUB_OUTPUT}"
   web:
     name: Web Verification
+    permissions:
+      contents: read
+      pull-requests: write
     if: needs.changes.outputs.web == 'true'
     needs: [changes]
     uses: ./.github/workflows/web.yml
@@ -63,7 +65,6 @@ jobs:
     needs: [changes]
     uses: ./.github/workflows/api.yml
     with:
-      run_schema: ${{ needs.changes.outputs.schema == 'true' }}
       build_images: ${{ needs.changes.outputs.docker == 'true' }}
       audit_dependencies: ${{ needs.changes.outputs.api_audit == 'true' }}
   auth:

@@ -5,35 +5,51 @@ run:
   tests: true
 
 linters:
-  default: none
+  # Extend the standard preset with the repository's explicit lint policy.
+  default: standard
   enable:
-    - govet
-    - ineffassign
-    - misspell
-    - staticcheck
-    - unused
-    - errcheck
+    - gosec
     - errorlint
     - bodyclose
-    - rowserrcheck
     - sqlclosecheck
-    - gosec
-    - revive
+    - rowserrcheck
+    - tagalign
+    - nolintlint
     - gocritic
+    - revive
+    - misspell
+    - prealloc
+    - dupl
+    - noctx
     - depguard
     - copyloopvar
     - nilerr
     - sloglint
-    # perfsprint: follow-up after autofix pass (touches ~12 files, low risk
-    # but noisy for this PR). Re-enable once `golangci-lint run --fix`
-    # for perfsprint is applied.
   settings:
     errcheck:
       # defer Close()/Rollback() noise is covered by sqlclosecheck/bodyclose;
       # keep blank-error checks off to avoid `_, _ =` churn.
       check-blank: false
+    tagalign:
+      # Enforce tag column alignment; the repo does not reorder tag keys
+      # themselves (sort:true would fight the file-local key order).
+      align: true
+      sort: false
+    prealloc:
+      # Report range loops that append to a slice whose size is inferable.
+      # `simple` (default) reports only loops without returns/breaks/
+      # continues/gotos; `for-loops` stays off (classic index loops are fine).
+      simple: true
+      range-loops: true
+      for-loops: false
+    dupl:
+      # 300 tokens: the repo's explicit contract renderers and thin store
+      # adapters repeat deliberately (one place per route/query), so the
+      # golangci-lint default of 150 flags intentional structure. Only
+      # whole-block copies above 300 tokens are reported.
+      threshold: 300
     gocritic:
-      # ifElseChain churns business branching; fix incrementally.
+      # Allow explicit business branching.
       disabled-checks:
         - ifElseChain
     gosec:
@@ -121,7 +137,8 @@ linters:
         - name: exported
           disabled: true
   exclusions:
-    generated: lax
+    # Only files with a standard generated-code marker are excluded.
+    generated: strict
     presets:
       - comments
       - std-error-handling
@@ -140,6 +157,9 @@ linters:
           - nilerr
           - sloglint
           - copyloopvar
+          - dupl
+          - noctx
+          - prealloc
       # defer Cleanup()/Rollback()/RemoveAll()/c.Error() are best-effort
       # teardown; real failures are surfaced by the primary error return.
       - text: Error return value of `.*(Cleanup|Rollback|RemoveAll)` is not checked
@@ -148,6 +168,20 @@ linters:
       - text: Error return value of `c\.Error` is not checked
         linters:
           - errcheck
+      # `net.Listen` at server startup: the listener is bound once before any
+      # request context exists and closed by the lifecycle coordinator.
+      - path: internal/runtime/infrastructure/http/server\.go
+        linters:
+          - noctx
+      # The grant-function list is assembled from three signature tables; the
+      # explicit append form is preferred over a compound make() capacity.
+      - path: internal/credits/infrastructure/postgres/privileges\.go
+        linters:
+          - prealloc
+      # Preserve explicit tag spacing in the domain structs.
+      - path: internal/tasking/domain/models\.go
+        linters:
+          - tagalign
 
 formatters:
   enable:

@@ -1,12 +1,12 @@
 name: API
 
+# Lint, standard tests, race tests, sqlc checks, and migration verification
+# run independently. Image builds and dependency auditing are controlled
+# by workflow inputs.
+
 on:
   workflow_call:
     inputs:
-      run_schema:
-        required: false
-        type: boolean
-        default: false
       build_images:
         required: false
         type: boolean
@@ -23,6 +23,25 @@ env:
   DOCKER_BUILD_RECORD_UPLOAD: 'false'
 
 jobs:
+  lint:
+    name: API Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      - name: Lint API
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee
+        with:
+          version: v2.14.0
+          working-directory: apps/api
+          only-new-issues: true
+          args: ./...
+
   quality:
     name: API Quality
     runs-on: ubuntu-latest
@@ -50,18 +69,20 @@ jobs:
           cache-dependency-path: apps/api/go.sum
       - name: Test CI parity entrypoint
         run: bash scripts/ci-parity-test.sh
+      # Fast lane: one unsharded standard run through the parity entrypoint.
+      # It fails closed when the database DSN is missing, so integration tests
+      # can never silently skip on a runner without PostgreSQL.
+      - name: Fast lane standard tests
+        env:
+          TEST_MODE: standard
+          TEST_SHARD: "0"
+          TEST_SHARD_COUNT: "1"
+        run: ./scripts/ci-parity.sh api-test
       - name: Test nested test infrastructure modules
         working-directory: apps/api
         run: |
-          go test ./...
           (cd internal/testdb && go test ./...)
           (cd internal/testsupport && go test ./...)
-      - name: Lint API
-        uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
-        with:
-          version: v2.12.2
-          working-directory: apps/api
-          args: ./...
       - name: Go vulnerability check
         if: inputs.audit_dependencies
         working-directory: apps/api
@@ -71,6 +92,251 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: go build ./...
+
+  tests:
+    name: API Race
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with: { cache-dependency-path: apps/api/go.sum }
+      # Run the full suite under the race detector.
+      - name: Test race shard
+        env:
+          TEST_MODE: race
+          TEST_SHARD: "0"
+          TEST_SHARD_COUNT: "1"
+        run: ./scripts/ci-parity.sh api-test
+
+  sqlc-diff:
+    name: sqlc Drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      # Use the module-pinned sqlc with the local engine.
+      - name: Check sqlc generated code drift
+        working-directory: apps/api
+        run: go tool sqlc diff --no-remote
+
+  sqlc-vet:
+    name: sqlc Vet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      SQLC_VET_DATABASE_URI: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      # The canonical schema snapshot (the same file sqlc.yaml generates from,
+      # and the same snapshot internal/testdb applies) is loaded into the
+      # service container so every query can be PREPAREd against a live
+      # PostgreSQL 17.
+      - name: Load canonical schema into the vet database
+        run: |
+          postgres_container="$(docker ps --filter 'ancestor=postgres:17-alpine' --format '{{.ID}}' | head -n 1)"
+          [[ -n "${postgres_container}" ]]
+          docker exec -i "${postgres_container}" \
+            psql -v ON_ERROR_STOP=1 -U ideaboard -d ideaboard_test \
+            < apps/api/internal/db/schema/schema.sql
+      # The db-prepare rule needs a database section, which is derived here
+      # instead of committed: a checked-in `database:` would force
+      # `sqlc diff` (and every local generate) to open a live connection.
+      # Paths inside the config resolve relative to the config file, so the
+      # copy lives next to sqlc.yaml.
+      - name: Vet queries against live PostgreSQL
+        working-directory: apps/api
+        run: |
+          cp sqlc.yaml sqlc.ci-vet.yaml
+          printf '%s\n' \
+            '    rules:' \
+            '      - sqlc/db-prepare' \
+            '    database:' \
+            "      uri: \"\${SQLC_VET_DATABASE_URI}\"" >> sqlc.ci-vet.yaml
+          go tool sqlc vet --no-remote -f sqlc.ci-vet.yaml
+
+  migration-gate:
+    name: Migration Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    # Each job uses an ephemeral JetStream store to isolate test streams.
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+      API_TEST_NATS_URL: nats://127.0.0.1:4222
+      # Destructive-DDL review needs the added-migration diff; passed through
+      # job env (never interpolated into shell source).
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      - name: Start NATS with JetStream
+        run: |
+          docker run -d --name ideaboard-nats --network host nats:2.11-alpine -js -m 8222
+          nats_ready=0
+          for _ in $(seq 1 30); do
+            if wget --spider -q http://127.0.0.1:8222/healthz; then
+              nats_ready=1
+              break
+            fi
+            sleep 1
+          done
+          [[ "${nats_ready}" == 1 ]] || { echo 'NATS JetStream did not become ready' >&2; exit 1; }
+      - name: Install Atlas
+        run: |
+          atlas_arch="$(uname -m)"
+          case "${atlas_arch}" in
+            x86_64) atlas_arch=amd64 ;;
+            aarch64|arm64) atlas_arch=arm64 ;;
+            *) echo "unsupported architecture: ${atlas_arch}" >&2; exit 1 ;;
+          esac
+          curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v1.3.2" -o /tmp/atlas
+          chmod 0555 /tmp/atlas
+          echo /tmp >> "${GITHUB_PATH}"
+      - name: Prepare runtime database roles
+        run: |
+          postgres_container="$(docker ps --filter 'ancestor=postgres:17-alpine' --format '{{.ID}}' | head -n 1)"
+          [[ -n "${postgres_container}" ]]
+          docker cp \
+            docker/postgres/init-runtime-roles.sh \
+            "${postgres_container}:/tmp/init-runtime-roles.sh"
+          docker exec \
+            -e POSTGRES_USER=ideaboard \
+            -e POSTGRES_DB=ideaboard_test \
+            -e API_DB_PASSWORD=ideaboard_api_test \
+            -e AUTH_DB_PASSWORD=ideaboard_auth_test \
+            "${postgres_container}" \
+            sh /tmp/init-runtime-roles.sh
+      # Destructive-DDL tripwire (DROP TABLE/COLUMN/... grep) plus
+      # `atlas migrate validate` with a Fresh replay on an isolated database.
+      # atlas-migration-check.sh owns the pattern list and the
+      # `-- destructive: approved` escape hatch.
+      - name: Create Atlas validation database
+        run: |
+          postgres_container="$(docker ps --filter 'ancestor=postgres:17-alpine' --format '{{.ID}}' | head -n 1)"
+          [[ -n "${postgres_container}" ]]
+          validation_db="ideaboard_atlas_validate_${GITHUB_RUN_ID}"
+          [[ "${validation_db}" =~ ^[a-zA-Z0-9_]+$ ]]
+          docker exec \
+            -e POSTGRES_USER=ideaboard \
+            -e POSTGRES_DB=ideaboard_test \
+            "${postgres_container}" \
+            psql -v ON_ERROR_STOP=1 -U ideaboard -d ideaboard_test \
+            -c "CREATE DATABASE ${validation_db}"
+          # Branch-creation pushes (repository bootstrap) carry an all-zero
+          # base SHA; the checker then diffs against the working tree, which
+          # is the correct review scope on CI.
+          if [[ ! "${ATLAS_BASE_SHA}" =~ ^[0-9a-f]{40}$ || "${ATLAS_BASE_SHA}" =~ ^0+$ ]]; then
+            echo "ATLAS_BASE_SHA=" >> "${GITHUB_ENV}"
+          fi
+          {
+            printf 'ATLAS_DEV_URL=postgres://ideaboard:ideaboard_test@127.0.0.1:5432/%s?sslmode=disable\n' "${validation_db}"
+            printf 'MIGRATION_VALIDATION_DB=%s\n' "${validation_db}"
+            printf 'ATLAS_BINARY=/tmp/atlas\n'
+          } >> "${GITHUB_ENV}"
+      - name: Check destructive migrations and validate the chain
+        run: bash scripts/atlas-migration-check.sh
+      - name: Compare migration replay with schema snapshot
+        working-directory: apps/api
+        run: go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"
+      - name: Apply API migrations up
+        run: |
+          /tmp/atlas migrate apply \
+            --dir "file://apps/api/internal/db/migrations" \
+            --url "${API_TEST_DATABASE_DSN}"
+      # River schema migration plus runtime privilege setup; the env block
+      # mirrors scripts/ci-migration-integration.sh, which runs the same
+      # finalize step (credentials are the documented throwaway test values).
+      - name: Finalize migration (River schema and runtime privileges)
+        working-directory: apps/api
+        env:
+          APP_ENV: production
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_NAME: ideaboard_test
+          DB_SSLMODE: disable
+          DB_USER: ideaboard_api
+          DB_PASSWORD: ideaboard_api_test
+          API_DB_USER: ideaboard_api
+          API_DB_PASSWORD: ideaboard_api_test
+          DB_MIGRATION_USER: ideaboard
+          DB_MIGRATION_PASSWORD: ideaboard_test
+          APP_SECRETS_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          PUBLIC_ORIGIN: https://app.example.com
+        run: go run ./cmd finalize-migrate
+      # Tests use isolated snapshot fixtures; migration semantics are checked above.
+      - name: Test snapshot fixtures and NATS integration
+        env:
+          TEST_MODE: standard
+          TEST_SHARD: "0"
+          TEST_SHARD_COUNT: "1"
+        run: ./scripts/ci-parity.sh api-test
+      - name: Tear down migration databases
+        if: always()
+        run: |
+          docker rm -f ideaboard-nats >/dev/null 2>&1 || true
+          postgres_container="$(docker ps --filter 'ancestor=postgres:17-alpine' --format '{{.ID}}' | head -n 1)"
+          [[ -n "${postgres_container}" ]]
+          for database in "${MIGRATION_VALIDATION_DB}" ideaboard_test; do
+            [[ -n "${database}" ]] || continue
+            docker exec \
+              -e POSTGRES_USER=ideaboard \
+              -e POSTGRES_DB=ideaboard_test \
+              "${postgres_container}" \
+              psql -v ON_ERROR_STOP=1 -U ideaboard -d postgres \
+              -c "DROP DATABASE IF EXISTS ${database} WITH (FORCE)"
+          done
 
   openapi-breaking:
     name: OpenAPI Breaking Changes
@@ -89,96 +355,6 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           OPENAPI_BREAKING_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: ./scripts/openapi-breaking-check.sh "${BASE_SHA}"
-
-  schema:
-    name: API Schema Release
-    if: inputs.run_schema
-    needs: [quality]
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: ideaboard_test
-          POSTGRES_USER: ideaboard
-          POSTGRES_PASSWORD: ideaboard_test
-        ports: [5432:5432]
-        options: >-
-          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
-          --health-interval 10s --health-timeout 5s --health-retries 10
-    env:
-      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go
-        with: { cache-dependency-path: apps/api/go.sum }
-      - name: Install Atlas
-        run: |
-          atlas_arch="$(uname -m)"
-          case "${atlas_arch}" in
-            x86_64) atlas_arch=amd64 ;;
-            aarch64|arm64) atlas_arch=arm64 ;;
-            *) echo "unsupported architecture: ${atlas_arch}" >&2; exit 1 ;;
-          esac
-          curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v1.3.2" -o /tmp/atlas
-          chmod 0555 /tmp/atlas
-          echo /tmp >> "${GITHUB_PATH}"
-      - name: Test schema contract
-        working-directory: apps/api
-        run: go test ./internal/db/schemacontract -count=1
-      - name: Resolve Schema Release commits
-        id: commits
-        env:
-          REQUESTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          head_sha="$(git rev-parse --verify 'HEAD^{commit}')"
-          base_sha="${REQUESTED_BASE_SHA}"
-          [[ -n "${base_sha}" && ! "${base_sha}" =~ ^0+$ ]] || base_sha="${head_sha}^1"
-          printf 'base_sha=%s\nhead_sha=%s\n' "$(git rev-parse --verify "${base_sha}^{commit}")" "${head_sha}" >> "${GITHUB_OUTPUT}"
-      - name: Check Schema Release contract
-        working-directory: apps/api
-        env:
-          BASE_SHA: ${{ steps.commits.outputs.base_sha }}
-          HEAD_SHA: ${{ steps.commits.outputs.head_sha }}
-        run: go run ./cmd/schemarelease
-
-  tests:
-    name: API Race (${{ matrix.shard }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        shard: [0, 1, 2]
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: ideaboard_test
-          POSTGRES_USER: ideaboard
-          POSTGRES_PASSWORD: ideaboard_test
-        ports: [5432:5432]
-        options: >-
-          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
-          --health-interval 10s --health-timeout 5s --health-retries 10
-    env:
-      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go
-        with: { cache-dependency-path: apps/api/go.sum }
-      - name: Test race shard
-        env:
-          TEST_MODE: race
-          TEST_SHARD: ${{ matrix.shard }}
-          TEST_SHARD_COUNT: "3"
-        run: ./scripts/ci-parity.sh api-test
 
   image:
     name: API PR Image
