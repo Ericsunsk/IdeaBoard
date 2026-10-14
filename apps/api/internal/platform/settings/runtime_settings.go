@@ -3,7 +3,6 @@ package settings
 import (
 	"context"
 	"errors"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -87,7 +86,6 @@ const (
 	defaultBrandingProjectName = "IdeaBoard"
 	maxBrandingProjectNameLen  = 40
 	maxBrandingLogoURLLen      = 2048
-	brandingUploadLogoPrefix   = "/uploads/site/assets/"
 )
 
 type cachedRateLimitSetting struct {
@@ -244,17 +242,25 @@ func (s *RuntimeSettingsService) GetBranding(ctx context.Context) (BrandingSetti
 	if projectName := strings.TrimSpace(values[brandingProjectNameKey]); projectName != "" {
 		setting.ProjectName = projectName
 	}
-	if logoURL := strings.TrimSpace(values[brandingLogoURLKey]); logoURL != "" && isValidBrandingLogoURL(logoURL) {
+	if logoURL, err := normalizeBrandingLogo(values[brandingLogoURLKey]); err == nil {
 		setting.LogoURL = logoURL
 	}
 	return setting, nil
 }
 
 func (s *RuntimeSettingsService) UpdateBranding(ctx context.Context, setting BrandingSetting) (BrandingSetting, error) {
-	normalized, err := normalizeBranding(setting)
+	projectName := strings.TrimSpace(setting.ProjectName)
+	if projectName == "" {
+		return BrandingSetting{}, validation.New(msgNormalizeBranding)
+	}
+	if len([]rune(projectName)) > maxBrandingProjectNameLen {
+		return BrandingSetting{}, validation.New(msgNormalizeBranding2)
+	}
+	logoKey, err := normalizeBrandingLogo(setting.LogoURL)
 	if err != nil {
 		return BrandingSetting{}, err
 	}
+	normalized := BrandingSetting{ProjectName: projectName, LogoURL: logoKey}
 	if err := s.setMany(ctx, []SystemConfigValue{
 		{Key: brandingProjectNameKey, Value: normalized.ProjectName},
 		{Key: brandingLogoURLKey, Value: normalized.LogoURL},
@@ -335,39 +341,6 @@ func NormalizeMediaUploadSetting(setting MediaUploadSetting) (MediaUploadSetting
 		return MediaUploadSetting{}, validation.New(msgNormalizeMediaUploadSetting)
 	}
 	return setting, nil
-}
-
-func normalizeBranding(setting BrandingSetting) (BrandingSetting, error) {
-	projectName := strings.TrimSpace(setting.ProjectName)
-	logoURL := strings.TrimSpace(setting.LogoURL)
-
-	if projectName == "" {
-		return BrandingSetting{}, validation.New(msgNormalizeBranding)
-	}
-	if len([]rune(projectName)) > maxBrandingProjectNameLen {
-		return BrandingSetting{}, validation.New(msgNormalizeBranding2)
-	}
-	if len(logoURL) > maxBrandingLogoURLLen {
-		return BrandingSetting{}, validation.New(msgNormalizeBranding3)
-	}
-	if !isValidBrandingLogoURL(logoURL) {
-		return BrandingSetting{}, validation.New(msgNormalizeBranding4)
-	}
-	return BrandingSetting{ProjectName: projectName, LogoURL: logoURL}, nil
-}
-
-func isValidBrandingLogoURL(raw string) bool {
-	if raw == "" {
-		return true
-	}
-	if strings.HasPrefix(raw, brandingUploadLogoPrefix) {
-		return !strings.Contains(raw, "..") && !strings.Contains(raw, "\\")
-	}
-	parsed, err := url.ParseRequestURI(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return false
-	}
-	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }
 
 func parseBoundedInt(raw string, min int, max int) (int, bool) {

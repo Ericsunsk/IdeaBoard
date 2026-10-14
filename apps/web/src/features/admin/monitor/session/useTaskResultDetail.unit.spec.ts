@@ -23,16 +23,20 @@ vi.mock('../../../../core/composables/useAppClipboard', () => ({
 
 describe('task result image URL validation', () => {
   it.each([
-    '/uploads/tasks/user/board/content/image.webp',
-    '/uploads/tasks/1/task/output.png?version=1',
-    new URL('/uploads/tasks/1/task/output.png', window.location.origin).toString(),
+    '/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
+    '/api/v1/workspaces/ws_test123/media-assets/asset_123/derivatives/preview',
+    new URL(
+      '/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
+      window.location.origin,
+    ).toString(),
+    '/demo/demo-render.svg',
   ])('allows %s', (url) => {
     expect(getSafeResultImageUrl(url)).not.toBe('')
   })
 
   it.each([
     'https://example.com/image.png',
-    'http://localhost:6000/uploads/tasks/1/task/output.png',
+    'http://localhost:6000/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
     'javascript:alert(1)',
     'data:image/png;base64,AAAA',
     'blob:https://example.com/id',
@@ -40,20 +44,24 @@ describe('task result image URL validation', () => {
     'ftp://example.com/image.png',
     'uploads/tasks/image.png',
     '/assets/admin-preview.png',
-    '/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
+    '/uploads/tasks/1/task/output.png',
     '/uploads/../admin-secret.png',
+    '/api/v1/workspaces/ws_test123/media-assets/asset_123',
+    '/api/v1/workspaces/ws_test123/media-assets/asset_123/derivatives',
+    '/api/v1/workspaces/ws_test123/tasks',
     '/\\evil',
   ])('rejects %s', (url) => {
     expect(getSafeResultImageUrl(url)).toBe('')
   })
 
   it('extracts the first safe task result image URL', () => {
+    const contentUrl = '/api/v1/workspaces/ws_test123/media-assets/asset_123/content'
     const result = JSON.stringify({
       image_url: 'https://example.com/unsafe.png',
-      image_urls: ['data:image/png;base64,AAAA', '/uploads/tasks/1/task/safe.png'],
+      image_urls: ['data:image/png;base64,AAAA', contentUrl],
     })
 
-    expect(getSafeTaskResultImageUrl(result)).toBe('/uploads/tasks/1/task/safe.png')
+    expect(getSafeTaskResultImageUrl(result)).toBe(contentUrl)
   })
 
   it('does not expose unsafe detail image URLs for rendering', () => {

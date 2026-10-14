@@ -7,7 +7,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 )
 
-// imgproxyConfigFromApp builds the signing config for delivery handlers
+// imgproxyConfigFromApp builds the signing config for image rendering
 // from the loaded application config.
 func imgproxyConfigFromApp(cfg *config.Config) imgproxy.Config {
 	if cfg == nil {
@@ -20,9 +20,7 @@ func imgproxyConfigFromApp(cfg *config.Config) imgproxy.Config {
 	}
 }
 
-// validateImgproxyOrFatal rejects boot without a usable on-demand image
-// renderer. Display tiers resolve through signed imgproxy URLs, so starting
-// without it would serve broken media.
+// validateImgproxyOrFatal requires a usable internal renderer binding at startup.
 func validateImgproxyOrFatal(cfg *config.Config) error {
 	if cfg == nil {
 		return fmt.Errorf("config is required")

@@ -78,10 +78,13 @@ services:
       DB_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       DB_NAME: ideaboard
       DB_SSLMODE: ${DB_SSLMODE:-disable}
+      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
       APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:?Set APP_SECRETS_ENCRYPTION_KEY}
       CREDITS_WELCOME_IDENTITY_KEY: ${CREDITS_WELCOME_IDENTITY_KEY:?Set CREDITS_WELCOME_IDENTITY_KEY}
       # Intentionally omitted: REWARDS_CODE_HMAC_KEYS + AUTH_INTERNAL_KEY are runtime-only (composition.Migrate never parses the HMAC keyring or wires internal routes); NATS/IMGPROXY/API_INTERNAL_URL/BETTER_AUTH_SECRET never enter the migrate path.
+    volumes:
+      - api-uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -169,6 +172,25 @@ services:
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /data
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
+      # API image responses use signed internal requests to this sidecar.
+      IMGPROXY_ALLOWED_SOURCES: ${IMGPROXY_ALLOWED_SOURCES:-local:///}
+      # S3 sources require matching credentials, buckets, and allowed sources.
+      IMGPROXY_USE_S3: ${IMGPROXY_USE_S3:-false}
+      IMGPROXY_S3_ENDPOINT: ${IMGPROXY_S3_ENDPOINT:-}
+      IMGPROXY_S3_REGION: ${IMGPROXY_S3_REGION:-auto}
+      IMGPROXY_S3_ACCESS_KEY_ID: ${IMGPROXY_S3_ACCESS_KEY_ID:-}
+      IMGPROXY_S3_SECRET_ACCESS_KEY: ${IMGPROXY_S3_SECRET_ACCESS_KEY:-}
+      IMGPROXY_S3_ALLOWED_BUCKETS: ${IMGPROXY_S3_ALLOWED_BUCKETS:-}
+      IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: "false"
+      IMGPROXY_ALLOW_LOOPBACK_SOURCE_ADDRESSES: "false"
+      IMGPROXY_ALLOW_LINK_LOCAL_SOURCE_ADDRESSES: "false"
+      IMGPROXY_MAX_REDIRECTS: "3"
+      IMGPROXY_DOWNLOAD_TIMEOUT: "5"
+      # Accept the Media delivery byte bound (100MiB) and the image format
+      # pixel bound (64 * 1024 * 1024 pixels, expressed in decimal megapixels).
+      IMGPROXY_MAX_SRC_FILE_SIZE: "104857600"
+      IMGPROXY_MAX_SRC_RESOLUTION: "67.2"
+      IMGPROXY_TTL: "31536000"
     volumes:
       - api-uploads:/data/uploads:ro
     networks:

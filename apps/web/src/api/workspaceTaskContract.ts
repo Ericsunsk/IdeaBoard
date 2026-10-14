@@ -145,7 +145,7 @@ export function toWorkspaceTaskOutputs(raw: unknown): {
     }
     if (ref.kind === 'remote' && typeof ref.url === 'string') {
       const lowered = ref.url.toLowerCase()
-      for (const marker of ['ws-uploads', 'builtin-local', 'storage_key']) {
+      for (const marker of ['ws-uploads', 'uploads/ws', 'builtin-local', 'storage_key']) {
         if (lowered.includes(marker)) throw new Error('Task output leaks storage internals')
       }
     }

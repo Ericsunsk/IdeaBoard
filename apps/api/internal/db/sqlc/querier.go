@@ -202,10 +202,6 @@ type Querier interface {
 	// readable, bytes go 410). Image rows carry width/height (NULL reads
 	// back as 0); non-image kinds leave dimensions NULL.
 	//
-	// Derivatives live in media_asset_derivatives keyed by
-	// (asset_id, variant_name) -- NOT separate media_asset rows. Inserts
-	// upsert so regeneration converges.
-	//
 	// Every lookup scopes by workspace public_id first so cross-workspace
 	// ids miss by construction and read as not found (never a distinct
 	// status). Membership gating stays at the v1 handler layer; the
@@ -237,20 +233,6 @@ type Querier interface {
 	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
-	// Legacy media derivative queries (#809 schema repair).
-	//
-	// The generated media_derivatives.sql.go output survived Phase 3b without its
-	// query source, which breaks the schema-release sqlc drift check. This file
-	// restores the source for the queries that still validate against the
-	// workspace schema: they touch only the retained legacy shells
-	// (media_derivatives, media_asset_sources) and never the replaced
-	// user-scoped media_assets columns. Queries that JOINed the old
-	// media_assets(id, owner_user_id, status, object_generation, deleted_at)
-	// shape (GetProcessingInputManifestObject,
-	// GetReadyMediaDerivativeStorageLocationByAssetID, ListMediaDerivativesByAsset,
-	// MarkMediaDerivativeReady, UpsertMediaDerivative) cannot validate against
-	// the workspace model and stay removed; their Go call sites fail closed.
-	DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error
 	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteServiceModelPoolEntries(ctx context.Context, service string) error
 	DeleteServiceModelPoolResolutions(ctx context.Context, service string) error
@@ -297,7 +279,6 @@ type Querier interface {
 	// GetMediaAssetByPublicID returns the asset row including archived
 	// ones (archived assets stay metadata-readable; bytes go 410).
 	GetMediaAssetByPublicID(ctx context.Context, arg GetMediaAssetByPublicIDParams) (MediaAsset, error)
-	GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMediaDerivativeByAssetTierParams) (MediaDerivative, error)
 	GetOrganizationByInternalID(ctx context.Context, internalID int64) (Organization, error)
 	GetOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
@@ -383,10 +364,6 @@ type Querier interface {
 	ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error)
 	ListLibraryFolders(ctx context.Context, arg ListLibraryFoldersParams) ([]LibraryFolder, error)
 	ListLibraryMaterializations(ctx context.Context, arg ListLibraryMaterializationsParams) ([]ListLibraryMaterializationsRow, error)
-	// ListMediaAssetDerivatives returns stored variants for one asset
-	// (internal id already resolved in the workspace scope).
-	ListMediaAssetDerivatives(ctx context.Context, assetID int64) ([]MediaAssetDerivative, error)
-	ListMediaAssetSources(ctx context.Context, arg ListMediaAssetSourcesParams) ([]MediaAssetSource, error)
 	// ListMediaAssets pages live (non-archived) workspace assets
 	// newest-first with limit/offset (the v1 layer converts cursor to
 	// offset and over-fetches by one for has_more).
@@ -565,10 +542,6 @@ type Querier interface {
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertJoinBoardMembership(ctx context.Context, arg UpsertJoinBoardMembershipParams) error
-	// UpsertMediaAssetDerivative records one materialized derivative
-	// variant. Regeneration converges on (asset_id, variant_name).
-	UpsertMediaAssetDerivative(ctx context.Context, arg UpsertMediaAssetDerivativeParams) (MediaAssetDerivative, error)
-	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
 	UpsertServiceModelPoolVersion(ctx context.Context, arg UpsertServiceModelPoolVersionParams) (int64, error)

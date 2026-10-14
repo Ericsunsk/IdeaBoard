@@ -73,7 +73,7 @@ describe('AdminBrandingCard', () => {
   it.each([true, false])(
     'closes the crop dialog only after upload succeeds (%s)',
     async (isSuccessful) => {
-      const uploadedLogoURL = '/uploads/site/assets/cropped.png'
+      const uploadedLogoURL = 'uploads/site/assets/logo_cropped12345678.png'
       useMswHandlers(
         http.post('/api/control/v1/platform/settings/branding/logo', () =>
           isSuccessful

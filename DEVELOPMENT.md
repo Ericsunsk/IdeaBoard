@@ -115,7 +115,6 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | -------------- | ----------------------- |
 | `/api/auth/**` | `http://localhost:6001` |
 | `/api/**`      | `http://localhost:6000` |
-| `/uploads/**`  | `http://localhost:6000` |
 
 ## 验证矩阵
 

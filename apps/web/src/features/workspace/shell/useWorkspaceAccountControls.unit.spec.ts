@@ -122,6 +122,19 @@ describe('useWorkspaceAccountControls', () => {
     ])
   })
 
+  it('sizes the public avatar route to the next variant up (32px chrome at dpr 1 → 32)', () => {
+    currentUser.value = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      avatar: '/api/v1/public/users/AVTR01/avatar',
+    })
+    const { controls } = renderAccountControls({
+      navigation: { navigate: vi.fn(), logout: vi.fn() },
+    })
+
+    expect(controls.viewModel.avatarUrl.value).toBe('/api/v1/public/users/AVTR01/avatar?size=32')
+  })
+
   it('falls back to the session store email when the user projection omits email', () => {
     currentUser.value = makeSessionUser({
       public_id: '00000000-0000-0000-0000-000000000001',

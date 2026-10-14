@@ -962,7 +962,7 @@ export const getDerivativeWorkspaceMediaAssetUrl = (
 }
 
 /**
- * Serves one generation-matched stored derivative row. Tiers without a stored row stay 409 until generation materializes them; there is no imgproxy pull-through on the v1 path.
+ * Returns rendered WebP bytes after workspace-membership and asset-ready checks. Sources use the fixed builtin-local workspace storage profile. processing-input is not a display tier (400).
  * @summary Read a workspace media asset derivative (members only)
  */
 export const derivativeWorkspaceMediaAsset = async (
@@ -987,7 +987,7 @@ export const getDerivativeWorkspaceMediaAssetQueryKey = (
 
 export const getDerivativeWorkspaceMediaAssetQueryOptions = <
   TData = Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>,
-  TError = BadRequestResponse | NotFoundResponse | ConflictResponse,
+  TError = BadRequestResponse | NotFoundResponse | ConflictResponse | void,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -1031,7 +1031,7 @@ export type DerivativeWorkspaceMediaAssetQueryResult = NonNullable<
   Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>
 >
 export type DerivativeWorkspaceMediaAssetQueryError =
-  BadRequestResponse | NotFoundResponse | ConflictResponse
+  BadRequestResponse | NotFoundResponse | ConflictResponse | void
 
 /**
  * @summary Read a workspace media asset derivative (members only)
@@ -1039,7 +1039,7 @@ export type DerivativeWorkspaceMediaAssetQueryError =
 
 export function useDerivativeWorkspaceMediaAsset<
   TData = Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>,
-  TError = BadRequestResponse | NotFoundResponse | ConflictResponse,
+  TError = BadRequestResponse | NotFoundResponse | ConflictResponse | void,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,

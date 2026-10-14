@@ -79,6 +79,9 @@ export class EmailTemplateError extends Error {
   }
 }
 
+const PUBLIC_BRANDING_LOGO_PATH = '/api/v1/public/branding/logo'
+const SITE_ASSET_LOGO_KEY_PREFIX = 'uploads/site/assets/'
+
 export function resolveBrandingLogoUrl(logoUrl?: string, baseUrl?: string): string {
   const fallback = `${resolvePublicSiteOrigin(baseUrl)}/favicon.svg`
   const trimmed = logoUrl?.trim() ?? ''
@@ -92,10 +95,14 @@ export function resolveBrandingLogoUrl(logoUrl?: string, baseUrl?: string): stri
       return fallback
     }
   }
-  if (trimmed.startsWith('/') && baseUrl?.trim()) {
+  const logoPath = trimmed.startsWith(SITE_ASSET_LOGO_KEY_PREFIX)
+    ? `${PUBLIC_BRANDING_LOGO_PATH}?key=${encodeURIComponent(trimmed)}`
+    : trimmed
+  if (logoPath.startsWith('/uploads/')) return fallback
+  if (logoPath.startsWith('/') && baseUrl?.trim()) {
     try {
       const base = new URL(baseUrl.trim())
-      const resolved = new URL(trimmed, base.origin)
+      const resolved = new URL(logoPath, base.origin)
       return validURL(resolved.toString(), 'brandLogoUrl')
     } catch {
       return fallback

@@ -12,6 +12,6 @@
  */
 
 export interface AvatarUploadResult {
-  /** @pattern ^/uploads/profile/ */
+  /** @pattern ^/api/v1/public/users/ */
   avatar_url: string
 }

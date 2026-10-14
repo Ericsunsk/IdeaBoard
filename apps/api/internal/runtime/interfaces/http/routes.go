@@ -10,7 +10,6 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	identityports "ideaboard/api/internal/identity/users/ports"
-	storageports "ideaboard/api/internal/media/storage/ports"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
@@ -24,7 +23,6 @@ import (
 type Dependencies struct {
 	Auth                AuthDeps
 	PublicSearchHandler *searchhttp.SearchHandler
-	StaticUploads       StaticUploadDeps
 	CORSMiddleware      gin.HandlerFunc
 	RateLimit           settings.RateLimitSettingProvider
 	Branding            settings.BrandingSettingProvider
@@ -62,11 +60,6 @@ type AuthDeps struct {
 	UserLifecycle     auth.IdentityProvisioner
 }
 
-type StaticUploadDeps struct {
-	Auth       AuthDeps
-	ReadAccess storageports.ReadableUploadAccess
-}
-
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
 
 // Hand-written route paths that bypass the Orval-generated client.
@@ -77,17 +70,11 @@ const (
 	RoutePaymentStripeWebhook   = "/api/webhooks/stripe"
 )
 
-// UploadsStaticRoutePrefix is the public prefix for locally served upload
-// bytes. Static routes, timeout exemptions and resource parsing must build
-// from it instead of repeating the literal.
-const UploadsStaticRoutePrefix = "/uploads/"
-
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
 	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler, deps.ReadyChecker)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
-	registerStaticUploadRoutes(r, deps.StaticUploads)
 	// Contract kernel v1 routes (issue #800 kernel, #801 handlers):
 	// the /api/v1 Public Data Plane plus the /api/control/v1 Control
 	// Plane (issue #808: capability auth, separate rate limits, audit).
@@ -163,6 +150,8 @@ func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gi
 			response.InternalError(c, http.StatusInternalServerError, msgServiceUnavailable22, err)
 			return
 		}
+		// The service already returns the display form (stored logo keys
+		// project to the public logo route); the boundary trusts it.
 		response.SuccessDTO(c, branding)
 	}
 }
@@ -178,10 +167,4 @@ func registerInternalRoutes(r *gin.Engine, deps InternalRouteDeps) {
 	if deps.UserHandler != nil {
 		r.POST("/internal/users/login-metadata", deps.UserHandler.UpdateLoginMetadata)
 	}
-}
-
-func registerStaticUploadRoutes(r *gin.Engine, deps StaticUploadDeps) {
-	uploadsHandler := uploadStaticHandler(deps)
-	r.GET(UploadsStaticRoutePrefix+"*filepath", uploadsHandler)
-	r.HEAD(UploadsStaticRoutePrefix+"*filepath", uploadsHandler)
 }

@@ -67,7 +67,7 @@ func newControlUserFromListItem(item *identityports.AdminUserListItem) controlUs
 	out.DisplayName = item.DisplayName
 	out.Email = item.Email
 	out.Providers = item.Providers
-	out.Avatar = item.Avatar
+	out.Avatar = v1PublicAvatarURLForRow(item.StorageUID, item.Avatar)
 	out.Role = item.Role
 	out.Status = item.Status
 	out.AvailableCredits = item.AvailableCredits

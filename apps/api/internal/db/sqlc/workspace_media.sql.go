@@ -192,10 +192,6 @@ type CreateUploadSessionParams struct {
 // readable, bytes go 410). Image rows carry width/height (NULL reads
 // back as 0); non-image kinds leave dimensions NULL.
 //
-// Derivatives live in media_asset_derivatives keyed by
-// (asset_id, variant_name) -- NOT separate media_asset rows. Inserts
-// upsert so regeneration converges.
-//
 // Every lookup scopes by workspace public_id first so cross-workspace
 // ids miss by construction and read as not found (never a distinct
 // status). Membership gating stays at the v1 handler layer; the
@@ -374,45 +370,6 @@ func (q *Queries) GetUploadSessionByPublicID(ctx context.Context, arg GetUploadS
 		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const listMediaAssetDerivatives = `-- name: ListMediaAssetDerivatives :many
-SELECT internal_id, asset_id, variant_name, storage_key, mime_type, size_bytes, width, height, created_at
-FROM media_asset_derivatives
-WHERE asset_id = $1
-ORDER BY variant_name ASC
-`
-
-// ListMediaAssetDerivatives returns stored variants for one asset
-// (internal id already resolved in the workspace scope).
-func (q *Queries) ListMediaAssetDerivatives(ctx context.Context, assetID int64) ([]MediaAssetDerivative, error) {
-	rows, err := q.db.Query(ctx, listMediaAssetDerivatives, assetID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []MediaAssetDerivative
-	for rows.Next() {
-		var i MediaAssetDerivative
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.AssetID,
-			&i.VariantName,
-			&i.StorageKey,
-			&i.MimeType,
-			&i.SizeBytes,
-			&i.Width,
-			&i.Height,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listMediaAssets = `-- name: ListMediaAssets :many
@@ -640,52 +597,6 @@ func (q *Queries) UpdateMediaAssetMetadata(ctx context.Context, arg UpdateMediaA
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.ArchivedAt,
-	)
-	return i, err
-}
-
-const upsertMediaAssetDerivative = `-- name: UpsertMediaAssetDerivative :one
-INSERT INTO media_asset_derivatives (asset_id, variant_name, storage_key, mime_type, size_bytes, width, height)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (asset_id, variant_name) DO UPDATE
-SET storage_key = EXCLUDED.storage_key, mime_type = EXCLUDED.mime_type, size_bytes = EXCLUDED.size_bytes,
-    width = EXCLUDED.width, height = EXCLUDED.height
-RETURNING internal_id, asset_id, variant_name, storage_key, mime_type, size_bytes, width, height, created_at
-`
-
-type UpsertMediaAssetDerivativeParams struct {
-	AssetID     int64       `json:"asset_id"`
-	VariantName string      `json:"variant_name"`
-	StorageKey  string      `json:"storage_key"`
-	MimeType    string      `json:"mime_type"`
-	SizeBytes   int64       `json:"size_bytes"`
-	Width       pgtype.Int4 `json:"width"`
-	Height      pgtype.Int4 `json:"height"`
-}
-
-// UpsertMediaAssetDerivative records one materialized derivative
-// variant. Regeneration converges on (asset_id, variant_name).
-func (q *Queries) UpsertMediaAssetDerivative(ctx context.Context, arg UpsertMediaAssetDerivativeParams) (MediaAssetDerivative, error) {
-	row := q.db.QueryRow(ctx, upsertMediaAssetDerivative,
-		arg.AssetID,
-		arg.VariantName,
-		arg.StorageKey,
-		arg.MimeType,
-		arg.SizeBytes,
-		arg.Width,
-		arg.Height,
-	)
-	var i MediaAssetDerivative
-	err := row.Scan(
-		&i.InternalID,
-		&i.AssetID,
-		&i.VariantName,
-		&i.StorageKey,
-		&i.MimeType,
-		&i.SizeBytes,
-		&i.Width,
-		&i.Height,
-		&i.CreatedAt,
 	)
 	return i, err
 }

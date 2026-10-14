@@ -39,7 +39,6 @@ expected_locations=(
   "location ~ ^/api/v1/workspaces/[^/]+/tasks(/|$)"
   "location ~ ^/api/v1/workspaces/[^/]+/events(/|$)"
   "location /api/"
-  "location /uploads/"
 )
 
 if ! grep -qF "server_name $legacy_host;" "$output" || ! grep -qE '^[[:space:]]*return 444;' "$output"; then
@@ -96,8 +95,8 @@ if grep -qF "$client_forwarded_proto" "$output" || grep -qF "$proxy_forwarded_pr
 fi
 forwarded_proto_pattern="proxy_set_header X-Forwarded-Proto \$scheme;"
 forwarded_proto_count="$(grep -cF "$forwarded_proto_pattern" "$output" || true)"
-if (( forwarded_proto_count != 7 )); then
-  printf 'render-nginx-template-test: X-Forwarded-Proto count = %d, want 7\n' "$forwarded_proto_count" >&2
+if (( forwarded_proto_count != 6 )); then
+  printf 'render-nginx-template-test: X-Forwarded-Proto count = %d, want 6\n' "$forwarded_proto_count" >&2
   exit 2
 fi
 

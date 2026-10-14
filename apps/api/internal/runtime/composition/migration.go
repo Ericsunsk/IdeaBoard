@@ -131,6 +131,9 @@ func Migrate(ctx context.Context, cfg *config.Config, atlasBinary, migrationsDir
 	if err := reconcileCleanBreakDatabase(ctx, migrationConfig, migrationsDirectory, cfg.Migration.CleanBreakAllowReset); err != nil {
 		return fmt.Errorf("clean break reconciliation failed: %w", err)
 	}
+	if err := prepareMediaObjectMigration(ctx, cfg, migrationConfig); err != nil {
+		return fmt.Errorf("media object migration failed: %w", err)
+	}
 	cmd := exec.CommandContext(ctx, atlasBinary, "migrate", "apply", "--dir", migrationsDirectory, "--url", database.PostgresDSN(migrationConfig))
 	var output bytes.Buffer
 	cmd.Stdout = io.MultiWriter(os.Stdout, &output)

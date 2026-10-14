@@ -3,6 +3,7 @@ package imgproxy
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/media/derivatives/domain"
 )
@@ -20,15 +21,63 @@ func TestSignPathMatchesDocumentedVector(t *testing.T) {
 
 func TestTierURLGeometry(t *testing.T) {
 	cfg := Config{BaseURL: "http://127.0.0.1:8080", KeyHex: strings.Repeat("ab", 16), SaltHex: strings.Repeat("cd", 16)}
-	url, err := cfg.TierURL(domain.TierThumb, "local:///uploads/tasks/u/b/content/image.png")
+	url, err := cfg.TierURL(domain.TierThumb, "local:///uploads/tasks/u/b/content/image.png", time.Unix(1893456000, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(url, "http://127.0.0.1:8080/") || !strings.Contains(url, "/rs:fit:256:256/plain/local:///uploads/tasks/u/b/content/image.png@webp") {
 		t.Fatalf("unexpected tier URL %s", url)
 	}
-	if _, err := cfg.TierURL("nope", "local:///x.png"); err == nil {
+	if _, err := cfg.TierURL("nope", "local:///x.png", time.Unix(1893456000, 0)); err == nil {
 		t.Fatal("unknown tier should fail")
+	}
+}
+
+func TestTierURLRequiresExpiry(t *testing.T) {
+	cfg := Config{BaseURL: "http://127.0.0.1:8080", KeyHex: strings.Repeat("ab", 16), SaltHex: strings.Repeat("cd", 16)}
+	expiry := time.Unix(1893456000, 0).UTC()
+	url, err := cfg.TierURL(domain.TierThumb, "local:///uploads/tasks/u/b/content/image.png", expiry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(url, "/exp:1893456000/rs:fit:256:256/plain/local:///uploads/tasks/u/b/content/image.png@webp") {
+		t.Fatalf("expiring tier URL missing exp segment: %s", url)
+	}
+	if _, err := cfg.TierURL(domain.TierThumb, "local:///uploads/tasks/u/b/content/image.png", time.Time{}); err == nil {
+		t.Fatal("zero tier expiry should fail")
+	}
+}
+
+func TestAvatarURLGeometry(t *testing.T) {
+	cfg := Config{BaseURL: "http://127.0.0.1:8080", KeyHex: strings.Repeat("ab", 16), SaltHex: strings.Repeat("cd", 16)}
+	if DefaultAvatarSize != 64 {
+		t.Fatalf("DefaultAvatarSize = %d, want 64", DefaultAvatarSize)
+	}
+	url, err := cfg.AvatarURL(64, "local:///uploads/avatars/AVTR01/abcdef1234567890.png", time.Unix(1893456000, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(url, "http://127.0.0.1:8080/") || !strings.Contains(url, "/rs:fill:64:64/plain/local:///uploads/avatars/AVTR01/abcdef1234567890.png@webp") {
+		t.Fatalf("unexpected avatar URL %s", url)
+	}
+	if _, err := cfg.AvatarURL(64, "local:///uploads/avatars/AVTR01/abcdef1234567890.png", time.Time{}); err == nil {
+		t.Fatal("zero avatar expiry should fail")
+	}
+	expiry := time.Unix(1893456000, 0).UTC()
+	expiring, err := cfg.AvatarURL(128, "local:///uploads/avatars/AVTR01/abcdef1234567890.png", expiry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(expiring, "/exp:1893456000/rs:fill:128:128/plain/local:///uploads/avatars/AVTR01/abcdef1234567890.png@webp") {
+		t.Fatalf("expiring avatar URL missing exp segment: %s", expiring)
+	}
+	for _, size := range []int{0, 16, 48, 100, 256 + 1} {
+		if _, err := cfg.AvatarURL(size, "local:///uploads/avatars/AVTR01/abcdef1234567890.png", expiry); err == nil {
+			t.Fatalf("avatar size %d should fail", size)
+		}
+	}
+	if _, err := cfg.AvatarURL(64, "  ", expiry); err == nil {
+		t.Fatal("blank avatar source should fail")
 	}
 }
 
@@ -52,11 +101,53 @@ func TestValidateRejectsWeakBindings(t *testing.T) {
 	}
 }
 
+func TestS3Source(t *testing.T) {
+	// R2/S3-profile keys carry no local mount: the bucket comes from the
+	// resolved storage profile and the key keeps the slot shape.
+	got, err := S3Source("media-private", "uploads/ws/abc123/def456/photo.png")
+	if err != nil || got != "s3://media-private/uploads/ws/abc123/def456/photo.png" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	got, err = S3Source("  media-private ", "tenant-9/photo.png")
+	if err != nil || got != "s3://media-private/tenant-9/photo.png" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	if _, err := S3Source("  ", "a/b.png"); err == nil {
+		t.Fatal("blank bucket should fail")
+	}
+	for _, tc := range []struct {
+		name   string
+		bucket string
+		key    string
+	}{
+		{"bucket with slash", "a/b", "a/b.png"},
+		{"dot bucket", ".", "a/b.png"},
+		{"dotdot bucket", "..", "a/b.png"},
+		{"blank key", "media-private", "  "},
+		{"leading slash", "media-private", "/tenant-9/photo.png"},
+		{"slash-only key", "media-private", "/"},
+		{"empty segment", "media-private", "a//b.png"},
+		{"dot segment", "media-private", "a/./b.png"},
+		{"dotdot segment", "media-private", "a/../b.png"},
+		{"trailing slash", "media-private", "a/b/"},
+	} {
+		if _, err := S3Source(tc.bucket, tc.key); err == nil {
+			t.Fatalf("%s should fail (bucket %q key %q)", tc.name, tc.bucket, tc.key)
+		}
+	}
+}
+
 func TestLocalSource(t *testing.T) {
 	// Builtin-local keys carry the uploads root, which is mounted below /data
 	// by Compose and therefore remains part of the imgproxy source path.
 	got, err := LocalSource("uploads/tasks/u/b/content/image.png")
 	if err != nil || got != "local:///uploads/tasks/u/b/content/image.png" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	// Canonical workspace slot root (single local keyspace): same
+	// local:/// form, same traversal discipline.
+	got, err = LocalSource("uploads/ws/abc123/def456/photo.png")
+	if err != nil || got != "local:///uploads/ws/abc123/def456/photo.png" {
 		t.Fatalf("got %q err %v", got, err)
 	}
 	if _, err := LocalSource("  "); err == nil {
@@ -68,6 +159,9 @@ func TestLocalSource(t *testing.T) {
 		"uploads/.",
 		"uploads/./image.png",
 		"uploads/../image.png",
+		"ws-uploads/abc123/def456/photo.png",
+		"ws-uploads/",
+		"ws-uploads/a/../../x.png",
 		"media/image.png",
 		"etc/passwd",
 	} {

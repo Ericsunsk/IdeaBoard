@@ -19,7 +19,7 @@ export interface User {
   display_name?: string
   role?: UserRole
   personal_workspace_id?: WorkspaceId
-  /** Persisted profile avatar URL; omitted when no avatar is set. */
+  /** Public avatar route URL with a content version query; omitted when no avatar is set. */
   avatar?: string
   /** Media storage namespace; omitted when no storage namespace is set. */
   storage_namespace?: string

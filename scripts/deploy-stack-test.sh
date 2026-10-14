@@ -92,4 +92,106 @@ for removed_contract in \
   fi
 done
 
-printf 'Deploy stack manifest contract tests passed\n'
+(
+  functions_file="$fixture_dir/function.sh"
+  sed -n '/^stage_workspace_uploads() (/,/^)/p' "${deploy_script}" > "$functions_file"
+  source "$functions_file"
+  log_file="$fixture_dir/log"
+
+  env_value() { printf /app; }
+  docker_compose() {
+    if [[ "$1" == ps ]]; then
+      [[ "$case_name" != fresh ]] || return 0
+      printf test-container
+    else
+      printf 'compose %s\n' "$*" >> "$log_file"
+      [[ "$case_name" != stop-failed ]]
+    fi
+  }
+  docker() {
+    printf 'docker %s\n' "$*" >> "$log_file"
+    if [[ "$2" == -a ]]; then
+      [[ "$case_name" != import-failed ]] || return 1
+      [[ "$(cat)" == archive ]] || return 1
+    elif [[ "$case_name" == missing ]]; then
+      echo 'Could not find the file /app/ws-uploads in container test-container' >&2
+      return 1
+    elif [[ "$case_name" == failed ]]; then
+      echo 'permission denied' >&2
+      return 1
+    elif [[ "$case_name" == snapshot-failed && -s "$log_file" ]] &&
+         grep -Fq 'compose stop api' "$log_file"; then
+      return 1
+    else
+      printf archive
+    fi
+  }
+  case_name=success
+  : > "$log_file"
+  stage_workspace_uploads
+  [[ "$(cat "$log_file")" == $'docker cp test-container:/app/ws-uploads -\ncompose stop api\ndocker cp test-container:/app/ws-uploads -\ndocker cp -a - test-container:/app/uploads' ]]
+  : > "$log_file"
+  case_name=fresh
+  stage_workspace_uploads
+  [[ ! -s "$log_file" ]]
+  case_name=missing
+  stage_workspace_uploads
+  [[ "$(cat "$log_file")" == 'docker cp test-container:/app/ws-uploads -' ]]
+  for case_name in failed stop-failed snapshot-failed import-failed; do
+    : > "$log_file"
+    if stage_workspace_uploads 2>/dev/null; then
+      fail "workspace object staging must reject $case_name"
+    fi
+  done
+  for entrypoint in run_deploy_transaction '  migrate)'; do
+    pipeline="$(sed -n "/^${entrypoint}/,/^}/p" "$deploy_script")"
+    [[ "$pipeline" == *run_stack_migrations* ]] ||
+      fail "$entrypoint must use the shared migration pipeline"
+  done
+)
+
+(
+  functions_file="$fixture_dir/migrations.sh"
+  sed -n '/^run_stack_migrations() {/,/^}/p' "$deploy_script" > "$functions_file"
+  cat >> "$functions_file" <<'BASH'
+record_step() {
+  printf '%s:%s\n' "$DEPLOY_STAGE" "$1" >> "$MIGRATION_TEST_LOG"
+  [[ "$1" != "$MIGRATION_TEST_FAILURE" ]]
+}
+docker_compose() { record_step postgres; }
+wait_for_postgres() { record_step ready; }
+stage_workspace_uploads() { record_step uploads; }
+backup_postgres() { record_step database-backup; }
+backup_api_uploads() { record_step uploads-backup; }
+run_api_migration() { record_step api; }
+run_auth_migration() { record_step auth; }
+DEPLOY_BACKUP_GATE=pending
+DEPLOY_MIGRATION_GATE=pending
+DEPLOY_MIGRATION_STARTED=0
+trap 'printf "gates:%s:%s:%s\n" "$DEPLOY_BACKUP_GATE" "$DEPLOY_MIGRATION_GATE" "$DEPLOY_MIGRATION_STARTED" >> "$MIGRATION_TEST_LOG"' EXIT
+run_stack_migrations
+BASH
+  expected_steps=$'start-postgres:postgres\nstart-postgres:ready\nstage-uploads:uploads\nbackup:database-backup\nbackup:uploads-backup\napi-migration:api\nauth-migration:auth'
+  for failed_step in none postgres ready uploads database-backup uploads-backup api auth; do
+    log_file="$fixture_dir/migration-$failed_step.log"
+    if env MIGRATION_TEST_LOG="$log_file" MIGRATION_TEST_FAILURE="$failed_step" bash -e "$functions_file"; then
+      [[ "$failed_step" == none ]] || fail "migration must stop at $failed_step"
+    else
+      [[ "$failed_step" != none ]] || fail 'shared migration pipeline failed'
+    fi
+    expected_prefix=''
+    while IFS= read -r step; do
+      expected_prefix+="${expected_prefix:+$'\n'}$step"
+      [[ "${step#*:}" != "$failed_step" ]] || break
+    done <<< "$expected_steps"
+    case "$failed_step" in
+      none) gates='gates:passed:passed:1' ;;
+      api|auth) gates='gates:passed:pending:1' ;;
+      *) gates='gates:pending:pending:0' ;;
+    esac
+    [[ "$(cat "$log_file")" == "$expected_prefix"$'\n'"$gates" ]] ||
+      fail "wrong migration order or gate state at $failed_step"
+  done
+)
+
+printf 'Deploy stack contract tests passed\n'

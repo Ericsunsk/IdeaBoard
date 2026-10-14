@@ -8,7 +8,7 @@ package worker
 // Fixture strategy (NOT the canonical schema.sql snapshot, which is
 // broken — parent #809 scope): minimal throwaway schemas with the
 // verbatim table definitions the three stores touch (users, workspaces,
-// upload_sessions, media_assets, media_asset_derivatives,
+// upload_sessions, media_assets,
 // billing_accounts, tasks, task_status_event_outbox, task_outputs, library_folders,
 // library_assets), following the #818/#820 fixture-DDL pattern. Tests
 // SKIP gracefully without API_TEST_DATABASE_DSN.
@@ -154,22 +154,6 @@ CREATE TABLE media_assets (
     OR (media_kind != 'image')
   ),
   CONSTRAINT chk_media_assets_metadata CHECK (jsonb_typeof(metadata) = 'object')
-);
-
-CREATE TABLE media_asset_derivatives (
-  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
-  variant_name TEXT NOT NULL,
-  storage_key TEXT NOT NULL,
-  mime_type TEXT NOT NULL,
-  size_bytes BIGINT NOT NULL,
-  width INT NULL,
-  height INT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_media_asset_derivatives_asset_variant UNIQUE (asset_id, variant_name),
-  CONSTRAINT uq_media_asset_derivatives_storage_key UNIQUE (storage_key),
-  CONSTRAINT chk_media_asset_derivatives_size_positive CHECK (size_bytes > 0),
-  CONSTRAINT chk_media_asset_derivatives_variant CHECK (length(btrim(variant_name)) BETWEEN 1 AND 64)
 );
 
 CREATE TABLE billing_accounts (

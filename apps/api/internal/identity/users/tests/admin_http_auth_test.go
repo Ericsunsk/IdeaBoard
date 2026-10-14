@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/testsupport"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/testsupport"
+
+	"github.com/gin-gonic/gin"
 )
 
 type fakeAdminUserService struct {

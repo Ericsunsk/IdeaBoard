@@ -29,11 +29,10 @@
 //     (completion accepted declarations only; byte verification is a
 //     future gate). archived_at marks the archive lifecycle: metadata
 //     stays readable, bytes go 410.
-//   - Derivatives live in media_asset_derivatives keyed by
-//     (asset_id, variant_name), NOT separate media_asset rows.
-//   - Storage keys are opaque to the legacy UploadResource parser by
-//     design: v1 bytes are served only through the profile+key seam,
-//     never URL-parsed. Keys embed the workspace suffix for isolation.
+//   - Storage keys are opaque object locators by design: v1 bytes are
+//     served only through the profile+key seam, never URL-parsed. Keys
+//     embed the workspace suffix for isolation under the canonical
+//     uploads/ws/ root.
 //   - Reads use the builtin-local storage profile constant (profile
 //     selection lands with the byte backend).
 package workspacemedia
@@ -46,6 +45,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/media/imageformat"
+	storagedomain "ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/platform/contract"
 )
 
@@ -153,9 +153,6 @@ var (
 	// ErrStateConflict reports a terminal-state mutation attempt
 	// (409 upload_state_conflict).
 	ErrStateConflict = errors.New("workspacemedia: illegal state transition")
-	// ErrDerivativeSourceMissing reports derivative generation with no
-	// readable original bytes (409 at the binary endpoint, never 500).
-	ErrDerivativeSourceMissing = errors.New("workspacemedia: derivative source missing")
 )
 
 // FieldError carries one field-level validation failure for
@@ -248,19 +245,6 @@ func (a *Asset) IsArchived() bool {
 	return a != nil && a.ArchivedAt != nil
 }
 
-// Derivative is the server-side projection of one materialized
-// derivative row used by generation and the v1 derivative-bytes
-// endpoint.
-type Derivative struct {
-	VariantName string
-	MIMEType    string
-	Width       int32
-	Height      int32
-	SizeBytes   int64
-	StorageKey  string
-	CreatedAt   time.Time
-}
-
 // TaskAsset is one media asset attached to a task output, with the
 // output role from task_outputs.metadata (#819's mapping).
 type TaskAsset struct {
@@ -319,8 +303,8 @@ type UpdateMetadataParams struct {
 }
 
 // WorkspaceMediaStore is the workspace-bound media persistence seam:
-// upload sessions (durable rows, lazy expiry) plus media assets,
-// derivatives, and task-media reads. Repository methods take
+// upload sessions (durable rows, lazy expiry) plus media assets
+// and task-media reads. Repository methods take
 // context.Context first and use the dbWithContext pattern in the
 // postgres sibling; the in-memory sibling is tests-only.
 type WorkspaceMediaStore interface {
@@ -359,10 +343,6 @@ type AssetStore interface {
 	ArchiveAsset(ctx context.Context, workspaceID, assetID string) (*Asset, error)
 	// UpdateAssetMetadata refreshes dimensions and merges metadata.
 	UpdateAssetMetadata(ctx context.Context, workspaceID, assetID string, params UpdateMetadataParams) (*Asset, error)
-	// RecordDerivative upserts one materialized derivative variant.
-	RecordDerivative(ctx context.Context, workspaceID, assetID string, derivative Derivative) (*Derivative, error)
-	// ListDerivatives returns stored variants for one asset.
-	ListDerivatives(ctx context.Context, workspaceID, assetID string) ([]*Derivative, error)
 	// ListTaskAssets queries media by task via task_outputs
 	// (media_asset outputs only, ordered by output_index).
 	ListTaskAssets(ctx context.Context, workspaceID, taskID string) ([]*TaskAsset, error)
@@ -455,7 +435,8 @@ func IsAssetID(id string) bool { return contract.IsAssetID(id) }
 // SlotKey reserves the server-side storage locator for a session. The
 // key never leaves the server: transfer instructions carry only the
 // opaque slot (the upload_ id), never bucket/secret/path. The workspace
-// suffix isolates tenants at the key level.
+// suffix isolates tenants at the key level. New slots reserve under the
+// canonical uploads/ws/ root (single local keyspace).
 func SlotKey(workspaceID, uploadID, filename string) string {
 	wsSuffix := strings.TrimPrefix(strings.TrimSpace(workspaceID), "ws_")
 	uploadSuffix := strings.TrimPrefix(strings.TrimSpace(uploadID), "upload_")
@@ -466,7 +447,7 @@ func SlotKey(workspaceID, uploadID, filename string) string {
 	if uploadSuffix == "" {
 		uploadSuffix = "unknown"
 	}
-	return "ws-uploads/" + wsSuffix + "/" + uploadSuffix + "/" + safe
+	return storagedomain.WorkspaceUploadCanonicalPrefix() + wsSuffix + "/" + uploadSuffix + "/" + safe
 }
 
 // SlotFilename recovers the reserved basename from a slot key (the
@@ -494,23 +475,4 @@ func SanitizeFilename(filename string) string {
 		trimmed = string(runes[:MaxFilenameRunes])
 	}
 	return trimmed
-}
-
-// DerivativeSlotKey reserves the storage locator for one derivative
-// variant under its parent asset.
-func DerivativeSlotKey(workspaceID, assetID, variant, ext string) string {
-	wsSuffix := strings.TrimPrefix(strings.TrimSpace(workspaceID), "ws_")
-	assetSuffix := strings.TrimPrefix(strings.TrimSpace(assetID), "asset_")
-	cleanExt := strings.TrimSpace(ext)
-	if !strings.HasPrefix(cleanExt, ".") {
-		cleanExt = "." + cleanExt
-	}
-	if wsSuffix == "" {
-		wsSuffix = "unknown"
-	}
-	if assetSuffix == "" {
-		assetSuffix = "unknown"
-	}
-	safeVariant := SanitizeFilename(strings.TrimSpace(variant))
-	return "ws-uploads/" + wsSuffix + "/" + assetSuffix + "/derivatives/" + safeVariant + cleanExt
 }

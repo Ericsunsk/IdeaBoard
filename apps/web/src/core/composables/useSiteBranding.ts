@@ -10,12 +10,6 @@ import {
 } from '../../api/contractKernel'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
-// Public site branding (issue #809). `GET /api/settings/branding` rides the
-// central `api.request` and parses through `contractKernel` (`{ data }` /
-// `{ error: ... }`); this composable keeps its query key and helper surface.
-// The backend success body still carries legacy `code`/`msg` keys alongside
-// `data`, which the kernel ignores; numeric error bodies never reach the
-// parser (non-2xx throws in the shared client first).
 export type BrandingSetting = {
   project_name: string
   logo_url: string
@@ -32,7 +26,8 @@ export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
 
 export const SITE_BRANDING_PROJECT_NAME_MAX_CHARS = 40
 export const SITE_BRANDING_LOGO_URL_MAX_LENGTH = 2048
-export const SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX = '/uploads/site/assets/'
+export const SITE_BRANDING_LOGO_ROUTE_PATH = '/api/v1/public/branding/logo'
+export const SITE_BRANDING_LOGO_STORAGE_KEY_PREFIX = 'uploads/site/assets/'
 export type SiteBrandingOptions = {
   enabled?: MaybeRef<boolean>
   /** Caller-supplied load-failure copy; shared owns no feature locale keys. */
@@ -116,7 +111,11 @@ export function normalizeSiteBrandingSetting(
 }
 
 export function resolveSiteBrandingLogoURL(logoURL: string): string {
-  return resolveAssetUrl(logoURL.trim())
+  const trimmed = logoURL.trim()
+  if (isSiteBrandingLogoStorageKey(trimmed)) {
+    return `${SITE_BRANDING_LOGO_ROUTE_PATH}?key=${encodeURIComponent(trimmed)}`
+  }
+  return resolveAssetUrl(trimmed)
 }
 
 export function validateSiteBrandingSetting(setting: BrandingSetting): string {
@@ -132,7 +131,7 @@ export function validateSiteBrandingSetting(setting: BrandingSetting): string {
     return `Logo 地址不能超过 ${SITE_BRANDING_LOGO_URL_MAX_LENGTH} 个字符`
   }
   if (!isValidSiteBrandingLogoURL(logoURL)) {
-    return 'Logo 地址必须为空、/uploads/site/assets/ 路径或 http(s) URL'
+    return 'Logo 地址必须为空、站内 Logo 链接或 http(s) URL'
   }
   return ''
 }
@@ -140,15 +139,20 @@ export function validateSiteBrandingSetting(setting: BrandingSetting): string {
 export function isValidSiteBrandingLogoURL(logoURL: string): boolean {
   const value = logoURL.trim()
   if (!value) return true
-  if (value.startsWith(SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX)) {
-    return !value.includes('..') && !value.includes('\\')
-  }
+  if (isSiteBrandingLogoStorageKey(value)) return true
   try {
     const parsed = new URL(value)
     return parsed.protocol === 'http:' || parsed.protocol === 'https:'
   } catch {
     return false
   }
+}
+
+function isSiteBrandingLogoStorageKey(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed.startsWith(SITE_BRANDING_LOGO_STORAGE_KEY_PREFIX)) return false
+  if (trimmed.includes('..') || trimmed.includes('\\')) return false
+  return trimmed.split('/').every((segment) => segment !== '' && segment !== '.')
 }
 
 export function getSiteBrandFallbackText(projectName: string): string {

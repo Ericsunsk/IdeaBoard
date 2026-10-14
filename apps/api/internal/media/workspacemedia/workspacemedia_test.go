@@ -118,8 +118,8 @@ func TestPublicIDShapes(t *testing.T) {
 
 func TestSlotKeys(t *testing.T) {
 	slot := SlotKey("ws_abc123", "upload_def456", "photo.png")
-	if !strings.HasPrefix(slot, "ws-uploads/abc123/def456/") {
-		t.Fatalf("slot = %q, want workspace-isolated prefix", slot)
+	if !strings.HasPrefix(slot, "uploads/ws/abc123/def456/") {
+		t.Fatalf("slot = %q, want canonical workspace-isolated prefix", slot)
 	}
 	if !strings.HasSuffix(slot, "photo.png") {
 		t.Fatalf("slot = %q, want sanitized filename suffix", slot)
@@ -134,10 +134,6 @@ func TestSlotKeys(t *testing.T) {
 	}
 	if got := SanitizeFilename(""); got != "upload.bin" {
 		t.Fatalf("SanitizeFilename empty = %q", got)
-	}
-	derivative := DerivativeSlotKey("ws_abc123", "asset_def456", "thumb", ".webp")
-	if derivative != "ws-uploads/abc123/def456/derivatives/thumb.webp" {
-		t.Fatalf("derivative slot = %q", derivative)
 	}
 }
 

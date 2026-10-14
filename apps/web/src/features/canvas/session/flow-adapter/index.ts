@@ -83,6 +83,7 @@ export { provideCanvasHandleProximityCoordinator } from './handles/useCanvasHand
 export { useFlowCanvasNodeHandleRail } from './handles/useFlowCanvasNodeHandleRail'
 export { useFlowNodeHandlesPresentation } from './handles/useFlowNodeHandlesPresentation'
 export { useDisplayImagePreview } from './projection/useDisplayImagePreview'
+export { useTierFallback } from './projection/useTierFallback'
 export { useCanvasImagePreviewQuality } from './viewport/useCanvasImagePreviewQuality'
 export { useImageStageRegistry } from './viewport/useImageStageRegistry'
 export {

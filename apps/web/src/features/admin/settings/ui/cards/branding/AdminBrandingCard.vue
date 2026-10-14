@@ -79,7 +79,7 @@
               v-model="brandingForm.logo_url"
               autocomplete="off"
               maxlength="2048"
-              placeholder="/uploads/site/assets/logo.png"
+              placeholder="https://example.com/logo.png"
               :disabled="isBrandingLoading || isBrandingSaving || uploading"
               @keyup.enter="saveBranding()"
             />

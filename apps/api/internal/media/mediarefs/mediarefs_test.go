@@ -5,18 +5,6 @@ import (
 	"testing"
 )
 
-func TestValidateUploadPath(t *testing.T) {
-	if _, err := ValidateUploadPath("/uploads/tasks/42/task-1/output/a.png"); err != nil {
-		t.Fatalf("expected valid upload path, got %v", err)
-	}
-	if _, err := ValidateUploadPath("/uploads/2026/05/13/a.png"); err == nil {
-		t.Fatalf("expected generic upload path to fail")
-	}
-	if _, err := ValidateUploadPath("/tmp/a.png"); err == nil {
-		t.Fatalf("expected invalid non-upload path")
-	}
-}
-
 func TestParseDataImageURL(t *testing.T) {
 	okData := "data:image/png;base64,aGVsbG8="
 	parsed, err := ParseDataImageURL(okData, 10)

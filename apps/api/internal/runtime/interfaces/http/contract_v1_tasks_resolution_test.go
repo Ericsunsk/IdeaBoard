@@ -3,8 +3,6 @@ package httpapi
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 type v1RoutingFixture struct {

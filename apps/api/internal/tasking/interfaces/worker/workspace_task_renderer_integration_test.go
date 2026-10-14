@@ -3,7 +3,7 @@ package worker
 // Renderer over fixture PostgreSQL (#827, Phase 4b-03 of #809):
 // task completes -> rendered output created as a workspace-scoped media
 // asset row -> task_outputs ref persisted through the atomic Complete
-// path -> derivative tiers generated. SKIPs gracefully without
+// path. SKIPs gracefully without
 // API_TEST_DATABASE_DSN (same harness as
 // workspace_task_worker_integration_test.go).
 //
@@ -11,8 +11,10 @@ package worker
 // checksum, standing in for provider bytes without credentials) flows
 // through request shaping + result mapping + the #827 renderer into a NEW
 // media_assets row (bytes via the objects seam, format validated via
-// imageformat), the Complete persists the asset ref through task_outputs
-// (ListTaskAssets reads it back), and sequential #820 derivatives land.
+// imageformat) and the Complete persists the asset ref through task_outputs
+// (ListTaskAssets reads it back). Completion records no derivative rows:
+// display tiers resolve on demand through signed imgproxy URLs (ADR-0007
+// pull model).
 // The deterministic-failure twin (TestWorkspaceWorkerDeterministicFailurePostgres)
 // keeps proving the creds-gated path converges without them.
 
@@ -42,7 +44,7 @@ func rendererIntegrationPNG(t *testing.T) ([]byte, string) {
 
 // Success: submit -> worker claims -> fake gateway yields a remote ref ->
 // renderer ingests a new asset -> completed with the asset ref mapped
-// through task_outputs, derivatives recorded.
+// through task_outputs.
 func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	env := openWorkspaceIntegrationEnv(t)
 	ctx := context.Background()
@@ -64,7 +66,6 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
 			return append([]byte(nil), png...), nil
 		}),
-		Derivatives: &fakeTaskRenderer{},
 	})
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)
@@ -133,9 +134,5 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].Asset.ID != renderedID || items[0].Role != "result" {
 		t.Fatalf("task assets = %+v, want the rendered asset with role", items)
-	}
-	derivatives, err := env.media.ListDerivatives(ctx, env.wsA, renderedID)
-	if err != nil || len(derivatives) != 3 {
-		t.Fatalf("derivatives = %+v %v, want 3 sequential tiers", derivatives, err)
 	}
 }

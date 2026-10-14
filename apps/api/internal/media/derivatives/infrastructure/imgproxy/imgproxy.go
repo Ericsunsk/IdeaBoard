@@ -6,9 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/media/derivatives/domain"
+	storagedomain "ideaboard/api/internal/media/storage/domain"
 )
 
 // Config carries the imgproxy deployment binding. Key/Salt are hex-encoded
@@ -58,10 +61,8 @@ func (c Config) SignPath(path string) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
-// TierURL builds a signed pull URL that renders the source object at the
-// tier geometry as webp. Source is an imgproxy source URL such as
-// local:///<storage-key> or s3://<bucket>/<key>.
-func (c Config) TierURL(tier, source string) (string, error) {
+// TierURL signs an expiring webp rendition using the domain tier geometry.
+func (c Config) TierURL(tier, source string, expires time.Time) (string, error) {
 	spec, ok := domain.TierSpecs[strings.TrimSpace(tier)]
 	if !ok {
 		return "", fmt.Errorf("unknown imgproxy tier %q", tier)
@@ -74,6 +75,38 @@ func (c Config) TierURL(tier, source string) (string, error) {
 		return "", err
 	}
 	path := fmt.Sprintf("/rs:fit:%d:%d/plain/%s@webp", side, side, strings.TrimSpace(source))
+	return c.signWithExpiry(path, expires)
+}
+
+// AvatarSizes is the closed display-size whitelist for profile avatars.
+// The frontend maps devicePixelRatio to the next size up; anything else
+// is rejected before signing.
+var AvatarSizes = []int{32, 64, 128, 256}
+
+// DefaultAvatarSize serves callers that omit the size query.
+const DefaultAvatarSize = 64
+
+// AvatarURL builds a signed pull URL that renders the source object as a
+// square webp crop with the given expiry.
+func (c Config) AvatarURL(size int, source string, expires time.Time) (string, error) {
+	if !slices.Contains(AvatarSizes, size) {
+		return "", fmt.Errorf("unknown avatar size %d", size)
+	}
+	if strings.TrimSpace(source) == "" {
+		return "", fmt.Errorf("imgproxy source is required")
+	}
+	if err := c.Validate(); err != nil {
+		return "", err
+	}
+	path := fmt.Sprintf("/rs:fill:%d:%d/plain/%s@webp", size, size, strings.TrimSpace(source))
+	return c.signWithExpiry(path, expires)
+}
+
+func (c Config) signWithExpiry(path string, expires time.Time) (string, error) {
+	if expires.IsZero() {
+		return "", fmt.Errorf("imgproxy expiry is required")
+	}
+	path = fmt.Sprintf("/exp:%d%s", expires.Unix(), path)
 	signature, err := c.SignPath(path)
 	if err != nil {
 		return "", err
@@ -81,33 +114,54 @@ func (c Config) TierURL(tier, source string) (string, error) {
 	return strings.TrimSuffix(strings.TrimSpace(c.BaseURL), "/") + "/" + signature + path, nil
 }
 
-// LocalSource maps a builtin-local storage key to an imgproxy source URL.
-//
-// Storage keys are relative to the app working directory and always start
-// with the uploads root (see UploadObjectRoot). Compose mounts that root at
-// /data/uploads, while IMGPROXY_LOCAL_FILESYSTEM_ROOT points at /data, so the
-// uploads segment must remain part of the source path.
-//
-// The local:// scheme treats the segment between the slashes as a host and the
-// rest as a path relative to IMGPROXY_LOCAL_FILESYSTEM_ROOT. An absolute path
-// therefore needs the empty host form — "local:///<key>" — or imgproxy resolves
-// the key against the wrong directory and 404s.
+// rejectDotSegments reports whether key contains an empty or dot path
+// segment. LocalSource and S3Source share this traversal discipline;
+// callers keep their own error context.
+func rejectDotSegments(key string) bool {
+	for _, segment := range strings.Split(key, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+// LocalSource maps an uploads key to the imgproxy local filesystem root.
+// Compose mounts uploads beneath /data, so the root stays in the source path.
 func LocalSource(storageKey string) (string, error) {
-	key := strings.TrimPrefix(strings.TrimSpace(storageKey), "/")
+	key := strings.TrimSpace(storageKey)
 	if key == "" {
 		return "", fmt.Errorf("imgproxy local source key is required")
 	}
-	// Storage keys are relative to the uploads mount. Requiring the canonical
-	// root and rejecting empty/dot segments prevents directory resolution and
-	// path traversal even if a malformed key reaches this boundary.
+	// Requiring a known root and rejecting empty/dot segments prevents
+	// directory resolution and path traversal even if a malformed key
+	// reaches this boundary.
 	segments := strings.Split(key, "/")
-	if len(segments) < 2 || segments[0] != "uploads" {
-		return "", fmt.Errorf("imgproxy local source key must be below the uploads root")
+	if len(segments) < 2 || segments[0] != storagedomain.UploadObjectRoot {
+		return "", fmt.Errorf("imgproxy local source key must be below a known uploads root")
 	}
-	for _, segment := range segments {
-		if segment == "" || segment == "." || segment == ".." {
-			return "", fmt.Errorf("imgproxy local source key contains an invalid path segment")
-		}
+	if rejectDotSegments(key) {
+		return "", fmt.Errorf("imgproxy local source key contains an invalid path segment")
 	}
 	return "local:///" + key, nil
+}
+
+// S3Source maps a canonical key to the active profile's bucket.
+// Deployment credentials and IMGPROXY_ALLOWED_SOURCES enforce renderer access.
+func S3Source(bucket, storageKey string) (string, error) {
+	name := strings.TrimSpace(bucket)
+	if name == "" {
+		return "", fmt.Errorf("imgproxy s3 source bucket is required")
+	}
+	if name == "." || name == ".." || strings.Contains(name, "/") {
+		return "", fmt.Errorf("imgproxy s3 source bucket contains an invalid path segment")
+	}
+	key := strings.TrimSpace(storageKey)
+	if key == "" {
+		return "", fmt.Errorf("imgproxy s3 source key is required")
+	}
+	if rejectDotSegments(key) {
+		return "", fmt.Errorf("imgproxy s3 source key contains an invalid path segment")
+	}
+	return "s3://" + name + "/" + key, nil
 }

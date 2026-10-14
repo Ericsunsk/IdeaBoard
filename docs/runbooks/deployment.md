@@ -28,6 +28,7 @@
 > 账号安全与业务运维的职责边界请同时参考 [auth-operations.md](./auth-operations.md)；PostgreSQL backup / restore 的密钥材料处理规则见 [data-protection.md](./data-protection.md)。
 
 <a id="deployment-profile"></a>
+
 ## 部署概览
 
 本文档覆盖当前推荐生产路径：`Cloudflare Pages + Cloudflare DNS/Proxy + VPS Reverse Proxy + GHCR + Docker Compose`。
@@ -38,7 +39,7 @@ graph LR
     Gateway --> CFProxy["Cloudflare DNS/Proxy"]
     CFProxy --> EdgeProxy["VPS Reverse Proxy<br>:443"]
     EdgeProxy -- "/api/auth" --> Auth["ideaboard-auth<br>127.0.0.1:6001"]
-    EdgeProxy -- "/api /uploads" --> API["ideaboard-api<br>127.0.0.1:6000"]
+    EdgeProxy -- "/api" --> API["ideaboard-api<br>127.0.0.1:6000"]
     Auth --> Postgres[("PostgreSQL volume")]
     API --> Postgres
     API --> NATS["NATS JetStream volume"]
@@ -48,7 +49,7 @@ graph LR
 
 - Cloudflare Pages 托管 `apps/web/dist`，并由 `ideaboard.art` Gateway 暴露应用。
 - Cloudflare DNS/Proxy 暴露 `ideaboard.art` 并提供 WAF / Rate Limiting / Cache Rules。
-- VPS 宿主机 Nginx 反代同域 `/api/*`、`/api/auth/*`、`/uploads/*` 到 Docker Compose 中的 API/Auth。
+- VPS 宿主机 Nginx 反代同域 `/api/*`、`/api/auth/*` 到 Docker Compose 中的 API/Auth。媒体通过 Media Asset、public avatar/logo API 返回图片字节；imgproxy 只接受 API 内部的签名渲染请求。
 - Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
 - River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
 
@@ -56,15 +57,15 @@ graph LR
 
 Pages 项目建议配置：
 
-| 项目 | 值 |
-|------|----|
-| Root directory | `apps/web` |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Environment variable | `NODE_VERSION`（与根目录 `.node-version` 一致） |
-| Environment variable | Leave `VITE_API_BASE_URL` and `VITE_PUBLIC_ASSET_BASE_URL` empty (same-origin Gateway) |
+| 项目                    | 值                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| Root directory          | `apps/web`                                                                                 |
+| Build command           | `npm run build`                                                                            |
+| Build output directory  | `dist`                                                                                     |
+| Environment variable    | `NODE_VERSION`（与根目录 `.node-version` 一致）                                            |
+| Environment variable    | Leave `VITE_API_BASE_URL` and `VITE_PUBLIC_ASSET_BASE_URL` empty (same-origin Gateway)     |
 | Pages Function variable | `IDEABOARD_API_ORIGIN=<current VPS API HTTPS origin>` (required; no retired-host fallback) |
-| Auth public origin | Derived from the current browser origin (`ideaboard.art`) |
+| Auth public origin      | Derived from the current browser origin (`ideaboard.art`)                                  |
 
 VPS 侧至少同步：
 
@@ -88,19 +89,21 @@ Proxy status: Proxied
 VPS 防火墙只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000`、`127.0.0.1:6001` 和仅供监控使用的 `127.0.0.1:9091`，不要把 `6000/6001/9091/PostgreSQL/NATS` 暴露到公网。
 
 <a id="cloudflare-edge-hardening"></a>
+
 ## Cloudflare 加固
 
 生产 Gateway 域名默认使用 `Proxied`；临时切到 `DNS only` 时，Cloudflare WAF、Rate Limiting、Cache Rules 和源站 allowlist 均不再生效，上线前必须切回并复验。
 
 - Origin 防火墙：VPS 安全组 / `ufw` 只开放 SSH、80、443；80/443 入站只允许 Cloudflare IP ranges 到达源站，或使用等价的源站防火墙策略。
 - 真实客户端 IP：宿主机反代层只信任 Cloudflare 来源，并通过 `CF-Connecting-IP` 恢复真实客户端 IP，再向 API/Auth 传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`。
-- Cache Rules：对 `/api/*`、`/api/auth/*`、SSE 任务状态接口、上传写入接口，以及所有带 `Authorization` 或 session Cookie 的请求设置 bypass cache。`/uploads/*` 可单独按素材访问策略缓存。
+- Cache Rules：对 `/api/*`、`/api/auth/*`、SSE 任务状态接口、上传写入接口，以及所有带 `Authorization` 或 session Cookie 的请求设置 bypass cache。图片响应的缓存策略由 API 的 `Cache-Control` 决定，网关不得延长缓存。
 - Metrics：API 使用独立 Prometheus listener；compose 默认仅将 `9091` 绑定到宿主机 `127.0.0.1`。监控系统抓取 `/metrics`，Nginx/Cloudflare 不得代理该端口或路径。
 - Rate Limiting / WAF：至少覆盖 `/api/auth/*`、管理员接口、上传接口、任务提交接口。对 `POST /api/v1/workspaces/{workspace_id}/rewards/redemptions` 按可信客户端 IP 设置初始 `60 attempts / 10 minutes` coarse limit；Cloudflare 使用 `CF-Connecting-IP`，源站反代仅在请求确由 Cloudflare allowlist 到达时信任该值。该 edge rule 与应用内 per-user `10 attempts / 10 minutes` limiter 共同生效。首次启用建议先用 log / challenge / captcha 灰度观察误伤，再切换到 block。
 - Pages 环境隔离：production 的 `VITE_API_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL` 必须为空并使用同域 Gateway；preview 不连接生产 API/Auth/数据库。
 - HTTPS / HSTS：SSL/TLS 使用 `Full (strict)`；Always Use HTTPS 和 HSTS 先灰度，不要一开始启用 `preload` 或 `includeSubDomains`。
 
 <a id="recommended-docker"></a>
+
 ## Docker 部署
 
 推荐方式是 CI 构建镜像并推送到 GHCR，VPS 只拉取镜像和启动容器：
@@ -151,13 +154,13 @@ restrict,command="/usr/local/libexec/ideaboard-production-deploy" ssh-ed25519 <p
 
 在 GitHub repository 中创建名为 `production` 的 Environment，并只配置以下连接值：
 
-| 类型 | 名称 | 用途 |
-| ---- | ---- | ---- |
-| Variable | `VPS_HOST` | VPS 的已验证 hostname 或 IPv4 address |
-| Variable | `VPS_SSH_PORT` | SSH port，例如 `5522` |
-| Variable | `VPS_DEPLOY_USER` | forced command 所属用户；当前部署为 `root` |
-| Secret | `VPS_DEPLOY_PRIVATE_KEY` | 上述专用 Ed25519 private key |
-| Secret | `VPS_KNOWN_HOSTS` | 与 `VPS_HOST`、`VPS_SSH_PORT` 精确匹配的 pinned OpenSSH host-key entry |
+| 类型     | 名称                     | 用途                                                                   |
+| -------- | ------------------------ | ---------------------------------------------------------------------- |
+| Variable | `VPS_HOST`               | VPS 的已验证 hostname 或 IPv4 address                                  |
+| Variable | `VPS_SSH_PORT`           | SSH port，例如 `5522`                                                  |
+| Variable | `VPS_DEPLOY_USER`        | forced command 所属用户；当前部署为 `root`                             |
+| Secret   | `VPS_DEPLOY_PRIVATE_KEY` | 上述专用 Ed25519 private key                                           |
+| Secret   | `VPS_KNOWN_HOSTS`        | 与 `VPS_HOST`、`VPS_SSH_PORT` 精确匹配的 pinned OpenSSH host-key entry |
 
 `VPS_KNOWN_HOSTS` 必须通过现有可信管理通道核对服务器 host-key fingerprint 后填写；不要在首次 deployment 中盲目信任 `ssh-keyscan` 的结果。数据库密码、Better Auth、Stripe、Resend、OAuth、encryption key 和 GHCR runtime credential 继续只保存在 VPS 的 root-only `.env`，不得复制到 GitHub Environment。
 
@@ -344,7 +347,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-如果 VPS 已经有 certbot 或自管的 `443 ssl` server block，可以把生成文件里的 `/api`、`/api/auth`、`/uploads` location 合并进现有 `ideaboard.art` server block。同时必须在该 HTTPS vhost（以及 Nginx Proxy Manager 对应的 HTTPS Proxy Host）中保留 `api.ideaboard.art` 的独立 reject 规则，返回 `444` 或直接拒绝连接，避免 retired API hostname 在 TLS 层落入主站 vhost。
+如果 VPS 已经有 certbot 或自管的 `443 ssl` server block，可以把生成文件里的 `/api`、`/api/auth` location 合并进现有 `ideaboard.art` server block。同时必须在该 HTTPS vhost（以及 Nginx Proxy Manager 对应的 HTTPS Proxy Host）中保留 `api.ideaboard.art` 的独立 reject 规则，返回 `444` 或直接拒绝连接，避免 retired API hostname 在 TLS 层落入主站 vhost。
 
 默认 upstream 是宿主机 loopback 端口：
 
@@ -433,6 +436,7 @@ go test ./internal/payments -run TestStripeTestModeSmoke -count=1
 通过后才由管理员保存 Stripe 配置并开启充值。配置准备失败会保留旧配置；如 Live 验收、税务确认或 provider health 出现问题，先关闭充值作为回滚入口，再处理 Stripe Dashboard 与 River 对账。
 
 <a id="operations"></a>
+
 ## 日常运维
 
 常用命令：
@@ -459,14 +463,14 @@ ideaboard delete --yes
 
 数据库连接池按部署调优（`apps/api/.env.example` 同步注释）：
 
-| 变量 | 默认 | 范围 | 说明 |
-|------|------|------|------|
-| `DB_POOL_MAX_OPEN` | 25 | 1–64 | `database/sql` 池上限 |
-| `DB_POOL_MAX_IDLE` | 10 | 0–64 | idle 上限，超过 open 上限自动 clamp |
-| `DB_POOL_MAX_LIFETIME_MINUTES` | 30 | 1–1440 | 连接复用最大年龄（NAT/pgbouncer 后防 stale socket） |
-| `DB_POOL_MAX_IDLE_MINUTES` | 5 | 1–1440 | idle 连接回收 |
-| `RIVER_POOL_MAX_CONNS` | 10 | 1–32 | River pgxpool 上限 |
-| `RIVER_POOL_MIN_CONNS` | 1 | 1–16 | River pgxpool 下限，不超过上限 |
+| 变量                           | 默认 | 范围   | 说明                                                |
+| ------------------------------ | ---- | ------ | --------------------------------------------------- |
+| `DB_POOL_MAX_OPEN`             | 25   | 1–64   | `database/sql` 池上限                               |
+| `DB_POOL_MAX_IDLE`             | 10   | 0–64   | idle 上限，超过 open 上限自动 clamp                 |
+| `DB_POOL_MAX_LIFETIME_MINUTES` | 30   | 1–1440 | 连接复用最大年龄（NAT/pgbouncer 后防 stale socket） |
+| `DB_POOL_MAX_IDLE_MINUTES`     | 5    | 1–1440 | idle 连接回收                                       |
+| `RIVER_POOL_MAX_CONNS`         | 10   | 1–32   | River pgxpool 上限                                  |
+| `RIVER_POOL_MIN_CONNS`         | 1    | 1–16   | River pgxpool 下限，不超过上限                      |
 
 单实例连接预算 = `DB_POOL_MAX_OPEN + RIVER_POOL_MAX_CONNS`（默认 35），必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）。改动重启 API 后生效；非法值回退默认并在生产启动期直接失败（`Config.InvalidEnv`），开发环境仅 warning。
 
@@ -474,14 +478,14 @@ ideaboard delete --yes
 
 River 重试矩阵是代码持有的 typed policy（事实源 `internal/platform/riverpolicy.RiverRetryMatrix`，insert 点引用同包常量，改预算只改一处）：
 
-| Queue | MaxAttempts | 说明 |
-|-------|-------------|------|
-| `drawing_default`（`drawing_generate` + settlement-only `drawing_final_failure`） | 25 | panic/process error/基础设施故障的队列层重试；provider transient 在预算内最多 2 次整任务重投（`tasks.retry_count` 为界） |
-| `credit_reconciliation` | 5 | 对账卡住直接告警，不 churn |
-| `payment_reconciliation` / `payment_checkout_shutdown` | 8 | Stripe/DB transient 重试 |
-| `task_retention` | 3 | 串行 purge，失败立即暴露 |
-| `vision_billing` | 5 | 快照对账 |
-| `media_reclamation` | 10 | 存储抖动偏 transient，预算高于其他维护队列 |
+| Queue                                                                             | MaxAttempts | 说明                                                                                                                     |
+| --------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `drawing_default`（`drawing_generate` + settlement-only `drawing_final_failure`） | 25          | panic/process error/基础设施故障的队列层重试；provider transient 在预算内最多 2 次整任务重投（`tasks.retry_count` 为界） |
+| `credit_reconciliation`                                                           | 5           | 对账卡住直接告警，不 churn                                                                                               |
+| `payment_reconciliation` / `payment_checkout_shutdown`                            | 8           | Stripe/DB transient 重试                                                                                                 |
+| `task_retention`                                                                  | 3           | 串行 purge，失败立即暴露                                                                                                 |
+| `vision_billing`                                                                  | 5           | 快照对账                                                                                                                 |
+| `media_reclamation`                                                               | 10          | 存储抖动偏 transient，预算高于其他维护队列                                                                               |
 
 attempt 间隔为 River 默认指数 backoff + jitter。全部 7 个队列的 depth/lag 都有独立 gauge（`ideaboard_river_queue_depth{queue}` / `ideaboard_river_queue_lag_seconds{queue}`，15s 刷新），排障见 [backend-metrics.md](./backend-metrics.md) C 节（按 queue 逐个看，不要只看 `drawing_default`）。
 
@@ -511,6 +515,7 @@ OpenAPI breaking-change 门禁：CI `API / OpenAPI Breaking Changes` job 用 oas
 5. 检查 `/opt/stacks/ideaboard-backups/`
 
 <a id="rewards-operations-and-rollback"></a>
+
 ## Rewards 运维与回滚
 
 ### HMAC two-stage rotation
@@ -533,6 +538,7 @@ Rewards 没有 Feature Flag。发生需要立即停止兑换或管理写入的�
 一旦存在 Redemption，禁止执行会删除 Rewards 数据的 destructive down migration，也禁止删除对应 Credits Ledger facts。应用回滚保留 Rewards schema 与历史事实；旧 image 可以暂不使用这些表。DB restore 是独立、人工确认的操作，不随 image rollback 自动执行。
 
 <a id="upgrade-and-rollback"></a>
+
 ## 升级与回滚
 
 ### 回滚决策
@@ -545,16 +551,16 @@ Image rollback 只替换容器镜像与前端静态资源，不撤销 PostgreSQL
 
 ### Media storage cutover
 
-Media 统一使用 `media_assets.storage_profile_id` + `storage_key` 作为对象定位；业务表和 Canvas 只持久化 Media Asset API URL。切换 Local / S3-compatible profile 时按以下顺序执行：
+Workspace Media 固定以 `builtin-local` + `storage_key` 定位对象；avatar 与 logo 使用当前 active profile，业务表和 Canvas 只持久化 Media Asset API URL。切换 Local / S3-compatible profile 时按以下顺序执行：
 
 1. 先确认目标 profile 已通过 Admin storage test，并在隔离对象上完成 upload、read、公开 URL 和 delete smoke；确认 API 与 Web 使用同一 release manifest。
-2. 部署 API/Worker 与 Web；等待 health、River 和 derivative worker 全部 ready，再在 Admin 中 Apply 目标 storage profile。不要先手工移动 `/uploads` 文件或直接改数据库中的 `storage_key`。
-3. 用真实用户流程验证 Canvas upload/reload、Admin logo、avatar、task output 和 Library materialization；再运行 `docker exec ideaboard-api /app/ideaboard-server media-reclamation scan`，记录 `stale_uploading_assets`、`orphan_assets`、`pending_deletion_assets` 与 derivative counters。
+2. 更换 active profile 前，必须将全部 avatar 与 logo 按原 key 复制到目标存储并验证可读，再在 Admin 中 Apply 目标 profile；目标 profile 的 imgproxy credentials 与 source allowlist 必须同步配置。
+3. 用真实用户流程验证 Canvas upload/reload、Admin logo、avatar、task output 和 Library materialization；再运行 `docker exec ideaboard-api /app/ideaboard-server media-reclamation scan`，记录 `stale_uploading_assets`、`orphan_assets` 与 `pending_deletion_assets`。
 4. 切换后保留原 profile 及其对象至少一个 `GracePeriod`（当前 24 小时），只允许通过 Media reclamation worker 删除已确认无引用对象。确认稳定后再由 Admin 禁用旧 profile。
 
-失败时先在 Admin Apply 上一个已验证 profile，并执行 API/Web smoke；不要回滚数据库或删除对象。若失败发生在 migration 之后，按本节 image rollback + backup 评估流程处理，Media Asset 的 profile/key 记录仍是事实源。
+失败时先在 Admin Apply 上一个已验证 profile，并执行 API/Web smoke；不要回滚数据库或删除对象。若失败发生在 migration 之后，按本节 image rollback + backup 评估流程处理，Media Asset 的 `storage_key` 记录仍是事实源。
 
-对象 orphan 检查必须以数据库引用反查 provider listing：分别导出 `media_assets` 中未删除对象和 `media_derivatives` 中 `ready` 对象的 `(storage_profile_id, storage_key)`，与各 profile 的 object listing 做集合差异；差异对象先标记、观察一个 `GracePeriod`，禁止直接批量删除。Local profile 通过挂载的 `api-uploads` volume 只读扫描，S3-compatible profile 使用 provider CLI/API 的 prefix listing；扫描输出不得包含 access key、signed URL 或用户内容。
+对象 orphan 检查必须以数据库引用反查 provider listing：导出 `media_assets` 中未归档对象的 `storage_key` 并归入 `builtin-local`，再按 active profile 纳入用户 avatar 与站点 logo 引用，与各 profile 的 object listing 做集合差异；差异对象先标记、观察一个 `GracePeriod`，禁止直接批量删除。Local profile 通过挂载的 `api-uploads` volume 只读扫描，S3-compatible profile 使用 provider CLI/API 的 prefix listing；扫描输出不得包含 access key、signed URL 或用户内容。
 
 升级：
 

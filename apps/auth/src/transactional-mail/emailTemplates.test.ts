@@ -76,12 +76,22 @@ describe('emailTemplates', () => {
       'https://app.example.com/favicon.svg',
     )
     assert.equal(
-      resolveBrandingLogoUrl('/uploads/site/assets/logo.png', 'https://app.example.com'),
-      'https://app.example.com/uploads/site/assets/logo.png',
+      resolveBrandingLogoUrl(
+        'uploads/site/assets/logo_abcdef1234567890.png',
+        'https://app.example.com',
+      ),
+      'https://app.example.com/api/v1/public/branding/logo?key=uploads%2Fsite%2Fassets%2Flogo_abcdef1234567890.png',
     )
     assert.equal(
-      resolveBrandingLogoUrl('/uploads/site/assets/logo.png', 'http://localhost:5173'),
-      'http://localhost:5173/uploads/site/assets/logo.png',
+      resolveBrandingLogoUrl(
+        '/uploads/site/assets/logo_abcdef1234567890.png',
+        'http://localhost:5173',
+      ),
+      'http://localhost:5173/favicon.svg',
+    )
+    assert.equal(
+      resolveBrandingLogoUrl('/api/v1/public/branding/logo', 'https://app.example.com'),
+      'https://app.example.com/api/v1/public/branding/logo',
     )
     assert.equal(
       resolveBrandingLogoUrl('https://cdn.example.com/logo.png', 'http://localhost:5173'),

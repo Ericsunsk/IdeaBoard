@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -35,8 +34,8 @@ func mustCreateSession(t *testing.T, ctx context.Context, store WorkspaceMediaSt
 	if session.Status != StatusPending {
 		t.Fatalf("session status = %q, want pending", session.Status)
 	}
-	if !strings.HasPrefix(session.StorageKey, "ws-uploads/") {
-		t.Fatalf("storage key = %q, want reserved ws-uploads slot", session.StorageKey)
+	if !strings.HasPrefix(session.StorageKey, "uploads/ws/") {
+		t.Fatalf("storage key = %q, want reserved canonical uploads/ws slot", session.StorageKey)
 	}
 	return session
 }
@@ -214,136 +213,6 @@ func TestMemoryUpdateMetadata(t *testing.T) {
 	}
 	if _, err := store.UpdateAssetMetadata(ctx, "ws_a", "asset_missing0001", UpdateMetadataParams{}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("update unknown err = %v, want not found", err)
-	}
-}
-
-// fakeDerivativeObjects is a map-backed DerivativeObjects fake.
-type fakeDerivativeObjects struct {
-	objects map[string][]byte
-	missing bool
-}
-
-func (f *fakeDerivativeObjects) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*storageports.StoredUploadObject, error) {
-	if f.missing {
-		return nil, errFakeMissing
-	}
-	data := f.objects[objectKey]
-	if len(data) == 0 {
-		return nil, errFakeMissing
-	}
-	return &storageports.StoredUploadObject{ObjectKey: objectKey, ContentType: "image/png", Data: data}, nil
-}
-
-func (f *fakeDerivativeObjects) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
-	if f.objects == nil {
-		f.objects = make(map[string][]byte)
-	}
-	f.objects[objectKey] = append([]byte(nil), data...)
-	return nil
-}
-
-var errFakeMissing = errors.New("fake: object missing")
-
-// fakeRenderer returns canned webp bytes with requested maxSide dims.
-type fakeRenderer struct {
-	calls    []int
-	mime     string
-	failOn   int
-	emptyOut bool
-}
-
-func (f *fakeRenderer) Render(ctx context.Context, data []byte, sourceName string, maxSide int) ([]byte, int, int, string, error) {
-	f.calls = append(f.calls, maxSide)
-	if f.failOn == len(f.calls) {
-		return nil, 0, 0, "", errors.New("fake: render failed")
-	}
-	if f.emptyOut {
-		return nil, 0, 0, "", nil
-	}
-	mime := f.mime
-	if mime == "" {
-		mime = "image/webp"
-	}
-	return []byte("webp-bytes-" + string(rune('0'+len(f.calls)))), maxSide, maxSide / 2, mime, nil
-}
-
-func TestEnsureDerivativesSequential(t *testing.T) {
-	ctx := context.Background()
-	store := newMemoryTestStore()
-	session := mustCreateSession(t, ctx, store, "ws_a", 7)
-	_, asset, err := store.CompleteSession(ctx, "ws_a", session.ID, completeFacts(), CreateAssetParams{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	objects := &fakeDerivativeObjects{objects: map[string][]byte{asset.StorageKey: []byte("png-bytes")}}
-	renderer := &fakeRenderer{}
-	records, err := EnsureDerivatives(ctx, store, objects, renderer, "ws_a", asset)
-	if err != nil {
-		t.Fatalf("EnsureDerivatives failed: %v", err)
-	}
-	if len(records) != 3 {
-		t.Fatalf("records = %d, want 3 display variants", len(records))
-	}
-	// Sequential in TierSpecs order: thumb 256, preview 640, large-preview 1280.
-	wantSides := []int{256, 640, 1280}
-	if len(renderer.calls) != len(wantSides) {
-		t.Fatalf("render calls = %v, want %v", renderer.calls, wantSides)
-	}
-	for i, want := range wantSides {
-		if renderer.calls[i] != want {
-			t.Fatalf("render calls = %v, want %v", renderer.calls, wantSides)
-		}
-		if records[i].VariantName != []string{"thumb", "preview", "large-preview"}[i] {
-			t.Fatalf("record %d variant = %q", i, records[i].VariantName)
-		}
-		if !strings.HasPrefix(records[i].StorageKey, "ws-uploads/") {
-			t.Fatalf("record %d key = %q, want ws-uploads slot", i, records[i].StorageKey)
-		}
-	}
-	listed, err := store.ListDerivatives(ctx, "ws_a", asset.ID)
-	if err != nil || len(listed) != 3 {
-		t.Fatalf("ListDerivatives = %+v %v", listed, err)
-	}
-
-	// Regeneration converges via upsert (no duplicate rows).
-	again, err := EnsureDerivatives(ctx, store, objects, renderer, "ws_a", asset)
-	if err != nil || len(again) != 3 {
-		t.Fatalf("regenerate = %+v %v", again, err)
-	}
-	listed, err = store.ListDerivatives(ctx, "ws_a", asset.ID)
-	if err != nil || len(listed) != 3 {
-		t.Fatalf("ListDerivatives after regen = %+v %v", listed, err)
-	}
-}
-
-func TestEnsureDerivativesSkips(t *testing.T) {
-	ctx := context.Background()
-	store := newMemoryTestStore()
-
-	// Non-image assets are a no-op.
-	if out, err := EnsureDerivatives(ctx, store, &fakeDerivativeObjects{}, &fakeRenderer{}, "ws_a", &Asset{ID: "asset_x", MediaKind: "video"}); err != nil || out != nil {
-		t.Fatalf("non-image = %+v %v, want no-op", out, err)
-	}
-	// Missing original bytes fail with the typed 409-class error.
-	session := mustCreateSession(t, ctx, store, "ws_a", 7)
-	_, asset, err := store.CompleteSession(ctx, "ws_a", session.ID, completeFacts(), CreateAssetParams{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = EnsureDerivatives(ctx, store, &fakeDerivativeObjects{missing: true}, &fakeRenderer{}, "ws_a", asset)
-	if !errors.Is(err, ErrDerivativeSourceMissing) {
-		t.Fatalf("missing source err = %v, want derivative source missing", err)
-	}
-	// Render failures name the variant and keep earlier tiers.
-	objects := &fakeDerivativeObjects{objects: map[string][]byte{asset.StorageKey: []byte("png-bytes")}}
-	_, err = EnsureDerivatives(ctx, store, objects, &fakeRenderer{failOn: 2}, "ws_a", asset)
-	if err == nil || !strings.Contains(err.Error(), "preview") {
-		t.Fatalf("render failure err = %v, want preview attribution", err)
-	}
-	listed, err := store.ListDerivatives(ctx, "ws_a", asset.ID)
-	if err != nil || len(listed) != 1 || listed[0].VariantName != "thumb" {
-		t.Fatalf("partial derivatives = %+v %v, want [thumb]", listed, err)
 	}
 }
 

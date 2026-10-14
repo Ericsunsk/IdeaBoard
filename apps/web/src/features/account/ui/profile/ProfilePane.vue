@@ -16,9 +16,9 @@
           >
             <Avatar class="h-full w-full">
               <AvatarImage
-                v-if="userStore.user?.avatar"
-                :src="userStore.user.avatar"
-                :alt="userStore.user.display_name"
+                v-if="sizedAvatarUrl"
+                :src="sizedAvatarUrl"
+                :alt="userStore.user?.display_name"
                 class="rounded-pill object-cover"
               />
               <AvatarFallback
@@ -103,6 +103,7 @@ import StatusBadge, { type AppStatusTone } from '../../../../core/components/Sta
 import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../session/profile/useAvatarUpload'
 import { formatDottedIsoDate } from '../../../../core/utils/dateTime'
+import { resolveSizedAvatarUrl } from '../../../../core/media/avatarUrl'
 import AccountPane from '../shared/AccountPane.vue'
 
 type ProfileField = {
@@ -116,8 +117,7 @@ const userStore = useUserStore()
 const { isUploading: isAvatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 
-// Session profile facts from `GET /api/v1/user`: display_name/role/avatar
-// plus the storage namespace, numeric status (0 = banned), and timestamps.
+const sizedAvatarUrl = computed(() => resolveSizedAvatarUrl(userStore.user?.avatar, 88))
 const isUserBanned = computed(() => userStore.user?.status === 0)
 const userRoleLabel = computed(() =>
   userStore.user?.role === 'admin'

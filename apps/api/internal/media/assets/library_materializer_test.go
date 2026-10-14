@@ -226,25 +226,6 @@ func TestLibraryMaterializeHappyPath(t *testing.T) {
 	}
 }
 
-func TestLibraryMaterializeNilRendererDefersDerivatives(t *testing.T) {
-	stubLibraryEgress(t, []string{"images.unsplash.com"})
-	fetcher := &stubLibraryFetcher{data: testLibraryPNG(t)}
-	materializer, media, _ := newLibraryMaterializerForTest(t, fetcher, nil)
-
-	ctx := WithLibraryMaterializationOwner(context.Background(), 42)
-	mediaID, err := materializer.MaterializeWorkspaceAsset(ctx, "ws_library_test", testLibraryAsset())
-	if err != nil {
-		t.Fatalf("MaterializeWorkspaceAsset: %v", err)
-	}
-	tiers, err := media.ListDerivatives(context.Background(), "ws_library_test", mediaID)
-	if err != nil {
-		t.Fatalf("ListDerivatives: %v", err)
-	}
-	if len(tiers) != 0 {
-		t.Fatalf("derivative tiers = %d, want 0 (lazy without renderer)", len(tiers))
-	}
-}
-
 func TestLibraryMaterializeProviderDeniedFailsClosed(t *testing.T) {
 	stubLibraryEgress(t, []string{"evil.example", "images.unsplash.com"})
 	fetcher := &stubLibraryFetcher{data: testLibraryPNG(t)}

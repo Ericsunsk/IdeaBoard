@@ -5,11 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -20,8 +22,25 @@ type avatarProfileRepository struct {
 	readErr, writeErr error
 }
 
+// errAvatarProfileUserNotFound is the fixture's unknown-uid signal. It
+// aliases the platform not-found sentinel so the public avatar route
+// converges it to 404 exactly like production.
+var errAvatarProfileUserNotFound = database.ErrNotFound
+
 func (r *avatarProfileRepository) GetByID(_ context.Context, id int64) (*identitydomain.User, error) {
 	return r.users[id], r.readErr
+}
+
+func (r *avatarProfileRepository) GetByStorageUID(_ context.Context, storageUID string) (*identitydomain.User, error) {
+	if r.readErr != nil {
+		return nil, r.readErr
+	}
+	for _, user := range r.users {
+		if user != nil && strings.TrimSpace(user.StorageUID) == strings.TrimSpace(storageUID) {
+			return user, nil
+		}
+	}
+	return nil, errAvatarProfileUserNotFound
 }
 
 func (r *avatarProfileRepository) UpdateAvatarByID(_ context.Context, id int64, avatar string) error {
@@ -33,12 +52,12 @@ func (r *avatarProfileRepository) UpdateAvatarByID(_ context.Context, id int64, 
 }
 
 func TestV1AvatarProfilePersistsAcrossHandlers(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, nil)
+	f := newV1MediaGapsFixture(t, nil)
 	repo := &avatarProfileRepository{users: map[int64]*identitydomain.User{
 		f.owner: {ID: f.owner, StorageUID: "AVTR01"},
 		f.other: {ID: f.other, StorageUID: "AVTR02"},
 	}}
-	deps := ContractV1Deps{Media: f.media, MediaObjects: f.objects,
+	deps := ContractV1Deps{Media: f.media, MediaObjects: f.objects, AvatarObjects: f.objects,
 		AvatarUID: NewV1AvatarDirectory(repo), AvatarProfile: NewV1AvatarProfileDirectory(repo)}
 	engine := newV1MediaTestEngine(f.store, f.dir, deps)
 	call := v1Call{method: "PUT", path: "/api/v1/user/avatar", userID: f.owner,
@@ -77,7 +96,7 @@ func TestV1AvatarProfilePersistsAcrossHandlers(t *testing.T) {
 }
 
 func TestV1AvatarProfileWriterRequired(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, nil)
+	f := newV1MediaGapsFixture(t, nil)
 	engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{
 		Media: f.media, MediaObjects: f.objects,
 		AvatarUID: &fakeAvatarUID{uid: "AVTR01"},
@@ -96,7 +115,7 @@ func TestV1AvatarProfileWriterRequired(t *testing.T) {
 // facts: storage namespace (users.storage_uid), RFC3339 timestamps,
 // numeric status, and the persisted avatar projection.
 func TestV1UserProjectsProfileFields(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, nil)
+	f := newV1MediaGapsFixture(t, nil)
 	created := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
 	updated := time.Date(2026, time.February, 3, 4, 5, 6, 0, time.UTC)
 	repo := &avatarProfileRepository{users: map[int64]*identitydomain.User{
@@ -149,7 +168,7 @@ func TestV1UserResponseMatchesPublicOpenAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	schema := doc.Paths.Value("/user").Get.Responses.Status(http.StatusOK).Value.Content["application/json"].Schema.Value
-	f := newV1MediaGapsFixture(t, false, nil)
+	f := newV1MediaGapsFixture(t, nil)
 	created := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
 	for _, tt := range []struct {
 		name    string

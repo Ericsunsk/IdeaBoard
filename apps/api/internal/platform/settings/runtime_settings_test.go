@@ -145,11 +145,11 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("rate limit = %+v, want persisted payload", rateLimit)
 	}
 
-	branding, err := service.UpdateBranding(ctx, BrandingSetting{ProjectName: "  Design Ops  ", LogoURL: "  /uploads/site/assets/logo.png  "})
+	branding, err := service.UpdateBranding(ctx, BrandingSetting{ProjectName: "  Design Ops  ", LogoURL: "  uploads/site/assets/logo_abcdef1234567890.png  "})
 	if err != nil {
 		t.Fatalf("update branding failed: %v", err)
 	}
-	if branding != (BrandingSetting{ProjectName: "Design Ops", LogoURL: "/uploads/site/assets/logo.png"}) {
+	if branding != (BrandingSetting{ProjectName: "Design Ops", LogoURL: "uploads/site/assets/logo_abcdef1234567890.png"}) {
 		t.Fatalf("branding = %+v, want normalized values", branding)
 	}
 
@@ -251,6 +251,34 @@ func TestNormalizeMediaUploadSettingRejectsOutOfRangeValues(t *testing.T) {
 	} {
 		if _, err := NormalizeMediaUploadSetting(setting); err == nil {
 			t.Fatalf("NormalizeMediaUploadSetting(%+v) succeeded, want error", setting)
+		}
+	}
+}
+
+func TestNormalizeBrandingLogo(t *testing.T) {
+	for _, value := range []string{"", "uploads/site/assets/logo_abcdef1234567890.png", "https://cdn.example.com/logo.png"} {
+		if got, err := normalizeBrandingLogo(value); err != nil || got != value {
+			t.Fatalf("normalize(%q) = %q, %v", value, got, err)
+		}
+	}
+	for _, value := range []string{"/api/v1/public/branding/logo", "/uploads/site/assets/logo_abcdef1234567890.png", "javascript:alert(1)", "uploads/site/assets/../secret.png", "uploads/site/assets/", "ftp://example.com/logo.png"} {
+		if _, err := normalizeBrandingLogo(value); err == nil {
+			t.Fatalf("accepted %q", value)
+		}
+	}
+}
+
+func TestRuntimeSettingsBrandingLogoKeyspace(t *testing.T) {
+	ctx := context.Background()
+	service := NewRuntimeSettingsService(NewSystemConfigRepository(testdb.Open(t)))
+	for _, value := range []string{"uploads/site/assets/logo_abcdef1234567890.png", "uploads/site/assets/logo_1111111111111111.png", "https://cdn.example.com/logo.png", ""} {
+		updated, err := service.UpdateBranding(ctx, BrandingSetting{ProjectName: "Acme", LogoURL: value})
+		if err != nil || updated.LogoURL != value {
+			t.Fatalf("update %q: %+v, %v", value, updated, err)
+		}
+		got, err := service.GetBranding(ctx)
+		if err != nil || got != updated {
+			t.Fatalf("read %q: %+v, %v", value, got, err)
 		}
 	}
 }

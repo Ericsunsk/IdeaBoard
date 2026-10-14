@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"mime/multipart"
 	"net/textproto"
-	"net/url"
 	"testing"
 
 	"ideaboard/api/internal/media/storage/domain"
@@ -31,51 +30,6 @@ func TestPublicUploadURL(t *testing.T) {
 	if urlNoOrigin != "/uploads/site/assets/sample.png" {
 		t.Fatalf("public URL = %q, want /uploads/site/assets/sample.png", urlNoOrigin)
 	}
-}
-
-func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
-	t.Run("virtual host style", func(t *testing.T) {
-		parsed, err := url.Parse("https://img.example.com/uploads/tasks/42/2026/04/24/demo.png")
-		if err != nil {
-			t.Fatalf("parse url failed: %v", err)
-		}
-
-		got, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed)
-		if err != nil {
-			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
-		}
-		want := "uploads/tasks/42/2026/04/24/demo.png"
-		if got != want {
-			t.Fatalf("object key = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("access domain base path is removed once", func(t *testing.T) {
-		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/tasks/42/2026/04/24/demo.png")
-		if err != nil {
-			t.Fatalf("parse url failed: %v", err)
-		}
-
-		got, err := extractObjectKeyFromAccessDomainURL("https://minio.example.com/feng-assets", parsed)
-		if err != nil {
-			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
-		}
-		want := "uploads/tasks/42/2026/04/24/demo.png"
-		if got != want {
-			t.Fatalf("object key = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("rejects mismatched host", func(t *testing.T) {
-		parsed, err := url.Parse("https://evil.example.com/uploads/tasks/42/2026/04/24/demo.png")
-		if err != nil {
-			t.Fatalf("parse url failed: %v", err)
-		}
-
-		if _, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed); err == nil {
-			t.Fatalf("expected host mismatch error")
-		}
-	})
 }
 
 func TestChecksumMultipartFile(t *testing.T) {

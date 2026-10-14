@@ -2072,10 +2072,16 @@
           "docs/frontend-seam-inventory.md: src/core/composables/useSiteBranding.ts#SITE_BRANDING_QUERY_KEY"
         ]
       },
-      "SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX": {
+      "SITE_BRANDING_LOGO_ROUTE_PATH": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/composables/useSiteBranding.ts#SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX"
+          "docs/frontend-seam-inventory.md: src/core/composables/useSiteBranding.ts#SITE_BRANDING_LOGO_ROUTE_PATH"
+        ]
+      },
+      "SITE_BRANDING_LOGO_STORAGE_KEY_PREFIX": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/composables/useSiteBranding.ts#SITE_BRANDING_LOGO_STORAGE_KEY_PREFIX"
         ]
       },
       "SiteBrandingOptions": {
@@ -6372,14 +6378,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/useBrandLogoOverrides.ts#useBrandLogoOverrides"
-        ]
-      }
-    },
-    "src/features/admin/shared/ui/serviceIcons.ts": {
-      "getServiceIcon": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/serviceIcons.ts#getServiceIcon"
         ]
       }
     },
@@ -14407,7 +14405,7 @@
       ]
     },
     "src/api/generated-query/control/control-platform/control-platform.ts": {
-      "sha256": "34e747c4f847fbead74c5b14c9f2257761f41e107c1db94856990eb2ca148004",
+      "sha256": "d2730970e1e545321403070efe0147e21376883ce7f9f960be75820864e83599",
       "exports": [
         "ApplyControlStorageProfileMutationError",
         "ApplyControlStorageProfileMutationResult",
@@ -15776,7 +15774,7 @@
       "exports": ["AddWorkspaceMemberRequestData"]
     },
     "src/api/generated-query/public/model/avatarUploadResult.ts": {
-      "sha256": "0813a4a9a1e373be9c3d34fb53c2f7915197547839732525c26ee0dd422a9894",
+      "sha256": "388d0b2693846286b5508c51c7e7225eb8ce61b30ea3f8b4febd3bf8a1d898c6",
       "exports": ["AvatarUploadResult"]
     },
     "src/api/generated-query/public/model/avatarUploadResultEnvelope.ts": {
@@ -16055,6 +16053,18 @@
       "sha256": "4e1b831ad3ca96250be824b97b54c13d1794aa521cde588135816695e31d308c",
       "exports": ["ForbiddenResponse"]
     },
+    "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts": {
+      "sha256": "c46c4332624dba0888ed2d9c0c86af3525088341a0fda2cc5b738ed4ccc0f3a1",
+      "exports": ["GetPublicBrandingLogoParams"]
+    },
+    "src/api/generated-query/public/model/getPublicUserAvatarParams.ts": {
+      "sha256": "76d23ea2bb7fc4859a73c5c06a4b36fbdb1f163f53279bb819381d8eefc79763",
+      "exports": ["GetPublicUserAvatarParams"]
+    },
+    "src/api/generated-query/public/model/getPublicUserAvatarSize.ts": {
+      "sha256": "e7fd58330e37162ebbb77b332fc4317bad930b1b6e19be9cea3932f9ae29c611",
+      "exports": ["GetPublicUserAvatarSize"]
+    },
     "src/api/generated-query/public/model/getWorkspaceUsageParams.ts": {
       "sha256": "157480284a69c0802ec73868a0afa7c3c74ff56db2c67d7139af04107332b16f",
       "exports": ["GetWorkspaceUsageParams"]
@@ -16072,7 +16082,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "7fe5676b4b12aa5438f68549427b3f0b4b57aa54202aa4003342b5132b5c4d2c",
+      "sha256": "388a8ed16220711920a0863fc07ce0637c3cf29ab70007e18ba101de538661c0",
       "exports": []
     },
     "src/api/generated-query/public/model/joinBoardRequest.ts": {
@@ -16160,11 +16170,11 @@
       "exports": ["ListWorkspaceTasksParams"]
     },
     "src/api/generated-query/public/model/mediaAsset.ts": {
-      "sha256": "e43624d8725cf83e24f531752c6a34721afb6b05c9e98961fbfe60c04eded585",
+      "sha256": "f8743fb1099b7d28244a8f003094cb34f5ac0251ec060a23e58e4a404d38a806",
       "exports": ["MediaAsset"]
     },
     "src/api/generated-query/public/model/mediaAssetDerivatives.ts": {
-      "sha256": "a6b25bfbc574aff186ebb66529f48e9cb18d571f0005cea26077b1eb50500424",
+      "sha256": "320d59e6cbd95338d04c93c58ab1fdbf56725a8e436fad721bb329bdb6cf7a80",
       "exports": ["MediaAssetDerivatives"]
     },
     "src/api/generated-query/public/model/mediaAssetEnvelope.ts": {
@@ -16520,7 +16530,7 @@
       "exports": ["UploadTargetKind"]
     },
     "src/api/generated-query/public/model/user.ts": {
-      "sha256": "4b698a7c357369224325d0b7c75b7b2468ab1476a275d5c2f7621b8d0bee6bd1",
+      "sha256": "9df7ff66783d340ffb98201d61aceca1aebedfa832ae7238b1c9b3d626509481",
       "exports": ["User"]
     },
     "src/api/generated-query/public/model/userEnvelope.ts": {
@@ -16761,8 +16771,12 @@
       ]
     },
     "src/api/generated-query/public/user/user.ts": {
-      "sha256": "bec1cb4809ac341a5e5a4e0442b89a77fe73cf0528a7283c4116a0176611e8fd",
+      "sha256": "8f7c4219a94974aa23101098d7d340fccd911bb7f703ff20630c097dd88cb902",
       "exports": [
+        "GetPublicBrandingLogoQueryError",
+        "GetPublicBrandingLogoQueryResult",
+        "GetPublicUserAvatarQueryError",
+        "GetPublicUserAvatarQueryResult",
         "GetSupportChannelsQueryError",
         "GetSupportChannelsQueryResult",
         "GetUserQueryError",
@@ -16771,18 +16785,28 @@
         "UploadAvatarMutationError",
         "UploadAvatarMutationResult",
         "UploadAvatarMutationVariables",
+        "getGetPublicBrandingLogoQueryKey",
+        "getGetPublicBrandingLogoQueryOptions",
+        "getGetPublicBrandingLogoUrl",
+        "getGetPublicUserAvatarQueryKey",
+        "getGetPublicUserAvatarQueryOptions",
+        "getGetPublicUserAvatarUrl",
         "getGetSupportChannelsQueryKey",
         "getGetSupportChannelsQueryOptions",
         "getGetSupportChannelsUrl",
         "getGetUserQueryKey",
         "getGetUserQueryOptions",
         "getGetUserUrl",
+        "getPublicBrandingLogo",
+        "getPublicUserAvatar",
         "getSupportChannels",
         "getUploadAvatarMutationKey",
         "getUploadAvatarMutationOptions",
         "getUploadAvatarUrl",
         "getUser",
         "uploadAvatar",
+        "useGetPublicBrandingLogo",
+        "useGetPublicUserAvatar",
         "useGetSupportChannels",
         "useGetUser",
         "useUploadAvatar"
@@ -16971,7 +16995,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-media/workspace-media.ts": {
-      "sha256": "9b8b29ce88f8f76b3e551521fd9b1c1b0a5a1dfe982ad025a122973c40b9be31",
+      "sha256": "3bbb33ac2237d7d26f5c937fe6fe67ca4641967f610f6315fa25ce8fd5f4311c",
       "exports": [
         "ArchiveWorkspaceMediaAssetMutationError",
         "ArchiveWorkspaceMediaAssetMutationResult",

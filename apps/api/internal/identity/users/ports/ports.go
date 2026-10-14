@@ -35,6 +35,7 @@ type AdminUserListItem struct {
 	Providers        []string  `json:"providers"`
 	DisplayName      string    `json:"display_name"`
 	Avatar           string    `json:"avatar,omitempty"`
+	StorageUID       string    `json:"storage_uid,omitempty"`
 	Role             string    `json:"role"`
 	Status           int16     `json:"status"`
 	CreatedAt        time.Time `json:"created_at"`

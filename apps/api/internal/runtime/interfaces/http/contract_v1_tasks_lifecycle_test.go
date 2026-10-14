@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestV1TaskRoutingUnavailableBeforeQuoteOrHold(t *testing.T) {
@@ -306,7 +307,7 @@ func TestV1TaskOutputRefs(t *testing.T) {
 		t.Fatalf("first output = %v, want asset ref", first)
 	}
 	serialized := fmt.Sprintf("%v", outputs)
-	for _, leaked := range []string{"storage_key", "builtin-local", "ws-uploads", "bucket"} {
+	for _, leaked := range []string{"storage_key", "builtin-local", "ws-uploads", "uploads/ws", "bucket"} {
 		if strings.Contains(serialized, leaked) {
 			t.Fatalf("outputs leak %q: %s", leaked, serialized)
 		}

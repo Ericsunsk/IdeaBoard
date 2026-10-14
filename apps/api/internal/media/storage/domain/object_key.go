@@ -27,7 +27,7 @@ func BuildObjectKey(dirPrefix string, ext string) (string, error) {
 	}
 	now := time.Now()
 	// Single-source traversal defense: the returned key is anchored by
-	// NormalizeUploadObjectKey (lexical Clean + uploads/ws-uploads root
+	// NormalizeUploadObjectKey (lexical Clean + uploads root
 	// check), so interior ".." segments that resolve inside the root
 	// normalize instead of failing, while escapes still error.
 	return NormalizeUploadObjectKey(fmt.Sprintf("%s/%s/%d%s", baseDir, now.Format("2006/01/02"), now.UnixNano(), cleanExt))

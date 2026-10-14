@@ -38,7 +38,7 @@ func fixtureChecksum(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// fakeRendererObjects is a map-backed workspacemedia.DerivativeObjects.
+// fakeRendererObjects is a map-backed workspacemedia.MediaObjects.
 type fakeRendererObjects struct {
 	objects map[string][]byte
 	putErr  error
@@ -64,16 +64,6 @@ func (f *fakeRendererObjects) PutObjectAtProfile(_ context.Context, _, objectKey
 }
 
 var errFakeRendererMissing = errors.New("fake: object missing")
-
-// fakeTaskRenderer returns canned webp bytes with requested maxSide dims.
-type fakeTaskRenderer struct {
-	calls []int
-}
-
-func (f *fakeTaskRenderer) Render(_ context.Context, _ []byte, _ string, maxSide int) ([]byte, int, int, string, error) {
-	f.calls = append(f.calls, maxSide)
-	return []byte("webp-bytes"), maxSide, maxSide / 2, "image/webp", nil
-}
 
 type rendererTestEnv struct {
 	media     *workspacemedia.InMemoryWorkspaceMediaStore
@@ -102,7 +92,6 @@ func (e *rendererTestEnv) renderer(t *testing.T, mutate func(*taskruntime.Worksp
 		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
 			return append([]byte(nil), e.pegged...), nil
 		}),
-		Derivatives: &fakeTaskRenderer{},
 	}
 	if mutate != nil {
 		mutate(&deps)
@@ -129,7 +118,8 @@ func rendererRemoteRef(sum string) workspacetasks.OutputRef {
 }
 
 // Remote ingest: bytes -> validated asset row -> settlement-ready asset
-// ref, with sequential derivative tiers recorded.
+// ref. Completion records no derivative rows: display tiers resolve on
+// demand through signed imgproxy URLs (ADR-0007 pull model).
 func TestWorkspaceTaskRendererRemoteToAsset(t *testing.T) {
 	env := newRendererTestEnv(t)
 	ctx := context.Background()
@@ -162,11 +152,6 @@ func TestWorkspaceTaskRendererRemoteToAsset(t *testing.T) {
 	stored := env.objects.objects[asset.StorageKey]
 	if len(stored) != len(env.pegged) {
 		t.Fatalf("stored bytes = %d, want %d at the asset slot", len(stored), len(env.pegged))
-	}
-	// Sequential tiers via the #820 path.
-	derivatives, err := env.media.ListDerivatives(ctx, "ws_test", refs[0].AssetID)
-	if err != nil || len(derivatives) != 3 {
-		t.Fatalf("derivatives = %+v %v, want 3 tiers", derivatives, err)
 	}
 }
 
@@ -255,23 +240,6 @@ func TestWorkspaceTaskRendererAssetPassthrough(t *testing.T) {
 	}
 }
 
-// Nil derivatives renderer defers tier generation: the asset still
-// completes ready with zero tiers (explicitly deferred, tiers pending).
-func TestWorkspaceTaskRendererDerivativesDeferred(t *testing.T) {
-	env := newRendererTestEnv(t)
-	ctx := context.Background()
-	r := env.renderer(t, func(d *taskruntime.WorkspaceTaskRendererDeps) { d.Derivatives = nil })
-
-	refs, err := r.RenderOutputs(ctx, rendererTestTask(), []workspacetasks.OutputRef{rendererRemoteRef(env.peggedSum)})
-	if err != nil {
-		t.Fatalf("RenderOutputs: %v", err)
-	}
-	derivatives, err := env.media.ListDerivatives(ctx, "ws_test", refs[0].AssetID)
-	if err != nil || len(derivatives) != 0 {
-		t.Fatalf("derivatives = %+v %v, want deferred (none)", derivatives, err)
-	}
-}
-
 // Constructor fails fast without settlement-critical seams.
 func TestNewWorkspaceTaskRendererRequiresSeams(t *testing.T) {
 	env := newRendererTestEnv(t)
@@ -321,7 +289,6 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
 			return append([]byte(nil), png...), nil
 		}),
-		Derivatives: &fakeTaskRenderer{},
 	})
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)

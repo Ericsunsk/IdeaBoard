@@ -33,7 +33,7 @@ export interface MediaAsset {
   checksum_sha256: string
   /** Canonical same-origin content URL. */
   content_url: string
-  /** Display tiers keyed by variant (thumb, preview, large-preview); tiers without stored rows stay pending. */
+  /** Display tiers keyed by variant (thumb, preview, large-preview); render on demand once the asset is ready, and stay pending while it is not. */
   derivatives: MediaAssetDerivatives
   /**
    * RFC3339 UTC timestamp; null unless archived.

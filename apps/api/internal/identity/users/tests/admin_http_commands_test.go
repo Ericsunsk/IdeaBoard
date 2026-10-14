@@ -3,7 +3,6 @@ package tests
 import (
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/authsync"
@@ -12,6 +11,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 type fakeAdminAuthManager struct {

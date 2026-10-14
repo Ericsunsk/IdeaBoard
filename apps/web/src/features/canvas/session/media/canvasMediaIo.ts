@@ -4,6 +4,7 @@ import {
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,
 } from '../../../../core/config/runtimeUrls'
+import { isMediaAssetDeliveryPath } from '../../../../core/media/mediaAssetPath'
 import { createUniqueSuffix } from '../../../../core/utils/ids'
 
 /**
@@ -30,16 +31,11 @@ function toAbsoluteUrl(raw: string): URL | null {
 
 /**
  * Parses any image URL to its pathname for stable-upload matching.
- * Bare `/...` paths pass through; absolute URLs resolve with the page
- * origin as fallback. Returns null for empty or unparseable input.
- * Single owner of URL→pathname parsing for canvas media flows (replaces
- * the former per-module twins).
+ * Relative and absolute URLs resolve with the page origin as fallback.
+ * Returns null for empty or unparseable input.
  */
 export function parseImageUrlPathname(raw: string): string | null {
-  const trimmed = raw.trim()
-  if (!trimmed) return null
-  if (trimmed.startsWith('/')) return trimmed
-  return toAbsoluteUrl(trimmed)?.pathname ?? null
+  return toAbsoluteUrl(raw)?.pathname ?? null
 }
 
 function encodePathSegment(segment: string): string {
@@ -73,15 +69,18 @@ function isBoardTaskUploadPath(path: string, userUid: string, boardId: string): 
 
 /**
  * Returns true when a canvas image URL is already a stable board-owned
- * upload (`/uploads/tasks/{userUid}/{boardId}/content/...`) that needs no
- * stabilization re-upload. Empty refs count as stable (nothing to fetch).
- * Absolute CDN/loopback upload refs canonicalize before matching.
+ * upload (`/uploads/tasks/{userUid}/{boardId}/content/...`, historical
+ * snapshots) or a v1 media-asset delivery URL (durable asset bytes) that
+ * needs no stabilization re-upload. Empty refs count as stable (nothing
+ * to fetch). Absolute CDN/loopback upload refs canonicalize before
+ * matching.
  */
 export function isStableBoardUploadUrl(raw: string, userUid: string, boardId: string): boolean {
   const trimmed = raw.trim()
   if (!trimmed) return true
   const path = parseImageUrlPathname(trimmed)
   if (!path) return false
+  if (isMediaAssetDeliveryPath(path)) return true
   return isBoardTaskUploadPath(path, userUid.trim(), boardId.trim())
 }
 

@@ -68,6 +68,32 @@ describe('ProfilePane account info', () => {
   })
 })
 
+describe('ProfilePane avatar', () => {
+  it('sizes the public route URL to the next variant up (88px at dpr 1 → 128)', () => {
+    mockUser.value = makeSessionUser({
+      display_name: 'Ada',
+      role: 'creator',
+      avatar: '/api/v1/public/users/AVTR01/avatar',
+    })
+    const { container } = renderWithUser(ProfilePane)
+
+    const image = container.querySelector('img')
+    expect(image?.getAttribute('src')).toBe('/api/v1/public/users/AVTR01/avatar?size=128')
+  })
+
+  it('passes provisioned external avatars through unsized', () => {
+    mockUser.value = makeSessionUser({
+      display_name: 'Ada',
+      role: 'creator',
+      avatar: 'https://cdn.example/avatar.png',
+    })
+    const { container } = renderWithUser(ProfilePane)
+
+    const image = container.querySelector('img')
+    expect(image?.getAttribute('src')).toBe('https://cdn.example/avatar.png')
+  })
+})
+
 describe('ProfilePane banned badge', () => {
   it('renders the banned badge on the danger shared status base without a dot', () => {
     mockUser.value = makeSessionUser({

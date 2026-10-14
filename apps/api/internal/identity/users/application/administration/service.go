@@ -136,6 +136,7 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 			Providers:        append([]string(nil), identity.Providers...),
 			DisplayName:      user.DisplayName,
 			Avatar:           user.Avatar,
+			StorageUID:       user.StorageUID,
 			Role:             user.Role,
 			Status:           user.Status,
 			CreatedAt:        user.CreatedAt,

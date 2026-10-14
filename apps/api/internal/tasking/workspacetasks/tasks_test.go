@@ -272,6 +272,9 @@ func TestOutputRefsValidation(t *testing.T) {
 	if err := ValidateOutputRef(OutputRef{Kind: OutputKindRemote, URL: "https://internal/ws-uploads/x", ChecksumSHA256: checksum}); !IsValidationError(err) {
 		t.Fatalf("storage internals err = %v, want validation", err)
 	}
+	if err := ValidateOutputRef(OutputRef{Kind: OutputKindRemote, URL: "https://internal/uploads/ws/abc/def/x.png", ChecksumSHA256: checksum}); !IsValidationError(err) {
+		t.Fatalf("canonical slot internals err = %v, want validation", err)
+	}
 }
 
 func TestInputAssetsRequireReady(t *testing.T) {

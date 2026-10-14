@@ -8,6 +8,7 @@ import type {
 import { ADMIN_ROOT_PATH } from '../../admin/routePaths'
 import { HOME_PATH } from '../routePaths'
 import { i18n } from '../../../core/i18n'
+import { resolveSizedAvatarUrl } from '../../../core/media/avatarUrl'
 import { formatLocaleNumber } from '../../../core/i18n/formatters'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import { formatIdeaAmount } from '../../../core/i18n/userIdeaCurrency'
@@ -178,7 +179,7 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
 
   return {
     viewModel: {
-      avatarUrl: computed(() => userStore.user?.avatar || undefined),
+      avatarUrl: computed(() => resolveSizedAvatarUrl(userStore.user?.avatar, 32)),
       // Menu email display stays on the Better Auth chain (issue #913):
       // the business principal has no email field to read.
       userEmail: computed(() => userStore.email || undefined),

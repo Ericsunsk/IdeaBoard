@@ -1,23 +1,8 @@
-// Package assets owns the media-side library materialization fetcher.
-//
-// The legacy user-scoped ingestion path (MediaAssetRegistry Begin/Complete
-// over the dropped media_assets owner model) is a fail-closed stub since
-// #817 Phase 3b-08. The live persistence owner for workspace-scoped media
-// rows is workspacemedia.Service (Phase 4-03 of #809), so this fetcher
-// persists through the #820 session flow (CreateSession -> PUT bytes ->
-// CompleteSession) — the same ingest the tasking renderer and the
-// workspace provider-result materializer share — instead of the dead
-// IngestionRegistry stubs. Provenance for the fetch is the durable
-// library materialization job record itself (library_asset_id ->
-// media asset_ link); media_assets.metadata carries no origin facts
-// (CompleteSession persists '{}'), so origin details (provider,
-// source_id) travel in structured logs only, never in errors or URLs.
+// Package assets materializes provider-owned Library references as managed media assets.
 package assets
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -27,20 +12,14 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/media/derivatives/ports"
-	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage/infrastructure/remote"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 )
 
 // WorkspaceAssetMaterializer is the media-owned fetch seam for turning an
-// owned workspace library reference into a managed media asset. It
-// defines the WorkspaceAssetMaterializer seam
-// (MaterializeWorkspaceAsset with the same signature), so composition can
-// assign a *LibraryMaterializer to that slot without touching the
-// contract file; the interface lives here to avoid importing the HTTP
-// layer into Media. The returned id always carries the asset_ shape.
+// owned workspace library reference into a managed media asset.
+// The returned id always carries the asset_ shape.
 type WorkspaceAssetMaterializer interface {
 	MaterializeWorkspaceAsset(ctx context.Context, workspacePublicID string, asset *domain.V1Asset) (string, error)
 }
@@ -64,15 +43,13 @@ type MaterializationReplayStore interface {
 }
 
 // LibraryMaterializerDeps wires the fetcher. Media, Objects, and Fetcher
-// are required (fail fast); Renderer is optional with deferred-tier
-// semantics (nil skips generation, tiers stay pending); Replay is
-// optional (nil skips the replay check).
+// are required (fail fast); Replay is optional (nil skips the replay
+// check).
 type LibraryMaterializerDeps struct {
-	Media    workspacemedia.SessionStore
-	Objects  workspacemedia.DerivativeObjects
-	Fetcher  LibrarySourceFetcher
-	Renderer ports.Renderer
-	Replay   MaterializationReplayStore
+	Media   workspacemedia.SessionStore
+	Objects workspacemedia.MediaObjects
+	Fetcher LibrarySourceFetcher
+	Replay  MaterializationReplayStore
 }
 
 // LibraryMaterializer is the internal (non-HTTP, non-billing,
@@ -83,11 +60,10 @@ type LibraryMaterializerDeps struct {
 // No quote, hold, capture, or release crosses this path (permanent free
 // tier); no events are emitted; no error_code is persisted.
 type LibraryMaterializer struct {
-	media    workspacemedia.SessionStore
-	objects  workspacemedia.DerivativeObjects
-	fetcher  LibrarySourceFetcher
-	renderer ports.Renderer
-	replay   MaterializationReplayStore
+	media   workspacemedia.SessionStore
+	objects workspacemedia.MediaObjects
+	fetcher LibrarySourceFetcher
+	replay  MaterializationReplayStore
 }
 
 var _ WorkspaceAssetMaterializer = (*LibraryMaterializer)(nil)
@@ -106,7 +82,7 @@ func NewLibraryMaterializer(deps LibraryMaterializerDeps) (*LibraryMaterializer,
 	}
 	return &LibraryMaterializer{
 		media: deps.Media, objects: deps.Objects, fetcher: deps.Fetcher,
-		renderer: deps.Renderer, replay: deps.Replay,
+		replay: deps.Replay,
 	}, nil
 }
 
@@ -174,11 +150,13 @@ func (m *LibraryMaterializer) MaterializeWorkspaceAsset(ctx context.Context, wor
 	if err != nil {
 		return "", fmt.Errorf("library materializer: download failed: %w", err)
 	}
-	managed, err := m.ingestMaterializedBytes(ctx, workspaceID, ownerUserID, asset, data)
+	managed, err := workspacemedia.IngestImage(ctx, m.media, m.objects, workspacemedia.IngestImageParams{
+		WorkspaceID: workspaceID, OwnerUserID: ownerUserID,
+		FilenameStem: "library-materialized", Data: data,
+	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("library materializer: ingest failed: %w", err)
 	}
-	generateLibraryDerivativesBestEffort(ctx, m.media, m.objects, m.renderer, workspaceID, managed)
 	slog.Info("library asset materialized as media asset",
 		"workspace_id", workspaceID, "library_asset", strings.TrimSpace(asset.PublicID),
 		"provider", strings.TrimSpace(asset.Provider), "source_id", strings.TrimSpace(asset.SourceID),
@@ -313,77 +291,6 @@ func normalizeLibraryEgressEntry(raw string) (string, string) {
 		return "", ""
 	}
 	return host, ""
-}
-
-// ingestMaterializedBytes validates the downloaded bytes and persists
-// them as a new workspace-scoped media asset via the #820 session flow.
-// The asset row commits before any later job-record update (byte PUT
-// cannot join a PG tx); a later caller-side failure orphans the row
-// harmlessly (listable, metadata-readable, same posture as unused
-// uploads). Payloads never enter errors.
-func (m *LibraryMaterializer) ingestMaterializedBytes(ctx context.Context, workspaceID string, ownerUserID int64, asset *domain.V1Asset, data []byte) (*workspacemedia.Asset, error) {
-	if len(data) == 0 {
-		return nil, errors.New("library materializer: provider result is empty")
-	}
-	if int64(len(data)) > workspacemedia.MaxUploadSizeBytes {
-		return nil, fmt.Errorf("library materializer: provider result exceeds size limit")
-	}
-	facts, err := imageformat.InspectDetectedBytes(data)
-	if err != nil {
-		return nil, fmt.Errorf("library materializer: provider result is not a supported image: %w", err)
-	}
-	sum := sha256.Sum256(data)
-	checksum := hex.EncodeToString(sum[:])
-	filename := fmt.Sprintf("library-materialized%s", facts.Extension)
-	session, err := m.media.CreateSession(ctx, workspacemedia.CreateSessionParams{
-		WorkspaceID: workspaceID, OwnerUserID: ownerUserID, Filename: filename,
-		MIMEType: facts.MIMEType, SizeBytes: int64(len(data)),
-		ChecksumSHA256: checksum, MediaKind: workspacemedia.MediaKindImage,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("library materializer: ingest failed: %w", err)
-	}
-	if err := m.objects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, data, facts.MIMEType); err != nil {
-		_, _ = m.media.FailSession(context.WithoutCancel(ctx), workspaceID, session.ID, "library materialization byte ingest failed")
-		return nil, fmt.Errorf("library materializer: byte store failed: %w", err)
-	}
-	_, managed, err := m.media.CompleteSession(ctx, workspaceID, session.ID, workspacemedia.CompleteFacts{
-		ChecksumSHA256: checksum, SizeBytes: int64(len(data)),
-		MIMEType: facts.MIMEType, MediaKind: workspacemedia.MediaKindImage,
-		Width: int32(facts.Width), Height: int32(facts.Height),
-	}, workspacemedia.CreateAssetParams{})
-	if err != nil {
-		return nil, fmt.Errorf("library materializer: ingest failed: %w", err)
-	}
-	return managed, nil
-}
-
-// generateLibraryDerivativesBestEffort runs sequential display-tier
-// generation after a successful ingest. Every failure mode (nil seams,
-// missing bytes, render errors) is absorbed: the asset is already ready
-// and unmaterialized tiers stay pending (409 at the derivative-bytes
-// endpoint). A nil renderer defers generation with a logged reason —
-// derivatives stay lazy by design; no derivative engine lives here.
-func generateLibraryDerivativesBestEffort(ctx context.Context, media workspacemedia.SessionStore, objects workspacemedia.DerivativeObjects, renderer ports.Renderer, workspaceID string, asset *workspacemedia.Asset) {
-	assetID := ""
-	if asset != nil {
-		assetID = asset.ID
-	}
-	if media == nil || objects == nil || renderer == nil {
-		slog.Info("library materialization derivatives deferred: renderer not configured; tiers stay pending",
-			"workspace_id", workspaceID, "asset_id", assetID)
-		return
-	}
-	store, ok := media.(workspacemedia.AssetStore)
-	if !ok {
-		slog.Info("library materialization derivatives deferred: media store cannot record tiers; tiers stay pending",
-			"workspace_id", workspaceID, "asset_id", assetID)
-		return
-	}
-	if _, err := workspacemedia.EnsureDerivatives(ctx, store, objects, renderer, workspaceID, asset); err != nil {
-		slog.Warn("library materialization derivatives best-effort failed; tiers stay pending",
-			"workspace_id", workspaceID, "asset_id", assetID, "err", err)
-	}
 }
 
 // RemoteLibrarySourceFetcher is the production LibrarySourceFetcher. The

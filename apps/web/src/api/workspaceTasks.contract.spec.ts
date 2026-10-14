@@ -157,6 +157,21 @@ describe('workspace task union validation mapping', () => {
     ).toThrow()
     expect(() =>
       toWorkspaceTaskOutputs({
+        data: {
+          task_id: TASK_ID,
+          outputs: [
+            {
+              kind: 'remote',
+              url: 'https://x/uploads/ws/abc/def/y.png',
+              checksum_sha256: CHECKSUM,
+              result_index: 0,
+            },
+          ],
+        },
+      }),
+    ).toThrow()
+    expect(() =>
+      toWorkspaceTaskOutputs({
         data: { task_id: TASK_ID, outputs: [{ kind: 'mystery', result_index: 0 }] },
       }),
     ).toThrow()

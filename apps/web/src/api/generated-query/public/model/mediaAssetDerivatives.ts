@@ -13,6 +13,6 @@
 import type { MediaDerivative } from './mediaDerivative'
 
 /**
- * Display tiers keyed by variant (thumb, preview, large-preview); tiers without stored rows stay pending.
+ * Display tiers keyed by variant (thumb, preview, large-preview); render on demand once the asset is ready, and stay pending while it is not.
  */
 export type MediaAssetDerivatives = { [key: string]: MediaDerivative }

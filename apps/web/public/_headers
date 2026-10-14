@@ -39,9 +39,3 @@
 
 /api/*
   X-Robots-Tag: noindex, nofollow
-
-/uploads
-  X-Robots-Tag: noindex, nofollow
-
-/uploads/*
-  X-Robots-Tag: noindex, nofollow

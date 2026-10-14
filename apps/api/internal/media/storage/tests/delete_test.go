@@ -107,11 +107,11 @@ func TestDeleteLocalByPrefixRemovesUserUploadTrees(t *testing.T) {
 
 	service, _ := newStorageServiceTest(t)
 	targetFiles := []string{
-		filepath.FromSlash(filepath.Join("uploads", "profile", "CLN123", "avatar", "avatar.png")),
+		filepath.FromSlash(filepath.Join("uploads", "avatars", "CLN123", "abcdef1234567890.png")),
 		filepath.FromSlash(filepath.Join("uploads", "tasks", "42", "task-owned", "result.png")),
 	}
 	otherFiles := []string{
-		filepath.FromSlash(filepath.Join("uploads", "profile", "OTHER1", "avatar", "keep.png")),
+		filepath.FromSlash(filepath.Join("uploads", "avatars", "OTHER1", "keep.png")),
 		filepath.FromSlash(filepath.Join("uploads", "tasks", "43", "task-owned", "keep.png")),
 	}
 

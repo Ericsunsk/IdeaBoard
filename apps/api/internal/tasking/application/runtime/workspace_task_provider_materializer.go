@@ -31,7 +31,6 @@ import (
 	"fmt"
 	"strings"
 
-	"ideaboard/api/internal/media/derivatives/ports"
 	"ideaboard/api/internal/media/workspacemedia"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -63,27 +62,22 @@ func workspaceTaskScopeFromCtx(ctx context.Context) string {
 const WorkspaceProviderResultRole = "result"
 
 // WorkspaceProviderResultMaterializerDeps wires the materializer. Media,
-// Objects, and Fetcher are required (fail fast); Derivatives is optional
-// with deferred-tier semantics (nil skips generation, tiers stay pending).
+// Objects, and Fetcher are required (fail fast).
 type WorkspaceProviderResultMaterializerDeps struct {
 	Media workspacemedia.WorkspaceMediaStore
 	// Objects carries result bytes (PUT) for the session-flow ingest.
-	Objects workspacemedia.DerivativeObjects
+	Objects workspacemedia.MediaObjects
 	// Fetcher downloads https: provider results through the allowlisted
 	// downloader. Inline data: results never touch it.
 	Fetcher WorkspaceResultBytesFetcher
-	// Derivatives renders display tiers best-effort. Nil defers
-	// generation (tiers stay pending) with a logged reason.
-	Derivatives ports.Renderer
 }
 
 // workspaceProviderResultMaterializer is the production
 // taskmedia.ResultMaterializer for workspace tasks.
 type workspaceProviderResultMaterializer struct {
-	media       workspacemedia.WorkspaceMediaStore
-	objects     workspacemedia.DerivativeObjects
-	fetcher     WorkspaceResultBytesFetcher
-	derivatives ports.Renderer
+	media   workspacemedia.WorkspaceMediaStore
+	objects workspacemedia.MediaObjects
+	fetcher WorkspaceResultBytesFetcher
 }
 
 var _ taskmedia.ResultMaterializer = (*workspaceProviderResultMaterializer)(nil)
@@ -103,7 +97,7 @@ func NewWorkspaceProviderResultMaterializer(deps WorkspaceProviderResultMaterial
 	}
 	return &workspaceProviderResultMaterializer{
 		media: deps.Media, objects: deps.Objects,
-		fetcher: deps.Fetcher, derivatives: deps.Derivatives,
+		fetcher: deps.Fetcher,
 	}, nil
 }
 
@@ -133,7 +127,7 @@ func (m *workspaceProviderResultMaterializer) MaterializeRemoteResults(ctx conte
 		if err != nil {
 			return taskmedia.MaterializedResults{}, err
 		}
-		asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, m.derivatives, task, data, index, "")
+		asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, task, data, index, "")
 		if err != nil {
 			return taskmedia.MaterializedResults{}, err
 		}
@@ -170,7 +164,7 @@ func (m *workspaceProviderResultMaterializer) MaterializeBytesResult(ctx context
 		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: task identity is required")
 	}
 	task := &workspacetasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, OwnerUserID: userID}
-	asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, m.derivatives, task, data, 0, "")
+	asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, task, data, 0, "")
 	if err != nil {
 		return taskmedia.MaterializedResults{}, err
 	}

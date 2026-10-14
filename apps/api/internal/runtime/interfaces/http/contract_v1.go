@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -72,18 +73,22 @@ type ContractV1Deps struct {
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.
-	// MediaObjects reads stored bytes for the content/derivative
-	// endpoints (nil fails binary reads closed with 503 while
-	// metadata keeps working); MediaRenderer is the optional
-	// derivative renderer (nil skips generation, tiers stay pending).
+	// MediaObjects reads stored bytes for the content endpoint (nil
+	// fails content reads closed with 503 while metadata keeps
+	// working).
 	Media         WorkspaceMediaStore
 	MediaObjects  WorkspaceMediaObjects
-	MediaRenderer v1MediaRenderer
+	MediaRenderer *imgproxy.Renderer
 	// AvatarUID resolves a caller's storage UID for the user-scoped
 	// avatar PUT (issue #809 media gap batch). Nil fails ONLY the
 	// avatar endpoint closed with 501; every other v1 route is
 	// unaffected. Production wires NewV1AvatarDirectory(userRepo).
 	AvatarUID V1AvatarUIDDirectory
+	// AvatarObjects persists avatar bytes through the storage
+	// abstraction (active profile). Nil fails ONLY the avatar PUT
+	// closed with 503. Production wires services.storageService;
+	// tests inject fakes.
+	AvatarObjects V1AvatarObjects
 	// Events is the workspace event hot log + SSE replay window (issue
 	// #807). Nil normalizes to a process-local log; tests inject a
 	// fresh instance per engine for isolation.
@@ -130,6 +135,10 @@ type V1AvatarProfileDirectory interface {
 	// (storage namespace, status, timestamps, avatar). It reuses the
 	// existing users.GetByID query; no new query or migration is needed.
 	GetUserByID(ctx context.Context, userID int64) (*identitydomain.User, error)
+	// GetUserByStorageUID projects the stored user row for the public
+	// avatar route. It reuses the existing users.GetByStorageUID
+	// query; no new query or migration is needed.
+	GetUserByStorageUID(ctx context.Context, storageUID string) (*identitydomain.User, error)
 }
 
 func NewV1AvatarProfileDirectory(repo identityports.UserRepository) V1AvatarProfileDirectory {
@@ -184,6 +193,20 @@ func (d usersRepositoryDirectory) GetUserByID(ctx context.Context, userID int64)
 	return d.repo.GetByID(ctx, userID)
 }
 
+func (d usersRepositoryDirectory) GetUserByStorageUID(ctx context.Context, storageUID string) (*identitydomain.User, error) {
+	if d.repo == nil || !identitydomain.IsValidStorageUID(storageUID) {
+		return nil, tenancy.ErrNotFound
+	}
+	user, err := d.repo.GetByStorageUID(ctx, strings.TrimSpace(storageUID))
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, tenancy.ErrNotFound
+	}
+	return user, nil
+}
+
 func (d *ContractV1Deps) normalize() {
 	if d.Tasks != nil {
 		if d.TaskLifecycle == nil {
@@ -233,6 +256,14 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps Co
 	deps.normalize()
 	handler := &contractV1Handler{deps: deps}
 	group.GET("/support-channels", publicSupportChannelsV1Handler(deps.SupportChannels))
+	// Public avatar delivery (no auth: avatars are public). Registered
+	// before the session middleware so it never requires a principal;
+	// per-IP rate limiting still rides the global engine middleware.
+	group.GET("/public/users/:uid/avatar", handler.publicAvatar)
+	// Public branding logo delivery (no auth: the logo is public). Same
+	// placement discipline as the avatar route: before the session
+	// middleware, single serving path for site-asset keys.
+	group.GET("/public/branding/logo", handler.publicBrandingLogo)
 	group.Use(v1AuthMiddleware(authDeps), ResolvePrincipal())
 	group.GET("/user", handler.getUser)
 	group.GET("/workspaces", handler.listWorkspaces)
@@ -392,7 +423,7 @@ func (h *contractV1Handler) getUser(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		dto.Avatar = strings.TrimSpace(profile.Avatar)
+		dto.Avatar = v1PublicAvatarURLForRow(profile.StorageUID, profile.Avatar)
 		dto.StorageNamespace = strings.TrimSpace(profile.StorageUID)
 		dto.CreatedAt = v1FormatTime(profile.CreatedAt)
 		dto.UpdatedAt = v1FormatTime(profile.UpdatedAt)

@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
@@ -65,9 +64,6 @@ func isTimeoutExemptRequest(req *http.Request) bool {
 	// event stream honors the standard request timeout like every other
 	// JSON route (clients resume with Last-Event-ID).
 	if path == RoutePaymentStripeWebhook {
-		return true
-	}
-	if strings.HasPrefix(path, UploadsStaticRoutePrefix) {
 		return true
 	}
 	return isUploadRequest(req)

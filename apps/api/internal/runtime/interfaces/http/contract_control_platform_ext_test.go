@@ -11,11 +11,14 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +28,14 @@ import (
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	rewardports "ideaboard/api/internal/rewards/ports"
 )
+
+// sha256Hex fingerprints upload bytes the same way the branding upload
+// handler keys them (hex sha256; the canonical key keeps the [:16]
+// prefix).
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
 
 // --- reward fakes (domain handlers under the control
 // guard; responses translated into the contract envelope at the
@@ -133,19 +144,25 @@ func (fakeRewardIdentityProjection) ResolveIdentities(_ context.Context, userIDs
 }
 
 // fakeControlBrandingUpload stores branding logos in memory for upload
-// tests (no storage backend).
+// tests (no storage backend). The default ref converges on the canonical
+// content-hashed key the handler reserves; tests override storedRef to
+// prove the handler always echoes the storage key (never a delivery URL).
 type fakeControlBrandingUpload struct {
 	calls     int
 	storedRef *ports.StoredUploadRef
 }
 
-func (f *fakeControlBrandingUpload) UploadRefWithOptions(_ context.Context, file *multipart.FileHeader, _ ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
+func (f *fakeControlBrandingUpload) UploadRefWithOptions(_ context.Context, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	f.calls++
 	if f.storedRef != nil {
 		return f.storedRef, nil
 	}
+	key := strings.TrimSpace(opts.ObjectKey)
+	if key == "" {
+		key = "uploads/site/assets/logo_fallback.png"
+	}
 	return &ports.StoredUploadRef{
-		URL: "https://site.example.com/uploads/site/assets/logo.png", StorageKey: "uploads/site/assets/logo.png",
+		URL: "https://site.example.com/" + key, StorageKey: key,
 		StorageProfile: "builtin-local",
 		MIMEType:       "image/png", Width: 120, Height: 40, SizeBytes: file.Size,
 	}, nil
@@ -685,8 +702,12 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 			t.Fatalf("upload status = %d (%v), want 200", status, payload)
 		}
 		data, _ := payload["data"].(map[string]any)
-		if data["logo_url"] != "/uploads/site/assets/logo.png" {
-			t.Fatalf("logo_url = %v", data["logo_url"])
+		// The response carries the canonical content-hashed storage key
+		// (never a delivery URL): it feeds the branding setting update
+		// verbatim and every read projects the public logo route.
+		wantKey := "uploads/site/assets/logo_" + sha256Hex(png)[:16] + ".png"
+		if data["logo_url"] != wantKey {
+			t.Fatalf("logo_url = %v, want %s", data["logo_url"], wantKey)
 		}
 		againStatus, againPayload := serveUpload(h.engine, newUploadRequest(t, "ext-up-4", png, "logo.png"))
 		if againStatus != http.StatusOK {
@@ -713,11 +734,11 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 		}
 	})
 
-	t.Run("object storage preserves its provider URL", func(t *testing.T) {
-		const logoURL = "https://cdn.example.com/uploads/site/assets/logo.png"
+	t.Run("stored key echoes back profile-independently", func(t *testing.T) {
+		const logoKey = "uploads/site/assets/logo_abcdef1234567890.png"
 		h := newControlHarness(t, func(deps *ContractControlDeps) {
 			deps.BrandingUpload = &fakeControlBrandingUpload{storedRef: &ports.StoredUploadRef{
-				URL: logoURL, StorageKey: "uploads/site/assets/logo.png",
+				URL: "https://cdn.example.com/" + logoKey, StorageKey: logoKey,
 				StorageProfile: "s3-profile", MIMEType: "image/png",
 			}}
 		})
@@ -726,8 +747,10 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 			t.Fatalf("upload status = %d (%v), want 200", status, payload)
 		}
 		data, _ := payload["data"].(map[string]any)
-		if data["logo_url"] != logoURL {
-			t.Fatalf("logo_url = %v, want %s", data["logo_url"], logoURL)
+		// The row keeps the canonical storage key on every profile (the
+		// provider URL never leaks into branding reads).
+		if data["logo_url"] != logoKey {
+			t.Fatalf("logo_url = %v, want %s", data["logo_url"], logoKey)
 		}
 	})
 }

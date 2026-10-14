@@ -1,12 +1,16 @@
 package local
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/media/storage/ports"
 )
 
 func TestLocalStorageDriverBasics(t *testing.T) {
@@ -110,5 +114,54 @@ func TestLocalStorageDriverListPrefixNormalization(t *testing.T) {
 		if len(keys) != 1 || filepath.ToSlash(keys[0]) != "uploads/test/sample.bin" {
 			t.Fatalf("prefix %q keys = %#v, want [uploads/test/sample.bin]", prefix, keys)
 		}
+	}
+}
+
+func TestLocalStorageDriverRepeatedImmutableUpload(t *testing.T) {
+	root := t.TempDir()
+	driver := NewLocalStorageDriverWithRoot("", root)
+	key := "uploads/site/assets/logo_hash.png"
+	data := []byte("same image bytes")
+	const parallelUploads = 8
+	var wg sync.WaitGroup
+	for range parallelUploads {
+		wg.Go(func() {
+			ref, err := driver.SaveReaderLocalRef(context.Background(), "logo.png", "image/png", bytes.NewReader(data), int64(len(data)), ports.StorageStoreOptions{ObjectKey: key})
+			if err != nil {
+				t.Errorf("repeated upload failed: %v", err)
+			} else if ref.StorageKey != key || ref.SizeBytes != int64(len(data)) {
+				t.Errorf("unexpected upload ref: %+v", ref)
+			}
+		})
+	}
+	wg.Wait()
+	actual, err := os.ReadFile(filepath.Join(root, key))
+	if err != nil || !bytes.Equal(actual, data) {
+		t.Fatalf("stored bytes = %q, err = %v", actual, err)
+	}
+
+	other := bytes.Repeat([]byte{'x'}, len(data))
+	if _, err := driver.SaveReaderLocalRef(context.Background(), "logo.png", "image/png", bytes.NewReader(other), int64(len(other)), ports.StorageStoreOptions{ObjectKey: key}); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("different bytes at immutable key must fail with ErrExist, got %v", err)
+	}
+	actual, err = os.ReadFile(filepath.Join(root, key))
+	if err != nil || !bytes.Equal(actual, data) {
+		t.Fatalf("collision changed original bytes = %q, err = %v", actual, err)
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "uploads/site/assets"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("upload left temporary files: %v, err = %v", entries, err)
+	}
+}
+
+func TestLocalStorageDriverIncompleteUploadDoesNotPublish(t *testing.T) {
+	root := t.TempDir()
+	driver := NewLocalStorageDriverWithRoot("", root)
+	key := "uploads/site/assets/logo_hash.png"
+	if _, err := driver.SaveReaderLocalRef(context.Background(), "logo.png", "image/png", bytes.NewReader([]byte("short")), 10, ports.StorageStoreOptions{ObjectKey: key}); err == nil {
+		t.Fatal("incomplete upload must fail")
+	}
+	if _, err := os.Stat(filepath.Join(root, key)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("incomplete object must not be published, got %v", err)
 	}
 }

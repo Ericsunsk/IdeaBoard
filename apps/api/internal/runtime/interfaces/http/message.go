@@ -216,7 +216,4 @@ const (
 	msgRateLimitMiddleware2            = "请求过于频繁，请稍后重试"                // RateLimitMiddleware @ rate_limit.go
 	msgReadyHandler                    = "服务尚未就绪"                      // ReadyHandler @ routes.go
 	msgPublicBrandingSettingsHandler   = "系统设置服务未配置"                   // PublicBrandingSettingsHandler @ routes.go
-	msgResolveStaticUploadReadAccess   = "读取上传资源失败"                    // ResolveStaticUploadReadAccess @ upload_static_handler.go
-	msgWriteUploadReadError            = "资源不存在"                       // WriteOwnedUploadReadError @ upload_static_handler.go
-	msgWriteUploadReadError2           = "无权访问该资源"                     // WriteOwnedUploadReadError @ upload_static_handler.go
 )

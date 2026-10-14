@@ -23,10 +23,12 @@ server {
     index index.html;
 
     # Same-origin gateway contract: mark every response on /api/**, /api/auth/**,
-    # /uploads/**, and SSE routes as uncacheable, and disable proxy buffering on
+    # and SSE routes as uncacheable, and disable proxy buffering on
     # SSE/streaming routes, so authenticated and state-changing traffic can never
     # be cached by an intermediary. (proxy_cache is not configured anywhere; this
-    # is response-header-only enforcement.)
+    # is response-header-only enforcement.) Media bytes ride the same /api/**
+    # surface (v1 media-assets content/derivatives, public avatar/logo routes):
+    # no path outside /api/** is proxied to the API.
 
     location = /api/health {
         proxy_pass ${NGINX_API_UPSTREAM};
@@ -118,18 +120,6 @@ server {
     }
 
     location /api/ {
-        proxy_pass ${NGINX_API_UPSTREAM};
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-    }
-
-    location /uploads/ {
         proxy_pass ${NGINX_API_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header Host $host;

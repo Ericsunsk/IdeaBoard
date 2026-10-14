@@ -100,12 +100,12 @@ describe('uploadApi', () => {
           bodyText: await request.text(),
         })
 
-        return HttpResponse.json({ data: { avatar_url: '/uploads/profile/user/avatar' } })
+        return HttpResponse.json({ data: { avatar_url: '/api/v1/public/users/AVTR01/avatar' } })
       }),
     )
 
     await expect(uploadApi.uploadAvatar(file)).resolves.toEqual({
-      avatar: '/uploads/profile/user/avatar',
+      avatar: '/api/v1/public/users/AVTR01/avatar',
       mime: 'image/jpeg',
       ext: '.jpg',
     })
@@ -134,7 +134,7 @@ describe('uploadApi', () => {
           resolveUploadStarted()
           await new Promise((resolve) => setTimeout(resolve, slowResponseDelayMs))
 
-          return HttpResponse.json({ data: { avatar_url: '/uploads/profile/me/slow-avatar' } })
+          return HttpResponse.json({ data: { avatar_url: '/api/v1/public/users/MEMB1A/avatar' } })
         }),
       )
 
@@ -145,7 +145,7 @@ describe('uploadApi', () => {
       await vi.advanceTimersByTimeAsync(slowResponseDelayMs)
 
       await expect(response).resolves.toEqual({
-        avatar: '/uploads/profile/me/slow-avatar',
+        avatar: '/api/v1/public/users/MEMB1A/avatar',
         mime: 'image/jpeg',
         ext: '.jpg',
       })

@@ -57,7 +57,9 @@ describe('canvas upload URL stability', () => {
     expect(parseImageUrlPathname('/uploads/tasks/u1/b1/content/a.png')).toBe(
       '/uploads/tasks/u1/b1/content/a.png',
     )
-    expect(parseImageUrlPathname('https://cdn.example.com/a/b.png?x=1')).toBe('/a/b.png')
+    expect(parseImageUrlPathname('https://cdn.example.com/a/b.png?x=1#preview')).toBe('/a/b.png')
+    expect(parseImageUrlPathname('/a/b.png?x=1#preview')).toBe('/a/b.png')
+    expect(parseImageUrlPathname('//cdn.example.com/a/b.png?x=1#preview')).toBe('/a/b.png')
     expect(parseImageUrlPathname('   ')).toBeNull()
     expect(parseImageUrlPathname('http://')).toBeNull()
   })
@@ -82,6 +84,37 @@ describe('canvas upload URL stability', () => {
       ),
     ).toBe(false)
   })
+
+  it('treats v1 media-asset delivery URLs as stable without re-upload', () => {
+    for (const url of [
+      '/api/v1/workspaces/ws_test123/media-assets/asset_abc123/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_abc123/derivatives/preview',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_abc123/content?download=1#preview',
+      'https://api.example.com/api/v1/workspaces/ws_test123/media-assets/asset_abc123/content',
+    ]) {
+      expect(isStableBoardUploadUrl(url, 'user-uid', 'board-a')).toBe(true)
+    }
+    expect(
+      isStableBoardUploadUrl(
+        '/api/v1/workspaces/ws_test123/media-assets/asset_abc123',
+        'user-uid',
+        'board-a',
+      ),
+    ).toBe(false)
+  })
+
+  it.each(['metadata', 'unknown', 'content/extra', 'derivatives/preview/extra'])(
+    'does not treat the unknown media tail %s as stable',
+    (tail) => {
+      expect(
+        isStableBoardUploadUrl(
+          `/api/v1/workspaces/ws_test123/media-assets/asset_abc123/${tail}`,
+          'user-uid',
+          'board-a',
+        ),
+      ).toBe(false)
+    },
+  )
 
   it('matches encoded user and board segments in stable paths', () => {
     expect(

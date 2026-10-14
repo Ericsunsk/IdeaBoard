@@ -205,16 +205,12 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return nil, fmt.Errorf(msgSaveReaderLocalRef2, err)
 	}
-	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	dstFile, err := os.CreateTemp(filepath.Dir(dst), ".upload-*")
 	if err != nil {
 		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
-	cleanupDst := true
-	defer func() {
-		if cleanupDst {
-			_ = os.Remove(dst)
-		}
-	}()
+	temporaryPath := dstFile.Name()
+	defer os.Remove(temporaryPath)
 	hash := sha256.New()
 	if err := copyExactWithBuffer(io.MultiWriter(dstFile, hash), src, size); err != nil {
 		_ = dstFile.Close()
@@ -223,7 +219,9 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 	if err := dstFile.Close(); err != nil {
 		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
-	cleanupDst = false
+	if err := publishLocalUpload(temporaryPath, dst, size, hash.Sum(nil)); err != nil {
+		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
+	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = inferStoredUploadContentType(filename, nil)
 	}
@@ -239,6 +237,35 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 		ChecksumSHA256: hex.EncodeToString(hash.Sum(nil)),
 		Animated:       strings.EqualFold(ext, ".gif"),
 	}, nil
+}
+
+// Publish complete bytes atomically; repeated content-addressed writes share one object.
+func publishLocalUpload(stagedPath, destination string, size int64, checksum []byte) error {
+	if err := os.Link(stagedPath, destination); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	info, err := os.Lstat(destination)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() != size {
+		return fmt.Errorf("upload destination already contains different content: %w", os.ErrExist)
+	}
+	existing, err := os.Open(destination)
+	if err != nil {
+		return err
+	}
+	defer existing.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, io.LimitReader(existing, size+1)); err != nil {
+		return err
+	}
+	if !bytes.Equal(hash.Sum(nil), checksum) {
+		return fmt.Errorf("upload destination already contains different content: %w", os.ErrExist)
+	}
+	return nil
 }
 
 func (d *LocalStorageDriver) PutObject(ctx context.Context, profile *domain.StorageProfile, objectKey string, data []byte, contentType string) error {
@@ -345,7 +372,7 @@ func (d *LocalStorageDriver) ListObjectKeysByPrefix(ctx context.Context, profile
 		return nil, err
 	}
 	// Single-source traversal defense: the domain normalizer anchors the
-	// prefix under uploads/ or ws-uploads/ (mirroring DeleteByPrefix); the
+	// prefix under uploads/ (mirroring DeleteByPrefix); the
 	// driver-local localPath root check stays as defense in depth.
 	normalizedPrefix, err := domain.NormalizeUploadObjectPrefix(objectKeyPrefix)
 	if err != nil {

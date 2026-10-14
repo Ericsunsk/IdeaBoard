@@ -57,11 +57,8 @@ services:
     networks:
       - ideaboard-network
 
-  # ADR-0007: on-demand derivative rendering via imgproxy.
-  # The API signs every tier URL (IMGPROXY_KEY / IMGPROXY_SALT), so imgproxy
-  # must be given the same pair; unsigned requests are rejected. Local-only:
-  # loopback bind + local filesystem source. Production swaps the source for
-  # S3/R2 and keeps the same signing pair.
+  # API image responses are rendered by imgproxy over signed internal requests.
+  # API and imgproxy must share IMGPROXY_KEY / IMGPROXY_SALT.
   imgproxy:
     image: ghcr.io/imgproxy/imgproxy:v4.0.14
     container_name: ideaboard-imgproxy
@@ -72,10 +69,20 @@ services:
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /data
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY in docker/.env}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT in docker/.env}
+      # Bound source access, download time, bytes, and decoded image size.
+      IMGPROXY_ALLOWED_SOURCES: local:///
+      IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: "false"
+      IMGPROXY_ALLOW_LOOPBACK_SOURCE_ADDRESSES: "false"
+      IMGPROXY_ALLOW_LINK_LOCAL_SOURCE_ADDRESSES: "false"
+      IMGPROXY_MAX_REDIRECTS: "3"
+      IMGPROXY_DOWNLOAD_TIMEOUT: "5"
+      IMGPROXY_MAX_SRC_FILE_SIZE: "104857600"
+      IMGPROXY_MAX_SRC_RESOLUTION: "67.2"
+      IMGPROXY_TTL: "31536000"
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - ../apps/api/uploads:/data:ro
+      - ../apps/api/uploads:/data/uploads:ro
     networks:
       - ideaboard-network
 

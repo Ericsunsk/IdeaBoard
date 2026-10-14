@@ -6,6 +6,7 @@ import {
   isValidSiteBrandingLogoURL,
   normalizeSiteBrandingSetting,
   resolveSiteBrandingLogoURL,
+  SITE_BRANDING_LOGO_ROUTE_PATH,
   SITE_BRANDING_PROJECT_NAME_MAX_CHARS,
   validateSiteBrandingSetting,
 } from './useSiteBranding'
@@ -54,26 +55,12 @@ describe('site branding helpers', () => {
     expect(
       normalizeSiteBrandingSetting({
         project_name: '  Creative Ops  ',
-        logo_url: '  /uploads/site/assets/logo.webp  ',
+        logo_url: '  uploads/site/assets/logo_abcdef1234567890.webp  ',
       }),
     ).toEqual({
       project_name: 'Creative Ops',
-      logo_url: '/uploads/site/assets/logo.webp',
+      logo_url: 'uploads/site/assets/logo_abcdef1234567890.webp',
     })
-  })
-
-  it('keeps persisted upload logo URLs canonical', () => {
-    const sameOriginLogoURL = new URL(
-      '/uploads/site/assets/logo.webp',
-      window.location.origin,
-    ).toString()
-
-    expect(
-      normalizeSiteBrandingSetting({
-        project_name: 'IdeaBoard',
-        logo_url: sameOriginLogoURL,
-      }).logo_url,
-    ).toBe('/uploads/site/assets/logo.webp')
   })
 
   it('rejects same-origin private upload logo URLs after canonicalization', () => {
@@ -89,12 +76,16 @@ describe('site branding helpers', () => {
           logo_url: sameOriginPrivateURL,
         }),
       ),
-    ).toBe('Logo 地址必须为空、/uploads/site/assets/ 路径或 http(s) URL')
+    ).toBe('Logo 地址必须为空、站内 Logo 链接或 http(s) URL')
   })
 
-  it('resolves logo URLs for display', () => {
-    expect(resolveSiteBrandingLogoURL(' /uploads/site/assets/logo.webp ')).toBe(
-      '/uploads/site/assets/logo.webp',
+  it('resolves each stored logo key to its own display URL', () => {
+    const key = 'uploads/site/assets/logo_abcdef1234567890.webp'
+    expect(resolveSiteBrandingLogoURL(` ${key} `)).toBe(
+      `${SITE_BRANDING_LOGO_ROUTE_PATH}?key=${encodeURIComponent(key)}`,
+    )
+    expect(resolveSiteBrandingLogoURL('uploads/site/assets/logo_other.webp')).not.toBe(
+      resolveSiteBrandingLogoURL(key),
     )
     expect(resolveSiteBrandingLogoURL('https://example.com/logo.webp')).toBe(
       'https://example.com/logo.webp',
@@ -105,9 +96,15 @@ describe('site branding helpers', () => {
     expect(
       validateSiteBrandingSetting({
         project_name: 'IdeaBoard',
-        logo_url: '/uploads/site/assets/logo.png',
+        logo_url: 'uploads/site/assets/logo_abcdef1234567890.png',
       }),
     ).toBe('')
+    expect(
+      validateSiteBrandingSetting({
+        project_name: 'IdeaBoard',
+        logo_url: SITE_BRANDING_LOGO_ROUTE_PATH,
+      }),
+    ).toBe('Logo 地址必须为空、站内 Logo 链接或 http(s) URL')
     expect(
       validateSiteBrandingSetting({
         project_name: '',
@@ -125,17 +122,20 @@ describe('site branding helpers', () => {
         project_name: 'IdeaBoard',
         logo_url: 'javascript:alert(1)',
       }),
-    ).toBe('Logo 地址必须为空、/uploads/site/assets/ 路径或 http(s) URL')
+    ).toBe('Logo 地址必须为空、站内 Logo 链接或 http(s) URL')
   })
 
-  it('allows only empty, site asset, and http logo URLs', () => {
+  it('allows only empty, canonical storage keys, and http logo URLs', () => {
     expect(isValidSiteBrandingLogoURL('')).toBe(true)
-    expect(isValidSiteBrandingLogoURL('/uploads/site/assets/logo.png')).toBe(true)
+    expect(isValidSiteBrandingLogoURL(SITE_BRANDING_LOGO_ROUTE_PATH)).toBe(false)
+    expect(isValidSiteBrandingLogoURL('uploads/site/assets/logo_abcdef1234567890.png')).toBe(true)
+    expect(isValidSiteBrandingLogoURL('/uploads/site/assets/logo.png')).toBe(false)
     expect(isValidSiteBrandingLogoURL('https://example.com/logo.png')).toBe(true)
     expect(isValidSiteBrandingLogoURL('http://example.com/logo.png')).toBe(true)
     expect(isValidSiteBrandingLogoURL('/uploads/admin/logo.png')).toBe(false)
     expect(isValidSiteBrandingLogoURL('/uploads/profile/OWNR1A/avatar/logo.png')).toBe(false)
     expect(isValidSiteBrandingLogoURL('/assets/logo.png')).toBe(false)
+    expect(isValidSiteBrandingLogoURL('uploads/site/assets/')).toBe(false)
     expect(isValidSiteBrandingLogoURL('/uploads/site/assets/../secret.png')).toBe(false)
     expect(isValidSiteBrandingLogoURL('ftp://example.com/logo.png')).toBe(false)
   })

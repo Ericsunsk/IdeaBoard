@@ -79,11 +79,15 @@ function createSeededRandom(seed: number) {
   }
 }
 
+// Monitor demo thumbnails are frontend-bundled static fixtures (public/
+// ships verbatim): they never ride the upload pipeline, so they stay out
+// of the backend site-asset keyspace (which serves only through the
+// public branding logo route).
 const DEMO_RESULT_IMAGES = [
-  '/uploads/site/assets/demo/demo-render.svg',
-  '/uploads/site/assets/demo/demo-variations.svg',
-  '/uploads/site/assets/demo/demo-upscale.svg',
-  '/uploads/site/assets/demo/demo-fusion.svg',
+  '/demo/demo-render.svg',
+  '/demo/demo-variations.svg',
+  '/demo/demo-upscale.svg',
+  '/demo/demo-fusion.svg',
 ] as const
 
 const DEMO_STATUSES = [

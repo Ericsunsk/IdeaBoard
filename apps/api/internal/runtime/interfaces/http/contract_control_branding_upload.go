@@ -1,8 +1,5 @@
 package httpapi
 
-// Control branding-logo upload stores images under the site-assets prefix.
-// Validation enforces a 50MB cap and detected image-format allowlist.
-//
 // Multipart bodies exceed the guard's 64KiB idempotency buffer, so this
 // POST route uses the read guard and enforces mutation guarantees in-handler:
 // header-only Idempotency-Key, content-identical replay, conflicting-content
@@ -41,8 +38,9 @@ type ControlBrandingUploadService interface {
 }
 
 // controlBrandingLogoUpload is the contract-envelope payload for a stored
-// branding logo: logo_url feeds the branding setting update, the rest is
-// operator-facing file evidence.
+// branding logo: logo_url carries the canonical storage key
+// (uploads/site/assets/logo_{hash}.ext) and feeds the branding setting
+// update verbatim; the rest is operator-facing file evidence.
 type controlBrandingLogoUpload struct {
 	LogoURL string `json:"logo_url"`
 	MIME    string `json:"mime,omitempty"`
@@ -114,12 +112,21 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest6)
 		return
 	}
-	if _, ok := validateControlUploadFile(c, file); !ok {
+	ext, ok := validateControlUploadFile(c, file)
+	if !ok {
 		return
 	}
 	contentHash, err := hashControlUploadFile(file)
 	if err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest7)
+		return
+	}
+	// Content-hashed canonical key (same shape as profile avatars):
+	// identical bytes converge on one object and the key
+	// self-invalidates caches on replacement.
+	objectKey, err := domain.SiteAssetLogoObjectKey(contentHash[:16], ext)
+	if err != nil {
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable5)
 		return
 	}
 	store := d.idempotencyStore()
@@ -142,15 +149,16 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 		return
 	}
 	stored, err := d.BrandingUpload.UploadRefWithOptions(c.Request.Context(), file, ports.StorageStoreOptions{
-		DirPrefix: domain.SiteAssetUploadDirPrefix(),
+		ObjectKey: objectKey,
 	})
 	if err != nil {
 		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable5)
 		return
 	}
-	logoURL := stored.URL
-	if stored.StorageProfile == "builtin-local" {
-		logoURL = "/" + strings.TrimLeft(stored.StorageKey, "/")
+	// Settings and upload responses use the canonical object key.
+	logoURL := strings.TrimSpace(stored.StorageKey)
+	if logoURL == "" {
+		logoURL = objectKey
 	}
 	payload := controlBrandingLogoUpload{
 		LogoURL: logoURL,

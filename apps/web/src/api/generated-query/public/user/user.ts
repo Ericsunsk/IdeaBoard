@@ -23,12 +23,16 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { unref } from 'vue'
+import { computed, toValue, unref } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   AvatarUploadResultEnvelope,
   BadRequestResponse,
   ErrorEnvelope,
+  GetPublicBrandingLogoParams,
+  GetPublicUserAvatarParams,
+  NotFoundResponse,
   SupportChannelsSettingEnvelope,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
@@ -186,7 +190,7 @@ export const getUploadAvatarUrl = () => {
 }
 
 /**
- * Replaces the caller's profile avatar. The request is raw image bytes (never JSON, never multipart); MIME is sniffed from the bytes against the image allowlist and capped at 5MiB. The response envelope carries the avatar URL served back by the existing static /uploads/profile/{uid}/avatar reads. Requires the Idempotency-Key header (scope avatar:upload): key reuse with a different body renders 409 media_idempotency_conflict.
+ * Replaces the caller's profile avatar. The request is raw image bytes (never JSON, never multipart); MIME is sniffed from the bytes against the image allowlist and capped at 5MiB. Bytes persist through the storage abstraction (active profile) under the canonical content-hashed key uploads/avatars/{uid}/{hash}.ext. The response envelope carries the public avatar route URL (/api/v1/public/users/{uid}/avatar?v={version}). The Idempotency-Key header is optional (scope avatar:upload): absent keys are minted server-side from the content hash; key reuse with a different body renders 409 media_idempotency_conflict.
  * @summary Replace the caller profile avatar (user-scoped, raw bytes)
  */
 export const uploadAvatar = async (
@@ -288,4 +292,194 @@ export const useUploadAvatar = <
   TContext
 > => {
   return useMutation(getUploadAvatarMutationOptions(options), queryClient)
+}
+export const getGetPublicUserAvatarUrl = (uid: string, params?: GetPublicUserAvatarParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/public/users/${encodeURIComponent(String(uid))}/avatar?${stringifiedParams}`
+    : `/public/users/${encodeURIComponent(String(uid))}/avatar`
+}
+
+/**
+ * Public avatar delivery (no auth: avatars are public). Returns rendered image bytes at the requested size (32|64|128|256, default 64); callers without a custom avatar get the bundled default SVG inline. Malformed uids and sizes outside the whitelist render plain 400; unknown uids render plain 404. Responses carry no JSON envelope. Per-IP rate limiting rides the global middleware, like every v1 route.
+ * @summary Read a user's public avatar (no auth, size variants)
+ */
+export const getPublicUserAvatar = async (
+  uid: string,
+  params?: GetPublicUserAvatarParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<Blob> => {
+  return publicMutator<Blob>(getGetPublicUserAvatarUrl(uid, params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetPublicUserAvatarQueryKey = (
+  uid: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetPublicUserAvatarParams>,
+) => {
+  return ['public', 'users', uid, 'avatar', ...(params ? [params] : [])] as const
+}
+
+export const getGetPublicUserAvatarQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicUserAvatar>>,
+  TError = BadRequestResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  uid: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetPublicUserAvatarParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicUserAvatar>>, TError, TData>>
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetPublicUserAvatarQueryKey(uid, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicUserAvatar>>> = ({ signal }) =>
+    getPublicUserAvatar(toValue(uid), toValue(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(uid) !== null && toValue(uid) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getPublicUserAvatar>>, TError, TData>
+}
+
+export type GetPublicUserAvatarQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicUserAvatar>>
+>
+export type GetPublicUserAvatarQueryError = BadRequestResponse | NotFoundResponse | ErrorEnvelope
+
+/**
+ * @summary Read a user's public avatar (no auth, size variants)
+ */
+
+export function useGetPublicUserAvatar<
+  TData = Awaited<ReturnType<typeof getPublicUserAvatar>>,
+  TError = BadRequestResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  uid: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetPublicUserAvatarParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicUserAvatar>>, TError, TData>>
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetPublicUserAvatarQueryOptions(uid, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetPublicBrandingLogoUrl = (params: GetPublicBrandingLogoParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/public/branding/logo?${stringifiedParams}`
+    : `/public/branding/logo`
+}
+
+/**
+ * Returns rendered WebP bytes for the requested canonical site-asset key. The requested upload can be previewed before the branding setting is saved. Responses carry no JSON envelope and Cache-Control is no-store.
+ * @summary Read an uploaded branding logo (no auth)
+ */
+export const getPublicBrandingLogo = async (
+  params: GetPublicBrandingLogoParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<Blob> => {
+  return publicMutator<Blob>(getGetPublicBrandingLogoUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetPublicBrandingLogoQueryKey = (
+  params?: MaybeRefOrGetter<GetPublicBrandingLogoParams>,
+) => {
+  return ['public', 'branding', 'logo', ...(params ? [params] : [])] as const
+}
+
+export const getGetPublicBrandingLogoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicBrandingLogo>>,
+  TError = void,
+>(
+  params: MaybeRefOrGetter<GetPublicBrandingLogoParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getPublicBrandingLogo>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetPublicBrandingLogoQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicBrandingLogo>>> = ({ signal }) =>
+    getPublicBrandingLogo(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicBrandingLogo>>,
+    TError,
+    TData
+  >
+}
+
+export type GetPublicBrandingLogoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicBrandingLogo>>
+>
+export type GetPublicBrandingLogoQueryError = void
+
+/**
+ * @summary Read an uploaded branding logo (no auth)
+ */
+
+export function useGetPublicBrandingLogo<
+  TData = Awaited<ReturnType<typeof getPublicBrandingLogo>>,
+  TError = void,
+>(
+  params: MaybeRefOrGetter<GetPublicBrandingLogoParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getPublicBrandingLogo>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetPublicBrandingLogoQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
 }

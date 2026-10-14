@@ -4,7 +4,7 @@ package httpapi
 // coverage (declare -> PUT bytes -> complete -> asset, avatar,
 // batch metadata, vision file/external refs, incomplete-complete
 // rejection). Uses serveAny=false byte fakes so unstaged slots
-// genuinely miss; the legacy serveAny fixture in
+// genuinely miss; the permissive serveAny fixture in
 // contract_v1_media_test.go cannot prove the complete-after-bytes
 // gate.
 
@@ -14,12 +14,17 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
 	"ideaboard/api/internal/identity/users/domain"
+	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
+	storagedomain "ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +39,11 @@ type fakeAvatarUID struct {
 	writeErr     error
 	writes       int
 }
+
+// errFakeAvatarUserNotFound is the fixture's unknown-uid signal. It
+// aliases the platform not-found sentinel so the public avatar route
+// converges it to 404 exactly like production.
+var errFakeAvatarUserNotFound = database.ErrNotFound
 
 func (f *fakeAvatarUID) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
 	if f.err != nil {
@@ -69,6 +79,20 @@ func (f *fakeAvatarUID) GetUserByID(ctx context.Context, userID int64) (*domain.
 	return user, nil
 }
 
+// GetUserByStorageUID resolves the same single-uid fixture by storage
+// namespace: a mismatched uid reads as not-found (the public avatar
+// route converges it to 404).
+func (f *fakeAvatarUID) GetUserByStorageUID(ctx context.Context, storageUID string) (*domain.User, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if strings.TrimSpace(storageUID) == "" || strings.TrimSpace(f.uid) == "" ||
+		strings.TrimSpace(storageUID) != strings.TrimSpace(f.uid) {
+		return nil, errFakeAvatarUserNotFound
+	}
+	return f.GetUserByID(ctx, f.avatarUserID)
+}
+
 type v1MediaGapsFixture struct {
 	store   *tenancy.InMemoryStore
 	media   *workspacemedia.InMemoryWorkspaceMediaStore
@@ -82,7 +106,7 @@ type v1MediaGapsFixture struct {
 	other   int64
 }
 
-func newV1MediaGapsFixture(t *testing.T, withRenderer bool, avatarUID V1AvatarUIDDirectory) *v1MediaGapsFixture {
+func newV1MediaGapsFixture(t *testing.T, avatarUID V1AvatarUIDDirectory) *v1MediaGapsFixture {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
@@ -105,12 +129,9 @@ func newV1MediaGapsFixture(t *testing.T, withRenderer bool, avatarUID V1AvatarUI
 		t.Fatal(err)
 	}
 	store.SeedWorkspaceMember(ws2.PublicID, owner, tenancy.RoleMember)
-	deps := ContractV1Deps{Media: media, MediaObjects: objects, AvatarUID: avatarUID}
+	deps := ContractV1Deps{Media: media, MediaObjects: objects, AvatarUID: avatarUID, AvatarObjects: objects, MediaRenderer: imgproxy.NewRenderer(v1TestImgproxyConfig(t), fakeV1StorageProfiler{profile: &storagedomain.StorageProfile{Provider: storagedomain.StorageProviderLocal, Enabled: true}})}
 	if profile, ok := avatarUID.(V1AvatarProfileDirectory); ok {
 		deps.AvatarProfile = profile
-	}
-	if withRenderer {
-		deps.MediaRenderer = &fakeV1MediaRenderer{}
 	}
 	engine := newV1MediaTestEngine(store, dir, deps)
 	return &v1MediaGapsFixture{store: store, media: media, objects: objects, dir: dir, engine: engine,
@@ -228,7 +249,7 @@ func v1GapsComplete(t *testing.T, engine *gin.Engine, path string, body []byte, 
 // end: declare -> PUT bytes -> complete -> asset -> content serves the
 // staged bytes -> derivatives -> archive.
 func TestV1UploadBytesFullLifecycle(t *testing.T) {
-	f := newV1MediaGapsFixture(t, true, &fakeAvatarUID{uid: "AVTR01"})
+	f := newV1MediaGapsFixture(t, &fakeAvatarUID{uid: "AVTR01"})
 	staged := v1GapsPNGBytes(1024)
 
 	uploadID := v1GapsDeclare(t, f.engine, f.uploadsPath(), f.owner, "gaps-life-create", "photo.png", staged)
@@ -240,11 +261,9 @@ func TestV1UploadBytesFullLifecycle(t *testing.T) {
 	if status != http.StatusOK || body != string(staged) {
 		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(staged))
 	}
-	status, _, body = doV1RoundTrip(t, f.engine, v1Call{method: "GET",
-		path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.member}, "test-gaps-")
-	if status != http.StatusOK || body != "fake-webp-bytes" {
-		t.Fatalf("derivative = %d %q, want 200 fake-webp-bytes", status, body)
-	}
+	assertV1DisplayTierImage(t, f.engine, v1TestImgproxyConfig(t),
+		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.member,
+		derivativedomain.TierThumb, derivativedomain.TierSpecs[derivativedomain.TierThumb].MaxSide)
 
 	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.assetsPath() + "/" + assetID + "/archive",
 		userID: f.owner, headers: map[string]string{"Idempotency-Key": "gaps-life-archive"}})
@@ -257,7 +276,7 @@ func TestV1UploadBytesFullLifecycle(t *testing.T) {
 // without the byte PUT fails loudly (422, nothing materialized) and
 // stays retryable: PUT then complete succeeds on the same session.
 func TestV1CompleteWithoutStagedBytesRejected(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, &fakeAvatarUID{uid: "AVTR01"})
+	f := newV1MediaGapsFixture(t, &fakeAvatarUID{uid: "AVTR01"})
 	staged := v1GapsPNGBytes(512)
 
 	uploadID := v1GapsDeclare(t, f.engine, f.uploadsPath(), f.owner, "gaps-nostage-create", "photo.png", staged)
@@ -303,7 +322,7 @@ func TestV1CompleteWithoutStagedBytesRejected(t *testing.T) {
 // corruption/eviction between PUT and complete fails loudly AND
 // terminally (mirroring completion-echo mismatch semantics).
 func TestV1CompleteCorruptedStagedBytesFailsSession(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, &fakeAvatarUID{uid: "AVTR01"})
+	f := newV1MediaGapsFixture(t, &fakeAvatarUID{uid: "AVTR01"})
 	staged := v1GapsPNGBytes(256)
 
 	uploadID := v1GapsDeclare(t, f.engine, f.uploadsPath(), f.owner, "gaps-corrupt-create", "photo.png", staged)
@@ -339,7 +358,7 @@ func TestV1CompleteCorruptedStagedBytesFailsSession(t *testing.T) {
 // size echo, checksum echo, sniffed-MIME echo, terminal-state 409,
 // idempotent replay/conflict, and the 404-vs-400 matrix.
 func TestV1PutUploadBytesValidation(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, &fakeAvatarUID{uid: "AVTR01"})
+	f := newV1MediaGapsFixture(t, &fakeAvatarUID{uid: "AVTR01"})
 	staged := v1GapsPNGBytes(1024)
 	bytesPath := func(uploadID string) string { return f.uploadsPath() + "/" + uploadID + "/bytes" }
 	put := func(uploadID string, body []byte, userID int64, key, contentType string) (int, map[string]any) {
@@ -429,12 +448,15 @@ func TestV1PutUploadBytesValidation(t *testing.T) {
 }
 
 // TestV1AvatarUpload covers the user-scoped avatar PUT: sniffed MIME +
-// size validation, static-namespace keying, idempotency, and the
-// fail-closed seams.
+// size validation, canonical content-hashed keying through the storage
+// abstraction, public-route-URL projection, idempotency, superseded-key
+// cleanup, and the fail-closed seams.
 func TestV1AvatarUpload(t *testing.T) {
 	profile := &fakeAvatarUID{uid: "AVTR01"}
-	f := newV1MediaGapsFixture(t, false, profile)
+	f := newV1MediaGapsFixture(t, profile)
 	avatar := v1GapsPNGBytes(2048)
+	wantKey := "uploads/avatars/AVTR01/" + v1GapsChecksum(avatar)[:16] + ".png"
+	wantURL := v1PublicAvatarURLForRow("AVTR01", wantKey)
 	put := func(body []byte, userID int64, key, contentType string) (int, map[string]any) {
 		headers := map[string]string{"Idempotency-Key": key}
 		if contentType != "" {
@@ -450,15 +472,16 @@ func TestV1AvatarUpload(t *testing.T) {
 		t.Fatalf("avatar PUT = %d %v, want 200", status, payload)
 	}
 	url, _ := v1Data(t, payload).(map[string]any)["avatar_url"].(string)
-	if url != "/uploads/profile/AVTR01/avatar/avatar.png" {
-		t.Fatalf("avatar_url = %q, want the static profile-avatar namespace", url)
+	if url != wantURL {
+		t.Fatalf("avatar_url = %q, want the public avatar route %q", url, wantURL)
 	}
-	if profile.avatar != url || profile.avatarUserID != f.owner {
-		t.Fatalf("avatar projection = %q for %d, want %q for owner", profile.avatar, profile.avatarUserID, url)
+	// The row keeps the canonical storage key, never the route URL.
+	if profile.avatar != wantKey || profile.avatarUserID != f.owner {
+		t.Fatalf("avatar projection = %q for %d, want key %q for owner", profile.avatar, profile.avatarUserID, wantKey)
 	}
 	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})
-	if status != http.StatusOK || v1Data(t, payload).(map[string]any)["avatar"] != url {
-		t.Fatalf("user avatar projection = %d %v, want persisted URL", status, payload)
+	if status != http.StatusOK || v1Data(t, payload).(map[string]any)["avatar"] != wantURL {
+		t.Fatalf("user avatar projection = %d %v, want the public route URL", status, payload)
 	}
 	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.other})
 	if _, leaked := v1Data(t, payload).(map[string]any)["avatar"]; status != http.StatusOK || leaked {
@@ -466,7 +489,7 @@ func TestV1AvatarUpload(t *testing.T) {
 	}
 	// The staged object is readable through the byte seam at that key.
 	object, err := f.objects.ReadObjectAtProfile(context.Background(), workspacemedia.DefaultStorageProfile,
-		"uploads/profile/AVTR01/avatar/avatar.png", v1AvatarMaxBytes)
+		wantKey, v1AvatarMaxBytes)
 	if err != nil || string(object.Data) != string(avatar) {
 		t.Fatalf("staged avatar = %v %v, want the PUT bytes", object, err)
 	}
@@ -501,8 +524,8 @@ func TestV1AvatarUpload(t *testing.T) {
 		userID: f.owner, headers: map[string]string{"Content-Type": "image/png"}}
 	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusOK {
 		t.Fatalf("keyless avatar = %d %v, want 200 (server-minted content-hash key)", status, payload)
-	} else if url, _ := v1Data(t, payload).(map[string]any)["avatar_url"].(string); url != "/uploads/profile/AVTR01/avatar/avatar.png" {
-		t.Fatalf("keyless avatar_url = %q, want the static profile-avatar namespace", url)
+	} else if url, _ := v1Data(t, payload).(map[string]any)["avatar_url"].(string); url != wantURL {
+		t.Fatalf("keyless avatar_url = %q, want the public avatar route", url)
 	}
 	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusOK {
 		t.Fatalf("keyless avatar replay = %d %v, want 200", status, payload)
@@ -511,13 +534,111 @@ func TestV1AvatarUpload(t *testing.T) {
 		v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
 		t.Fatalf("overlong key avatar = %d %v, want 400 idempotency_key_required", status, payload)
 	}
+
+	// A replaced avatar stores under its own content key, projects the
+	// same route URL, and removes the superseded object best-effort.
+	replacement := v1GapsGIFBytes(2048)
+	replacementKey := "uploads/avatars/AVTR01/" + v1GapsChecksum(replacement)[:16] + ".gif"
+	if status, payload := put(replacement, f.owner, "avatar-2", "image/gif"); status != http.StatusOK {
+		t.Fatalf("avatar replacement = %d %v, want 200", status, payload)
+	} else if url, _ := v1Data(t, payload).(map[string]any)["avatar_url"].(string); url != v1PublicAvatarURLForRow("AVTR01", replacementKey) {
+		t.Fatalf("replacement avatar_url = %q, want the replacement version", url)
+	}
+	if profile.avatar != replacementKey {
+		t.Fatalf("replacement projection = %q, want key %q", profile.avatar, replacementKey)
+	}
+	if profile.writes != 2 {
+		t.Fatalf("replacement avatar writes = %d, want 2", profile.writes)
+	}
+	f.objects.mu.Lock()
+	_, superseded := f.objects.objects[wantKey]
+	f.objects.mu.Unlock()
+	if superseded {
+		t.Fatalf("superseded avatar key %q was not cleaned up", wantKey)
+	}
+}
+
+// assertV1PublicAvatarImage verifies a public size variant and its internal source.
+func assertV1PublicAvatarImage(t *testing.T, engine *gin.Engine, cfg imgproxy.Config, path string, userID int64, size int, key string) {
+	t.Helper()
+	call := v1Call{method: "GET", path: path}
+	if userID > 0 {
+		call.userID = userID
+	}
+	assertImgproxyImage(t, engine, cfg, call, "test-avatar-",
+		path, "no-store",
+		fmt.Sprintf("/rs:fill:%d:%d/plain/local:///%s@webp", size, size, key))
+}
+
+// TestV1PublicAvatarRoute covers the public avatar GET: sizeless and
+// size variants (anonymous included), the size whitelist, unknown/malformed
+// uids, and the bundled default SVG for callers without an avatar.
+func TestV1PublicAvatarRoute(t *testing.T) {
+	profile := &fakeAvatarUID{uid: "AVTR01"}
+	f := newV1MediaGapsFixture(t, profile)
+	cfg := v1TestImgproxyConfig(t)
+	route := "/api/v1/public/users/AVTR01/avatar"
+
+	// No custom avatar yet: the bundled default SVG serves inline.
+	status, header, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: route}, "test-avatar-")
+	if status != http.StatusOK {
+		t.Fatalf("default avatar = %d, want 200", status)
+	}
+	if ct := header.Get("Content-Type"); ct != "image/svg+xml" {
+		t.Fatalf("default avatar Content-Type = %q, want image/svg+xml", ct)
+	}
+	if cc := header.Get("Cache-Control"); cc != "no-store" {
+		t.Fatalf("default avatar Cache-Control = %q, want no-store", cc)
+	}
+	if !strings.Contains(body, "<svg") {
+		t.Fatalf("default avatar body is not SVG: %q", body)
+	}
+
+	avatar := v1GapsPNGBytes(2048)
+	wantKey := "uploads/avatars/AVTR01/" + v1GapsChecksum(avatar)[:16] + ".png"
+	status, _, payload := doV1(t, f.engine, v1Call{method: "PUT", path: "/api/v1/user/avatar",
+		body: string(avatar), userID: f.owner,
+		headers: map[string]string{"Content-Type": "image/png", "Idempotency-Key": "avatar-route-1"}})
+	if status != http.StatusOK {
+		t.Fatalf("avatar PUT = %d %v, want 200", status, payload)
+	}
+
+	// Sizeless defaults to 64; explicit sizes render their fill
+	// geometry. Anonymous callers pass (avatars are public).
+	assertV1PublicAvatarImage(t, f.engine, cfg, route, f.owner, 64, wantKey)
+	assertV1PublicAvatarImage(t, f.engine, cfg, route, 0, 64, wantKey)
+	for _, size := range []int{32, 128, 256} {
+		assertV1PublicAvatarImage(t, f.engine, cfg, route+"?size="+strconv.Itoa(size), f.owner, size, wantKey)
+	}
+
+	// Outside the whitelist (or unparsable) reads as plain 400.
+	for _, size := range []string{"100", "0", "-1", "abc", "64.5"} {
+		status, _, _ := doV1RoundTrip(t, f.engine, v1Call{method: "GET",
+			path: route + "?size=" + size, userID: f.owner}, "test-avatar-")
+		if status != http.StatusBadRequest {
+			t.Fatalf("avatar size %q = %d, want plain 400", size, status)
+		}
+	}
+
+	// Well-shaped but unknown uids converge to 404; malformed uids to
+	// 400. Both stay envelope-free like the binary endpoints.
+	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET",
+		path: "/api/v1/public/users/ZZZZ99/avatar", userID: f.owner}, "test-avatar-")
+	if status != http.StatusNotFound {
+		t.Fatalf("unknown avatar uid = %d, want plain 404", status)
+	}
+	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET",
+		path: "/api/v1/public/users/bad%20uid!/avatar", userID: f.owner}, "test-avatar-")
+	if status != http.StatusBadRequest {
+		t.Fatalf("malformed avatar uid = %d, want plain 400", status)
+	}
 }
 
 // TestV1AvatarFailClosed proves the avatar endpoint fails closed
 // without its seams (501 without the UID directory, 503 without the
 // byte backend).
 func TestV1AvatarFailClosed(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, nil)
+	f := newV1MediaGapsFixture(t, nil)
 	avatar := v1GapsPNGBytes(512)
 	call := v1Call{method: "PUT", path: "/api/v1/user/avatar", body: string(avatar), userID: f.owner,
 		headers: map[string]string{"Content-Type": "image/png", "Idempotency-Key": "avatar-closed-1"}}
@@ -548,7 +669,7 @@ func TestV1AvatarFailClosed(t *testing.T) {
 // order preservation, 404 convergence per invisible id, bounds, and
 // auth.
 func TestV1BatchGetMediaAssets(t *testing.T) {
-	f := newV1MediaGapsFixture(t, false, &fakeAvatarUID{uid: "AVTR01"})
+	f := newV1MediaGapsFixture(t, &fakeAvatarUID{uid: "AVTR01"})
 	first := v1GapsPNGBytes(256)
 	second := v1GapsPNGBytes(512)
 

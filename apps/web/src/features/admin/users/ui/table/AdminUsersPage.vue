@@ -85,8 +85,8 @@
           <div class="flex items-center gap-2.5 font-sans">
             <div class="relative shrink-0">
               <img
-                v-if="user.avatarUrl"
-                :src="user.avatarUrl"
+                v-if="sizedAvatarUrl(user.avatarUrl)"
+                :src="sizedAvatarUrl(user.avatarUrl)"
                 :alt="user.displayName"
                 class="size-9 rounded-pill object-cover"
               />
@@ -288,6 +288,7 @@ import { banDurationOptions } from '../../session/commands'
 import { useAdminUsersContext } from '../../session/context'
 import { useUsersFeedback } from '../../session/useUsersFeedback'
 import { USERS_MESSAGES } from './messages'
+import { resolveSizedAvatarUrl } from '../../../../../core/media/avatarUrl'
 import {
   getCountryFlag,
   getCountryLabel,
@@ -353,6 +354,10 @@ const userRowActionItems = computed(() =>
 function toggleUserActionMenu(event: Event, user: AdminUserRowView) {
   openUserActionMenu(user)
   userActionPopoverRef.value?.toggle(event)
+}
+
+function sizedAvatarUrl(base: string): string | undefined {
+  return resolveSizedAvatarUrl(base, 36)
 }
 
 function handleActionSelect(key: string) {

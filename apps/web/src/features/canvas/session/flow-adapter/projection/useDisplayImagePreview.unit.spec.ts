@@ -49,6 +49,48 @@ async function importPreviewModule() {
   return { useDisplayImagePreview }
 }
 
+function mediaAssetEnvelope(
+  assetId: string,
+  derivatives: Record<string, { status: string; format?: string; url?: string }>,
+) {
+  return {
+    data: {
+      id: assetId,
+      workspace_id: 'ws_test123',
+      status: 'ready',
+      media_kind: 'image',
+      mime_type: 'image/jpeg',
+      width: 2048,
+      height: 1024,
+      size_bytes: 100,
+      checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      content_url: `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
+      derivatives,
+      created_at: '2026-09-25T00:00:00.000Z',
+      updated_at: '2026-09-25T00:00:00.000Z',
+    },
+  }
+}
+
+function readyDerivatives(assetId: string) {
+  return {
+    thumb: {
+      status: 'ready',
+      format: 'webp',
+      url: `/api/v1/workspaces/ws_test123/media-assets/${assetId}/derivatives/thumb`,
+    },
+    preview: {
+      status: 'ready',
+      format: 'webp',
+      url: `/api/v1/workspaces/ws_test123/media-assets/${assetId}/derivatives/preview`,
+    },
+    'large-preview': {
+      status: 'ready',
+      format: 'webp',
+      url: `/api/v1/workspaces/ws_test123/media-assets/${assetId}/derivatives/large-preview`,
+    },
+  }
+}
 async function flushPreviewTasks() {
   for (let index = 0; index < 10; index += 1) {
     await Promise.resolve()
@@ -78,40 +120,10 @@ describe('useDisplayImagePreview', () => {
         const url = typeof input === 'string' ? input : input.toString()
         if (url.includes('/v1/workspaces/ws_test123/media-assets/asset-42')) {
           return new Response(
-            JSON.stringify({
-              data: {
-                id: 'asset-42',
-                workspace_id: 'ws_test123',
-                status: 'ready',
-                media_kind: 'image',
-                mime_type: 'image/jpeg',
-                width: 2048,
-                height: 1024,
-                size_bytes: 100,
-                checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-                content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
-                derivatives: {
-                  thumb: {
-                    status: 'ready',
-                    format: 'webp',
-                    url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb',
-                  },
-                  preview: {
-                    status: 'ready',
-                    format: 'webp',
-                    url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
-                  },
-                  'large-preview': {
-                    status: 'ready',
-                    format: 'webp',
-                    url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/large-preview',
-                  },
-                },
-                created_at: '2026-09-25T00:00:00.000Z',
-                updated_at: '2026-09-25T00:00:00.000Z',
-              },
-            }),
-            { headers: { 'content-type': 'application/json' } },
+            JSON.stringify(mediaAssetEnvelope('asset-42', readyDerivatives('asset-42'))),
+            {
+              headers: { 'content-type': 'application/json' },
+            },
           )
         }
         return {
@@ -132,6 +144,7 @@ describe('useDisplayImagePreview', () => {
       object instanceof Blob ? `blob:${object.size}` : 'blob:media-source',
     )
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    canvasMediaIOMocks.canvasToBlob.mockReset()
     canvasMediaIOMocks.canvasToBlob.mockResolvedValue(new Blob(['preview'], { type: 'image/webp' }))
     canvasMediaIOMocks.resolveFetchUrl.mockImplementation((url: string) => url)
   })
@@ -221,6 +234,32 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('gates v1 media-asset delivery URLs like managed uploads', async () => {
+    const sourceUrl = ref('/api/v1/workspaces/ws_test123/media-assets/asset-99/content')
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, {
+        maxSide: 640,
+      }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    expect(preview.displayUrl.value).toBe('')
+
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toBe('blob:7')
+    })
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspaces/ws_test123/media-assets/asset-99/content',
+      expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
+    )
+    expect(createImageBitmap).toHaveBeenCalled()
+    expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalled()
+    scope.stop()
+  })
+
   it('uses the canonical media derivative and never falls back to the original asset', async () => {
     const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const { useDisplayImagePreview } = await importPreviewModule()
@@ -269,6 +308,88 @@ describe('useDisplayImagePreview', () => {
         '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
       ),
     )
+    scope.stop()
+  })
+
+  it.each([2048, null])('resolves full quality (%s) to the content route', async (maxSide) => {
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, { maxSide, assetId: 'asset-42' }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() =>
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
+      ),
+    )
+    scope.stop()
+  })
+
+  it('decodes the ready original when the initial derivative cannot load', async () => {
+    class DerivativeFailureImage {
+      src = ''
+
+      decode() {
+        return this.src.includes('/derivatives/')
+          ? Promise.reject(new Error('Image failed to load'))
+          : Promise.resolve()
+      }
+    }
+    vi.stubGlobal('Image', DerivativeFailureImage)
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/api/v1/workspaces/ws_test123/media-assets/asset-42/content', {
+        maxSide: 640,
+        assetId: 'asset-42',
+      }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() =>
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
+      ),
+    )
+    scope.stop()
+  })
+
+  it('exposes the ready original as the 409 content fallback', async () => {
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId: 'asset-42' }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    expect(preview.contentFallbackUrl.value).toBe('')
+    await vi.waitFor(() =>
+      expect(preview.contentFallbackUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
+      ),
+    )
+    scope.stop()
+  })
+
+  it('keeps the content fallback empty without a media asset', async () => {
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, {
+        maxSide: null,
+      }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toBe('/uploads/tasks/U123/board/content/image.png')
+    })
+    expect(preview.contentFallbackUrl.value).toBe('')
     scope.stop()
   })
 
@@ -422,43 +543,211 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
-  it('never revokes the preview URL backing a displayed image during cache eviction', async () => {
+  it('keeps live resources usable when cache capacity is exceeded', async () => {
+    let blobCounter = 0
+    vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:owned-${(blobCounter += 1)}`)
+    const { createDisplayPreviewResources } = await import('./displayImagePreviewResources')
+    const consumers: Array<ReturnType<typeof createDisplayPreviewResources>> = []
+    for (let index = 0; index < 85; index += 1) {
+      const consumer = createDisplayPreviewResources()
+      consumers.push(consumer)
+      await expect(consumer.load(`https://example.com/owned-${index}.jpg`, 640)).resolves.toBe(
+        `blob:owned-${index + 1}`,
+      )
+    }
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+    for (const consumer of consumers) consumer.dispose()
+    expect(URL.revokeObjectURL).toHaveBeenCalled()
+  })
+
+  it('does not publish a resource whose encoding finishes after disposal', async () => {
+    let finishEncoding: ((blob: Blob) => void) | undefined
+    canvasMediaIOMocks.canvasToBlob.mockImplementationOnce(
+      () =>
+        new Promise<Blob>((resolve) => {
+          finishEncoding = resolve
+        }),
+    )
+    const { createDisplayPreviewResources } = await import('./displayImagePreviewResources')
+    const consumer = createDisplayPreviewResources()
+    const result = consumer.load('https://example.com/late.jpg', 640)
+    await vi.waitFor(() => expect(finishEncoding).toBeTypeOf('function'))
+    consumer.dispose()
+    finishEncoding?.(new Blob(['late'], { type: 'image/webp' }))
+    await expect(result).resolves.toBeNull()
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
+
+  async function fillPreviewCache() {
+    const { useDisplayImagePreview } = await importPreviewModule()
+    for (let index = 0; index < 85; index += 1) {
+      const scope = effectScope()
+      const preview = scope.run(() =>
+        useDisplayImagePreview(`https://example.com/filler-${index}.jpg`, { maxSide: 640 }),
+      )
+      await vi.waitFor(() => expect(preview?.displayUrl.value).toMatch(/^blob:preview-\d+$/), {
+        interval: 1,
+      })
+      scope.stop()
+    }
+  }
+
+  it('keeps shared generation alive when its first consumer is disposed', async () => {
+    let finishFetch: ((response: Response) => void) | undefined
+    vi.mocked(fetch).mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishFetch = resolve
+        }),
+    )
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const firstScope = effectScope()
+    firstScope.run(() => useDisplayImagePreview('/uploads/shared.jpg', { maxSide: 640 }))
+    const secondScope = effectScope()
+    const second = secondScope.run(() =>
+      useDisplayImagePreview('/uploads/shared.jpg', { maxSide: 640 }),
+    )
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const signal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal
+    firstScope.stop()
+    expect(signal?.aborted).toBe(false)
+    finishFetch?.(new Response(new Blob(['image'], { type: 'image/jpeg' })))
+    await vi.waitFor(() => expect(second?.displayUrl.value).toBe('blob:7'))
+    expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(1)
+    secondScope.stop()
+  })
+
+  it('aborts shared generation only after its last consumer leaves', async () => {
+    vi.mocked(fetch).mockImplementationOnce(
+      (_input, options) =>
+        new Promise<Response>((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          )
+        }),
+    )
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const firstScope = effectScope()
+    firstScope.run(() => useDisplayImagePreview('/uploads/shared.jpg', { maxSide: 640 }))
+    const secondScope = effectScope()
+    secondScope.run(() => useDisplayImagePreview('/uploads/shared.jpg', { maxSide: 640 }))
+    const signal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal
+
+    firstScope.stop()
+    expect(signal?.aborted).toBe(false)
+    secondScope.stop()
+    expect(signal?.aborted).toBe(true)
+    await flushPreviewTasks()
+    expect(canvasMediaIOMocks.canvasToBlob).not.toHaveBeenCalled()
+
+    const retryScope = effectScope()
+    const retry = retryScope.run(() =>
+      useDisplayImagePreview('/uploads/shared.jpg', { maxSide: 640 }),
+    )
+    await vi.waitFor(() => expect(retry?.displayUrl.value).toBe('blob:7'))
+    retryScope.stop()
+  })
+
+  it('removes an unused queued preview without starting its fetch', async () => {
+    const waitForAbort = (_input: RequestInfo | URL, options?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError')),
+        )
+      })
+    vi.mocked(fetch).mockImplementationOnce(waitForAbort).mockImplementationOnce(waitForAbort)
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scopes = [effectScope(), effectScope(), effectScope()]
+    for (const [index, scope] of scopes.entries()) {
+      scope.run(() => useDisplayImagePreview(`/uploads/queued-${index}.jpg`, { maxSide: 640 }))
+    }
+    expect(fetch).toHaveBeenCalledTimes(2)
+    scopes[2]?.stop()
+    scopes[0]?.stop()
+    scopes[1]?.stop()
+    await flushPreviewTasks()
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    const retryScope = effectScope()
+    const retry = retryScope.run(() =>
+      useDisplayImagePreview('/uploads/queued-2.jpg', { maxSide: 640 }),
+    )
+    await vi.waitFor(() => expect(retry?.displayUrl.value).toBe('blob:7'))
+    expect(fetch).toHaveBeenCalledTimes(3)
+    retryScope.stop()
+  })
+
+  it('retains a shared displayed URL until its last consumer is disposed', async () => {
     let blobCounter = 0
     vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:preview-${(blobCounter += 1)}`)
     const { useDisplayImagePreview } = await importPreviewModule()
+    const firstScope = effectScope()
+    const first = firstScope.run(() =>
+      useDisplayImagePreview('https://example.com/hero.jpg', { maxSide: 640 }),
+    )
+    const secondScope = effectScope()
+    const second = secondScope.run(() =>
+      useDisplayImagePreview('https://example.com/hero.jpg', { maxSide: 640 }),
+    )
+    await vi.waitFor(() => expect(first?.displayUrl.value).toMatch(/^blob:preview-\d+$/))
+    const heroUrl = first?.displayUrl.value
+    expect(second?.displayUrl.value).toBe(heroUrl)
+    firstScope.stop()
 
-    const heroSource = ref('https://example.com/hero.jpg')
-    const heroScope = effectScope()
-    const hero = heroScope.run(() => useDisplayImagePreview(heroSource, { maxSide: 640 }))
-    if (!hero) throw new Error('preview composable was not created')
-    await vi.waitFor(() => expect(hero.displayUrl.value).toMatch(/^blob:preview-\d+$/))
-    const heroUrl = hero.displayUrl.value
+    await fillPreviewCache()
+    expect(URL.revokeObjectURL).toHaveBeenCalled()
+    expect(vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)).not.toContain(heroUrl)
+    expect(second?.displayUrl.value).toBe(heroUrl)
 
-    const fillerScopes: Array<ReturnType<typeof effectScope>> = []
-    for (let index = 0; index < 85; index += 1) {
-      const fillerScope = effectScope()
-      const fillerSource = ref(`https://example.com/filler-${index}.jpg`)
-      const filler = fillerScope.run(() => useDisplayImagePreview(fillerSource, { maxSide: 640 }))
-      if (!filler) throw new Error('preview composable was not created')
-      fillerScopes.push(fillerScope)
-    }
-    // 86 cached previews against a limit of 80 forces eviction.
-    await vi.waitFor(() => {
-      expect(vi.mocked(URL.revokeObjectURL).mock.calls.length).toBeGreaterThanOrEqual(6)
-    })
-    const revokedWhileDisplayed = vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)
-    expect(revokedWhileDisplayed).not.toContain(heroUrl)
-
-    // Once the image is no longer displayed, its URL becomes evictable again.
-    heroScope.stop()
+    secondScope.stop()
     const extraScope = effectScope()
-    const extraSource = ref('https://example.com/filler-extra.jpg')
-    const extra = extraScope.run(() => useDisplayImagePreview(extraSource, { maxSide: 640 }))
-    if (!extra) throw new Error('preview composable was not created')
+    const extra = extraScope.run(() =>
+      useDisplayImagePreview('https://example.com/extra.jpg', { maxSide: 640 }),
+    )
     await vi.waitFor(() => {
+      expect(extra?.displayUrl.value).toMatch(/^blob:preview-\d+$/)
       expect(vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)).toContain(heroUrl)
     })
-    for (const fillerScope of fillerScopes) fillerScope.stop()
     extraScope.stop()
+  })
+
+  it('retains the previous frame while its replacement is decoding under cache pressure', async () => {
+    let blobCounter = 0
+    vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:preview-${(blobCounter += 1)}`)
+    let blockedUrl = ''
+    let finishDecode: (() => void) | undefined
+    class DeferredImage {
+      src = ''
+
+      decode() {
+        return this.src === blockedUrl
+          ? new Promise<void>((resolve) => {
+              finishDecode = resolve
+            })
+          : Promise.resolve()
+      }
+    }
+    vi.stubGlobal('Image', DeferredImage)
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const source = ref('/uploads/hero.jpg')
+    const heroScope = effectScope()
+    const hero = heroScope.run(() =>
+      useDisplayImagePreview(source, { maxSide: 640, shouldKeepPreviousOnSourceChange: true }),
+    )
+    await vi.waitFor(() => expect(hero?.displayUrl.value).toBe('blob:preview-1'))
+
+    blockedUrl = 'blob:preview-2'
+    source.value = '/uploads/replacement.jpg'
+    await vi.waitFor(() => expect(finishDecode).toBeTypeOf('function'))
+    await fillPreviewCache()
+    const revoked = vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)
+    expect(revoked).not.toContain('blob:preview-1')
+    expect(revoked).not.toContain('blob:preview-2')
+    expect(hero?.displayUrl.value).toBe('blob:preview-1')
+
+    finishDecode?.()
+    await vi.waitFor(() => expect(hero?.displayUrl.value).toBe('blob:preview-2'))
+    heroScope.stop()
   })
 })

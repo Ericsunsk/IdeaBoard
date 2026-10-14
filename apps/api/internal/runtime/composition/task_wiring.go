@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/generation/routing"
 	identityreconciliation "ideaboard/api/internal/identity/users/application/reconciliation"
-	"ideaboard/api/internal/identity/users/ports"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/config"
@@ -251,24 +250,21 @@ func newAppTaskRuntime(
 	// this materializer ever runs.
 	workspaceProviderMaterializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media: workspaceMedia, Objects: services.storageService,
-		Fetcher:     taskruntime.WorkspaceTaskResultBytesFetcher{},
-		Derivatives: taskruntime.WorkspaceTaskDerivativeRenderer{},
+		Fetcher: taskruntime.WorkspaceTaskResultBytesFetcher{},
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace provider result materializer: %w", err)
 	}
 	workspaceGateway := providers.NewExecutor(workspaceMediaResolver, workspaceProviderMaterializer, cfg.PublicOrigins, gatewayFactory, modelRoutes)
 	// #827 (#809 Phase 4b-03): result renderer ingests provider outputs
-	// into workspace-scoped media assets before the atomic Complete. Both
-	// byte seams are production implementations: remote downloads retain
-	// the outbound allowlist/timeout/size policy and derivatives are
-	// best-effort bounded PNG renders.
+	// into workspace-scoped media assets before the atomic Complete. The
+	// byte seam is the production implementation: remote downloads retain
+	// the outbound allowlist/timeout/size policy.
 	workspaceRenderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
-		Media:       workspaceMedia,
-		Assets:      workspaceAssets,
-		Objects:     services.storageService,
-		Fetcher:     taskruntime.WorkspaceTaskResultBytesFetcher{},
-		Derivatives: taskruntime.WorkspaceTaskDerivativeRenderer{},
+		Media:   workspaceMedia,
+		Assets:  workspaceAssets,
+		Objects: services.storageService,
+		Fetcher: taskruntime.WorkspaceTaskResultBytesFetcher{},
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task renderer: %w", err)
@@ -666,18 +662,6 @@ func workerWorkspaceEventData(typ string, event workspacetasks.TaskEvent) any {
 	default:
 		return nil
 	}
-}
-
-type uploadOwnerStorageUIDResolver struct {
-	repo ports.UserRepository
-}
-
-func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
-	user, err := r.repo.GetByID(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-	return user.StorageUID, nil
 }
 
 // aiGatewayModelRouteReader adapts the admin model catalog to the worker's

@@ -18,7 +18,7 @@ import (
 	libraryapplication "ideaboard/api/internal/library/application"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	materializerassets "ideaboard/api/internal/media/assets"
-	storageauth "ideaboard/api/internal/media/storage/application/authorization"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -39,7 +39,6 @@ import (
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -74,7 +73,6 @@ func newAppRouter(
 		UserRepo:          repos.userRepo,
 		UserLifecycle:     services.userLifecycle,
 	}
-	uploadReadAccess := storageauth.NewReadableUploadAccess(uploadOwnerStorageUIDResolver{repo: repos.userRepo})
 	searchProviderConfig := searchinfra.NewConfigRepository(repos.systemConfigRepo)
 	aiGatewayRepo := aigateway.NewConfigRepository(repos.systemConfigRepo)
 	aiGatewayHandler := aigateway.NewHandler(aiGatewayRepo)
@@ -122,9 +120,8 @@ func newAppRouter(
 	libraryStore := librarypostgres.NewService(repos.db)
 	libraryMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: taskServices.workspaceTaskMedia, Objects: services.storageService,
-		Fetcher:  materializerassets.RemoteLibrarySourceFetcher{},
-		Renderer: taskruntime.WorkspaceTaskDerivativeRenderer{},
-		Replay:   &libraryapplication.StoreReplay{Store: libraryStore},
+		Fetcher: materializerassets.RemoteLibrarySourceFetcher{},
+		Replay:  &libraryapplication.StoreReplay{Store: libraryStore},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize library materializer: %w", err)
@@ -141,6 +138,10 @@ func newAppRouter(
 			Users:           httpapi.NewUsersRepositoryDirectory(repos.userRepo),
 			AvatarUID:       httpapi.NewV1AvatarDirectory(repos.userRepo),
 			AvatarProfile:   httpapi.NewV1AvatarProfileDirectory(repos.userRepo),
+			// Avatar bytes ride the storage abstraction (active
+			// profile): the same seam serves local today and R2 after
+			// the profile cutover.
+			AvatarObjects: services.storageService,
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
 			Boards: boards.NewPostgresWorkspaceBoardStore(repos.db),
@@ -154,13 +155,9 @@ func newAppRouter(
 				ReadThrough: libraryReadThrough,
 			},
 			Media: taskServices.workspaceTaskMedia,
-			// Binary reads ride the storage service. Upload completion
-			// renders display tiers inline with the same bounded
-			// production renderer the task worker uses, so tiers are
-			// materialized instead of staying pending forever (nothing
-			// else generates them for uploads).
+			// Binary reads ride the storage service.
 			MediaObjects:  services.storageService,
-			MediaRenderer: taskruntime.WorkspaceTaskDerivativeRenderer{},
+			MediaRenderer: imgproxy.NewRenderer(imgproxyConfigFromApp(cfg), services.storageService),
 			// #821 (#809 Phase 4-04): workspace-scoped task postgres
 			// store + production settlement adapters. Task routes
 			// are live: Quote via the billing catalog, Hold/Capture/
@@ -290,7 +287,6 @@ func newAppRouter(
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		PaymentWebhook:      paymentWebhookHandler,
 		Internal:            httpapi.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
-		StaticUploads:       httpapi.StaticUploadDeps{Auth: authDeps, ReadAccess: uploadReadAccess},
 		CORSMiddleware:      httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 		RateLimit:           services.runtimeSettings,
 		Branding:            services.runtimeSettings,

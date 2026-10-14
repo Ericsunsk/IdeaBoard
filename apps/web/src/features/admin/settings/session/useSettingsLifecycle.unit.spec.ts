@@ -110,7 +110,7 @@ describe('Admin System Settings lifecycle', () => {
 
 describe('Admin System Settings adapters', () => {
   it('uploads a branding logo as multipart with an idempotency key and updates only the draft', async () => {
-    const uploadedLogoURL = '/uploads/site/assets/logo.png'
+    const uploadedLogoKey = 'uploads/site/assets/logo_abcdef1234567890.png'
     let uploadBody: FormData | undefined
     let idempotencyKey: string | null = null
     const saveRequest = vi.fn()
@@ -121,7 +121,7 @@ describe('Admin System Settings adapters', () => {
       http.post('/api/control/v1/platform/settings/branding/logo', async ({ request }) => {
         uploadBody = await request.formData()
         idempotencyKey = request.headers.get('Idempotency-Key')
-        return HttpResponse.json({ data: { logo_url: uploadedLogoURL } })
+        return HttpResponse.json({ data: { logo_url: uploadedLogoKey } })
       }),
       http.put('/api/control/v1/platform/settings/branding', saveRequest),
     )
@@ -142,9 +142,11 @@ describe('Admin System Settings adapters', () => {
       expect(idempotencyKey).toBeTruthy()
       expect(harness.value.form.value).toEqual({
         project_name: 'Draft Brand',
-        logo_url: uploadedLogoURL,
+        logo_url: uploadedLogoKey,
       })
-      expect(harness.value.logoPreviewURL.value).toContain(uploadedLogoURL)
+      expect(harness.value.logoPreviewURL.value).toBe(
+        `/api/v1/public/branding/logo?key=${encodeURIComponent(uploadedLogoKey)}`,
+      )
       expect(harness.value.isDirty.value).toBe(true)
       expect(harness.value.uploading.value).toBe(false)
       expect(feedback.logoUploaded).toHaveBeenCalledOnce()

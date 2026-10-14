@@ -14,22 +14,20 @@ import (
 // miss), lazy session expiry, atomic complete (asset insert +
 // session flip), and idempotent archive.
 type InMemoryWorkspaceMediaStore struct {
-	mu          sync.Mutex
-	sessions    map[string]*Session
-	assets      map[string]*Asset
-	derivatives map[string][]*Derivative
-	taskAssets  map[string][]*TaskAsset
-	now         func() time.Time
+	mu         sync.Mutex
+	sessions   map[string]*Session
+	assets     map[string]*Asset
+	taskAssets map[string][]*TaskAsset
+	now        func() time.Time
 }
 
 // NewInMemoryWorkspaceMediaStoreForTests builds an empty test-only store.
 func NewInMemoryWorkspaceMediaStoreForTests() *InMemoryWorkspaceMediaStore {
 	return &InMemoryWorkspaceMediaStore{
-		sessions:    make(map[string]*Session),
-		assets:      make(map[string]*Asset),
-		derivatives: make(map[string][]*Derivative),
-		taskAssets:  make(map[string][]*TaskAsset),
-		now:         time.Now,
+		sessions:   make(map[string]*Session),
+		assets:     make(map[string]*Asset),
+		taskAssets: make(map[string][]*TaskAsset),
+		now:        time.Now,
 	}
 }
 
@@ -79,14 +77,6 @@ func copyAsset(in *Asset) *Asset {
 		archived := *in.ArchivedAt
 		out.ArchivedAt = &archived
 	}
-	return &out
-}
-
-func copyDerivative(in *Derivative) *Derivative {
-	if in == nil {
-		return nil
-	}
-	out := *in
 	return &out
 }
 
@@ -350,60 +340,6 @@ func (s *InMemoryWorkspaceMediaStore) UpdateAssetMetadata(ctx context.Context, w
 		asset.Height = params.Height
 	}
 	return copyAsset(asset), nil
-}
-
-// RecordDerivative upserts one derivative variant.
-func (s *InMemoryWorkspaceMediaStore) RecordDerivative(ctx context.Context, workspaceID, assetID string, derivative Derivative) (*Derivative, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.assets[mediaKey(workspaceID, assetID)] == nil {
-		return nil, ErrNotFound
-	}
-	variant := strings.TrimSpace(derivative.VariantName)
-	if variant == "" {
-		return nil, NewFieldValidationError("variant")
-	}
-	if strings.TrimSpace(derivative.StorageKey) == "" {
-		return nil, NewFieldValidationError("storage_key")
-	}
-	key := mediaKey(workspaceID, assetID)
-	record := copyDerivative(&derivative)
-	record.VariantName = variant
-	record.CreatedAt = s.clock()
-	replaced := false
-	for i, existing := range s.derivatives[key] {
-		if existing.VariantName == variant {
-			s.derivatives[key][i] = record
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		s.derivatives[key] = append(s.derivatives[key], record)
-	}
-	return copyDerivative(record), nil
-}
-
-// ListDerivatives returns stored variants for one asset.
-func (s *InMemoryWorkspaceMediaStore) ListDerivatives(ctx context.Context, workspaceID, assetID string) ([]*Derivative, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.assets[mediaKey(workspaceID, assetID)] == nil {
-		return nil, ErrNotFound
-	}
-	rows := s.derivatives[mediaKey(workspaceID, assetID)]
-	out := make([]*Derivative, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, copyDerivative(row))
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].VariantName < out[j].VariantName })
-	return out, nil
 }
 
 // SeedTaskAssetForTests attaches an asset to a task for ListTaskAssets

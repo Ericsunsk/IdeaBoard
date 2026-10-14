@@ -21,7 +21,12 @@ function makeRow(overrides: Partial<AdminTaskRow> = {}): AdminTaskRow {
   } as AdminTaskRow
 }
 
-const urls = ['/uploads/a.jpg', '/uploads/b.jpg', '/uploads/c.jpg', '/uploads/d.jpg']
+const urls = [
+  '/api/v1/workspaces/ws_test123/media-assets/asset_a/content',
+  '/api/v1/workspaces/ws_test123/media-assets/asset_b/content',
+  '/api/v1/workspaces/ws_test123/media-assets/asset_c/content',
+  '/api/v1/workspaces/ws_test123/media-assets/asset_d/content',
+]
 
 describe('TaskResultCell', () => {
   it('renders up to 3 thumbnails with an overflow badge', async () => {

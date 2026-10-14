@@ -2,9 +2,10 @@ package tests
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
 	"os"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 type fakeAdminUserImpersonator struct {

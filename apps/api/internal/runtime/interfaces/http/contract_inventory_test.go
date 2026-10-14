@@ -11,7 +11,7 @@ package httpapi
 //
 // Notes on deliberate non-bans (verified live, not legacy):
 //   - platform/response: survives ONLY for documented protocol exceptions
-//     (health/readiness probes, provider webhooks, static bytes, SSE
+//     (health/readiness probes, provider webhooks, SSE
 //     framing, binary bodies, cross-cutting middleware). v1 + control JSON
 //     handlers render via platform/contract; see
 //     TestContractV1EnvelopeUnification for the v1 pin.
@@ -45,7 +45,7 @@ const (
 	bucketPublic  contractInventoryBucket = "public"  // new /api/v1 + legacy public paths
 	bucketControl contractInventoryBucket = "control" // new /api/control/v1
 	bucketAuth    contractInventoryBucket = "auth"    // Better Auth transport, owned by apps/auth
-	bucketInfra   contractInventoryBucket = "infra"   // health/readiness, webhooks, internal, static bytes
+	bucketInfra   contractInventoryBucket = "infra"   // health/readiness, webhooks, internal
 )
 
 type inventoryRateLimitStub struct{}
@@ -86,8 +86,7 @@ func classifyContractRoute(path string) (contractInventoryBucket, bool) {
 	case path == "/api/auth" || strings.HasPrefix(path, "/api/auth/"):
 		return bucketAuth, true
 	case path == "/api/webhooks" || strings.HasPrefix(path, "/api/webhooks/") ||
-		path == "/internal" || strings.HasPrefix(path, "/internal/") ||
-		path == "/uploads" || strings.HasPrefix(path, "/uploads/"):
+		path == "/internal" || strings.HasPrefix(path, "/internal/"):
 		return bucketInfra, true
 	case path == "/":
 		return bucketInfra, true
@@ -181,6 +180,8 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: stageWorkspaceUploadBytes",
 			"operationId: batchGetWorkspaceMediaAssets",
 			"operationId: uploadAvatar",
+			"operationId: getPublicUserAvatar",
+			"operationId: getPublicBrandingLogo",
 			"operationId: createWorkspaceTask",
 			"operationId: listWorkspaceTasks",
 			"operationId: getWorkspaceTask",
@@ -285,7 +286,6 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 //     (framing protocol, no JSON envelope at all).
 //   - binary: contract_v1_media.go content/derivative via c.Data and
 //     renderV1BinaryError via c.String (plain bytes/status, no JSON).
-//   - static bytes: upload_static_handler.go (/uploads/*).
 //   - cross-cutting middleware (body-limit, timeout, rate-limit, recovery):
 //     routes_middleware.go, security.go, rate_limit.go, observability.go.
 //
@@ -406,6 +406,11 @@ func TestContractInventoryLegacySurfacesStayDeleted(t *testing.T) {
 		"upload_handler.go",
 		"download_handler.go",
 		"media_asset_handler.go",
+		// Static /uploads/ serving retired: every byte rides the
+		// unified object-storage + pull pipeline (v1 media-assets
+		// content/derivatives, public avatar/logo routes).
+		"upload_static_handler.go",
+		"upload_static_handler_test.go",
 		// Fail-closed legacy task-store stub (+ its pin test): the
 		// workspace-scoped store replaced every seam it covered.
 		filepath.Join("..", "composition", "legacy_task_store_stub.go"),

@@ -108,7 +108,7 @@ describe('AdminTaskResultDialog', () => {
   it('keeps the result action visible for keyboard focus', async () => {
     renderDialog(
       makeTask({
-        result: '{"image_url":"/uploads/tasks/1/task/output.png"}',
+        result: '{"image_url":"/api/v1/workspaces/ws_test123/media-assets/asset_123/content"}',
       }),
     )
 

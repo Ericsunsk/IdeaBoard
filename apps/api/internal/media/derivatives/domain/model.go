@@ -3,7 +3,6 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"time"
 )
 
 // --- Tier Constants and Specs ---
@@ -27,23 +26,14 @@ type TierSpec struct {
 }
 
 var TierSpecs = map[string]TierSpec{
+	// Display tiers mirror the frontend width-to-tier map in
+	// apps/web/src/core/media/displayTier.ts (MEDIA_DISPLAY_TIER_MAX_SIDE:
+	// thumb 256, preview 640, large-preview 1280); keep both sides in sync.
 	TierThumb:           {MaxSide: 256},
 	TierPreview:         {MaxSide: 640},
 	TierLargePreview:    {MaxSide: 1280},
 	TierProcessingInput: {MaxSide: ProcessingInputMaxSide},
 }
-
-// --- Render & Repair Limits ---
-
-const MaxAttempts = 5
-
-const (
-	MaxSourceBytes = 100 * 1024 * 1024
-	MaxOutputBytes = 20 * 1024 * 1024
-	RenderDeadline = 2 * time.Minute
-)
-
-var ErrRepairNotPossible = errors.New("media derivative repair is not possible")
 
 // --- Input Profile Specifications ---
 

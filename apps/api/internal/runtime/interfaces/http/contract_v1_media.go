@@ -23,84 +23,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Workspace upload sessions + media assets (issue #803, restored in
-// #820 as Phase 4-03 of #809). Additive only: legacy /api/user upload
-// and media routes are untouched.
-//
-// Restored surface (ContractV1GroupPath + PublicContractChain):
-//
-//	POST /api/v1/workspaces/{workspace_id}/uploads (201)
-//	GET  /api/v1/workspaces/{workspace_id}/uploads/{upload_id}
-//	PUT  /api/v1/workspaces/{workspace_id}/uploads/{upload_id}/bytes (200 + session; stages declared bytes)
-//	POST /api/v1/workspaces/{workspace_id}/uploads/{upload_id}/complete (200 + asset; requires staged bytes)
-//	GET  /api/v1/workspaces/{workspace_id}/media-assets (cursor page_size)
-//	POST /api/v1/workspaces/{workspace_id}/media-assets/batch (200 + items; bounded asset_ids)
-//	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}
-//	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/content (bytes)
-//	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/derivatives/{variant} (bytes)
-//	POST /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/archive (owner/admin)
-//	PUT  /api/v1/user/avatar (200 + avatar_url; user-scoped profile avatar)
-//
-// Binary vs metadata separation: session/list/get/batch/archive/avatar
-// speak JSON (avatar takes raw bytes in, never out); content/derivative
-// serve bytes (never the envelope, never storage keys). The byte PUT is
-// the single writer for upload slots: complete verifies the staged
-// object (size, checksum, sniffed MIME) and fails loudly without
-// materializing anything when bytes are missing or mismatched. Errors
-// on the binary endpoints are plain non-JSON statuses for the same
-// reason.
-//
-// Auth model: workspace membership, not per-owner scoping. Any member
-// reads and completes; archive needs owner/admin. The avatar PUT is
-// user-scoped (any authenticated caller for their own avatar). Hidden
-// workspaces converge to 404 workspace_not_found, visible-but-forbidden
-// to 403.
-// Resource ids are upload_/asset_ opaque segments: malformed shapes,
-// unknown ids, and cross-workspace ids converge to the matching
-// *_not_found 404 (Baseline 4 anti-enumeration).
-//
-// Envelope: contract.RenderCreated/RenderSuccess/RenderPaginated/
-// RenderError; cursor pagination via cursor/page_size; create/complete/
-// archive require the Idempotency-Key header (scope upload:<op> /
-// media:<op>; reuse with a different request hash renders 409
-// upload_idempotency_conflict / media_idempotency_conflict). The byte
-// PUT and avatar upload accept the key optionally: when absent the
-// server mints a deterministic key from the content hash in the same
-// scope, so replay protection holds without client friction.
-//
-// Production wiring fills ContractV1Deps.Media (+ MediaObjects for
-// bytes) when the postgres store lands; nil store fails closed with
-// 501, nil objects with 503 on binary reads (metadata keeps working)
-// while derivative generation is skipped. Tests inject the in-memory
-// store plus fakes.
+// Workspace upload and media endpoints enforce membership for reads and completion,
+// and owner/admin access for archival. Upload completion verifies the staged bytes
+// against declared size, checksum, and MIME before making the asset ready.
+// Original content is read from storage; display tiers render on demand via imgproxy.
 
 // WorkspaceMediaStore is the v1 media persistence seam (alias so
 // ContractV1Deps stays in one package without import cycles).
 type WorkspaceMediaStore = workspacemedia.WorkspaceMediaStore
 
-// WorkspaceMediaObjects is the narrow byte seam the v1 content,
-// derivative, and generation paths need. *storage.Service satisfies it
-// in production; tests inject fakes. Nil fails binary reads closed
-// with 503 and skips generation while metadata endpoints keep working.
-type WorkspaceMediaObjects = workspacemedia.DerivativeObjects
+// WorkspaceMediaObjects stores and reads workspace original bytes.
+type WorkspaceMediaObjects = workspacemedia.MediaObjects
 
 // maxCompleteDimension bounds client-declared frame dimensions at
 // complete time (no byte inspection in this slice; 0 maps to NULL and
 // reads back as 0).
 const maxCompleteDimension = int32(32768)
 
-// v1MediaBinaryMaxBytes bounds one binary read (parity with the legacy
-// original-bytes path).
+// v1MediaBinaryMaxBytes bounds each original image response.
 const v1MediaBinaryMaxBytes = 100 * 1024 * 1024
 
 // maxV1MediaBatchAssets bounds one batch metadata read (bounded input:
 // the per-id lookups stay a single-digit-millisecond fan-out, never an
 // unbounded scan).
 const maxV1MediaBatchAssets = 50
-
-// v1AvatarMaxBytes bounds one avatar upload (5MiB: avatars are display
-// images, never originals).
-const v1AvatarMaxBytes = 5 * 1024 * 1024
 
 // V1AvatarUIDDirectory resolves a caller's storage UID for the
 // user-scoped avatar PUT. Production adapts the identity
@@ -288,11 +234,7 @@ func toMediaAssetDTO(workspacePublicID string, asset *workspacemedia.Asset, upda
 		CreatedAt:      v1FormatTime(asset.CreatedAt),
 		UpdatedAt:      updatedAt,
 	}
-	// Display tiers resolve from stored derivative rows once generated.
-	// Until then every tier is pending unless the asset itself is
-	// ready, mirroring the frozen metadata shape (ready tiers carry
-	// URLs, others stay pending; the binary endpoint 409s on rows
-	// that were never materialized).
+	// Display tiers become available when their source asset is ready.
 	for tier := range derivativedomain.TierSpecs {
 		if tier == derivativedomain.TierProcessingInput {
 			continue
@@ -365,6 +307,7 @@ func renderMediaValidationError(c *gin.Context, err error) {
 // renderV1BinaryError answers binary endpoints with a plain non-JSON
 // status: content/derivative endpoints never carry the JSON envelope.
 func renderV1BinaryError(c *gin.Context, status int) {
+	c.Header("Cache-Control", "no-store")
 	c.String(status, http.StatusText(status))
 	c.Abort()
 }
@@ -711,14 +654,6 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 	})
 }
 
-// v1MediaRenderer renders display derivatives during completion. The
-// production renderer adapts the derivatives rendering seam; nil (or a
-// missing byte backend) skips generation while the asset stays ready
-// with pending tiers.
-type v1MediaRenderer interface {
-	Render(ctx context.Context, data []byte, sourceName string, maxSide int) ([]byte, int, int, string, error)
-}
-
 func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePublicID, uploadID string, identityPrincipal principal.Principal, facts workspacemedia.CompleteFacts) (any, error) {
 	assetPublicID, err := workspacemedia.NewAssetPublicID()
 	if err != nil {
@@ -751,11 +686,6 @@ func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePub
 	h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1MediaAssetReady,
 		events.V1Resource{Type: events.V1ResourceMediaAsset, ID: asset.ID},
 		events.V1MediaAssetReadyData{AssetID: asset.ID})
-	// Best-effort derivative generation: failures never fail the
-	// completion itself (tiers without rows stay pending). The renderer
-	// seam is optional; without it (or without readable original
-	// bytes) generation is skipped silently.
-	h.generateMediaDerivativesBestEffort(ctx, workspacePublicID, asset)
 	uploadDTO := toUploadSessionDTO(completed)
 	dto := &v1CompleteUploadDTO{Upload: uploadDTO, Asset: toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(completed.UpdatedAt))}
 	return dto, nil
@@ -795,17 +725,6 @@ func (h *contractV1Handler) verifyStagedUploadBytes(ctx context.Context, session
 		return &workspacemedia.ValidationError{Fields: map[string]string{"checksum_sha256": "invalid"}}
 	}
 	return nil
-}
-
-// generateMediaDerivativesBestEffort runs sequential derivative
-// generation after a successful completion. Every failure mode (nil
-// seams, missing bytes, render errors) is absorbed: the asset is
-// already ready and unmaterialized tiers stay pending.
-func (h *contractV1Handler) generateMediaDerivativesBestEffort(ctx context.Context, workspacePublicID string, asset *workspacemedia.Asset) {
-	if h == nil || h.deps.Media == nil || h.deps.MediaObjects == nil || h.deps.MediaRenderer == nil {
-		return
-	}
-	_, _ = workspacemedia.EnsureDerivatives(ctx, h.deps.Media, h.deps.MediaObjects, h.deps.MediaRenderer, workspacePublicID, asset)
 }
 
 func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
@@ -1063,9 +982,50 @@ func (h *contractV1Handler) writeV1MediaBytes(c *gin.Context, objectKey, mimeTyp
 	if mime == "" {
 		mime = "application/octet-stream"
 	}
+	// Content-addressed ETag: bytes are immutable per storage key, so a
+	// strong validator is exact and safe. Conditional requests revalidate
+	// to 304 without resending bytes.
+	sum := sha256.Sum256(object.Data)
+	etag := `"` + hex.EncodeToString(sum[:]) + `"`
+	if matchV1MediaETag(c.GetHeader("If-None-Match"), etag) {
+		c.Header("ETag", etag)
+		c.Status(http.StatusNotModified)
+		return
+	}
 	c.Header("Cache-Control", "private, max-age=3600")
-	c.Header("Content-Disposition", "inline")
+	c.Header("ETag", etag)
+	c.Header("Content-Disposition", v1MediaDisposition(mime, object.Filename))
 	c.Data(http.StatusOK, mime, object.Data)
+}
+
+// matchV1MediaETag reports whether an If-None-Match header value covers a
+// ETag, using weak comparison as required for If-None-Match.
+func matchV1MediaETag(header, etag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		candidate = strings.TrimPrefix(candidate, "W/")
+		if candidate == "*" || candidate == etag {
+			return true
+		}
+	}
+	return false
+}
+
+// v1MediaDisposition keeps `inline` for verified raster image MIME types
+// (the only types the upload allowlist admits) and fails closed to
+// `attachment` for anything else, so a future MIME can never execute as
+// active content on the app origin.
+func v1MediaDisposition(mime, filename string) string {
+	switch strings.ToLower(strings.TrimSpace(strings.Split(mime, ";")[0])) {
+	case "image/jpeg", "image/png", "image/gif", "image/bmp", "image/webp", "image/avif":
+		return "inline"
+	default:
+		name := strings.TrimSpace(filename)
+		if name == "" {
+			name = "asset"
+		}
+		return `attachment; filename="` + strings.ReplaceAll(name, `"`, "") + `"`
+	}
 }
 
 func (h *contractV1Handler) contentMediaAsset(c *gin.Context) {
@@ -1100,190 +1060,6 @@ func (h *contractV1Handler) derivativeMediaAsset(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// Serve the generation-matched stored derivative row. Tiers without
-	// a stored row stay 409 until generation materializes them; there
-	// is no imgproxy pull-through on the v1 path in this slice.
-	derivatives, err := h.deps.Media.ListDerivatives(c.Request.Context(), workspacePublicID, asset.ID)
-	if err != nil {
-		renderV1BinaryError(c, http.StatusServiceUnavailable)
-		return
-	}
-	for _, derivative := range derivatives {
-		if derivative.VariantName != variant {
-			continue
-		}
-		h.writeV1MediaBytes(c, derivative.StorageKey, derivative.MIMEType)
-		return
-	}
-	renderV1BinaryError(c, http.StatusConflict)
+	image, err := h.deps.MediaRenderer.WorkspaceTier(c.Request.Context(), asset.StorageKey, variant)
+	writeRenderedImage(c, image, err, "private, max-age=300")
 }
-
-type v1AvatarDTO struct {
-	AvatarURL string `json:"avatar_url"`
-}
-
-// uploadAvatar replaces the caller's profile avatar (user-scoped: the
-// v1 successor of the deleted legacy /api/user/profile/avatar). The
-// request is raw image bytes (never JSON, never multipart); the
-// response is the JSON envelope with the avatar URL served by the
-// existing static uploads handler (owner-only reads, unchanged). MIME
-// is sniffed from the bytes against the imageformat allowlist and size
-// is capped at v1AvatarMaxBytes; the object key reuses the static
-// profile-avatar namespace so serving needs no new endpoint.
-func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok {
-		return
-	}
-	if h.deps.AvatarUID == nil {
-		contract.RenderError(c, http.StatusNotImplemented,
-			contract.CodeContractNotImplemented, "The v1 avatar surface is not implemented yet")
-		c.Abort()
-		return
-	}
-	if h.deps.MediaObjects == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
-		c.Abort()
-		return
-	}
-	if h.deps.AvatarProfile == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
-		c.Abort()
-		return
-	}
-	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, v1AvatarMaxBytes+1))
-	if readErr != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgRequireEmptyV1BillingActionBody)
-		c.Abort()
-		return
-	}
-	if len(data) == 0 {
-		renderMediaValidationError(c, workspacemedia.NewFieldValidationError("avatar"))
-		return
-	}
-	if len(data) > v1AvatarMaxBytes {
-		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"avatar": "out_of_range"}})
-		return
-	}
-	ext := imageformat.DetectImageExtensionFromBytes(data)
-	mime := imageformat.ImageMIMEFromExtension(ext)
-	if ext == "" || mime == "" {
-		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"avatar": "unsupported"}})
-		return
-	}
-	if raw := strings.TrimSpace(c.GetHeader("Content-Type")); raw != "" {
-		if canonical, ok := imageformat.NormalizeImageMIME(raw); !ok || canonical != mime {
-			renderMediaValidationError(c, workspacemedia.NewFieldValidationError("avatar"))
-			return
-		}
-	}
-	ctx := c.Request.Context()
-	storageUID, err := h.deps.AvatarUID.GetStorageUIDByUserID(ctx, identityPrincipal.UserID())
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
-		c.Abort()
-		return
-	}
-	prefix, err := storagedomain.ProfileAvatarUploadObjectPrefix(storageUID)
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
-		c.Abort()
-		return
-	}
-	objectKey := prefix + "avatar" + ext
-	sum := sha256.Sum256(data)
-	bodyChecksum := hex.EncodeToString(sum[:])
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "avatar:upload")
-	hash := contract.HashIdempotencyRequest("avatar:upload", externalUser, bodyChecksum,
-		strconv.FormatInt(int64(len(data)), 10), mime)
-	// Avatar bytes are naturally idempotent (sniffed format + content
-	// hash dedup): same optional-key contract as the upload byte PUT.
-	key, ok := v1OptionalIdempotencyKey(c, hash)
-	if !ok {
-		return
-	}
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		if putErr := h.deps.MediaObjects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, objectKey, data, mime); putErr != nil {
-			return nil, errV1MediaBytesStoreUnavailable
-		}
-		avatarURL := "/" + objectKey
-		if writeErr := h.deps.AvatarProfile.UpdateUserAvatar(ctx, identityPrincipal.UserID(), avatarURL); writeErr != nil {
-			return nil, writeErr
-		}
-		return &v1AvatarDTO{AvatarURL: avatarURL}, nil
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, msgWorkspaceIdempotencyConflict)
-			c.Abort()
-			return
-		}
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
-		c.Abort()
-		return
-	}
-	dto, ok := result.(*v1AvatarDTO)
-	if !ok || dto == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, dto)
-}
-
-// OpenAPI deltas for the merger (DO NOT edit apps/api/openapi*.yaml here).
-// Add under paths (tags: WorkspaceMedia), reusing components parameters
-// Cursor/PageSize/WorkspaceId/UploadId/AssetId/IdempotencyKey/RequestId and responses
-// BadRequest/Unauthorized/Forbidden/NotFound/Conflict/Gone/UnprocessableEntity:
-//
-//	/workspaces/{workspace_id}/uploads:
-//	  post: {operationId: createWorkspaceUpload, parameters: [WorkspaceId, IdempotencyKey]}
-//	/workspaces/{workspace_id}/uploads/{upload_id}:
-//	  get: {operationId: getWorkspaceUpload, parameters: [WorkspaceId, UploadId]}
-//	/workspaces/{workspace_id}/uploads/{upload_id}/bytes:
-//	  put: {operationId: stageWorkspaceUploadBytes, parameters: [WorkspaceId, UploadId, IdempotencyKey(optional)],
-//	        requestBody: {content: {'application/octet-stream': {schema: {type: string, format: binary}}},
-//	                     description: 'Raw image bytes matching the session declaration (size, checksum, MIME). Retryable 422s change no state. Idempotency-Key optional: absent keys are minted server-side from the content hash.'}}
-//	/workspaces/{workspace_id}/uploads/{upload_id}/complete:
-//	  post: {operationId: completeWorkspaceUpload, parameters: [WorkspaceId, UploadId, IdempotencyKey]}
-//	        (complete-after-bytes: 422 upload_validation_failed details.bytes=missing when no bytes
-//	         were staged, details.size_bytes/checksum_sha256/mime_type on staged mismatch (session failed);
-//	         503 service_unavailable on transient staged-read failures)
-//	/workspaces/{workspace_id}/media-assets:
-//	  get: {operationId: listWorkspaceMediaAssets, parameters: [WorkspaceId, Cursor, PageSize]}
-//	/workspaces/{workspace_id}/media-assets/batch:
-//	  post: {operationId: batchGetWorkspaceMediaAssets, parameters: [WorkspaceId],
-//	        requestBody: {data: {asset_ids: {type: array, minItems: 1, maxItems: 50, items: {type: string, pattern: '^asset_'}}}}}
-//	        (read-only POST, no Idempotency-Key; any malformed/unknown/cross-workspace id converges
-//	         to 404 media_not_found; over-bound renders 422 media_validation_failed)
-//	/workspaces/{workspace_id}/media-assets/{asset_id}:
-//	  get: {operationId: getWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId]}
-//	/workspaces/{workspace_id}/media-assets/{asset_id}/content:
-//	  get: {operationId: contentWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId]}
-//	/workspaces/{workspace_id}/media-assets/{asset_id}/derivatives/{variant}:
-//	  get: {operationId: derivativeWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId, {name: variant, in: path, required: true, schema: {type: string, enum: [thumb, preview, large-preview]}}]}
-//	/workspaces/{workspace_id}/media-assets/{asset_id}/archive:
-//	  post: {operationId: archiveWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId, IdempotencyKey]}
-//	/user/avatar:
-//	  put: {operationId: uploadAvatar, parameters: [IdempotencyKey(optional)],
-//	        requestBody: {content: {'application/octet-stream': {schema: {type: string, format: binary, maxLength: 5242880}}},
-//	                     description: 'Raw image bytes (allowlisted image MIME, 5MiB cap). Idempotency-Key optional: absent keys are minted server-side from the content hash. Served back by the existing static /uploads/profile/{uid}/avatar reads.'}}
-//
-// Schemas (UploadSession/MediaAsset/UploadId/MediaAssetId and request
-// bodies) already exist in openapi.public.yaml from #803; the paths
-// above were removed with the surface in #813 and return here unchanged.
-// New schemas for the merger: BatchGetMediaAssetsRequest
-// ({data: {asset_ids: asset_[]}}), BatchGetMediaAssetsResult
-// ({items: MediaAsset[]}), AvatarUploadResult ({avatar_url: string,
-// pattern '^/uploads/profile/'}); the bytes PUT takes a binary body
-// (no JSON schema) and its success reuses the UploadSession envelope.
-//
-// Error codes frozen: upload_not_found (404), upload_expired (410),
-// upload_state_conflict (409), upload_idempotency_conflict (409),
-// upload_validation_failed (422), media_not_found (404),
-// media_not_ready (409), media_archived (410),
-// media_idempotency_conflict (409), media_validation_failed (422);
-// reused kernel codes workspace_not_found/workspace_forbidden/
-// pagination_cursor_invalid/bad_request/idempotency_key_required/
-// service_unavailable.

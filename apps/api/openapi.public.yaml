@@ -100,16 +100,19 @@ paths:
       description: >-
         Replaces the caller's profile avatar. The request is raw image
         bytes (never JSON, never multipart); MIME is sniffed from the
-        bytes against the image allowlist and capped at 5MiB. The
-        response envelope carries the avatar URL served back by the
-        existing static /uploads/profile/{uid}/avatar reads. Requires
-        the Idempotency-Key header (scope avatar:upload): key reuse with
-        a different body renders 409 media_idempotency_conflict.
+        bytes against the image allowlist and capped at 5MiB. Bytes
+        persist through the storage abstraction (active profile) under
+        the canonical content-hashed key uploads/avatars/{uid}/{hash}.ext.
+        The response envelope carries the public avatar route URL
+        (/api/v1/public/users/{uid}/avatar?v={version}). The Idempotency-Key header
+        is optional (scope avatar:upload): absent keys are minted
+        server-side from the content hash; key reuse with a different
+        body renders 409 media_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
-        description: Raw image bytes (allowlisted image MIME, 5MiB cap). Served back by the existing static /uploads/profile/{uid}/avatar reads.
+        description: Raw image bytes (allowlisted image MIME, 5MiB cap). Persisted under the canonical avatar key; served back by the public avatar route.
         content:
           application/octet-stream:
             schema:
@@ -159,6 +162,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /public/users/{uid}/avatar:
+    get:
+      tags: [User]
+      operationId: getPublicUserAvatar
+      summary: Read a user's public avatar (no auth, size variants)
+      description: >-
+        Public avatar delivery (no auth: avatars are public). Returns
+        rendered image bytes at the requested size
+        (32|64|128|256, default 64); callers without a custom avatar get
+        the bundled default SVG inline. Malformed uids and sizes outside
+        the whitelist render plain 400; unknown uids render plain 404.
+        Responses carry no JSON envelope. Per-IP rate limiting rides the
+        global middleware, like every v1 route.
+      security: []
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          description: Media storage namespace UID (6 uppercase alphanumerics); unknown values converge to 404.
+          schema:
+            type: string
+            pattern: "^[A-Z0-9]{6}$"
+        - name: size
+          in: query
+          required: false
+          description: Square display size. Defaults to 64; anything outside 32|64|128|256 renders 400.
+          schema:
+            type: integer
+            enum: [32, 64, 128, 256]
+            default: 64
+        - name: v
+          in: query
+          required: false
+          description: Content version used to refresh avatar consumers after replacement.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >-
+            Rendered WebP or bundled default SVG (no custom avatar set);
+            Cache-Control: no-store.
+          headers:
+            Cache-Control:
+              description: Response cache policy (no-store).
+              schema:
+                type: string
+            Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Avatar has no servable source (media_not_ready).
+          headers:
+            Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Avatar service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /public/branding/logo:
+    get:
+      tags: [User]
+      operationId: getPublicBrandingLogo
+      summary: Read an uploaded branding logo (no auth)
+      description: >-
+        Returns rendered WebP bytes for the requested canonical site-asset key.
+        The requested upload can be previewed before the branding setting is saved.
+        Responses carry no JSON envelope and Cache-Control is no-store.
+      security: []
+      parameters:
+        - name: key
+          in: query
+          required: true
+          description: Canonical uploads/site/assets/ object key.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rendered logo image bytes.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Missing or invalid site-asset key (plain status).
+        "404":
+          description: Logo object not found (plain status).
+        "409":
+          description: Logo source unavailable (plain status).
+        "503":
+          description: Renderer unavailable (plain status).
+
   /workspaces:
     get:
       tags: [Workspaces]
@@ -2568,9 +2690,9 @@ paths:
       operationId: derivativeWorkspaceMediaAsset
       summary: Read a workspace media asset derivative (members only)
       description: >-
-        Serves one generation-matched stored derivative row. Tiers
-        without a stored row stay 409 until generation materializes
-        them; there is no imgproxy pull-through on the v1 path.
+        Returns rendered WebP bytes after workspace-membership and asset-ready
+        checks. Sources use the fixed builtin-local workspace storage profile.
+        processing-input is not a display tier (400).
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/AssetId'
@@ -2582,19 +2704,32 @@ paths:
             type: string
             enum: [thumb, preview, large-preview]
       responses:
-        '200':
-          description: Derivative bytes.
+        "200":
+          description: Rendered image bytes; Cache-Control is private, max-age=300.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            Request-Id:
+              $ref: "#/components/headers/RequestId"
           content:
-            application/octet-stream:
+            image/webp:
               schema:
                 type: string
                 format: binary
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        "503":
+          description: Renderer unavailable (plain status).
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "410":
+          description: Media asset archived (media_archived).
+          headers:
+            Request-Id:
+              $ref: "#/components/headers/RequestId"
   /workspaces/{workspace_id}/media-assets/{asset_id}/archive:
     post:
       tags: [WorkspaceMedia]
@@ -3533,7 +3668,7 @@ components:
           $ref: '#/components/schemas/WorkspaceId'
         avatar:
           type: string
-          description: Persisted profile avatar URL; omitted when no avatar is set.
+          description: Public avatar route URL with a content version query; omitted when no avatar is set.
         storage_namespace:
           type: string
           description: Media storage namespace; omitted when no storage namespace is set.
@@ -4260,7 +4395,7 @@ components:
           description: Canonical same-origin content URL.
         derivatives:
           type: object
-          description: Display tiers keyed by variant (thumb, preview, large-preview); tiers without stored rows stay pending.
+          description: Display tiers keyed by variant (thumb, preview, large-preview); render on demand once the asset is ready, and stay pending while it is not.
           additionalProperties:
             $ref: '#/components/schemas/MediaDerivative'
         archived_at:
@@ -4321,7 +4456,7 @@ components:
       properties:
         avatar_url:
           type: string
-          pattern: '^/uploads/profile/'
+          pattern: "^/api/v1/public/users/"
     AvatarUploadResultEnvelope:
       type: object
       required: [data]

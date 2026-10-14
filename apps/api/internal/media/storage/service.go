@@ -204,20 +204,12 @@ func (s *Service) UploadRefWithProfile(ctx context.Context, profile domain.Stora
 	return s.runtimeService.UploadRefWithProfile(ctx, profile, file, opts)
 }
 
-func (s *Service) ReadUploadResourceByURL(ctx context.Context, rawURL string, maxBytes int64) (*ports.StoredUploadObject, error) {
-	return s.runtimeService.ReadUploadResourceByURL(ctx, rawURL, maxBytes)
-}
-
 func (s *Service) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
 	return s.runtimeService.PutObjectAtProfile(ctx, profileID, objectKey, data, contentType)
 }
 
 func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error) {
 	return s.runtimeService.ReadObjectAtProfile(ctx, profileID, objectKey, maxBytes)
-}
-
-func (s *Service) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
-	return s.runtimeService.DeleteProfileAvatarByURL(ctx, storageUID, rawURL)
 }
 
 func (s *Service) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
@@ -246,10 +238,6 @@ func (s *Service) DeleteUploadObjectPrefixes(ctx context.Context, prefixes []str
 
 func (s *Service) UsesObjectStorage(ctx context.Context) bool {
 	return s.runtimeService.UsesObjectStorage(ctx)
-}
-
-func (s *Service) ResolveStoredUploadTarget(ctx context.Context, rawURL string) (*domain.StorageProfile, string, error) {
-	return s.runtimeService.ResolveStoredUploadTarget(ctx, rawURL)
 }
 
 func (s *Service) PublicUploadURL(objectKey string) string {

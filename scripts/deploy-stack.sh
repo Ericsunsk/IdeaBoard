@@ -1401,7 +1401,7 @@ write_automation_result() {
 
   [[ -n "$DEPLOY_AUTOMATION_RESULT_FILE" ]] || return 0
   case "$safe_stage" in
-    init|resolve-images|preflight|pull|start-postgres|backup|api-migration|auth-migration|up|smoke|complete) ;;
+    init|resolve-images|preflight|pull|start-postgres|stage-uploads|backup|api-migration|auth-migration|up|smoke|complete) ;;
     *) safe_stage="unknown" ;;
   esac
   case "$recovery_hint" in
@@ -1632,9 +1632,26 @@ run_deploy_transaction() {
   DEPLOY_STAGE="pull"
   prepare_stack_images
 
+  run_stack_migrations
+  DEPLOY_ENV_RESTORE_ALLOWED=0
+
+  DEPLOY_STAGE="up"
+  docker_compose up -d
+
+  DEPLOY_STAGE="smoke"
+  run_backend_smoke_checks
+
+  complete_deploy_success
+  docker_compose ps
+}
+
+run_stack_migrations() {
   DEPLOY_STAGE="start-postgres"
   docker_compose up -d postgres
   wait_for_postgres
+
+  DEPLOY_STAGE="stage-uploads"
+  stage_workspace_uploads
 
   DEPLOY_STAGE="backup"
   backup_postgres
@@ -1648,16 +1665,6 @@ run_deploy_transaction() {
   DEPLOY_STAGE="auth-migration"
   run_auth_migration
   DEPLOY_MIGRATION_GATE="passed"
-  DEPLOY_ENV_RESTORE_ALLOWED=0
-
-  DEPLOY_STAGE="up"
-  docker_compose up -d
-
-  DEPLOY_STAGE="smoke"
-  run_backend_smoke_checks
-
-  complete_deploy_success
-  docker_compose ps
 }
 
 restore_previous_image_refs() {
@@ -1827,6 +1834,28 @@ run_auth_migration() {
   docker_compose run --rm auth-migrate
 }
 
+stage_workspace_uploads() (
+  local container_id storage_root staging_dir
+  container_id="$(docker_compose ps -a -q api)"
+  [[ -n "$container_id" ]] || return 0
+  storage_root="$(env_value STORAGE_LOCAL_ROOT)"
+  storage_root="${storage_root:-/app}"
+  staging_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$staging_dir"' EXIT
+
+  if ! docker cp "$container_id:$storage_root/ws-uploads" - >"$staging_dir/objects.tar" 2>"$staging_dir/copy-error"; then
+    if grep -Fq 'Could not find the file' "$staging_dir/copy-error"; then
+      return 0
+    fi
+    echo "Error: cannot inspect workspace upload objects in the current API container." >&2
+    return 1
+  fi
+
+  docker_compose stop api || return 1
+  docker cp "$container_id:$storage_root/ws-uploads" - >"$staging_dir/objects.tar" || return 1
+  docker cp -a - "$container_id:$storage_root/uploads" <"$staging_dir/objects.tar" || return 1
+)
+
 run_api_migration() {
   docker_compose run --rm api-migrate
 }
@@ -1943,19 +1972,7 @@ case "$command" in
     enable_deploy_failure_trap
     DEPLOY_STAGE="pull"
     prepare_stack_images
-    DEPLOY_STAGE="start-postgres"
-    docker_compose up -d postgres
-    wait_for_postgres
-    DEPLOY_STAGE="backup"
-    backup_postgres
-    backup_api_uploads
-    DEPLOY_BACKUP_GATE="passed"
-    DEPLOY_STAGE="api-migration"
-    DEPLOY_MIGRATION_STARTED=1
-    run_api_migration
-    DEPLOY_STAGE="auth-migration"
-    run_auth_migration
-    DEPLOY_MIGRATION_GATE="passed"
+    run_stack_migrations
     finish_trapped_command_success
     ;;
   ps)

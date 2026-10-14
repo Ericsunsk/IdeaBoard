@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "313ec7b74707ca145f7e82feeb588c17fad34fbe",
+  "checkpointSha": "18b236d777b5702321422ca8b3bf275e2b1a30cf",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -2588,7 +2588,7 @@
         }
       ],
       "fanIn": 19,
-      "fanOut": 236,
+      "fanOut": 239,
       "fanOutTargets": [
         "src/api/generated-query/public/model/addBoardMemberRequest.ts",
         "src/api/generated-query/public/model/addBoardMemberRequestData.ts",
@@ -2664,6 +2664,9 @@
         "src/api/generated-query/public/model/errorEnvelopeErrorDetails.ts",
         "src/api/generated-query/public/model/eventId.ts",
         "src/api/generated-query/public/model/forbiddenResponse.ts",
+        "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts",
+        "src/api/generated-query/public/model/getPublicUserAvatarParams.ts",
+        "src/api/generated-query/public/model/getPublicUserAvatarSize.ts",
         "src/api/generated-query/public/model/getWorkspaceUsageParams.ts",
         "src/api/generated-query/public/model/getWorkspaceUsageRange.ts",
         "src/api/generated-query/public/model/idempotencyKeyParameter.ts",
@@ -3196,6 +3199,21 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/forbiddenResponse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/getPublicUserAvatarParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/getPublicUserAvatarSize.ts",
           "kind": "runtime"
         },
         {
@@ -4014,7 +4032,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 19,
-      "targetFanOut": 236,
+      "targetFanOut": 239,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4076,6 +4094,11 @@
           "from": "src/api/generated-query/public/user/user.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/user/user.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "type-only"
         },
         {
           "from": "src/api/generated-query/public/user/user.ts",
@@ -13609,7 +13632,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 79,
+      "fanOut": 80,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -13663,6 +13686,7 @@
         "src/core/lib/chartPrimitives.ts",
         "src/core/lib/chartTimeRange.ts",
         "src/core/lib/pageChrome.ts",
+        "src/core/media/avatarUrl.ts",
         "src/core/motion/chartMotion.ts",
         "src/core/motion/motionPolicy.ts",
         "src/core/query/queryDefaults.ts",
@@ -14879,6 +14903,11 @@
         },
         {
           "from": "src/features/account/ui/profile/ProfilePane.vue",
+          "to": "src/core/media/avatarUrl.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/core/utils/dateTime.ts",
           "kind": "runtime"
         },
@@ -15323,7 +15352,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 79,
+      "targetFanOut": 80,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -27746,7 +27775,7 @@
         }
       ],
       "fanIn": 61,
-      "fanOut": 28,
+      "fanOut": 30,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -27757,6 +27786,8 @@
         "src/core/config/runtimeUrls.ts",
         "src/core/contracts/generationContract.ts",
         "src/core/i18n/index.ts",
+        "src/core/media/displayTier.ts",
+        "src/core/media/mediaAssetPath.ts",
         "src/core/media/mediaRef.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
@@ -28209,6 +28240,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/flow-adapter/projection/displayImagePreviewResources.ts",
+          "to": "src/features/canvas/session/media/canvasMediaIo.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/displayImagePreviewResources.ts",
+          "to": "src/features/canvas/session/media/displayImagePreviewEncoding.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/flow-adapter/projection/flowGraphDeleteProjection.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
           "kind": "type-only"
@@ -28430,12 +28471,17 @@
         },
         {
           "from": "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
-          "to": "src/features/canvas/session/media/canvasMediaIo.ts",
+          "to": "src/core/media/displayTier.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
-          "to": "src/features/canvas/session/media/displayImagePreviewEncoding.ts",
+          "to": "src/core/media/mediaAssetPath.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useDisplayImagePreview.ts",
+          "to": "src/features/canvas/session/media/canvasMediaIo.ts",
           "kind": "runtime"
         },
         {
@@ -28477,6 +28523,21 @@
           "from": "src/features/canvas/session/flow-adapter/projection/useFlowCanvasNodeAdapter.ts",
           "to": "src/features/canvas/core/nodes/flowTypes.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useTierFallback.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useTierFallback.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/projection/useTierFallback.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/flow-adapter/projection/vueFlowProjectionAdapter.contract.spec.ts",
@@ -28684,7 +28745,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 61,
-      "targetFanOut": 28,
+      "targetFanOut": 30,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -33946,6 +34007,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -34823,6 +34889,11 @@
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
           "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts",
+          "to": "node_modules/@vueuse/core/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -38057,7 +38128,7 @@
         }
       ],
       "fanIn": 20,
-      "fanOut": 52,
+      "fanOut": 53,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -38088,6 +38159,7 @@
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/media/avatarUrl.ts",
         "src/core/query/queryDefaults.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/auth.ts",
@@ -38570,6 +38642,11 @@
         },
         {
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
+          "to": "src/core/media/avatarUrl.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/features/account/index.ts",
           "kind": "runtime"
         },
@@ -38634,7 +38711,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 20,
-      "targetFanOut": 52,
+      "targetFanOut": 53,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

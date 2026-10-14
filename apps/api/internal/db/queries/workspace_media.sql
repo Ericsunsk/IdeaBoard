@@ -16,10 +16,6 @@
 -- readable, bytes go 410). Image rows carry width/height (NULL reads
 -- back as 0); non-image kinds leave dimensions NULL.
 --
--- Derivatives live in media_asset_derivatives keyed by
--- (asset_id, variant_name) -- NOT separate media_asset rows. Inserts
--- upsert so regeneration converges.
---
 -- Every lookup scopes by workspace public_id first so cross-workspace
 -- ids miss by construction and read as not found (never a distinct
 -- status). Membership gating stays at the v1 handler layer; the
@@ -139,24 +135,6 @@ WHERE m.workspace_id = w.internal_id
 AND m.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 RETURNING m.internal_id, m.public_id, m.workspace_id, m.upload_session_id, m.owner_user_id, m.storage_key, m.mime_type, m.size_bytes, m.checksum, m.media_kind, m.width, m.height, m.duration_ms, m.metadata, m.created_at, m.archived_at;
-
--- UpsertMediaAssetDerivative records one materialized derivative
--- variant. Regeneration converges on (asset_id, variant_name).
--- name: UpsertMediaAssetDerivative :one
-INSERT INTO media_asset_derivatives (asset_id, variant_name, storage_key, mime_type, size_bytes, width, height)
-VALUES (sqlc.arg(asset_id), sqlc.arg(variant_name), sqlc.arg(storage_key), sqlc.arg(mime_type), sqlc.arg(size_bytes), sqlc.narg(width), sqlc.narg(height))
-ON CONFLICT (asset_id, variant_name) DO UPDATE
-SET storage_key = EXCLUDED.storage_key, mime_type = EXCLUDED.mime_type, size_bytes = EXCLUDED.size_bytes,
-    width = EXCLUDED.width, height = EXCLUDED.height
-RETURNING internal_id, asset_id, variant_name, storage_key, mime_type, size_bytes, width, height, created_at;
-
--- ListMediaAssetDerivatives returns stored variants for one asset
--- (internal id already resolved in the workspace scope).
--- name: ListMediaAssetDerivatives :many
-SELECT internal_id, asset_id, variant_name, storage_key, mime_type, size_bytes, width, height, created_at
-FROM media_asset_derivatives
-WHERE asset_id = sqlc.arg(asset_id)
-ORDER BY variant_name ASC;
 
 -- ListTaskMediaAssets queries media by task: asset rows attached to a
 -- workspace-scoped task via task_outputs, ordered by output_index.

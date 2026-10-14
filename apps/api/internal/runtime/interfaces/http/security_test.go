@@ -37,15 +37,6 @@ func TestSecurityHeadersMiddlewareSetsHardeningHeaders(t *testing.T) {
 	}
 }
 
-func TestUploadBypassPathsStayLive(t *testing.T) {
-	if UploadsStaticRoutePrefix != "/uploads/" {
-		t.Fatalf("uploads prefix drifted: %q", UploadsStaticRoutePrefix)
-	}
-	if RoutePaymentStripeWebhook != "/api/webhooks/stripe" {
-		t.Fatalf("stripe webhook path drifted: %q", RoutePaymentStripeWebhook)
-	}
-}
-
 func TestRequestTimeoutMiddlewareEnforcesDeadline(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -71,17 +62,10 @@ func TestRequestTimeoutMiddlewareEnforcesDeadline(t *testing.T) {
 }
 
 func TestRequestTimeoutMiddlewareExemptsStreamsAndUploads(t *testing.T) {
-	for path, method := range map[string]string{
-		RoutePaymentStripeWebhook:                      http.MethodPost,
-		UploadsStaticRoutePrefix + "site/assets/a.png": http.MethodGet,
-	} {
-		req := httptest.NewRequest(method, path, nil)
-		if method == http.MethodPost {
-			req.ContentLength = 1
-		}
-		if !isTimeoutExemptRequest(req) {
-			t.Fatalf("%s %s should be timeout-exempt", method, path)
-		}
+	req := httptest.NewRequest(http.MethodPost, RoutePaymentStripeWebhook, nil)
+	req.ContentLength = 1
+	if !isTimeoutExemptRequest(req) {
+		t.Fatalf("%s %s should be timeout-exempt", http.MethodPost, RoutePaymentStripeWebhook)
 	}
 
 	jsonReq := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/ws_123/tasks", nil)

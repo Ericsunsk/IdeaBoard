@@ -12,23 +12,21 @@
 
 ## Decision
 
-已落地（2026-09-14）：
-
-1. **Tier 只保留为契约名词**（`thumb/preview/large-preview/processing-input` 的语义和调用方不变），物化从 push 预计算改为 **pull 按需渲染**：衍生 `content` 端点不再读盘回源，而是校验归属后 302 到签名后的 imgproxy tier URL，由 imgproxy 首次请求同步渲染 + 自缓存。失败变同步 HTTP 错误，**轮询、outbox、River worker、重试、stuck 四件套已整体删除**（`media_derivative_outbox` 消费链路、`infrastructure/worker` 包、`EnsureDerivative` / `RequestDerivativeRepair` 一并退场）。
-2. **`processing-input` 是唯一物化的衍生**：它在 ingestion `Complete` 内同步落行（provider-neutral 契约，task manifest 靠它取输入），不再走异步生成。物化失败会把已提交的 asset 转为 `failed`，不会返回一个 ready-but-unusable 的 asset；仅对历史 task output 保留 manifest-time lazy healing。前端 `resolveMediaAssetProcessingURL` 与 `ensure_tier` 参数同步退化为**单次 metadata 读**。
-3. **Asset 健康显性化**：上传去重只复用完全健康的 asset（对象存在 + 关键衍生可用）；终态失败必须能被前端渲染为错误态（重传引导），而不是空白 Preparing。
-4. **性能验证后再决定 preview 层的去留**：若实测客户端降采样顶得住列表/画布首屏，则服务端只留原图 + processing-input；顶不住则保留 pull 模式的服务端切图。
-5. **Renderer source 必须显式可用**：`builtin-local` 通过 compose 中的 imgproxy sidecar 共享只读 uploads volume；其他 storage profile 不把原图伪装成 tier。`processing-input` 只从已验证的物化 derivative 读取，display tier 在尚未接入 provider source adapter 时返回明确错误。
+1. **Display Tier 采用 pull 按需渲染**：`thumb/preview/large-preview` 由 imgproxy 同步渲染，经 same-origin route 返回经过验证的图片 bytes。Workspace route 先验证归属和 Asset readiness，renderer 的签名 URL 仅供内部请求使用。Display Tier 不落数据库、不预生成，也不建立异步生成或修复队列。
+2. **Processing Input 与 Display Tier 分离**：`processing-input` 表示 provider-neutral 的 `InputProfile`，不作为 Browser display endpoint，也不持久化 derivative rows。Tasking 通过 Media contract 解析输入引用；展示尺寸变化不改变处理输入的语义。
+3. **Asset 健康显性化**：上传成功的 Asset 必须具有经过校验的原图事实。原图不可用、渲染失败和素材仍在准备中具有明确状态，调用方根据状态展示等待、错误或可重试操作，不把已失败的素材长期留在 Preparing。
+4. **服务端 Tier 与客户端 preview 各有职责**：managed Asset 使用服务端 pull Tier；没有 Asset identity 的图片可以在 Browser 生成 preview。客户端 preview 的共享任务、使用期与 Object URL 回收由同一资源 owner 管理；decode gate 保留当前展示帧直到替换图片可用。
+5. **Renderer source 策略显式且归 Media 所有**：Workspace Media 使用 `builtin-local`，通过 imgproxy sidecar 的只读 uploads volume 回源；Avatar 与 Branding Logo 使用 active Storage Profile 的 Local 或 S3-compatible source。HTTP adapter 保留授权、状态映射和 cache policy，Media renderer 拥有 source 选择、签名、bounded fetch 与图片响应校验。
 
 ## Consequences
 
 - 正面：消灭整类“静默卡死”；去重、删除、衍生三处的隐式耦合收敛到一次同步检查；取证不再依赖被覆盖的 error 字段。
-- 代价：首次 GET 延迟上升（需要渲染超时 + 降级策略）；非 local profile 的 display tier 需要后续 provider source adapter 才能启用；S3 出站与客户端算力开销需重新评估；board 删除与 asset 生命周期的归属仍需单独决策（孤儿行问题本 ADR 未覆盖）。
+- 代价：首次 GET 需要承担同步渲染延迟与失败；API 承担 bounded image response 的内存和转发开销；S3 出站与 Browser preview 的算力开销需要监测。Board 删除与 Asset 生命周期的归属不由本 ADR 决定。
 - 排除项：本 ADR 不改变 asset 跨 board 复用的用户级语义，不动计费/任务侧的媒体引用契约。
 
 ## Status
 
-Accepted（2026-09-14）。第 1、2 项已实施：后端 `internal/media/imgproxy` + `composition/imgproxy.go` 提供签名 URL 与 302 网关，衍生 worker/outbox 链路已删除；前端 `mediaAssetDelivery` 的 `ensure_tier` 参数与轮询已删除。第 3 项（去重探活）已单独落地。第 4 项待性能实测。
+Accepted。Display Tier 通过 imgproxy pull rendering 与 same-origin bytes 交付；Media 持久化原图事实，Renderer 不写 derivative rows。
 
 ## Vendor Note (2026-09-14)
 

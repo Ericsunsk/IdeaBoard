@@ -112,21 +112,6 @@ type ObjectStore interface {
 	Presign(ctx context.Context, req PresignRequest) (PresignedURL, error)
 }
 
-// --- Upload Authorization ---
-
-type UploadOwnerStorageUIDResolver interface {
-	GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error)
-}
-
-type ReadableUploadAccess interface {
-	AuthorizeUploadPathRead(ctx context.Context, userID int64, rawPath string) (ReadableUploadAccessResult, error)
-	AuthorizeUploadResourceRead(ctx context.Context, userID int64, resource domain.UploadResource) (ReadableUploadAccessResult, error)
-}
-
-type ReadableUploadAccessResult struct {
-	Resource domain.UploadResource
-}
-
 // --- Profile Repository ---
 
 type ProfileRepository interface {

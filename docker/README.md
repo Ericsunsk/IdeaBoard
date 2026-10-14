@@ -37,15 +37,15 @@ docker compose -f compose.local.yml logs -f postgres
 
 ### PostgreSQL
 
-| 项目 | 说明 |
-|------|------|
-| 镜像 | `postgres:17-alpine` |
-| 容器名 | `ideaboard-postgres` |
-| 宿主机端口 | `127.0.0.1:${POSTGRES_PORT:-5432}` |
-| 默认数据库 | `ideaboard` |
-| Schema owner / migration user | `ideaboard` / `${POSTGRES_PASSWORD}` |
-| API runtime user | `ideaboard_api` / `${API_DB_PASSWORD}`，无 Credits 表写权限 |
-| Auth runtime user | `ideaboard_auth` / `${AUTH_DB_PASSWORD}`，仅 Better Auth tables DML |
+| 项目                          | 说明                                                                |
+| ----------------------------- | ------------------------------------------------------------------- |
+| 镜像                          | `postgres:17-alpine`                                                |
+| 容器名                        | `ideaboard-postgres`                                                |
+| 宿主机端口                    | `127.0.0.1:${POSTGRES_PORT:-5432}`                                  |
+| 默认数据库                    | `ideaboard`                                                         |
+| Schema owner / migration user | `ideaboard` / `${POSTGRES_PASSWORD}`                                |
+| API runtime user              | `ideaboard_api` / `${API_DB_PASSWORD}`，无 Credits 表写权限         |
+| Auth runtime user             | `ideaboard_auth` / `${AUTH_DB_PASSWORD}`，仅 Better Auth tables DML |
 
 > [!TIP]
 > compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_EMAIL='admin@example.com' INIT_ADMIN_DISPLAY_NAME='Admin' INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
@@ -160,4 +160,4 @@ docker compose -f compose.local.yml up -d
 2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用固定 owner `ideaboard` 与 `POSTGRES_PASSWORD`。
 3. owner、API runtime、Auth runtime 三个 roles 必须不同；本地旧 volume 没有 runtime roles 时，重建开发 volume。
 
-> 说明：`PUBLIC_ORIGIN` 是浏览器跳转、分享链接和同域 Gateway 的 canonical public Origin；`API_BASE_URL` 仅在 API 独立 host 时作为 override，用于 Stripe Webhook 及服务间 API 地址，不能作为浏览器或本地上传素材的默认公开地址。浏览器统一访问 `ideaboard.art` 的 `/api/**`、`/api/auth/**` 和 `/uploads/**`。`PUBLIC_ORIGIN` 缺失或不是纯 http(s) Origin 时，API 会拒绝启动。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。
+> 说明：`PUBLIC_ORIGIN` 是浏览器跳转、分享链接和同域 Gateway 的 canonical public Origin；`API_BASE_URL` 仅在 API 独立 host 时作为 override，用于 Stripe Webhook 及服务间 API 地址，不能作为浏览器或本地上传素材的默认公开地址。浏览器统一访问 `ideaboard.art` 的 `/api/**`、`/api/auth/**`，媒体字节经 Media Asset 与 public avatar/logo API 交付。`PUBLIC_ORIGIN` 缺失或不是纯 http(s) Origin 时，API 会拒绝启动。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。

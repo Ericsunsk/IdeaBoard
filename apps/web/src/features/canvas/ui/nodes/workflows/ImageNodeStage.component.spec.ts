@@ -1,14 +1,33 @@
-import { computed, toValue } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { computed, ref, toValue } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import type { ImageToolStageBinding } from '../../../tools/image-tools'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { render } from '../../../../../test/render'
 
-const previewState = vi.hoisted(() => ({ displayUrl: null as string | null }))
+const previewState = vi.hoisted(() => ({
+  displayUrl: null as string | null,
+  contentFallbackUrl: '' as string,
+  isVisible: false,
+}))
 
 afterEach(() => {
   previewState.displayUrl = null
+  previewState.contentFallbackUrl = ''
+})
+
+beforeEach(() => {
+  // jsdom never intersects: stages start offscreen (lazy) unless a test
+  // overrides the visibility mock.
+  previewState.isVisible = false
+})
+
+vi.mock('@vueuse/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vueuse/core')>()
+  return {
+    ...actual,
+    useElementVisibility: vi.fn(() => ref(previewState.isVisible)),
+  }
 })
 
 vi.mock('../../../session/flow-adapter/projection/useDisplayImagePreview', () => ({
@@ -20,6 +39,7 @@ vi.mock('../../../session/flow-adapter/projection/useDisplayImagePreview', () =>
       if (toValue(options?.assetId)) return previewState.displayUrl ?? ''
       return previewState.displayUrl ?? toValue(sourceUrl) ?? ''
     }),
+    contentFallbackUrl: computed(() => previewState.contentFallbackUrl),
   }),
 }))
 
@@ -219,6 +239,101 @@ describe('ImageNodeStage Library import recovery', () => {
 
     expect(view.queryByRole('button', { name: /Image node preview/ })).toBeNull()
     expect(view.getByLabelText('Preparing image preview')).toBeTruthy()
+  })
+})
+
+describe('ImageNodeStage tier delivery', () => {
+  function renderAssetStage() {
+    return render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: {
+          url: '/api/v1/workspaces/ws_test123/media-assets/asset_5/content',
+          assetId: 'asset_5',
+        },
+        isActive: false,
+        isDragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+  }
+
+  it.each([
+    { isVisible: false, loading: 'lazy' },
+    { isVisible: true, loading: 'eager' },
+  ])('uses $loading loading when visibility is $isVisible', ({ isVisible, loading }) => {
+    previewState.displayUrl = 'https://provider.example/image.png'
+    previewState.isVisible = isVisible
+    const view = renderAssetStage()
+    const image = view.getByRole('button', { name: /Image node preview/ })
+    expect(image).toHaveAttribute('loading', loading)
+    expect(image).toHaveAttribute('decoding', 'async')
+  })
+
+  it('unblurs the tier image on load', async () => {
+    previewState.displayUrl = 'https://provider.example/image.png'
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: 'https://provider.example/image.png' },
+        isActive: false,
+        isDragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+    const image = view.getByRole('button', { name: /Image node preview/ })
+    expect(image.classList.contains('is-tier-loading')).toBe(true)
+    await fireEvent.load(image)
+    expect(image.classList.contains('is-tier-loading')).toBe(false)
+  })
+
+  it('falls back to the content URL once when a tier 409s', async () => {
+    previewState.displayUrl =
+      '/api/v1/workspaces/ws_test123/media-assets/asset_5/derivatives/preview'
+    previewState.contentFallbackUrl = '/api/v1/workspaces/ws_test123/media-assets/asset_5/content'
+    const view = renderAssetStage()
+    const image = view.getByRole('button', { name: /Image node preview/ })
+    expect(image).toHaveAttribute(
+      'src',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_5/derivatives/preview',
+    )
+
+    await fireEvent.error(image)
+    expect(image).toHaveAttribute(
+      'src',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_5/content',
+    )
+
+    expect(image).not.toHaveAttribute('srcset')
+
+    // A failing fallback must not error-loop back onto itself.
+    await fireEvent.error(image)
+    expect(image).toHaveAttribute(
+      'src',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_5/content',
+    )
+  })
+
+  it('leaves non-asset sources untouched when the image errors', async () => {
+    previewState.displayUrl = 'https://provider.example/image.png'
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: 'https://provider.example/image.png' },
+        isActive: false,
+        isDragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+    const image = view.getByRole('button', { name: /Image node preview/ })
+    await fireEvent.error(image)
+    expect(image).toHaveAttribute('src', 'https://provider.example/image.png')
   })
 })
 

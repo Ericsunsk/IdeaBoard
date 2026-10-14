@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"path"
 	"strings"
 
 	"ideaboard/api/internal/media/imageformat"
@@ -17,55 +16,6 @@ type DataImage struct {
 	MIMEType string
 	Ext      string
 	Data     []byte
-}
-
-func ValidateUploadPath(raw string) (string, error) {
-	cleaned, err := normalizeUploadPath(raw)
-	if err != nil {
-		return "", err
-	}
-	parts, err := uploadPathParts(cleaned)
-	if err != nil {
-		return "", err
-	}
-	if isSupportedUploadPath(parts) {
-		return cleaned, nil
-	}
-	return "", errors.New(msgValidateUploadPath)
-}
-
-func normalizeUploadPath(raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if !strings.HasPrefix(trimmed, "/uploads/") {
-		return "", errors.New(msgNormalizeUploadPath)
-	}
-	cleaned := path.Clean(trimmed)
-	if !strings.HasPrefix(cleaned, "/uploads/") {
-		return "", errors.New(msgNormalizeUploadPath)
-	}
-	return cleaned, nil
-}
-
-func uploadPathParts(cleaned string) ([]string, error) {
-	parts := strings.Split(strings.TrimPrefix(cleaned, "/uploads/"), "/")
-	if len(parts) < 1 || parts[0] == "" {
-		return nil, errors.New(msgUploadPathParts)
-	}
-	return parts, nil
-}
-
-func isSupportedUploadPath(parts []string) bool {
-	if len(parts) < 4 || parts[1] == "" || strings.Join(parts[3:], "") == "" {
-		return false
-	}
-	switch parts[0] {
-	case "tasks":
-		return parts[2] != ""
-	case "profile":
-		return parts[2] == "avatar" || parts[2] == "vector"
-	default:
-		return false
-	}
 }
 
 func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {

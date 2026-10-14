@@ -2,8 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {

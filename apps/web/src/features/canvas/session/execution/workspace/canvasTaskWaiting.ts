@@ -30,7 +30,7 @@ import {
   resolveBoundCanvasTaskWorkspaceId,
 } from './canvasTaskCancellation'
 
-const STORAGE_OUTPUT_MARKERS = ['ws-uploads', 'builtin-local', 'storage_key']
+const STORAGE_OUTPUT_MARKERS = ['ws-uploads', 'uploads/ws', 'builtin-local', 'storage_key']
 
 function toWorkspaceImageResults(
   workspaceId: string,

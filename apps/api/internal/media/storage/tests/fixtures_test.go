@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/media/storage/application/authorization"
 	"ideaboard/api/internal/media/storage/application/integrity"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/infrastructure/local"
@@ -25,36 +24,27 @@ import (
 )
 
 type (
-	StorageService                = storage.Service
-	StorageProfile                = domain.StorageProfile
-	StorageProvider               = domain.StorageProvider
-	StorageFieldType              = domain.StorageFieldType
-	StorageProviderField          = domain.StorageProviderField
-	StorageProviderMeta           = domain.StorageProviderMeta
-	StorageSecretVersion          = domain.StorageSecretVersion
-	StorageDriver                 = ports.StorageDriver
-	StorageStoreOptions           = ports.StorageStoreOptions
-	StoredUploadRef               = ports.StoredUploadRef
-	StoredUploadObject            = ports.StoredUploadObject
-	ObjectStore                   = ports.ObjectStore
-	PresignedURL                  = ports.PresignedURL
-	PresignRequest                = ports.PresignRequest
-	UploadResourceKind            = domain.UploadResourceKind
-	UploadResource                = domain.UploadResource
-	UploadProfileAvatarResource   = domain.UploadProfileAvatarResource
-	UploadTaskOutputResource      = domain.UploadTaskOutputResource
-	UploadLibraryResource         = domain.UploadLibraryResource
-	UploadSiteAssetResource       = domain.UploadSiteAssetResource
-	UploadOwnerStorageUIDResolver = ports.UploadOwnerStorageUIDResolver
-	ReadableUploadAccess          = ports.ReadableUploadAccess
-	ReadableUploadAccessResult    = ports.ReadableUploadAccessResult
-	IntegrityVerifier             = integrity.IntegrityVerifier
-	IntegrityConfig               = integrity.IntegrityConfig
-	S3CompatibleService           = s3.S3CompatibleService
-	S3CompatibleConfig            = s3.S3CompatibleConfig
-	S3CompatibleProfileConfig     = s3.S3CompatibleProfileConfig
-	LocalStorageProfileConfig     = local.LocalStorageProfileConfig
-	StorageProfileRepository      struct {
+	StorageService            = storage.Service
+	StorageProfile            = domain.StorageProfile
+	StorageProvider           = domain.StorageProvider
+	StorageFieldType          = domain.StorageFieldType
+	StorageProviderField      = domain.StorageProviderField
+	StorageProviderMeta       = domain.StorageProviderMeta
+	StorageSecretVersion      = domain.StorageSecretVersion
+	StorageDriver             = ports.StorageDriver
+	StorageStoreOptions       = ports.StorageStoreOptions
+	StoredUploadRef           = ports.StoredUploadRef
+	StoredUploadObject        = ports.StoredUploadObject
+	ObjectStore               = ports.ObjectStore
+	PresignedURL              = ports.PresignedURL
+	PresignRequest            = ports.PresignRequest
+	IntegrityVerifier         = integrity.IntegrityVerifier
+	IntegrityConfig           = integrity.IntegrityConfig
+	S3CompatibleService       = s3.S3CompatibleService
+	S3CompatibleConfig        = s3.S3CompatibleConfig
+	S3CompatibleProfileConfig = s3.S3CompatibleProfileConfig
+	LocalStorageProfileConfig = local.LocalStorageProfileConfig
+	StorageProfileRepository  struct {
 		*postgres.Repository
 		DB *pgxpool.Pool
 	}
@@ -70,11 +60,6 @@ const (
 	MaxPresignTTL                     = ports.MaxPresignTTL
 	UploadObjectRoot                  = domain.UploadObjectRoot
 	storageSecretAccessKeyName        = "secret_access_key"
-
-	UploadResourceKindSiteAsset     = domain.UploadResourceKindSiteAsset
-	UploadResourceKindProfileAvatar = domain.UploadResourceKindProfileAvatar
-	UploadResourceKindTaskOutput    = domain.UploadResourceKindTaskOutput
-	UploadResourceKindLibrary       = domain.UploadResourceKindLibrary
 )
 
 var (
@@ -86,17 +71,12 @@ var (
 	ErrPresignInvalidObjectKey        = domain.ErrPresignInvalidObjectKey
 	ErrPresignTTLTooLong              = domain.ErrPresignTTLTooLong
 	ErrPresignUnsupportedProvider     = domain.ErrPresignUnsupportedProvider
-	ErrUploadAccessInvalidPath        = domain.ErrUploadAccessInvalidPath
-	ErrUploadAccessDenied             = domain.ErrUploadAccessDenied
-	ErrUploadAccessOwnerMismatch      = domain.ErrUploadAccessOwnerMismatch
 	ErrUploadAccessDependencyMissing  = domain.ErrUploadAccessDependencyMissing
 	ErrProviderHTTPSUnavailable       = domain.ErrProviderHTTPSUnavailable
 
 	NewStorageService                = storage.NewService
 	NewStorageProfileRepository      = newStorageProfileRepository
-	NewReadableUploadAccess          = authorization.NewReadableUploadAccess
 	NewIntegrityVerifier             = integrity.NewIntegrityVerifier
-	ParseUploadResource              = domain.ParseUploadResource
 	NormalizeUploadObjectKey         = domain.NormalizeUploadObjectKey
 	NormalizeStorageUserSegment      = domain.NormalizeStorageUserSegment
 	UserUploadObjectPrefixes         = domain.UserUploadObjectPrefixes

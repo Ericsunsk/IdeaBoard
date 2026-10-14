@@ -92,7 +92,12 @@ describe('task monitor model column', () => {
   })
 
   it('previews at most 3 result images with overflow count', () => {
-    const urls = ['/uploads/a.jpg', '/uploads/b.jpg', '/uploads/c.jpg', '/uploads/d.jpg']
+    const urls = [
+      '/api/v1/workspaces/ws_test123/media-assets/asset_a/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_b/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_c/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_d/content',
+    ]
     const row = makeTask({
       status: 'completed',
       result: JSON.stringify({ image_urls: urls }),
@@ -103,9 +108,14 @@ describe('task monitor model column', () => {
 
     const single = makeTask({
       status: 'completed',
-      result: JSON.stringify({ image_url: '/uploads/a.jpg' }),
+      result: JSON.stringify({
+        image_url: '/api/v1/workspaces/ws_test123/media-assets/asset_a/content',
+      }),
     })
-    expect(getTaskResultPreview(single)).toEqual({ urls: ['/uploads/a.jpg'], overflow: 0 })
+    expect(getTaskResultPreview(single)).toEqual({
+      urls: ['/api/v1/workspaces/ws_test123/media-assets/asset_a/content'],
+      overflow: 0,
+    })
 
     const pending = makeTask({ status: 'pending', result: JSON.stringify({ image_urls: urls }) })
     expect(getTaskResultPreview(pending)).toEqual({ urls: [], overflow: 0 })

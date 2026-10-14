@@ -18,7 +18,10 @@ describe('task result presentation', () => {
         JSON.stringify({
           status: 'completed',
           platform: 'openai',
-          images: ['/uploads/tasks/1/task/a.png', '/uploads/tasks/1/task/b.png'],
+          images: [
+            '/api/v1/workspaces/ws_test123/media-assets/asset_a/content',
+            '/api/v1/workspaces/ws_test123/media-assets/asset_b/content',
+          ],
           token: 'secret-token',
         }),
       ),
@@ -44,15 +47,16 @@ describe('task result presentation', () => {
   })
 
   it('reads the result image from result metadata', () => {
+    const contentUrl = '/api/v1/workspaces/ws_test123/media-assets/asset_123/content'
     const task = makeTask({
       status: adminTaskStatuses.completed,
       result: JSON.stringify({
         platform: 'google',
-        image_url: '/uploads/tasks/1/task/output.png',
+        image_url: contentUrl,
       }),
     })
 
-    expect(getTaskResultImageUrl(task)).toBe('/uploads/tasks/1/task/output.png')
+    expect(getTaskResultImageUrl(task)).toBe(contentUrl)
   })
 
   it('formats duration and tone consistently', () => {

@@ -32,7 +32,7 @@
 3. Outbound webhook signing secret，对应 `event_subscriptions`（见下节）。
 4. 生产环境 Better Auth secret 与 auth internal key，只在怀疑 backup 泄露或传输边界失控时轮换。
 
-轮换后执行 smoke 检查，确认登录、任务提交、结果回写、上传与 `/uploads/*` 访问正常。
+轮换后执行 smoke 检查，确认登录、任务提交、结果回写、上传与媒体读取（v1 media-assets content/derivatives、public avatar/logo route）正常。
 
 ## Outbound Webhook Signing Secret 轮换
 

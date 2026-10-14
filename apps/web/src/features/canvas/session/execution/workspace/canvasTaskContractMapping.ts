@@ -168,6 +168,7 @@ const STORAGE_URL_MARKERS = [
   's3://',
   'storage_key',
   'ws-uploads',
+  'uploads/ws',
   'builtin-local',
   'bucket',
 ]

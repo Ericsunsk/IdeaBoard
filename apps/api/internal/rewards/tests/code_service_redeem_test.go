@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/rewards/application/redemptions"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {

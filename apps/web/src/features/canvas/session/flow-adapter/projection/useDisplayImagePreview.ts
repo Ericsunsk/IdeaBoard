@@ -7,17 +7,14 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
-import { canvasToBlob, fetchImageBlobFromUrl, resolveFetchUrl } from '../../media/canvasMediaIo.ts'
-import {
-  detectCanvasTransparency,
-  resolvePreviewMimeType,
-  WEBP_PREVIEW_MIME_TYPE,
-  WEBP_PREVIEW_QUALITY,
-} from '../../media/displayImagePreviewEncoding.ts'
+import { parseImageUrlPathname } from '../../media/canvasMediaIo.ts'
+import { createDisplayPreviewResources } from './displayImagePreviewResources'
 import {
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,
 } from '../../../../../core/config/runtimeUrls'
+import { resolveMediaDisplayTier } from '../../../../../core/media/displayTier'
+import { isMediaAssetDeliveryPath } from '../../../../../core/media/mediaAssetPath'
 import {
   normalizeMediaAssetId,
   useMediaAssetDelivery,
@@ -33,16 +30,6 @@ interface PreviewOptions {
 }
 
 const DEFAULT_MAX_SIDE = 1280
-const PREVIEW_CACHE_LIMIT = 80
-const PREVIEW_CONCURRENCY = 2
-const previewCache = new Map<string, string>()
-const inFlightPreviewTasks = new Map<string, Promise<string | null>>()
-const pendingPreviewTasks: Array<() => void> = []
-let activePreviewTasks = 0
-
-function buildPreviewCacheKey(sourceUrl: string, maxSide: number) {
-  return `${maxSide}::${sourceUrl}`
-}
 
 function resolvePreviewMaxSide(value: unknown): number | null {
   // null is the explicit full-quality tier: keep the original URL and skip canvas work.
@@ -50,212 +37,6 @@ function resolvePreviewMaxSide(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : DEFAULT_MAX_SIDE
-}
-
-function touchCache(cacheKey: string, previewObjectUrl: string) {
-  if (previewCache.has(cacheKey)) previewCache.delete(cacheKey)
-  previewCache.set(cacheKey, previewObjectUrl)
-  trimPreviewCache()
-}
-
-// Object URLs currently committed to a live `<img>` (or awaiting decode in
-// the display gate) must survive LRU eviction: revoking a URL out from under
-// a mid-load image breaks the render with no re-trigger. Pinned entries are
-// skipped as eviction victims; unpinned on replace/dispose.
-const pinnedPreviewUrls = new Set<string>()
-
-function pinPreviewUrl(previewObjectUrl: string) {
-  if (previewObjectUrl) pinnedPreviewUrls.add(previewObjectUrl)
-}
-
-function unpinPreviewUrl(previewObjectUrl: string) {
-  if (previewObjectUrl) pinnedPreviewUrls.delete(previewObjectUrl)
-}
-
-function trimPreviewCache() {
-  while (previewCache.size > PREVIEW_CACHE_LIMIT) {
-    let victim: [string, string] | undefined
-    for (const entry of previewCache.entries()) {
-      if (!pinnedPreviewUrls.has(entry[1])) {
-        victim = entry
-        break
-      }
-    }
-    if (!victim) break
-    previewCache.delete(victim[0])
-    URL.revokeObjectURL(victim[1])
-  }
-}
-
-function getCachedPreviewUrl(cacheKey: string): string | null {
-  const cached = previewCache.get(cacheKey)
-  if (!cached) return null
-  touchCache(cacheKey, cached)
-  return cached
-}
-
-function runNextPreviewTask() {
-  while (activePreviewTasks < PREVIEW_CONCURRENCY && pendingPreviewTasks.length > 0) {
-    const task = pendingPreviewTasks.shift()
-    if (!task) break
-    task()
-  }
-}
-
-function enqueuePreviewTask<T>(taskFactory: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (signal?.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'))
-  return new Promise<T>((resolve, reject) => {
-    const cleanup = () => signal?.removeEventListener('abort', handleAbort)
-    const wrappedResolve = (value: T) => {
-      cleanup()
-      resolve(value)
-    }
-    const wrappedReject = (reason?: unknown) => {
-      cleanup()
-      reject(reason)
-    }
-    const run = () => {
-      if (signal?.aborted) {
-        wrappedReject(new DOMException('Aborted', 'AbortError'))
-        return
-      }
-      activePreviewTasks += 1
-      void taskFactory()
-        .then(wrappedResolve)
-        .catch(wrappedReject)
-        .finally(() => {
-          activePreviewTasks = Math.max(0, activePreviewTasks - 1)
-          runNextPreviewTask()
-        })
-    }
-    const handleAbort = () => {
-      const pendingIndex = pendingPreviewTasks.indexOf(run)
-      if (pendingIndex >= 0) {
-        pendingPreviewTasks.splice(pendingIndex, 1)
-        wrappedReject(new DOMException('Aborted', 'AbortError'))
-      }
-    }
-    if (signal) {
-      signal.addEventListener('abort', handleAbort, { once: true })
-    }
-    pendingPreviewTasks.push(run)
-    runNextPreviewTask()
-  })
-}
-
-async function fetchPreviewSourceBlob(
-  sourceUrl: string,
-  signal?: AbortSignal,
-): Promise<Blob | null> {
-  if (signal?.aborted) return null
-  const fetchUrl = resolveFetchUrl(sourceUrl)
-  if (!fetchUrl) return null
-  try {
-    const blob = await fetchImageBlobFromUrl(fetchUrl, signal ? { signal } : undefined)
-    if (signal?.aborted) return null
-    return blob
-  } catch {
-    return null
-  }
-}
-
-function resolvePreviewRenderSize(
-  bitmap: ImageBitmap,
-  maxSide: number,
-): { width: number; height: number } | null {
-  const longestSide = Math.max(bitmap.width, bitmap.height)
-  if (longestSide <= 0 || longestSide <= maxSide) return null
-  const scale = maxSide / longestSide
-  return {
-    width: Math.max(1, Math.round(bitmap.width * scale)),
-    height: Math.max(1, Math.round(bitmap.height * scale)),
-  }
-}
-
-async function renderPreviewObjectUrl(
-  sourceBlob: Blob,
-  maxSide: number,
-  signal?: AbortSignal,
-): Promise<string | null> {
-  let bitmap: ImageBitmap | null = null
-  try {
-    try {
-      bitmap = await createImageBitmap(sourceBlob)
-    } catch {
-      return null
-    }
-    if (signal?.aborted) return null
-    const size = resolvePreviewRenderSize(bitmap, maxSide)
-    if (!size) return null
-    const canvas = document.createElement('canvas')
-    canvas.width = size.width
-    canvas.height = size.height
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) return null
-    ctx.drawImage(bitmap, 0, 0, size.width, size.height)
-    bitmap.close()
-    bitmap = null
-    if (signal?.aborted) return null
-    const hasTransparentPixels = detectCanvasTransparency(ctx, size.width, size.height)
-    const previewMime = resolvePreviewMimeType(sourceBlob.type, hasTransparentPixels)
-    const previewBlob = await canvasToBlob(
-      canvas,
-      previewMime,
-      previewMime === WEBP_PREVIEW_MIME_TYPE ? WEBP_PREVIEW_QUALITY : undefined,
-    )
-    if (signal?.aborted) return null
-    const objectUrl = URL.createObjectURL(previewBlob)
-    if (signal?.aborted) {
-      try {
-        URL.revokeObjectURL(objectUrl)
-      } catch {
-        // ignore cleanup failures
-      }
-      return null
-    }
-    return objectUrl
-  } finally {
-    bitmap?.close()
-  }
-}
-
-async function createPreviewObjectUrl(
-  sourceUrl: string,
-  maxSide: number,
-  signal?: AbortSignal,
-): Promise<string | null> {
-  if (signal?.aborted) return null
-  const sourceBlob = await fetchPreviewSourceBlob(sourceUrl, signal)
-  if (!sourceBlob || signal?.aborted) return null
-  if (!sourceBlob.type.startsWith('image/')) return null
-  return renderPreviewObjectUrl(sourceBlob, maxSide, signal)
-}
-
-async function getOrCreatePreviewUrl(
-  sourceUrl: string,
-  maxSide: number,
-  signal?: AbortSignal,
-): Promise<string | null> {
-  if (signal?.aborted) return null
-  const cacheKey = buildPreviewCacheKey(sourceUrl, maxSide)
-  const cached = getCachedPreviewUrl(cacheKey)
-  if (cached) return cached
-
-  const inFlight = inFlightPreviewTasks.get(cacheKey)
-  if (inFlight) return inFlight
-
-  const task = enqueuePreviewTask(() => createPreviewObjectUrl(sourceUrl, maxSide, signal), signal)
-    .then((previewUrl) => {
-      if (previewUrl) touchCache(cacheKey, previewUrl)
-      return previewUrl
-    })
-    .catch(() => null)
-    .finally(() => {
-      inFlightPreviewTasks.delete(cacheKey)
-    })
-
-  inFlightPreviewTasks.set(cacheKey, task)
-  return task
 }
 
 function supportsImageDecode() {
@@ -295,7 +76,14 @@ export function useDisplayImagePreview(
     const raw = toValue(sourceUrl)
     return raw ? canonicalizeRuntimeUploadRef(raw.trim()).trim() : ''
   })
-  const isManagedUpload = computed(() => canonicalSourceUrl.value.startsWith('/uploads/'))
+  const isManagedUpload = computed(() => {
+    const source = canonicalSourceUrl.value
+    if (!source) return false
+    const pathname = parseImageUrlPathname(source)
+    return (
+      pathname !== null && (pathname.startsWith('/uploads/') || isMediaAssetDeliveryPath(pathname))
+    )
+  })
   const resolvedSourceUrl = computed(() => {
     return canonicalSourceUrl.value ? resolveAssetUrl(canonicalSourceUrl.value) : ''
   })
@@ -306,11 +94,7 @@ export function useDisplayImagePreview(
   const isVisible = computed(() => toValue(options.isVisible) !== false)
   const resolvedMediaTier = computed<MediaAssetDeliveryTier>(() => {
     if (resolvedMaxSide.value === null) return 'original'
-    if (resolvedMaxSide.value <= 256) return 'thumb'
-    if (resolvedMaxSide.value <= 640) return 'preview'
-    // Canvas nodes stay backed by the largest display tier. It is the
-    // durable edit-quality source; preview is reserved for editor controls.
-    return 'large-preview'
+    return resolveMediaDisplayTier(resolvedMaxSide.value)
   })
   const mediaDelivery = useMediaAssetDelivery(resolvedAssetId, resolvedMediaTier, {
     isEnabled: isVisible,
@@ -322,18 +106,8 @@ export function useDisplayImagePreview(
   let requestToken = 0
   let activeSource = ''
   let displayRequestToken = 0
-  let previewController: AbortController | null = null
+  const previewResources = createDisplayPreviewResources()
   let displayController: AbortController | null = null
-  // The candidate most recently observed by the display gate. Pinned while
-  // observed so LRU eviction cannot revoke it mid-decode or mid-load.
-  let pinnedDisplayUrl = ''
-
-  function setPinnedDisplayUrl(next: string) {
-    if (pinnedDisplayUrl === next) return
-    unpinPreviewUrl(pinnedDisplayUrl)
-    pinnedDisplayUrl = next
-    pinPreviewUrl(pinnedDisplayUrl)
-  }
 
   watch(
     [
@@ -345,9 +119,10 @@ export function useDisplayImagePreview(
     ([currentSource, maxSide, assetId, isVisible]) => {
       requestToken += 1
       const token = requestToken
-      previewController?.abort()
-      previewController = new AbortController()
-      const signal = previewController.signal
+      const previewTask = previewResources.load(
+        currentSource && isVisible && assetId === null ? currentSource : '',
+        maxSide,
+      )
       if (currentSource !== activeSource) previewUrl.value = null
       activeSource = currentSource
       isResolved.value = false
@@ -360,16 +135,8 @@ export function useDisplayImagePreview(
 
       if (assetId !== null) return
 
-      const cacheKey = buildPreviewCacheKey(currentSource, maxSide)
-      const cached = getCachedPreviewUrl(cacheKey)
-      if (cached) {
-        previewUrl.value = cached
-        isResolved.value = true
-        return
-      }
-
-      void getOrCreatePreviewUrl(currentSource, maxSide, signal).then((generatedPreviewUrl) => {
-        if (token !== requestToken || signal.aborted) return
+      void previewTask.then((generatedPreviewUrl) => {
+        if (token !== requestToken) return
         previewUrl.value = generatedPreviewUrl
         isResolved.value = true
       })
@@ -379,11 +146,9 @@ export function useDisplayImagePreview(
 
   if (getCurrentScope()) {
     onScopeDispose(() => {
-      previewController?.abort()
       displayController?.abort()
-      previewController = null
       displayController = null
-      setPinnedDisplayUrl('')
+      previewResources.dispose()
       requestToken += 1
       displayRequestToken += 1
     })
@@ -426,7 +191,7 @@ export function useDisplayImagePreview(
       if (!currentSource) {
         displayedSource.value = ''
         displayedUrl.value = ''
-        setPinnedDisplayUrl('')
+        previewResources.display()
         return
       }
 
@@ -434,26 +199,33 @@ export function useDisplayImagePreview(
         displayedSource.value = currentSource
         if (!options.shouldKeepPreviousOnSourceChange) displayedUrl.value = ''
       }
-      setPinnedDisplayUrl(nextUrl)
+      previewResources.display(nextUrl, displayedUrl.value)
       if (!nextUrl || nextUrl === displayedUrl.value) return
 
       // A new external/blob source is already the optimistic preview. Commit it immediately;
       // derived previews and delivery URLs wait for decode so a zoom never flashes a placeholder.
       if (nextUrl === currentSource && !isManagedUpload.value && !displayedUrl.value) {
         displayedUrl.value = nextUrl
+        previewResources.display(nextUrl)
         return
       }
 
-      void canDisplayImage(nextUrl, signal).then((isDisplayable) => {
+      void canDisplayImage(nextUrl, signal).then(async (isDisplayable) => {
+        let decodedUrl = isDisplayable ? nextUrl : ''
+        const fallbackUrl = contentFallbackUrl.value
+        if (!decodedUrl && fallbackUrl && fallbackUrl !== nextUrl && !signal.aborted) {
+          if (await canDisplayImage(fallbackUrl, signal)) decodedUrl = fallbackUrl
+        }
         if (
-          !isDisplayable ||
+          !decodedUrl ||
           token !== displayRequestToken ||
           signal.aborted ||
           currentSource !== displayedSource.value
         ) {
           return
         }
-        displayedUrl.value = nextUrl
+        displayedUrl.value = decodedUrl
+        previewResources.display(decodedUrl)
       })
     },
     { immediate: true, flush: 'sync' },
@@ -461,7 +233,17 @@ export function useDisplayImagePreview(
 
   const displayUrl = computed(() => displayedUrl.value)
 
+  // Offer the original only after metadata confirms it is ready.
+  const contentFallbackUrl = computed(() => {
+    if (resolvedAssetId.value === null) return ''
+    const original = mediaDelivery.metadata.value?.original
+    const originalUrl = original?.url?.trim()
+    if (original?.status === 'ready' && originalUrl) return resolveAssetUrl(originalUrl)
+    return ''
+  })
+
   return {
     displayUrl,
+    contentFallbackUrl,
   }
 }

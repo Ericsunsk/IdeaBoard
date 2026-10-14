@@ -138,7 +138,10 @@ func DoWithAllowHosts(
 		Timeout:   effectiveTimeout(timeout),
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
+			// User-influenced fetches cap redirect hops at 3: each hop is
+			// re-validated against the allowlist + IP policy, and fewer
+			// hops shrink the redirect-chain SSRF surface.
+			if len(via) >= 3 {
 				return errors.New(msgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(req.Context(), req.URL.String(), effectiveTimeout(timeout), allowHosts...)
@@ -175,7 +178,8 @@ func DoRequestWithAllowHosts(
 		Timeout:   effectiveTimeout(timeout),
 		Transport: transport,
 		CheckRedirect: func(next *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
+			// Same 3-hop cap as DoWithAllowHosts (see above).
+			if len(via) >= 3 {
 				return errors.New(msgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(next.Context(), next.URL.String(), effectiveTimeout(timeout), allowHosts...)

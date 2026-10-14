@@ -28,13 +28,17 @@
       >
         <img
           :src="renderedStageUrl"
+          :loading="isStageVisible ? 'eager' : 'lazy'"
+          decoding="async"
           class="image-node-stage-image image-tool-stage-media"
-          :class="{ 'is-dragging': isDragging }"
+          :class="{ 'is-dragging': isDragging, 'is-tier-loading': !isStageImageLoaded }"
           :alt="t('canvas.controls.stagePreviewAlt')"
           draggable="false"
           role="button"
           tabindex="0"
           :aria-label="t('canvas.controls.stagePreviewHint')"
+          @load="onStageImageLoad"
+          @error="onStageImageError"
           @dblclick="emit('append-to-canvas')"
           @keydown.enter.prevent="emit('open-preview')"
           @keydown.space.prevent="emit('append-to-canvas')"
@@ -43,12 +47,17 @@
       <img
         v-else
         :src="renderedStageUrl"
+        :loading="isStageVisible ? 'eager' : 'lazy'"
+        decoding="async"
         class="image-node-stage-image"
+        :class="{ 'is-dragging': isDragging, 'is-tier-loading': !isStageImageLoaded }"
         :alt="t('canvas.controls.stagePreviewAlt')"
         draggable="false"
         role="button"
         tabindex="0"
         :aria-label="t('canvas.controls.stagePreviewHint')"
+        @load="onStageImageLoad"
+        @error="onStageImageError"
         @dblclick="emit('append-to-canvas')"
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
@@ -136,7 +145,7 @@ import type { ImageToolStageBinding } from '../../../tools/image-tools'
 import type { LibraryImportFact } from '../../../../board/ports/canvas'
 import type { FlowLocalUploadState } from '../../../core/nodes/flowTypes.ts'
 import { useCanvasImagePreviewQuality } from '../../../session/flow-adapter'
-import { useDisplayImagePreview } from '../../../session/flow-adapter'
+import { useDisplayImagePreview, useTierFallback } from '../../../session/flow-adapter'
 import ImageOutpaintOverlay from '../../../tools/outpaint/ui/ImageOutpaintOverlay.vue'
 import ComposingOrb from './ComposingOrb.vue'
 import { NodeActionButton, NodeEmptyStateIcon, NodeStageFrame } from '../primitives'
@@ -211,21 +220,31 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
   zoomLevel: canvasViewport.zoomLevel,
   shouldForceFullQuality: shouldForceFullPreviewQuality,
 })
-const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
-  maxSide: previewMaxSide,
-  assetId: () => stageDisplayImage.value?.assetId,
-  isVisible: isStageVisible,
-  shouldKeepPreviousOnSourceChange: true,
-})
+const { displayUrl: stageDisplayUrl, contentFallbackUrl: stageContentFallbackUrl } =
+  useDisplayImagePreview(sourceDisplayUrl, {
+    maxSide: previewMaxSide,
+    assetId: () => stageDisplayImage.value?.assetId,
+    isVisible: isStageVisible,
+    shouldKeepPreviousOnSourceChange: true,
+  })
 // Media assets are authenticated API resources. Do not bind their API URL as
 // an optimistic <img> fallback while the signed delivery URL is loading: the
 // API URL is not a durable cross-origin image source and can fail before the
 // authenticated delivery metadata resolves. Local and external sources retain
 // the immediate optimistic fallback behavior.
-const renderedStageUrl = computed(() => {
+const renderedStageBase = computed(() => {
   if (stageDisplayImage.value?.assetId) return stageDisplayUrl.value
   return stageDisplayUrl.value || sourceDisplayUrl.value
 })
+const {
+  src: renderedStageUrl,
+  isLoaded: isStageImageLoaded,
+  onLoad: onStageImageLoad,
+  onError: onStageImageError,
+} = useTierFallback(renderedStageBase, stageContentFallbackUrl, () => [
+  sourceDisplayUrl.value,
+  stageDisplayImage.value?.assetId,
+])
 const isMediaAssetPending = computed(
   () => !!stageDisplayImage.value?.assetId && !stageDisplayUrl.value,
 )
@@ -279,6 +298,11 @@ function submitOutpaint(prompt: string) {
   background: var(--canvas-node-bg);
   cursor: grab;
   user-select: none;
+  transition: filter var(--motion-feedback-duration) var(--motion-feedback-easing);
+}
+
+.image-node-stage-image.is-tier-loading {
+  filter: blur(12px);
 }
 
 .image-node-stage-import-failure {

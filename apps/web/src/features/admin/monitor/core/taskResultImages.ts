@@ -1,7 +1,7 @@
 import { resolveAssetUrl } from '../../../../core/config/runtimeUrls'
+import { isMediaAssetDeliveryPath } from '../../../../core/media/mediaAssetPath'
 
 const HTTP_URL_RE = /^https?:\/\//i
-const UPLOAD_ASSET_PATH_PREFIX = '/uploads/'
 const ENCODED_BACKSLASH_RE = /%5c/i
 
 function getCurrentOrigin(): string {
@@ -17,14 +17,23 @@ function parseResultImageUrl(rawUrl: string): URL | null {
   }
 }
 
-function hasUploadAssetPath(pathname: string): boolean {
-  return pathname.startsWith(UPLOAD_ASSET_PATH_PREFIX)
+// v1 media-asset delivery paths served by the API behind the same-origin
+// gateway: .../media-assets/{asset}/content and
+// .../media-assets/{asset}/derivatives/{variant}. Nothing else under
+// /api/ is renderable here (JSON envelopes must never bind to <img>).
+// Strict grammar lives in core/media/mediaAssetPath; this module only adds
+// the demo-fixture prefix.
+function hasTrustedDeliveryPath(pathname: string): boolean {
+  // Frontend-bundled demo fixtures ship with the app shell, never through
+  // the upload pipeline.
+  if (pathname === '/demo' || pathname.startsWith('/demo/')) return true
+  return isMediaAssetDeliveryPath(pathname)
 }
 
-// Browser-visible task images must stay on the same-origin upload path.
-function isTrustedUploadUrl(url: URL): boolean {
+// Browser-visible task images must stay on the same-origin delivery path.
+function isTrustedDeliveryUrl(url: URL): boolean {
   const currentOrigin = getCurrentOrigin()
-  return url.origin === currentOrigin && hasUploadAssetPath(url.pathname)
+  return url.origin === currentOrigin && hasTrustedDeliveryPath(url.pathname)
 }
 
 export function getSafeResultImageUrl(rawUrl: string): string {
@@ -42,7 +51,7 @@ export function getSafeResultImageUrl(rawUrl: string): string {
 
   const resolved = resolveAssetUrl(trimmed)
   const parsed = parseResultImageUrl(resolved)
-  if (!parsed || !isTrustedUploadUrl(parsed)) return ''
+  if (!parsed || !isTrustedDeliveryUrl(parsed)) return ''
 
   return resolved
 }

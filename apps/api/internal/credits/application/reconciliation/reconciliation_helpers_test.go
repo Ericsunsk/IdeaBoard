@@ -2,16 +2,18 @@ package reconciliation_test
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"strconv"
+	"sync"
+	"testing"
+
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/credits/testhelpers"
 	"ideaboard/api/internal/testsupport"
-	"strconv"
-	"sync"
-	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type reconciliationEnqueuerStub struct {

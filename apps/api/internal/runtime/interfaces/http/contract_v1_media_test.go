@@ -13,14 +13,20 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/media/workspacemedia"
@@ -62,31 +68,43 @@ func (f *fakeV1MediaObjects) PutObjectAtProfile(ctx context.Context, profileID, 
 	return nil
 }
 
-// fakeV1MediaRenderer returns canned webp bytes with requested dims.
-type fakeV1MediaRenderer struct {
-	mu    sync.Mutex
-	calls []int
+// StoreBytesRef honors an explicit ObjectKey (the avatar handler always
+// passes the canonical content-hashed key); without one it fails closed
+// like a miswired caller.
+func (f *fakeV1MediaObjects) StoreBytesRef(ctx context.Context, filename string, data []byte, opts storageports.StorageStoreOptions) (*storageports.StoredUploadRef, error) {
+	if strings.TrimSpace(opts.ObjectKey) == "" {
+		return nil, storagedomain.ErrStoredObjectNotFound
+	}
+	if err := f.PutObjectAtProfile(ctx, "", opts.ObjectKey, data, "image/png"); err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(data)
+	return &storageports.StoredUploadRef{
+		StorageKey:     strings.TrimSpace(opts.ObjectKey),
+		MIMEType:       "image/png",
+		SizeBytes:      int64(len(data)),
+		ChecksumSHA256: hex.EncodeToString(sum[:]),
+	}, nil
 }
 
-func (f *fakeV1MediaRenderer) Render(ctx context.Context, data []byte, sourceName string, maxSide int) ([]byte, int, int, string, error) {
+func (f *fakeV1MediaObjects) DeleteObjectByKey(ctx context.Context, objectKey string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.calls = append(f.calls, maxSide)
-	return []byte("fake-webp-bytes"), maxSide, maxSide / 2, "image/webp", nil
+	delete(f.objects, objectKey)
+	return nil
 }
 
 type v1MediaFixture struct {
-	store    *tenancy.InMemoryStore
-	media    *workspacemedia.InMemoryWorkspaceMediaStore
-	objects  *fakeV1MediaObjects
-	renderer *fakeV1MediaRenderer
-	dir      *staticUserDirectory
-	engine   *gin.Engine
-	ws       *tenancy.Workspace
-	ws2      *tenancy.Workspace
-	owner    int64
-	member   int64
-	other    int64
+	store   *tenancy.InMemoryStore
+	media   *workspacemedia.InMemoryWorkspaceMediaStore
+	objects *fakeV1MediaObjects
+	dir     *staticUserDirectory
+	engine  *gin.Engine
+	ws      *tenancy.Workspace
+	ws2     *tenancy.Workspace
+	owner   int64
+	member  int64
+	other   int64
 }
 
 func newV1MediaTestEngine(store tenancy.Store, dir *staticUserDirectory, deps ContractV1Deps) *gin.Engine {
@@ -128,7 +146,7 @@ func newV1MediaTestEngine(store tenancy.Store, dir *staticUserDirectory, deps Co
 	return router
 }
 
-func newV1MediaFixture(t *testing.T, withRenderer bool) *v1MediaFixture {
+func newV1MediaFixture(t *testing.T) *v1MediaFixture {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
@@ -149,16 +167,60 @@ func newV1MediaFixture(t *testing.T, withRenderer bool) *v1MediaFixture {
 		t.Fatal(err)
 	}
 	store.SeedWorkspaceMember(ws2.PublicID, owner, tenancy.RoleMember)
-	deps := ContractV1Deps{Media: media, MediaObjects: objects}
-	if withRenderer {
-		deps.MediaRenderer = &fakeV1MediaRenderer{}
-	}
+	deps := ContractV1Deps{Media: media, MediaObjects: objects, MediaRenderer: imgproxy.NewRenderer(v1TestImgproxyConfig(t), nil)}
 	engine := newV1MediaTestEngine(store, dir, deps)
-	f := &v1MediaFixture{store: store, media: media, objects: objects, dir: dir, engine: engine, ws: ws, ws2: ws2, owner: owner, member: member, other: other}
-	if deps.MediaRenderer != nil {
-		f.renderer, _ = deps.MediaRenderer.(*fakeV1MediaRenderer)
+	return &v1MediaFixture{store: store, media: media, objects: objects, dir: dir, engine: engine, ws: ws, ws2: ws2, owner: owner, member: member, other: other}
+}
+
+// v1TestImgproxyConfig provides a signed renderer that echoes its requested path.
+func v1TestImgproxyConfig(t *testing.T) imgproxy.Config {
+	t.Helper()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	t.Cleanup(upstream.Close)
+	return imgproxy.Config{BaseURL: upstream.URL, KeyHex: strings.Repeat("ab", 16), SaltHex: strings.Repeat("cd", 16)}
+}
+
+// assertImgproxyImage verifies the API response and signed internal render request.
+func assertImgproxyImage(t *testing.T, engine *gin.Engine, cfg imgproxy.Config, call v1Call, reqIDPrefix, label, wantCacheControl, wantGeometrySubstr string) {
+	t.Helper()
+	before := time.Now()
+	status, header, body := doV1RoundTrip(t, engine, call, reqIDPrefix)
+	if status != http.StatusOK || header.Get("Location") != "" || header.Get("Content-Type") != "image/webp" {
+		t.Fatalf("image %s = %d %v", label, status, header)
 	}
-	return f
+	if cc := header.Get("Cache-Control"); cc != wantCacheControl {
+		t.Fatalf("image %s Cache-Control = %q, want %q", label, cc, wantCacheControl)
+	}
+	sig, signedPath, ok := strings.Cut(strings.TrimPrefix(body, "/"), "/")
+	if !ok {
+		t.Fatalf("image %s did not reach renderer: %q", label, body)
+	}
+	signedPath = "/" + signedPath
+	wantSig, err := cfg.SignPath(signedPath)
+	if err != nil || sig != wantSig {
+		t.Fatalf("image %s invalid signature", label)
+	}
+	if !strings.Contains(signedPath, wantGeometrySubstr) {
+		t.Fatalf("image %s path = %q, want geometry %q", label, signedPath, wantGeometrySubstr)
+	}
+	if !strings.HasPrefix(signedPath, "/exp:") {
+		t.Fatal("missing render expiry")
+	}
+	expUnix, err := strconv.ParseInt(strings.SplitN(strings.TrimPrefix(signedPath, "/exp:"), "/", 2)[0], 10, 64)
+	if err != nil || expUnix < before.Add(4*time.Minute).Unix() || expUnix > time.Now().Add(5*time.Minute+time.Second).Unix() {
+		t.Fatalf("image %s invalid expiry: %d", label, expUnix)
+	}
+}
+
+func assertV1DisplayTierImage(t *testing.T, engine *gin.Engine, cfg imgproxy.Config, path string, userID int64, tier string, side int) {
+	t.Helper()
+	assertImgproxyImage(t, engine, cfg,
+		v1Call{method: "GET", path: path, userID: userID}, "test-media-",
+		tier, "private, max-age=300",
+		fmt.Sprintf("/rs:fit:%d:%d/", side, side))
 }
 
 const v1MediaTestChecksum = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -205,7 +267,7 @@ func v1MediaAssetID(t *testing.T, data any) string {
 // end: create -> get -> complete -> metadata -> bytes -> derivatives
 // -> archive -> post-archive gates.
 func TestV1MediaUploadLifecycle(t *testing.T) {
-	f := newV1MediaFixture(t, true)
+	f := newV1MediaFixture(t)
 	staged := v1GapsPNGBytes(1024)
 	checksum := v1GapsChecksum(staged)
 	createBody := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, checksum)
@@ -267,14 +329,10 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 	if status != http.StatusOK || body != string(staged) {
 		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(staged))
 	}
-	// Generation ran at complete (fake renderer): thumb serves.
-	status, _, body = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.member}, "test-media-")
-	if status != http.StatusOK || body != "fake-webp-bytes" {
-		t.Fatalf("derivative = %d %q, want 200 fake-webp-bytes", status, body)
-	}
-	if f.renderer == nil || len(f.renderer.calls) != 3 {
-		t.Fatalf("renderer calls = %v, want 3 sequential tiers", f.renderer)
-	}
+	// Display tiers render on demand after the asset is ready.
+	assertV1DisplayTierImage(t, f.engine, v1TestImgproxyConfig(t),
+		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.member,
+		derivativedomain.TierThumb, derivativedomain.TierSpecs[derivativedomain.TierThumb].MaxSide)
 
 	// Archive needs owner/admin: the member is forbidden.
 	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.assetsPath() + "/" + assetID + "/archive", userID: f.member, headers: map[string]string{"Idempotency-Key": "media-life-3"}})
@@ -299,6 +357,11 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 	if status != http.StatusGone {
 		t.Fatalf("archived content = %d, want 410", status)
 	}
+	// The archive gate precedes rendering: derivatives go 410 too.
+	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.member}, "test-media-")
+	if status != http.StatusGone {
+		t.Fatalf("archived derivative = %d, want 410", status)
+	}
 	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath(), userID: f.member})
 	if status != http.StatusOK {
 		t.Fatalf("list after archive = %d %v, want 200", status, payload)
@@ -309,7 +372,7 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 }
 
 func TestV1MediaCompleteMismatch(t *testing.T) {
-	f := newV1MediaFixture(t, true)
+	f := newV1MediaFixture(t)
 	staged := v1GapsPNGBytes(1024)
 	checksum := v1GapsChecksum(staged)
 	createBody := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, checksum)
@@ -337,7 +400,7 @@ func TestV1MediaCompleteMismatch(t *testing.T) {
 }
 
 func TestV1MediaIdempotency(t *testing.T) {
-	f := newV1MediaFixture(t, true)
+	f := newV1MediaFixture(t)
 
 	first := v1Call{method: "POST", path: f.uploadsPath(), body: v1NewUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-idem-1"}}
 	status, _, payload := doV1(t, f.engine, first)
@@ -367,7 +430,7 @@ func TestV1MediaIdempotency(t *testing.T) {
 }
 
 func TestV1MediaAuthMatrix(t *testing.T) {
-	f := newV1MediaFixture(t, true)
+	f := newV1MediaFixture(t)
 
 	// Anonymous callers get 401 on JSON endpoints, plain 401 on bytes.
 	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: v1NewUploadBody(), headers: map[string]string{"Idempotency-Key": "media-auth-1"}})
@@ -439,12 +502,15 @@ func TestV1MediaAuthMatrix(t *testing.T) {
 	if status != http.StatusBadRequest {
 		t.Fatalf("unknown variant = %d, want plain 400", status)
 	}
+	// processing-input is the materialized tier, never a display tier.
+	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/processing-input", userID: f.owner}, "test-media-")
+	if status != http.StatusBadRequest {
+		t.Fatalf("processing-input variant = %d, want plain 400", status)
+	}
 }
 
-func TestV1MediaDerivativePendingWithoutRenderer(t *testing.T) {
-	// Without a renderer generation is skipped: metadata tiers stay
-	// pending-shaped and the binary endpoint stays 409.
-	f := newV1MediaFixture(t, false)
+func TestV1MediaDerivativeRendersOnDemand(t *testing.T) {
+	f := newV1MediaFixture(t)
 
 	// Declare with a stageable checksum (the fixed-checksum helper
 	// cannot be staged: sha256 preimage).
@@ -464,15 +530,161 @@ func TestV1MediaDerivativePendingWithoutRenderer(t *testing.T) {
 	}
 	assetID := v1MediaAssetID(t, v1Data(t, payload).(map[string]any)["asset"])
 
-	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.owner}, "test-media-")
-	if status != http.StatusConflict {
-		t.Fatalf("pending derivative = %d, want plain 409", status)
-	}
-	// The original still serves: only derivatives are pending.
+	assertV1DisplayTierImage(t, f.engine, v1TestImgproxyConfig(t),
+		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.owner,
+		derivativedomain.TierThumb, derivativedomain.TierSpecs[derivativedomain.TierThumb].MaxSide)
+	// Original content is independent of the rendered display tiers.
 	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.owner}, "test-media-")
 	if status != http.StatusOK || body != string(pendingStaged) {
 		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(pendingStaged))
 	}
+}
+
+// TestV1MediaDerivativeWithoutImgproxyBinding proves degenerate wiring
+// (no signing binding) fails closed with plain 409 on the existing
+// media_not_ready surface — never unsigned URLs, never new codes.
+// Production cannot reach this: composition fails closed at boot via
+// validateImgproxyOrFatal.
+func TestV1MediaDerivativeWithoutImgproxyBinding(t *testing.T) {
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
+	objects := &fakeV1MediaObjects{objects: make(map[string][]byte)}
+	const owner, member = 1, 2
+	dir.ensure(owner)
+	dir.ensure(member)
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "media-nosign", OwnerUserID: owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.SeedWorkspaceMember(ws.PublicID, member, tenancy.RoleMember)
+	engine := newV1MediaTestEngine(store, dir, ContractV1Deps{Media: media, MediaObjects: objects})
+	uploadsPath := "/api/v1/workspaces/" + ws.PublicID + "/uploads"
+	assetsPath := "/api/v1/workspaces/" + ws.PublicID + "/media-assets"
+
+	staged := v1GapsPNGBytes(512)
+	uploadID := v1GapsDeclare(t, engine, uploadsPath, owner, "nosign-create", "photo.png", staged)
+	v1GapsStage(t, engine, uploadsPath+"/"+uploadID+"/bytes", staged, member, "nosign-stage")
+	assetID := v1GapsComplete(t, engine, uploadsPath+"/"+uploadID+"/complete", staged, member, "nosign-complete")
+
+	status, _, _ := doV1RoundTrip(t, engine, v1Call{method: "GET",
+		path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: member}, "test-media-")
+	if status != http.StatusConflict {
+		t.Fatalf("unsigned derivative = %d, want plain 409", status)
+	}
+}
+
+// fakeV1StorageProfiler resolves a canned active storage profile for
+// display-tier source-selection tests (fake profile/config, no network).
+type fakeV1StorageProfiler struct {
+	profile *storagedomain.StorageProfile
+	err     error
+}
+
+func (f fakeV1StorageProfiler) ResolveActiveProfile(ctx context.Context) (*storagedomain.StorageProfile, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.profile, nil
+}
+
+// r2KeyMediaStore replays the in-memory media store but projects the
+// completed asset onto a non-local key: the upload flow always reserves
+// canonical uploads/ws/ slots, so only an override can place an R2-profile key
+// behind a real asset id.
+type r2KeyMediaStore struct {
+	*workspacemedia.InMemoryWorkspaceMediaStore
+	r2Key string
+}
+
+func (s r2KeyMediaStore) GetAsset(ctx context.Context, workspaceID, assetID string) (*workspacemedia.Asset, error) {
+	asset, err := s.InMemoryWorkspaceMediaStore.GetAsset(ctx, workspaceID, assetID)
+	if err != nil {
+		return nil, err
+	}
+	clone := *asset
+	clone.StorageKey = s.r2Key
+	return &clone, nil
+}
+
+func TestV1MediaDerivativeUsesLocalProfile(t *testing.T) {
+	const bucket = "test-r2-bucket"
+	const r2Key = "tenant-migrated/photo.png"
+	r2Profile := &storagedomain.StorageProfile{
+		ID: "r2-profile", Name: "r2", Provider: storagedomain.StorageProviderS3Compatible,
+		Enabled: true, IsCurrent: true, Config: map[string]interface{}{"bucket_name": bucket},
+	}
+	build := func(t *testing.T, profiler imgproxy.ProfileResolver, key string) (*gin.Engine, string, string) {
+		t.Helper()
+		ctx := context.Background()
+		store := tenancy.NewInMemoryStoreForTests()
+		dir := newStaticUserDirectory()
+		media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
+		objects := &fakeV1MediaObjects{objects: make(map[string][]byte)}
+		const owner, member = 1, 2
+		dir.ensure(owner)
+		dir.ensure(member)
+		ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "media-r2", OwnerUserID: owner})
+		if err != nil {
+			t.Fatal(err)
+		}
+		store.SeedWorkspaceMember(ws.PublicID, member, tenancy.RoleMember)
+		engine := newV1MediaTestEngine(store, dir, ContractV1Deps{
+			Media:         &r2KeyMediaStore{InMemoryWorkspaceMediaStore: media, r2Key: key},
+			MediaObjects:  objects,
+			MediaRenderer: imgproxy.NewRenderer(v1TestImgproxyConfig(t), profiler),
+		})
+		uploadsPath := "/api/v1/workspaces/" + ws.PublicID + "/uploads"
+		assetsPath := "/api/v1/workspaces/" + ws.PublicID + "/media-assets"
+		staged := v1GapsPNGBytes(512)
+		uploadID := v1GapsDeclare(t, engine, uploadsPath, owner, "r2-src-create", "photo.png", staged)
+		v1GapsStage(t, engine, uploadsPath+"/"+uploadID+"/bytes", staged, member, "r2-src-stage")
+		assetID := v1GapsComplete(t, engine, uploadsPath+"/"+uploadID+"/complete", staged, member, "r2-src-complete")
+		return engine, assetsPath, assetID
+	}
+
+	t.Run("workspace remains local with active s3 profile", func(t *testing.T) {
+		const key = "uploads/ws/workspace/upload/image.png"
+		engine, assetsPath, assetID := build(t, fakeV1StorageProfiler{profile: r2Profile}, key)
+		assertImgproxyImage(t, engine, v1TestImgproxyConfig(t), v1Call{method: "GET", path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: 2}, "local-media-", "workspace local", "private, max-age=300", "/plain/local:///"+key+"@webp")
+	})
+
+	t.Run("anything else stays 409", func(t *testing.T) {
+		localProfile := &storagedomain.StorageProfile{
+			ID: "builtin-local", Provider: storagedomain.StorageProviderLocal,
+			Enabled: true, IsCurrent: true,
+		}
+		disabledS3 := &storagedomain.StorageProfile{
+			ID: "r2-off", Provider: storagedomain.StorageProviderS3Compatible,
+			Enabled: false, Config: map[string]interface{}{"bucket_name": bucket},
+		}
+		bucketlessS3 := &storagedomain.StorageProfile{
+			ID: "r2-nobucket", Provider: storagedomain.StorageProviderS3Compatible,
+			Enabled: true, IsCurrent: true,
+		}
+		for _, tc := range []struct {
+			name     string
+			profiler imgproxy.ProfileResolver
+			key      string
+		}{
+			{"no resolver wired", nil, r2Key},
+			{"resolver failure", fakeV1StorageProfiler{err: context.DeadlineExceeded}, r2Key},
+			{"local active profile", fakeV1StorageProfiler{profile: localProfile}, r2Key},
+			{"disabled s3 profile", fakeV1StorageProfiler{profile: disabledS3}, r2Key},
+			{"s3 profile without bucket", fakeV1StorageProfiler{profile: bucketlessS3}, r2Key},
+			{"traversal key under s3 profile", fakeV1StorageProfiler{profile: r2Profile}, "../evil.png"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				engine, assetsPath, assetID := build(t, tc.profiler, tc.key)
+				status, _, _ := doV1RoundTrip(t, engine, v1Call{method: "GET",
+					path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: 2}, "test-media-")
+				if status != http.StatusConflict {
+					t.Fatalf("%s derivative = %d, want plain 409", tc.name, status)
+				}
+			})
+		}
+	})
 }
 
 func TestV1MediaFailClosedWithoutStore(t *testing.T) {
@@ -492,7 +704,7 @@ func TestV1MediaFailClosedWithoutStore(t *testing.T) {
 }
 
 func TestV1MediaValidation(t *testing.T) {
-	f := newV1MediaFixture(t, true)
+	f := newV1MediaFixture(t)
 
 	badMime := strings.Replace(v1NewUploadBody(), "image/png", "image/heic", 1)
 	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: badMime, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-valid-1"}})

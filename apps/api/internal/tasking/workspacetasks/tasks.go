@@ -418,7 +418,7 @@ func containsStorageURL(value any) bool {
 	switch typed := value.(type) {
 	case string:
 		lowered := strings.ToLower(strings.TrimSpace(typed))
-		for _, marker := range []string{"http://", "https://", "s3://", "storage_key", "ws-uploads", "builtin-local", "bucket"} {
+		for _, marker := range []string{"http://", "https://", "s3://", "storage_key", "ws-uploads", "uploads/ws", "builtin-local", "bucket"} {
 			if strings.Contains(lowered, marker) {
 				return true
 			}
@@ -470,7 +470,7 @@ func ValidateOutputRef(ref OutputRef) error {
 			return newValidationError(FieldError{Field: "url", Message: "invalid"})
 		}
 		lowered := strings.ToLower(url)
-		for _, marker := range []string{"ws-uploads", "builtin-local", "storage_key"} {
+		for _, marker := range []string{"ws-uploads", "uploads/ws", "builtin-local", "storage_key"} {
 			if strings.Contains(lowered, marker) {
 				return newValidationError(FieldError{Field: "url", Message: "storage_internals_forbidden"})
 			}

@@ -28,7 +28,6 @@ flowchart TB
     Browser["Browser / Vue SPA"] --> Proxy["Reverse Proxy"]
     Proxy -- "/api/auth/**" --> Auth["Better Auth Service<br>Fastify :6001"]
     Proxy -- "/api/**" --> API["Go API<br>Gin :6000"]
-    Proxy -- "/uploads/**" --> Uploads["Static Uploads"]
 
     Auth --> Postgres[("PostgreSQL 17")]
     API --> Postgres
