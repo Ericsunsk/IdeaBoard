@@ -17,7 +17,6 @@ export function adminControlUnavailable(feature: string): AdminControlUnavailabl
     'gateway-reference': '参照价查询暂不可用。',
     'gateway-observed': '观测数据暂不可用。',
     'gateway-test': '网关连接测试暂不可用。',
-    'branding-upload': 'Logo 上传暂不可用，请直接填写 Logo 地址后保存。',
   }
   const error = new Error(
     messages[feature] ?? '该管理功能暂不可用。',

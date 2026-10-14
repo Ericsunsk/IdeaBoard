@@ -109,6 +109,87 @@ describe('Admin System Settings lifecycle', () => {
 })
 
 describe('Admin System Settings adapters', () => {
+  it('uploads a branding logo as multipart with an idempotency key and updates only the draft', async () => {
+    const uploadedLogoURL = '/uploads/site/assets/logo.png'
+    let uploadBody: FormData | undefined
+    let idempotencyKey: string | null = null
+    const saveRequest = vi.fn()
+    useMswHandlers(
+      http.get('/api/control/v1/platform/settings/branding', () =>
+        HttpResponse.json({ data: { project_name: 'IdeaBoard', logo_url: '' } }),
+      ),
+      http.post('/api/control/v1/platform/settings/branding/logo', async ({ request }) => {
+        uploadBody = await request.formData()
+        idempotencyKey = request.headers.get('Idempotency-Key')
+        return HttpResponse.json({ data: { logo_url: uploadedLogoURL } })
+      }),
+      http.put('/api/control/v1/platform/settings/branding', saveRequest),
+    )
+    const feedback = createBrandingFeedback()
+    const harness = mountComposable(() => useBrandingSettings({ feedback }))
+
+    try {
+      await vi.waitFor(() => expect(harness.value.isLoading.value).toBe(false))
+      harness.value.form.value.project_name = 'Draft Brand'
+      const file = new File(['logo contents'], 'logo.png', { type: 'image/png' })
+
+      await expect(harness.value.handleUploadLogo(file)).resolves.toBe(true)
+
+      const uploadedFile = uploadBody?.get('file') as File
+      expect(uploadedFile.name).toBe('logo.png')
+      expect(uploadedFile.type).toBe('image/png')
+      expect(await uploadedFile.text()).toBe('logo contents')
+      expect(idempotencyKey).toBeTruthy()
+      expect(harness.value.form.value).toEqual({
+        project_name: 'Draft Brand',
+        logo_url: uploadedLogoURL,
+      })
+      expect(harness.value.logoPreviewURL.value).toContain(uploadedLogoURL)
+      expect(harness.value.isDirty.value).toBe(true)
+      expect(harness.value.uploading.value).toBe(false)
+      expect(feedback.logoUploaded).toHaveBeenCalledOnce()
+      expect(feedback.logoUploadFailed).not.toHaveBeenCalled()
+      expect(saveRequest).not.toHaveBeenCalled()
+    } finally {
+      await harness.unmount()
+    }
+  })
+
+  it('preserves the branding draft and reports a failed logo upload', async () => {
+    useMswHandlers(
+      http.get('/api/control/v1/platform/settings/branding', () =>
+        HttpResponse.json({ data: { project_name: 'IdeaBoard', logo_url: '' } }),
+      ),
+      http.post('/api/control/v1/platform/settings/branding/logo', () =>
+        HttpResponse.json(
+          { error: { code: 'payload_too_large', message: 'Logo 文件过大' } },
+          { status: 413 },
+        ),
+      ),
+    )
+    const feedback = createBrandingFeedback()
+    const harness = mountComposable(() => useBrandingSettings({ feedback }))
+
+    try {
+      await vi.waitFor(() => expect(harness.value.isLoading.value).toBe(false))
+      const draft = { project_name: 'Draft Brand', logo_url: 'https://example.com/original.png' }
+      harness.value.form.value = { ...draft }
+
+      await expect(
+        harness.value.handleUploadLogo(new File(['logo'], 'logo.png', { type: 'image/png' })),
+      ).resolves.toBe(false)
+
+      expect(harness.value.form.value).toEqual(draft)
+      expect(harness.value.uploading.value).toBe(false)
+      expect(feedback.logoUploadFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Logo 文件过大' }),
+      )
+      expect(feedback.logoUploaded).not.toHaveBeenCalled()
+    } finally {
+      await harness.unmount()
+    }
+  })
+
   it('preserves Branding load, dirty, reset, save, cache refresh, and feedback', async () => {
     const updateRequests: unknown[] = []
     let saved = false

@@ -4,7 +4,9 @@ import { computed } from 'vue'
 import {
   getControlBrandingSetting,
   updateControlBrandingSetting,
+  uploadControlBrandingLogo,
 } from '../../../../../api/generated-query/control/control-platform/control-platform'
+import type { ControlBrandingLogoUpload } from '../../../../../api/generated-query/control/model/controlBrandingLogoUpload'
 import { requireContractData } from '../../../../../api/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminBrandingSettingsFeedback } from '../useSettingsFeedback'
@@ -19,7 +21,6 @@ import {
   type BrandingSetting,
 } from '../../../../../core/composables/useSiteBranding'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'
-import { adminControlUnavailable } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'
 
 const ADMIN_BRANDING_QUERY_KEY = ['admin', 'settings', 'branding'] as const
@@ -133,14 +134,17 @@ function isSameBrandingSetting(current: BrandingSetting, synced: BrandingSetting
   return current.project_name === synced.project_name && current.logo_url === synced.logo_url
 }
 
-async function uploadBrandingLogoFile(_file: File): Promise<string> {
-  // No control equivalent for direct logo upload: fail closed with
-  // guidance instead of calling the deleted `POST /api/admin/upload`.
-  // Backend gap: control branding logo upload (see the stream report).
-  throw adminControlUnavailable('branding-upload')
+async function uploadBrandingLogoFile(file: File): Promise<string> {
+  try {
+    const body = await uploadControlBrandingLogo(
+      { file },
+      { headers: buildControlMutationHeaders() },
+    )
+    return requireContractData<ControlBrandingLogoUpload>(body, '上传 Logo 失败').logo_url
+  } catch (error) {
+    throw withControlCopy(error, '上传 Logo 失败')
+  }
 }
-
-// withControlCopy is shared — see admin/shared/core/controlCopy.ts.
 
 function writeBrandingQueryCache(queryClient: QueryClient, setting: BrandingSetting) {
   queryClient.setQueryData(ADMIN_BRANDING_QUERY_KEY, setting)

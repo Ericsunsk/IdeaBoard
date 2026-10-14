@@ -212,7 +212,8 @@ async function handleLogoInputChange(event: Event) {
 }
 
 async function handleLogoCropConfirm(croppedFile: File) {
-  await setCustomLogoFile(croppedFile)
+  if (!(await setCustomLogoFile(croppedFile))) return
+  logoCropDialogVisible.value = false
   pendingLogoFile.value = null
 }
 </script>

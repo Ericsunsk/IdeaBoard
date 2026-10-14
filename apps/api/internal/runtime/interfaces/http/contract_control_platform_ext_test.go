@@ -135,14 +135,19 @@ func (fakeRewardIdentityProjection) ResolveIdentities(_ context.Context, userIDs
 // fakeControlBrandingUpload stores branding logos in memory for upload
 // tests (no storage backend).
 type fakeControlBrandingUpload struct {
-	calls int
+	calls     int
+	storedRef *ports.StoredUploadRef
 }
 
 func (f *fakeControlBrandingUpload) UploadRefWithOptions(_ context.Context, file *multipart.FileHeader, _ ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	f.calls++
+	if f.storedRef != nil {
+		return f.storedRef, nil
+	}
 	return &ports.StoredUploadRef{
-		URL: "/uploads/site/assets/logo.png", StorageKey: "uploads/site/assets/logo.png",
-		MIMEType: "image/png", Width: 120, Height: 40, SizeBytes: file.Size,
+		URL: "https://site.example.com/uploads/site/assets/logo.png", StorageKey: "uploads/site/assets/logo.png",
+		StorageProfile: "builtin-local",
+		MIMEType:       "image/png", Width: 120, Height: 40, SizeBytes: file.Size,
 	}, nil
 }
 
@@ -705,6 +710,24 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 		last := records[len(records)-1]
 		if last.Operation != "platform.upload_branding_logo" || last.Outcome != ControlAuditFailed || last.Status != http.StatusConflict {
 			t.Fatalf("branding upload audit = %+v, want audited conflict", last)
+		}
+	})
+
+	t.Run("object storage preserves its provider URL", func(t *testing.T) {
+		const logoURL = "https://cdn.example.com/uploads/site/assets/logo.png"
+		h := newControlHarness(t, func(deps *ContractControlDeps) {
+			deps.BrandingUpload = &fakeControlBrandingUpload{storedRef: &ports.StoredUploadRef{
+				URL: logoURL, StorageKey: "uploads/site/assets/logo.png",
+				StorageProfile: "s3-profile", MIMEType: "image/png",
+			}}
+		})
+		status, payload := serveUpload(h.engine, newUploadRequest(t, "object-storage-logo", png, "logo.png"))
+		if status != http.StatusOK {
+			t.Fatalf("upload status = %d (%v), want 200", status, payload)
+		}
+		data, _ := payload["data"].(map[string]any)
+		if data["logo_url"] != logoURL {
+			t.Fatalf("logo_url = %v, want %s", data["logo_url"], logoURL)
 		}
 	})
 }

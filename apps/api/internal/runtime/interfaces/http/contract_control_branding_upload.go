@@ -148,8 +148,12 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable5)
 		return
 	}
+	logoURL := stored.URL
+	if stored.StorageProfile == "builtin-local" {
+		logoURL = "/" + strings.TrimLeft(stored.StorageKey, "/")
+	}
 	payload := controlBrandingLogoUpload{
-		LogoURL: stored.URL,
+		LogoURL: logoURL,
 		MIME:    stored.MIMEType,
 		Width:   stored.Width,
 		Height:  stored.Height,
