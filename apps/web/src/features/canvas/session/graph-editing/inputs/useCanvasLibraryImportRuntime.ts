@@ -221,9 +221,11 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     candidate: CanvasLibraryImportDescriptor,
     center: { x: number; y: number },
   ): Promise<CanvasGraphNodeIdForKind<'image'> | null> {
+    const attachment = options.readAttachment()
     const isPreviewReady = await (options.preloadImage ?? preloadImage)(candidate.previewUrl).catch(
       () => false,
     )
+    if (options.readAttachment() !== attachment) return null
     if (!isPreviewReady) {
       options.onWarning(i18n.global.t('canvas.session.libraryImportFailed'))
       return null
@@ -245,7 +247,6 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     setTransientPreview(nodeId, candidate.previewUrl)
     options.selectOnlyNode(nodeId)
     options.refreshNodeInternals([nodeId])
-    const attachment = options.readAttachment()
     if (attachment) materializePending(nodeId, candidate.assetId, sourceRatio, attachment, true)
     return nodeId
   }

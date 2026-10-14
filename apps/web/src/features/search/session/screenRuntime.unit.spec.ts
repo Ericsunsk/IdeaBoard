@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick, ref } from 'vue'
 import { mockAppToast } from '../../../test/toast'
 import { screenRuntime } from './screenRuntime'
-import { readSearchReferenceTransfer, writeSearchReferenceTransfer } from '../../library'
 import type { SearchResult } from '../core/models'
 
 const mocks = vi.hoisted(() => ({
   authOpen: vi.fn(),
+  workspaceId: null as ReturnType<typeof ref<string>> | null,
   setPendingSearchAuthAction: vi.fn(),
   peekPendingSearchAuthAction: vi.fn(),
   libraryCoordinator: {
@@ -66,7 +66,7 @@ vi.mock('./useSearchSession', () => ({
 }))
 
 vi.mock('../../workspace', () => ({
-  useWorkspaceSelection: () => ({ selectedId: ref('ws_test123') }),
+  useWorkspaceSelection: () => ({ selectedId: (mocks.workspaceId ??= ref('ws_test123')) }),
 }))
 
 vi.mock('../../library', async (importOriginal) => {
@@ -74,8 +74,6 @@ vi.mock('../../library', async (importOriginal) => {
   return {
     ...actual,
     libraryAssetKey: (provider: string, id: string) => `${provider}:${id}`,
-    readSearchReferenceTransfer: vi.fn(),
-    writeSearchReferenceTransfer: vi.fn(),
   }
 })
 
@@ -173,6 +171,15 @@ function dragResult(): SearchResult {
   }
 }
 
+function createDropTarget(runtime: ReturnType<typeof screenRuntime>) {
+  const trigger = document.createElement('button')
+  document.body.appendChild(trigger)
+  vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100))
+  vi.spyOn(document, 'elementFromPoint').mockReturnValue(trigger)
+  runtime.commands.library.registerTrigger(trigger)
+  return trigger
+}
+
 describe('screenRuntime', () => {
   beforeEach(() => {
     mockAppToast()
@@ -190,9 +197,10 @@ describe('screenRuntime', () => {
       }
     })
     mocks.mutationListener = null
-    vi.mocked(writeSearchReferenceTransfer).mockReset()
-    vi.mocked(readSearchReferenceTransfer).mockReset()
+    mocks.workspaceId = null
   })
+
+  afterEach(() => vi.restoreAllMocks())
 
   it('owns the Auth gate for protected Library actions', async () => {
     const { runtime, unmount } = mountRuntime(false)
@@ -274,25 +282,32 @@ describe('screenRuntime', () => {
   })
 
   it('writes the Search reference payload and cleans up the drag ghost', () => {
-    vi.useFakeTimers()
+    const { runtime, unmount } = mountRuntime(true)
+    const hitTest = vi.spyOn(document, 'elementFromPoint').mockReturnValue(null)
     try {
-      const { runtime, unmount } = mountRuntime(true)
       const result = dragResult()
-      const dataTransfer = { setDragImage: vi.fn() }
+      runtime.commands.library.handleCardPointerDown(
+        new PointerEvent('pointerdown', {
+          pointerId: 1,
+          isPrimary: true,
+          clientX: 10,
+          clientY: 10,
+        }),
+        result,
+      )
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { pointerId: 1, clientX: 30, clientY: 30 }),
+      )
 
-      runtime.commands.library.handleCardDragStart({ dataTransfer } as unknown as DragEvent, result)
-
-      expect(writeSearchReferenceTransfer).toHaveBeenCalledWith(dataTransfer, result)
-      expect(dataTransfer.setDragImage).toHaveBeenCalledOnce()
-      const ghost = vi.mocked(dataTransfer.setDragImage).mock.calls[0]?.[0] as HTMLElement
-      expect(ghost.isConnected).toBe(true)
-
-      vi.runAllTimers()
-      expect(ghost.isConnected).toBe(false)
-      unmount()
+      expect(mocks.sessions[0]?.toLibraryReference).toHaveBeenCalledWith(result)
+      expect(document.documentElement.classList.contains('image-pointer-dragging')).toBe(true)
+      expect(document.body.querySelector('img')).not.toBeNull()
     } finally {
-      vi.useRealTimers()
+      unmount()
+      hitTest.mockRestore()
     }
+    expect(document.documentElement.classList.contains('image-pointer-dragging')).toBe(false)
+    expect(document.body.querySelector('img')).toBeNull()
   })
 
   it('anchors the save popover to the event currentTarget', () => {
@@ -326,39 +341,124 @@ describe('screenRuntime', () => {
       const { runtime, unmount } = mountRuntime(true)
       const session = mocks.sessions[0]!
       expect(session.library.open.value).toBe(false)
-
-      const dataTransfer = { dropEffect: '' }
-      runtime.commands.library.handleTriggerDragOver({ dataTransfer } as unknown as DragEvent)
-      expect(dataTransfer.dropEffect).toBe('copy')
+      const trigger = createDropTarget(runtime)
+      const reference = dragResult()
+      runtime.dropTargets.update(10, 10, { kind: 'reference', reference })
       expect(runtime.view.library.isDropTarget.value).toBe(true)
 
-      runtime.commands.library.handleTriggerDragLeave()
+      runtime.dropTargets.clear()
       expect(runtime.view.library.isDropTarget.value).toBe(false)
       vi.advanceTimersByTime(280)
       expect(session.library.open.value).toBe(false)
 
-      runtime.commands.library.handleTriggerDragOver({ dataTransfer } as unknown as DragEvent)
+      runtime.dropTargets.update(10, 10, { kind: 'reference', reference })
+      runtime.commands.library.registerTrigger(trigger)
       vi.advanceTimersByTime(280)
       expect(session.library.open.value).toBe(true)
 
-      runtime.commands.library.handleCardDragEnd()
+      runtime.dropTargets.clear()
       expect(runtime.view.library.isDropTarget.value).toBe(false)
       unmount()
+      trigger.remove()
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('drops the transferred reference into Quick Saves', async () => {
+  it('drops the reference directly into Quick Saves', () => {
     const { runtime, unmount } = mountRuntime(true)
     const session = mocks.sessions[0]!
-    const reference = { provider: 'unsplash', id: 'photo-1' }
-    vi.mocked(readSearchReferenceTransfer).mockReturnValue(reference as never)
-
-    await runtime.commands.library.handleTriggerDrop({} as unknown as DragEvent)
+    const reference = dragResult()
+    const trigger = createDropTarget(runtime)
+    runtime.dropTargets.drop({ kind: 'reference', reference }, 10, 10)
 
     expect(session.library.saveReferenceToQuickSaves).toHaveBeenCalledWith(reference)
     expect(runtime.view.library.isDropTarget.value).toBe(false)
     unmount()
+    trigger.remove()
+  })
+
+  it('retargets the automatically opened Library without another pointer move', () => {
+    vi.useFakeTimers()
+    const { runtime, unmount } = mountRuntime(true)
+    const trigger = createDropTarget(runtime)
+    try {
+      runtime.commands.library.handleCardPointerDown(
+        new PointerEvent('pointerdown', { pointerId: 1, isPrimary: true }),
+        dragResult(),
+      )
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { pointerId: 1, clientX: 10, clientY: 10 }),
+      )
+      vi.advanceTimersByTime(280)
+      expect(mocks.sessions[0]?.library.open.value).toBe(true)
+
+      const folder = document.createElement('div')
+      trigger.appendChild(folder)
+      vi.spyOn(folder, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100))
+      vi.mocked(document.elementFromPoint).mockReturnValue(folder)
+      const onHoverChange = vi.fn()
+      const onDrop = vi.fn()
+      runtime.dropTargets.register({
+        element: folder,
+        canReceive: () => true,
+        onHoverChange,
+        onDrop,
+      })
+      vi.advanceTimersToNextFrame()
+      expect(onHoverChange).toHaveBeenCalledWith(true)
+      expect(runtime.view.library.isDropTarget.value).toBe(false)
+
+      window.dispatchEvent(
+        new PointerEvent('pointerup', { pointerId: 1, clientX: 10, clientY: 10 }),
+      )
+      expect(onDrop).toHaveBeenCalledOnce()
+      expect(mocks.sessions[0]?.library.saveReferenceToQuickSaves).not.toHaveBeenCalled()
+    } finally {
+      unmount()
+      trigger.remove()
+      vi.runAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('retains the save intent and login prompt for an anonymous trigger drop', () => {
+    const { runtime, unmount } = mountRuntime(false)
+    const trigger = createDropTarget(runtime)
+    const reference = dragResult()
+    runtime.dropTargets.update(10, 10, { kind: 'reference', reference })
+    expect(runtime.view.library.isDropTarget.value).toBe(false)
+    runtime.dropTargets.drop({ kind: 'reference', reference }, 10, 10)
+
+    expect(mocks.setPendingSearchAuthAction).toHaveBeenCalledWith({
+      kind: 'save-reference',
+      reference,
+    })
+    expect(mocks.authOpen).toHaveBeenCalledWith('login')
+    expect(mocks.sessions[0]?.library.saveReferenceToQuickSaves).not.toHaveBeenCalled()
+    unmount()
+    trigger.remove()
+  })
+
+  it('cancels the active drag synchronously when the workspace changes', () => {
+    const { runtime, unmount } = mountRuntime(true)
+    const trigger = createDropTarget(runtime)
+    runtime.commands.library.handleCardPointerDown(
+      new PointerEvent('pointerdown', { pointerId: 1, isPrimary: true }),
+      dragResult(),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', { pointerId: 1, clientX: 10, clientY: 10 }),
+    )
+    expect(runtime.view.library.isDropTarget.value).toBe(true)
+
+    mocks.workspaceId!.value = 'ws_other123'
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 10, clientY: 10 }))
+
+    expect(runtime.view.library.isDropTarget.value).toBe(false)
+    expect(document.documentElement.classList.contains('image-pointer-dragging')).toBe(false)
+    expect(mocks.sessions[0]?.library.saveReferenceToQuickSaves).not.toHaveBeenCalled()
+    unmount()
+    trigger.remove()
   })
 })

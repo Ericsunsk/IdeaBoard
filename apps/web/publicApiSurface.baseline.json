@@ -3749,13 +3749,13 @@
     "TERMS_PATH"
   ],
   "src/features/library/index.ts": [
-    "CANVAS_LIBRARY_IMPORT_MIME",
     "CanvasLibraryImportDescriptor",
     "LIBRARY_ALL_FOLDER_KEY",
-    "LIBRARY_FOLDER_MOVE_MIME",
     "LibraryAssetFact",
     "LibraryAssetMaterializer",
     "LibraryAssetView",
+    "LibraryDragPayload",
+    "LibraryDropTargets",
     "LibraryFolderFacts",
     "LibraryFolderLoadResult",
     "LibraryFolderTab",
@@ -3767,7 +3767,6 @@
     "LibraryMutationPublisher",
     "LibrarySearchReference",
     "LibraryWorkspaceOptions",
-    "SEARCH_REFERENCE_MIME",
     "WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS",
     "WorkspaceLibraryAsset",
     "WorkspaceLibraryAssetInput",
@@ -3790,7 +3789,6 @@
     "createLibraryFolderFacts",
     "createLibraryMutationPublisher",
     "deleteFolderConfirmation",
-    "getLibraryDropEffect",
     "libraryAffectedFolderKeysForAsset",
     "libraryAssetKey",
     "listAllWorkspaceLibraryFolders",
@@ -3799,9 +3797,6 @@
     "mapWorkspaceLibraryProvider",
     "mapWorkspaceLibraryResolveStatus",
     "materializeLibraryAssetForCanvas",
-    "readCanvasLibraryImportTransfer",
-    "readLibraryFolderMoveTransfer",
-    "readSearchReferenceTransfer",
     "removeAssetConfirmation",
     "removeWorkspaceSearchReference",
     "requireWorkspaceId",
@@ -3814,10 +3809,7 @@
     "toWorkspaceLibraryResolveResult",
     "uniqueLibraryFolderKeys",
     "useLibraryWorkspace",
-    "workspaceLibraryApi",
-    "writeCanvasLibraryImportTransfer",
-    "writeLibraryFolderMoveTransfer",
-    "writeSearchReferenceTransfer"
+    "workspaceLibraryApi"
   ],
   "src/features/search/index.ts": [
     "LibrarySearchReference",

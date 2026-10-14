@@ -138,7 +138,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     screenToFlowCoordinate: options.screenToFlowCoordinate,
     onWarning: options.feedback.operationWarning,
     createImageNodeFromFile,
-    addLibraryAsset: libraryImport.start,
   })
   function createNodeInteractions(
     interactionOptions: CanvasGraphEditingNodeInteractionsOptions,

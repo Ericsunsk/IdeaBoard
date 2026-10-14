@@ -34,6 +34,7 @@
           presentation="canvas"
           :open="canvasLibrary.view.isOpen.value"
           :workspace-id="canvasWorkspaceId"
+          :drop-targets="libraryDropTargets"
           :folder-facts="canvasLibrary.view.folderFacts"
           :mutation-publisher="canvasLibrary.view.mutationPublisher"
           @add-to-canvas="addLibraryAssetToCanvas"
@@ -152,6 +153,7 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
+import { useCanvasLibraryDrop } from './internal/useCanvasLibraryDrop'
 import {
   loadLibraryFloatingIsland,
   materializeLibraryAssetForCanvas,
@@ -324,6 +326,13 @@ const {
     locks: { isChromeHidden: isRetouchChromeHidden, isCanvasLocked: isFlowCanvasLocked },
   },
 } = imageTools
+const libraryDropTargets = useCanvasLibraryDrop({
+  element: canvasWrapRef,
+  context: () => [canvasWorkspaceId.value, currentBoardId.value, isFlowCanvasLocked.value],
+  canReceive: () => !isFlowCanvasLocked.value,
+  screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,
+  add: (asset, point) => commands.graphEditing.libraryImport.add(asset, point),
+})
 const { isFlowInteractionActive, isFlowViewportPanInteractionActive } = viewModel.graphEditing
 const surface = useCanvasScreenSurfaceInteractions({
   workspace,

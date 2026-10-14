@@ -2,15 +2,15 @@
   <article
     :key="`${result.provider}:${result.id}`"
     :style="cardStyle"
-    draggable="true"
+    :draggable="false"
     class="group relative overflow-hidden rounded-panel bg-card/85 cursor-grab active:cursor-grabbing select-none"
-    @dragstart="$emit('cardDragStart', $event)"
-    @dragend="$emit('cardDragEnd')"
+    @dragstart.prevent
   >
     <button
       type="button"
       class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       :aria-label="t('search.viewResult', { title: result.title || t('search.fallbackTitle') })"
+      @pointerdown="$emit('cardPointerDown', $event)"
       @click="$emit('openLightbox')"
     >
       <div
@@ -142,8 +142,7 @@ defineProps<{
 }>()
 
 defineEmits<{
-  (e: 'cardDragStart', event: DragEvent): void
-  (e: 'cardDragEnd'): void
+  (e: 'cardPointerDown', event: PointerEvent): void
   (e: 'openLightbox'): void
   (e: 'markImageError'): void
   (e: 'toggleSelect'): void

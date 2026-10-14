@@ -40,6 +40,8 @@ import SearchSavePopover from './ui/components/SearchSavePopover.vue'
 import SearchPage from './ui/pages/SearchPage.vue'
 import type { SearchSavePopoverController } from './ui/browser/savePopoverContract'
 import type { SearchResult } from './core/models'
+import { createPointerDropTargets } from '../../core/interaction/pointerDropTargets'
+import type { LibraryDragPayload } from '../library'
 
 vi.mock('../../core/composables/useAppToast', () => ({
   useAppToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }),
@@ -125,11 +127,8 @@ vi.mock('./session/screenRuntime', () => ({
         preload: vi.fn(),
         close: vi.fn(),
         openSavePopover: vi.fn(),
-        handleCardDragStart: vi.fn(),
-        handleCardDragEnd: vi.fn(),
-        handleTriggerDragOver: vi.fn(),
-        handleTriggerDragLeave: vi.fn(),
-        handleTriggerDrop: vi.fn(),
+        handleCardPointerDown: vi.fn(),
+        registerTrigger: vi.fn(),
         registerSavePopover: vi.fn(),
         requestSaveAuthentication: vi.fn(),
         setSavePopoverAnchor: vi.fn(),
@@ -138,6 +137,7 @@ vi.mock('./session/screenRuntime', () => ({
     },
     savePopoverAnchor: ref(null),
     workspaceId: ref('workspace-test'),
+    dropTargets: createPointerDropTargets<LibraryDragPayload>(),
   }),
 }))
 

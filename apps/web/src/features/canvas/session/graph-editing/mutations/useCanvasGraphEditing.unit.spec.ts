@@ -17,10 +17,7 @@ import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
 import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'
-import {
-  writeCanvasLibraryImportTransfer,
-  type CanvasLibraryImportDescriptor,
-} from '../../../../library'
+import type { CanvasLibraryImportDescriptor } from '../../../../library'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
@@ -251,21 +248,6 @@ describe('useCanvasGraphEditing', () => {
 
   it('imports a dragged Library asset at its Canvas drop coordinate without upload', async () => {
     const harness = createHarness()
-    const values = new Map<string, string>()
-    const types: string[] = []
-    const dataTransfer = {
-      types,
-      effectAllowed: 'all',
-      dropEffect: 'none',
-      setData(type: string, value: string) {
-        values.set(type, value)
-        types.push(type)
-      },
-      getData(type: string) {
-        return values.get(type) ?? ''
-      },
-      files: [new File(['ignored'], 'should-not-upload.png', { type: 'image/png' })],
-    } as unknown as DataTransfer
     const asset: CanvasLibraryImportDescriptor = {
       assetId: 'lasset_asset0042',
       previewUrl: 'https://images.unsplash.com/dragged-asset-preview',
@@ -273,13 +255,7 @@ describe('useCanvasGraphEditing', () => {
       width: 1200,
       height: 800,
     }
-    writeCanvasLibraryImportTransfer(dataTransfer, asset)
-
-    await harness.editing.commands.canvasFiles.drop({
-      clientX: 90,
-      clientY: 110,
-      dataTransfer,
-    } as unknown as DragEvent)
+    await harness.editing.commands.libraryImport.add(asset, { x: 100, y: 130 })
     await Promise.resolve()
 
     expect(harness.materializeLibraryAsset).toHaveBeenCalledWith('lasset_asset0042')
@@ -295,9 +271,6 @@ describe('useCanvasGraphEditing', () => {
         }),
       }),
     )
-
-    harness.editing.commands.canvasFiles.dragOver({ dataTransfer } as unknown as DragEvent)
-    expect(harness.markDropAsCopy).toHaveBeenCalled()
   })
 
   it('creates a running pending retouch node matching the source node dimensions and ratio', () => {

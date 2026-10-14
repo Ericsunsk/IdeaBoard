@@ -11,12 +11,7 @@ import {
 import { useAppToast } from '../../../core/composables/useAppToast'
 import { useAuthOverlay } from '../../auth'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  libraryAssetKey,
-  loadLibraryFloatingIsland,
-  readSearchReferenceTransfer,
-  writeSearchReferenceTransfer,
-} from '../../library'
+import { libraryAssetKey, loadLibraryFloatingIsland, type LibraryDragPayload } from '../../library'
 import { type SearchAuthAction } from '../core/authAction'
 import {
   peekPendingSearchAuthAction,
@@ -31,14 +26,12 @@ import { type SearchResult, type VisionReference } from '../core/models'
 import { useSearchSession } from './useSearchSession'
 import {
   isSavePopoverController,
+  resolveSavePopoverAnchor,
   type SearchSavePopoverController,
   type SearchSavePopoverRequest,
 } from '../ui/browser/savePopoverContract'
-import {
-  attachSearchDragImage,
-  resolveDragAnchor,
-  SEARCH_LIBRARY_AUTO_OPEN_DELAY_MS,
-} from '../ui/browser/dragGhost'
+import { startPointerDrag } from '../../../core/interaction/pointerDrag'
+import { createPointerDropTargets } from '../../../core/interaction/pointerDropTargets'
 
 type SearchScreenRuntimeOptions = {
   userPublicID: Readonly<Ref<string | undefined>>
@@ -215,6 +208,9 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   const isMounted = ref(false)
   const isLibraryIslandMounted = ref(current.value.session.library.open.value)
   const isTriggerHoveredDuringDrag = ref(false)
+  const dropTargets = createPointerDropTargets<LibraryDragPayload>()
+  let unregisterTrigger: (() => void) | null = null
+  let triggerElement: HTMLElement | null = null
   const savePopover = shallowRef<SearchSavePopoverController | null>(null)
   const savePopoverAnchor = ref<HTMLElement | null>(null)
   let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
@@ -289,6 +285,7 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
       : []
 
     closeSavePopover()
+    dropTargets.cancel()
     clearAutoOpenTimer()
     isTriggerHoveredDuringDrag.value = false
     libraryCoordinator.reset()
@@ -327,7 +324,7 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
         session().library.close()
       },
       openSavePopover(event: Event, result: SearchResult) {
-        const anchor = resolveDragAnchor(event)
+        const anchor = resolveSavePopoverAnchor(event)
         if (!anchor) return
         savePopoverAnchor.value = anchor
         const request: SearchSavePopoverRequest = {
@@ -352,41 +349,47 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
       handleAnchorHidden() {
         closeSavePopover()
       },
-      handleCardDragStart(event: DragEvent, result: SearchResult) {
-        const dataTransfer = event.dataTransfer
-        if (!dataTransfer) return
-        writeSearchReferenceTransfer(dataTransfer, session().toLibraryReference(result))
-        attachSearchDragImage(dataTransfer, result)
+      handleCardPointerDown(event: PointerEvent, result: SearchResult) {
+        startPointerDrag(event, {
+          payload: { kind: 'reference', reference: session().toLibraryReference(result) },
+          previewUrl: result.thumbnail_url || result.preview_url,
+          targets: dropTargets,
+          onEnd: () => {
+            clearAutoOpenTimer()
+            isTriggerHoveredDuringDrag.value = false
+          },
+        })
       },
-      handleCardDragEnd() {
-        clearAutoOpenTimer()
-        isTriggerHoveredDuringDrag.value = false
-      },
-      handleTriggerDragOver(event: DragEvent) {
-        if (!options.isAuthenticated() || !event.dataTransfer) return
-        event.dataTransfer.dropEffect = 'copy'
-        isTriggerHoveredDuringDrag.value = true
-        if (!session().library.open.value && !autoOpenTimer) {
-          autoOpenTimer = setTimeout(() => {
-            session().library.open.value = true
-            autoOpenTimer = null
-          }, SEARCH_LIBRARY_AUTO_OPEN_DELAY_MS)
-        }
-      },
-      handleTriggerDragLeave() {
-        isTriggerHoveredDuringDrag.value = false
-        clearAutoOpenTimer()
-      },
-      async handleTriggerDrop(event: DragEvent) {
-        isTriggerHoveredDuringDrag.value = false
-        clearAutoOpenTimer()
-        const reference = readSearchReferenceTransfer(event.dataTransfer)
-        if (!reference) return
-        if (!options.isAuthenticated()) {
-          requireLogin({ kind: 'save-reference', reference })
-          return
-        }
-        await session().library.saveReferenceToQuickSaves(reference)
+      registerTrigger(element: unknown) {
+        const next = element instanceof HTMLElement ? element : null
+        if (triggerElement === next) return
+        unregisterTrigger?.()
+        unregisterTrigger = null
+        triggerElement = next
+        if (!next) return
+        unregisterTrigger = dropTargets.register({
+          element: next,
+          canReceive: (payload) => payload.kind === 'reference',
+          onHoverChange(isHovered) {
+            isTriggerHoveredDuringDrag.value = isHovered && options.isAuthenticated()
+            clearAutoOpenTimer()
+            if (isTriggerHoveredDuringDrag.value && !session().library.open.value) {
+              autoOpenTimer = setTimeout(() => {
+                session().library.open.value = true
+                autoOpenTimer = null
+              }, 280)
+            }
+          },
+          onDrop(payload) {
+            if (payload.kind !== 'reference') return
+            const { reference } = payload
+            if (!options.isAuthenticated()) {
+              requireLogin({ kind: 'save-reference', reference })
+              return
+            }
+            void session().library.saveReferenceToQuickSaves(reference)
+          },
+        })
       },
     },
   }
@@ -394,9 +397,16 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   watch(view.library.isOpen, (isOpen) => {
     if (isOpen) isLibraryIslandMounted.value = true
   })
-  watch(selectedWorkspaceId, (next, previous) => {
-    if (next !== previous) libraryCoordinator.reset()
-  })
+  watch(
+    selectedWorkspaceId,
+    (next, previous) => {
+      if (next !== previous) {
+        dropTargets.cancel()
+        libraryCoordinator.reset()
+      }
+    },
+    { flush: 'sync' },
+  )
   watch(
     scopeKey,
     (nextScope, previousScope) => {
@@ -412,6 +422,8 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   })
 
   onBeforeUnmount(() => {
+    dropTargets.cancel()
+    unregisterTrigger?.()
     clearAutoOpenTimer()
     closeSavePopover()
     current.value.stop()
@@ -419,5 +431,5 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
     libraryCoordinator.dispose()
   })
 
-  return { view, commands, savePopoverAnchor, workspaceId }
+  return { view, commands, savePopoverAnchor, workspaceId, dropTargets }
 }

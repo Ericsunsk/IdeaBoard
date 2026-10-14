@@ -1,0 +1,5 @@
+html.image-pointer-dragging,
+html.image-pointer-dragging * {
+  cursor: none !important;
+  user-select: none !important;
+}

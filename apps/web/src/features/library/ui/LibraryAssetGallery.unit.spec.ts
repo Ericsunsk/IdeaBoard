@@ -35,6 +35,20 @@ const baseProps = (assets: LibraryAssetView[]) => ({
 })
 
 describe('LibraryAssetGallery', () => {
+  it('starts pointer dragging only from the preview and prevents native dragging', async () => {
+    const asset = galleryAsset(0)
+    const view = render(LibraryAssetGallery, { props: baseProps([asset]) })
+    const preview = screen.getByRole('button', { name: 'View Reference 0' })
+    await fireEvent.pointerDown(preview)
+    expect(view.emitted()['asset-pointer-down']).toHaveLength(1)
+    await fireEvent.pointerDown(screen.getByRole('button', { name: 'Use as search reference' }))
+    expect(view.emitted()['asset-pointer-down']).toHaveLength(1)
+    const native = new Event('dragstart', { bubbles: true, cancelable: true })
+    expect(preview.dispatchEvent(native)).toBe(false)
+    await fireEvent.click(preview)
+    expect(view.emitted()['open-asset']).toHaveLength(1)
+  })
+
   it('renders identical output across viewport-dependent column counts', async () => {
     const assets = [0, 1, 2, 3, 4].map(galleryAsset)
     const { rerender } = render(LibraryAssetGallery, { props: baseProps(assets) })

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "aff496e53ea9cc8e04c46439cb085a2c150cc72e",
+  "checkpointSha": "018ba5d6b252e62451a1cb4864906778b786a770",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -9393,11 +9393,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/core/transfer.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
@@ -9443,7 +9438,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 12,
+      "fanIn": 11,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -9451,7 +9446,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -29166,18 +29161,8 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.unit.spec.ts",
-          "to": "src/features/library/index.ts",
           "kind": "runtime"
         },
         {
@@ -29533,7 +29518,7 @@
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.unit.spec.ts",
           "to": "src/features/library/index.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphHistory.ts",
@@ -35345,7 +35330,7 @@
         }
       ],
       "fanIn": 1,
-      "fanOut": 43,
+      "fanOut": 45,
       "fanOutTargets": [
         "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/@vue-flow/core/dist/style.css",
@@ -35363,6 +35348,8 @@
         "src/app/style.css",
         "src/core/config/runtimeUrls.ts",
         "src/core/i18n/index.ts",
+        "src/core/interaction/pointerDrag.ts",
+        "src/core/interaction/pointerDropTargets.ts",
         "src/core/media/imageDimensions.ts",
         "src/core/router/queryParams.ts",
         "src/features/board/ports/canvas.ts",
@@ -35718,6 +35705,41 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.ts",
+          "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.unit.spec.ts",
+          "to": "src/core/interaction/pointerDrag.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
@@ -35978,7 +36000,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 1,
-      "targetFanOut": 43,
+      "targetFanOut": 45,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -36440,16 +36462,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.unit.spec.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
@@ -36457,7 +36469,7 @@
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.unit.spec.ts",
           "to": "src/features/library/index.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
@@ -36485,6 +36497,16 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
@@ -36496,6 +36518,11 @@
         },
         {
           "from": "src/features/search/ports/libraryCoordinatorPort.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
         },
@@ -36550,8 +36577,8 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 22,
-      "fanOut": 40,
+      "fanIn": 23,
+      "fanOut": 42,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -36578,6 +36605,8 @@
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/index.ts",
         "src/core/interaction/menuKeyboardNavigation.ts",
+        "src/core/interaction/pointerDrag.ts",
+        "src/core/interaction/pointerDropTargets.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
@@ -36596,9 +36625,9 @@
       ],
       "outboundEdges": [
         {
-          "from": "src/features/library/core/transfer.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "runtime"
+          "from": "src/features/library/core/drag.ts",
+          "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/library/core/transfer.unit.spec.ts",
@@ -36713,11 +36742,6 @@
         {
           "from": "src/features/library/session/useLibraryIslandDnD.ts",
           "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/session/useLibraryIslandDnD.ts",
-          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
@@ -36886,6 +36910,26 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/ui/LibraryFloatingIsland.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.component.spec.ts",
+          "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -36918,6 +36962,16 @@
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/interaction/pointerDrag.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/interaction/pointerDropTargets.ts",
           "kind": "runtime"
         },
         {
@@ -36999,14 +37053,19 @@
           "from": "src/features/library/ui/confirmations.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryDropTargets.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 22,
-      "targetFanOut": 40,
+      "targetFanIn": 23,
+      "targetFanOut": 42,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -37031,7 +37090,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 42,
+      "fanOut": 44,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-virtual/dist/cjs/index.cjs",
@@ -37058,6 +37117,8 @@
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/interaction/pointerDrag.ts",
+        "src/core/interaction/pointerDropTargets.ts",
         "src/core/media/visionIngressPolicy.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",
@@ -37134,8 +37195,18 @@
         },
         {
           "from": "src/features/search/searchChromeStyle.browser.spec.ts",
+          "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/search/searchChromeStyle.browser.spec.ts",
@@ -37369,6 +37440,16 @@
         },
         {
           "from": "src/features/search/session/screenRuntime.ts",
+          "to": "src/core/interaction/pointerDrag.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/screenRuntime.ts",
+          "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/screenRuntime.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -37553,11 +37634,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/ui/browser/dragGhost.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/search/ui/browser/savePopoverContract.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -37605,6 +37681,21 @@
         {
           "from": "src/features/search/ui/components/SearchLightboxModal.vue",
           "to": "src/theme/lightboxScrim.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchResultCard.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchResultCard.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchResultCard.component.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -37793,7 +37884,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 42,
+      "targetFanOut": 44,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

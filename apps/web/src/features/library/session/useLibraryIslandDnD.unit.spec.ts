@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useLibraryIslandDnD } from './useLibraryIslandDnD'
-import { writeLibraryFolderMoveTransfer, writeSearchReferenceTransfer } from '../core/transfer'
 
 const mocks = vi.hoisted(() => ({
   saveReference: vi.fn(),
@@ -21,23 +20,6 @@ vi.mock('./libraryUseCases', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./libraryUseCases')>()
   return { ...actual, saveWorkspaceSearchReference: mocks.saveReference }
 })
-
-function dataTransfer(): DataTransfer {
-  const values = new Map<string, string>()
-  const types: string[] = []
-  return {
-    types,
-    effectAllowed: 'all',
-    dropEffect: 'none',
-    setData(type: string, value: string) {
-      values.set(type, value)
-      if (!types.includes(type)) types.push(type)
-    },
-    getData(type: string) {
-      return values.get(type) ?? ''
-    },
-  } as unknown as DataTransfer
-}
 
 const reference = {
   provider: 'unsplash' as const,
@@ -72,7 +54,7 @@ describe('useLibraryIslandDnD', () => {
     })
     const outcomes: unknown[] = []
     const workspace = workspaceStub()
-    const { handlePillDrop } = useLibraryIslandDnD({
+    const { receiveReference } = useLibraryIslandDnD({
       workspace: workspace as never,
       mutationPublisher: {
         publishMutation: vi.fn(async (outcome: unknown) => {
@@ -82,14 +64,7 @@ describe('useLibraryIslandDnD', () => {
         subscribe: vi.fn(() => () => {}),
       },
     })
-    const transfer = dataTransfer()
-    writeSearchReferenceTransfer(transfer, reference)
-
-    await handlePillDrop({ dataTransfer: transfer } as unknown as DragEvent, {
-      folderKey: 'lfolder_folder0007',
-      name: 'Destination',
-      isMutable: true,
-    })
+    await receiveReference(reference, 'lfolder_folder0007')
 
     expect(mocks.saveReference).toHaveBeenCalledWith('ws_test123', reference, 'lfolder_folder0007')
     // Facts come from the committed save — never rebuilt from the pill key —
@@ -115,7 +90,7 @@ describe('useLibraryIslandDnD', () => {
     })
     const outcomes: unknown[] = []
     const workspace = workspaceStub()
-    const { handlePillDrop } = useLibraryIslandDnD({
+    const { receiveReference } = useLibraryIslandDnD({
       workspace: workspace as never,
       mutationPublisher: {
         publishMutation: vi.fn(async (outcome: unknown) => {
@@ -125,14 +100,7 @@ describe('useLibraryIslandDnD', () => {
         subscribe: vi.fn(() => () => {}),
       },
     })
-    const transfer = dataTransfer()
-    writeSearchReferenceTransfer(transfer, reference)
-
-    await handlePillDrop({ dataTransfer: transfer } as unknown as DragEvent, {
-      folderKey: 'all',
-      name: 'All',
-      isMutable: false,
-    })
+    await receiveReference(reference, 'all')
 
     expect(outcomes).toEqual([
       {
@@ -149,7 +117,7 @@ describe('useLibraryIslandDnD', () => {
 
   it('delegates folder-move drops to the workspace move command', async () => {
     const workspace = workspaceStub()
-    const { handlePillDrop } = useLibraryIslandDnD({
+    const { receiveDrop } = useLibraryIslandDnD({
       workspace: workspace as never,
       mutationPublisher: {
         publishMutation: vi.fn(async () => {}),
@@ -157,19 +125,62 @@ describe('useLibraryIslandDnD', () => {
         subscribe: vi.fn(() => () => {}),
       },
     })
-    const transfer = dataTransfer()
-    writeLibraryFolderMoveTransfer(transfer, 'lasset_asset0009')
-
-    await handlePillDrop({ dataTransfer: transfer } as unknown as DragEvent, {
-      folderKey: 'lfolder_folder0007',
-      name: 'Destination',
-      isMutable: true,
-    })
+    await receiveDrop(
+      {
+        kind: 'asset',
+        asset: {
+          assetId: 'lasset_asset0009',
+          title: '',
+          previewUrl: '',
+          width: 100,
+          height: 100,
+        },
+      },
+      'lfolder_folder0007',
+    )
 
     expect(workspace.moveSelectedAsset).toHaveBeenCalledWith(
       'lasset_asset0009',
       'lfolder_folder0007',
     )
     expect(mocks.saveReference).not.toHaveBeenCalled()
+  })
+
+  it('does not publish or select a stale save after a workspace change', async () => {
+    const workspace = workspaceStub()
+    const publishMutation = vi.fn()
+    const { receiveReference } = useLibraryIslandDnD({
+      workspace: workspace as never,
+      mutationPublisher: { publishMutation, publishMutations: vi.fn(), subscribe: vi.fn() },
+    })
+    let finish!: (value: unknown) => void
+    mocks.saveReference.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    const pending = receiveReference(reference, 'all')
+    workspace.workspaceId.value = 'ws_other123'
+    finish({ asset: { folderId: undefined }, affectedFolderKeys: ['all'] })
+    await pending
+
+    expect(mocks.saveReference).toHaveBeenCalledWith('ws_test123', reference, undefined)
+    expect(publishMutation).not.toHaveBeenCalled()
+    expect(workspace.selectFolder).not.toHaveBeenCalled()
+  })
+
+  it('rejects a removed folder instead of saving an unfiled asset', async () => {
+    const workspace = workspaceStub()
+    const { receiveReference } = useLibraryIslandDnD({
+      workspace: workspace as never,
+      mutationPublisher: {
+        publishMutation: vi.fn(),
+        publishMutations: vi.fn(),
+        subscribe: vi.fn(),
+      },
+    })
+    await receiveReference(reference, 'lfolder_missing123')
+    expect(mocks.saveReference).not.toHaveBeenCalled()
+    expect(workspace.selectFolder).not.toHaveBeenCalled()
   })
 })

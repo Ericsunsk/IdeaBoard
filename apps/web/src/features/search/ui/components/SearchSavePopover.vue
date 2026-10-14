@@ -93,7 +93,7 @@ import { useAppToast } from '../../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { useSearchLibraryCoordinator } from '../../session/adapters/libraryCoordinator'
 import type { SearchSavePopoverRequest } from '../browser/savePopoverContract'
-import { resolveDragAnchor } from '../browser/dragGhost'
+import { resolveSavePopoverAnchor } from '../browser/savePopoverContract'
 
 type OpenRequest = SearchSavePopoverRequest & { event: Event; anchor: HTMLElement }
 
@@ -208,7 +208,7 @@ function toggle(event: Event, request: SearchSavePopoverRequest) {
     return
   }
 
-  const anchor = resolveDragAnchor(event)
+  const anchor = resolveSavePopoverAnchor(event)
   if (!anchor) return
   const nextRequest: OpenRequest = { ...request, event, anchor }
   const activeKey =

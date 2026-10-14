@@ -3,12 +3,14 @@
     <aside
       v-if="presentation === 'canvas' || open"
       v-show="open"
+      v-library-drop
       class="page-chrome-surface z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
-      :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
+      :class="[
+        isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass,
+        isPanelHovered ? 'ring-2 ring-primary' : '',
+      ]"
       :aria-label="t('library.title')"
       @click="closeFolderMenu(false)"
-      @dragover.prevent="handleIslandDragOver"
-      @drop.prevent="handleIslandDrop"
     >
       <!-- 🌟 1. 常驻顶栏控制区与灵感夹微胶囊 (支持用户主动折叠/展开分类胶囊) -->
       <div class="flex flex-col shrink-0 mb-2">
@@ -76,10 +78,8 @@
               <div
                 v-for="folder in workspace.folderTabs.value"
                 :key="folder.folderKey"
+                v-library-drop="folder.folderKey"
                 class="group/folder-pill inline-flex h-7 shrink-0 items-center rounded-pill"
-                @dragover.prevent.stop="handlePillDragOver($event, folder.folderKey)"
-                @dragleave.stop="handlePillDragLeave"
-                @drop.prevent.stop="handlePillDrop($event, folder)"
                 @contextmenu.stop="openFolderMenu($event, folder)"
               >
                 <button
@@ -160,7 +160,7 @@
         @remove-asset="requestRemove"
         @add-to-canvas="emit('add-to-canvas', $event)"
         @select-reference="selectReference"
-        @asset-dragstart="handleAssetDragStart"
+        @asset-pointer-down="handleAssetPointerDown"
       />
     </aside>
   </Transition>
@@ -221,7 +221,9 @@ import {
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../session/useLibraryWorkspace'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../session/folderFacts'
-import type { LibraryAssetView } from '../core/transfer'
+import { toCanvasLibraryImportDescriptor, type LibraryAssetView } from '../core/transfer'
+import { createPointerDropTargets } from '../../../core/interaction/pointerDropTargets'
+import { startPointerDrag } from '../../../core/interaction/pointerDrag'
 import type { CanvasLibraryImportDescriptor } from '../core/transfer'
 import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../core/composables/useUserConfirmDialog'
@@ -238,6 +240,8 @@ import LibraryFolderContextMenu from './LibraryFolderContextMenu.vue'
 import { useLibraryIslandDnD } from '../session/useLibraryIslandDnD'
 import { useAppToast } from '../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
+import type { LibraryDragPayload, LibraryDropTargets } from '../core/drag'
+import { useLibraryDropTargets } from './useLibraryDropTargets'
 
 const props = defineProps<{
   open: boolean
@@ -246,6 +250,7 @@ const props = defineProps<{
   mutationPublisher: LibraryMutationPublisher
   referenceKeys?: string[]
   presentation: 'search' | 'canvas'
+  dropTargets?: LibraryDropTargets
 }>()
 
 const emit = defineEmits<{
@@ -278,17 +283,37 @@ const workspace = useLibraryWorkspace({
   mutationPublisher: props.mutationPublisher,
 })
 
-const {
-  hoveredPillKey,
-  handleAssetDragStart,
-  handleIslandDragOver,
-  handleIslandDrop,
-  handlePillDragOver,
-  handlePillDragLeave,
-  handlePillDrop,
-} = useLibraryIslandDnD({
+const dropTargets = props.dropTargets ?? createPointerDropTargets<LibraryDragPayload>()
+const hoveredPillKey = ref<string | null>(null)
+const { receiveDrop } = useLibraryIslandDnD({
   workspace,
   mutationPublisher: props.mutationPublisher,
+})
+let disposeAssetDrag: (() => void) | null = null
+function handleAssetPointerDown(event: PointerEvent, asset: LibraryAssetView) {
+  disposeAssetDrag?.()
+  disposeAssetDrag = startPointerDrag(event, {
+    payload: { kind: 'asset', asset: toCanvasLibraryImportDescriptor(asset) },
+    previewUrl: asset.previewUrl,
+    targets: dropTargets,
+  })
+}
+watch(
+  () => [props.workspaceId, props.open],
+  () => disposeAssetDrag?.(),
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => disposeAssetDrag?.())
+
+const { directive: vLibraryDrop, isPanelHovered } = useLibraryDropTargets({
+  targets: () => dropTargets,
+  isOpen: () => props.open,
+  onFolderHover: (key) => {
+    hoveredPillKey.value = key
+  },
+  onDrop: (payload, folderKey) => {
+    void receiveDrop(payload, folderKey ?? workspace.selectedFolder.value)
+  },
 })
 
 const initialized = ref(false)

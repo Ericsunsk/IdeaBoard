@@ -12562,18 +12562,6 @@
       }
     },
     "src/features/library/core/transfer.ts": {
-      "SEARCH_REFERENCE_MIME": {
-        "kind": "test-contract",
-        "evidence": ["src/features/library/core/transfer.unit.spec.ts"]
-      },
-      "LIBRARY_FOLDER_MOVE_MIME": {
-        "kind": "test-contract",
-        "evidence": ["src/features/library/core/transfer.unit.spec.ts"]
-      },
-      "CANVAS_LIBRARY_IMPORT_MIME": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#CANVAS_LIBRARY_IMPORT_MIME"]
-      },
       "CanvasLibraryImportDescriptor": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#CanvasLibraryImportDescriptor"]
@@ -12582,37 +12570,9 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#LibraryAssetView"]
       },
-      "getLibraryDropEffect": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#getLibraryDropEffect"]
-      },
-      "readCanvasLibraryImportTransfer": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#readCanvasLibraryImportTransfer"]
-      },
-      "readLibraryFolderMoveTransfer": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#readLibraryFolderMoveTransfer"]
-      },
-      "readSearchReferenceTransfer": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#readSearchReferenceTransfer"]
-      },
       "toCanvasLibraryImportDescriptor": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#toCanvasLibraryImportDescriptor"]
-      },
-      "writeCanvasLibraryImportTransfer": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#writeCanvasLibraryImportTransfer"]
-      },
-      "writeLibraryFolderMoveTransfer": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#writeLibraryFolderMoveTransfer"]
-      },
-      "writeSearchReferenceTransfer": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#writeSearchReferenceTransfer"]
       }
     },
     "src/features/library/core/validators.ts": {
@@ -12698,12 +12658,6 @@
       }
     },
     "src/features/library/index.ts": {
-      "CANVAS_LIBRARY_IMPORT_MIME": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#CANVAS_LIBRARY_IMPORT_MIME"
-        ]
-      },
       "CanvasLibraryImportDescriptor": {
         "kind": "canonical-public",
         "evidence": [
@@ -12714,12 +12668,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#LIBRARY_ALL_FOLDER_KEY"
-        ]
-      },
-      "LIBRARY_FOLDER_MOVE_MIME": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LIBRARY_FOLDER_MOVE_MIME"
         ]
       },
       "LibraryAssetFact": {
@@ -12804,12 +12752,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibraryWorkspaceOptions"
-        ]
-      },
-      "SEARCH_REFERENCE_MIME": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#SEARCH_REFERENCE_MIME"
         ]
       },
       "WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS": {
@@ -12944,12 +12886,6 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#deleteFolderConfirmation"
         ]
       },
-      "getLibraryDropEffect": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#getLibraryDropEffect"
-        ]
-      },
       "libraryAffectedFolderKeysForAsset": {
         "kind": "canonical-public",
         "evidence": [
@@ -12996,24 +12932,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#materializeLibraryAssetForCanvas"
-        ]
-      },
-      "readCanvasLibraryImportTransfer": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#readCanvasLibraryImportTransfer"
-        ]
-      },
-      "readLibraryFolderMoveTransfer": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#readLibraryFolderMoveTransfer"
-        ]
-      },
-      "readSearchReferenceTransfer": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#readSearchReferenceTransfer"
         ]
       },
       "removeAssetConfirmation": {
@@ -13092,24 +13010,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#workspaceLibraryApi"
-        ]
-      },
-      "writeCanvasLibraryImportTransfer": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#writeCanvasLibraryImportTransfer"
-        ]
-      },
-      "writeLibraryFolderMoveTransfer": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#writeLibraryFolderMoveTransfer"
-        ]
-      },
-      "writeSearchReferenceTransfer": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#writeSearchReferenceTransfer"
         ]
       }
     },
@@ -13483,12 +13383,6 @@
       "MAX_REFERENCE_COUNT": {
         "kind": "test-contract",
         "evidence": ["src/features/search/session/visionReferenceCollection.unit.spec.ts"]
-      }
-    },
-    "src/features/search/ui/browser/dragGhost.ts": {
-      "createSearchDragGhost": {
-        "kind": "test-contract",
-        "evidence": ["src/features/search/ui/browser/dragGhost.unit.spec.ts"]
       }
     },
     "src/features/workspace/index.ts": {

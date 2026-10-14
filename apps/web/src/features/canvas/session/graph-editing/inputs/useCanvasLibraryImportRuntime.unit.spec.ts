@@ -136,6 +136,27 @@ describe('useCanvasLibraryImportRuntime', () => {
     expect(harness.nodes.value).toHaveLength(1)
   })
 
+  it('discards a decoded preview after the Board attachment changes', async () => {
+    const request = deferred<boolean>()
+    const harness = createHarness([], () => request.promise)
+    const pending = harness.imports.start(
+      {
+        assetId: 'lasset_asset0007',
+        title: 'Reference',
+        previewUrl: 'https://provider.example/preview.png',
+        width: 200,
+        height: 100,
+      },
+      { x: 100, y: 200 },
+    )
+    harness.currentAttachment.value = attachment()
+    request.resolve(true)
+    expect(await pending).toBeNull()
+    expect(harness.nodes.value).toHaveLength(0)
+    expect(harness.materialize).not.toHaveBeenCalled()
+    expect(harness.onWarning).not.toHaveBeenCalled()
+  })
+
   it('persists only the owned asset fact, then atomically promotes to managed Media', async () => {
     const harness = createHarness()
     const request = deferred<{ mediaAssetId: string; url: string; width: number; height: number }>()

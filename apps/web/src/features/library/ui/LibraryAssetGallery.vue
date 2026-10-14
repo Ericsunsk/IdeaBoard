@@ -41,9 +41,9 @@
           ref="cardElements"
           :data-asset-id="asset.id"
           :style="style"
-          draggable="true"
+          :draggable="false"
           class="group/libcard relative overflow-hidden rounded-panel bg-card/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
-          @dragstart="emit('asset-dragstart', $event, asset)"
+          @dragstart.prevent
         >
           <button
             type="button"
@@ -53,6 +53,7 @@
                 title: asset.title || t('library.states.savedReference'),
               })
             "
+            @pointerdown="emit('asset-pointer-down', $event, asset)"
             @click="emit('open-asset', asset)"
           >
             <div
@@ -181,7 +182,7 @@ const emit = defineEmits<{
   'remove-asset': [asset: LibraryAssetView]
   'add-to-canvas': [descriptor: CanvasLibraryImportDescriptor]
   'select-reference': [asset: LibraryAssetView]
-  'asset-dragstart': [e: DragEvent, asset: LibraryAssetView]
+  'asset-pointer-down': [e: PointerEvent, asset: LibraryAssetView]
 }>()
 
 const { t } = useI18n()

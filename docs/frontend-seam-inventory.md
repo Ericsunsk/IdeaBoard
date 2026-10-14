@@ -8162,11 +8162,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/core/transfer.ts",
-          "to": "src/core/contracts/externalImageProviders.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "runtime"
@@ -8212,9 +8207,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 11,
       "measuredFanOut": 0,
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 0,
       "ownershipScope": ["src/core/contracts/externalImageProviders.ts"],
       "publicExports": [
@@ -20549,9 +20544,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 43,
+      "measuredFanOut": 45,
       "targetFanIn": 1,
-      "targetFanOut": 43,
+      "targetFanOut": 45,
       "ownershipScope": ["src/features/canvas/ui/screens/"],
       "publicExports": ["CanvasScreen"],
       "targetFanOutTargets": [
@@ -20571,6 +20566,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/app/style.css",
         "src/core/config/runtimeUrls.ts",
         "src/core/i18n/index.ts",
+        "src/core/interaction/pointerDrag.ts",
+        "src/core/interaction/pointerDropTargets.ts",
         "src/core/media/imageDimensions.ts",
         "src/core/router/queryParams.ts",
         "src/features/board/ports/canvas.ts",
@@ -20918,16 +20915,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/graph-editing/inputs/useFlowCanvasDrop.unit.spec.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
@@ -20935,7 +20922,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.unit.spec.ts",
           "to": "src/features/library/index.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
@@ -20963,6 +20950,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryDrop.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
@@ -20974,6 +20971,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/search/ports/libraryCoordinatorPort.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
         },
@@ -21028,19 +21030,19 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 22,
-      "measuredFanOut": 40,
-      "targetFanIn": 22,
-      "targetFanOut": 40,
+      "measuredFanIn": 23,
+      "measuredFanOut": 42,
+      "targetFanIn": 23,
+      "targetFanOut": 42,
       "ownershipScope": ["src/features/library/"],
       "publicExports": [
-        "CANVAS_LIBRARY_IMPORT_MIME",
         "CanvasLibraryImportDescriptor",
         "LIBRARY_ALL_FOLDER_KEY",
-        "LIBRARY_FOLDER_MOVE_MIME",
         "LibraryAssetFact",
         "LibraryAssetMaterializer",
         "LibraryAssetView",
+        "LibraryDragPayload",
+        "LibraryDropTargets",
         "LibraryFolderFacts",
         "LibraryFolderLoadResult",
         "LibraryFolderTab",
@@ -21052,7 +21054,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "LibraryMutationPublisher",
         "LibrarySearchReference",
         "LibraryWorkspaceOptions",
-        "SEARCH_REFERENCE_MIME",
         "WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS",
         "WorkspaceLibraryAsset",
         "WorkspaceLibraryAssetInput",
@@ -21075,7 +21076,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "createLibraryFolderFacts",
         "createLibraryMutationPublisher",
         "deleteFolderConfirmation",
-        "getLibraryDropEffect",
         "libraryAffectedFolderKeysForAsset",
         "libraryAssetKey",
         "listAllWorkspaceLibraryFolders",
@@ -21084,9 +21084,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "mapWorkspaceLibraryProvider",
         "mapWorkspaceLibraryResolveStatus",
         "materializeLibraryAssetForCanvas",
-        "readCanvasLibraryImportTransfer",
-        "readLibraryFolderMoveTransfer",
-        "readSearchReferenceTransfer",
         "removeAssetConfirmation",
         "removeWorkspaceSearchReference",
         "requireWorkspaceId",
@@ -21099,10 +21096,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "toWorkspaceLibraryResolveResult",
         "uniqueLibraryFolderKeys",
         "useLibraryWorkspace",
-        "workspaceLibraryApi",
-        "writeCanvasLibraryImportTransfer",
-        "writeLibraryFolderMoveTransfer",
-        "writeSearchReferenceTransfer"
+        "workspaceLibraryApi"
       ],
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -21130,6 +21124,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/index.ts",
         "src/core/interaction/menuKeyboardNavigation.ts",
+        "src/core/interaction/pointerDrag.ts",
+        "src/core/interaction/pointerDropTargets.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
@@ -21166,9 +21162,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 42,
+      "measuredFanOut": 44,
       "targetFanIn": 2,
-      "targetFanOut": 42,
+      "targetFanOut": 44,
       "ownershipScope": ["src/features/search/"],
       "publicExports": [
         "LibrarySearchReference",
@@ -21219,6 +21215,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
+        "src/core/interaction/pointerDrag.ts",
+        "src/core/interaction/pointerDropTargets.ts",
         "src/core/media/visionIngressPolicy.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",

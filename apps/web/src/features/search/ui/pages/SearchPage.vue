@@ -134,6 +134,7 @@
           </form>
 
           <button
+            :ref="libraryCommands.registerTrigger"
             type="button"
             class="page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-pill transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)] cursor-pointer"
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-primary' : '']"
@@ -143,9 +144,6 @@
             @pointerenter="preloadLibraryIsland"
             @focus="preloadLibraryIsland"
             @click="toggleLibraryIslandForUser"
-            @dragover.prevent="handleLibraryTriggerDragOver"
-            @dragleave="handleLibraryTriggerDragLeave"
-            @drop.prevent="handleLibraryTriggerDrop"
           >
             <BookmarkSolid
               v-if="isLibraryIslandOpen"
@@ -252,8 +250,7 @@
             :is-saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
             :has-image-error="failedImages.has(result.id)"
             :image-retry-count="imageRetryCount(result.id)"
-            @card-drag-start="handleCardDragStart($event, result)"
-            @card-drag-end="handleCardDragEnd"
+            @card-pointer-down="handleCardPointerDown($event, result)"
             @open-lightbox="openLightbox(result)"
             @mark-image-error="markImageError(result.id)"
             @toggle-select="toggleBatchSelect(result)"
@@ -284,6 +281,7 @@
       :workspace-id="libraryWorkspaceId"
       :folder-facts="libraryFolderFacts"
       :mutation-publisher="libraryMutationPublisher"
+      :drop-targets="dropTargets"
       :reference-keys="references.map((reference) => reference.key)"
       @close="closeLibraryIsland"
       @reference-selected="handleLibraryReference"
@@ -361,6 +359,7 @@ const searchScreen = screenRuntime({
   // handler reloads the page to login.
   isAuthenticated: () => Boolean(userStore.user) && userStore.sessionValidatedAt > 0,
 })
+const { dropTargets } = searchScreen
 const { search, results: searchResults, library, selection, preview } = searchScreen.view
 const {
   search: searchCommands,
@@ -433,10 +432,6 @@ const {
   preload: preloadLibraryIsland,
   close: closeLibraryIsland,
   openSavePopover: toggleSavePopover,
-  handleCardDragStart,
-  handleCardDragEnd,
-  handleTriggerDragOver: handleLibraryTriggerDragOver,
-  handleTriggerDragLeave: handleLibraryTriggerDragLeave,
-  handleTriggerDrop: handleLibraryTriggerDrop,
+  handleCardPointerDown,
 } = libraryCommands
 </script>

@@ -21,3 +21,7 @@ export function isSavePopoverController(value: unknown): value is SearchSavePopo
     typeof value.hide === 'function'
   )
 }
+
+export function resolveSavePopoverAnchor(event: Event): HTMLElement | null {
+  return event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+}

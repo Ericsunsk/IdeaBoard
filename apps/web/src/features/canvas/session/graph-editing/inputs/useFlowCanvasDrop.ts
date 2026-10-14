@@ -2,11 +2,6 @@ import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
 } from '../../../../../core/utils/imageUploadSupport'
-import {
-  CANVAS_LIBRARY_IMPORT_MIME,
-  readCanvasLibraryImportTransfer,
-  type CanvasLibraryImportDescriptor,
-} from '../../../../library'
 import { userFacingErrorCopy } from '../../../../../core/errors/errorCatalog'
 import { i18n } from '../../../../../core/i18n'
 import type { CanvasImageNodeCreationResult } from './useFlowImageUploadActions'
@@ -23,10 +18,6 @@ type UseFlowCanvasDropOptions = {
     point: { x: number; y: number },
     file: File,
   ) => Promise<CanvasImageNodeCreationResult | null>
-  addLibraryAsset: (
-    asset: CanvasLibraryImportDescriptor,
-    point: { x: number; y: number },
-  ) => Promise<unknown>
 }
 
 export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
@@ -36,13 +27,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
 
   async function onCanvasDrop(event: DragEvent) {
     const point = options.screenToFlowCoordinate(options.browser.readDropScreenPoint(event))
-
-    const transferTypes = Array.from(event.dataTransfer?.types ?? [])
-    if (transferTypes.includes(CANVAS_LIBRARY_IMPORT_MIME)) {
-      const libraryAsset = readCanvasLibraryImportTransfer(event.dataTransfer)
-      if (libraryAsset) await options.addLibraryAsset(libraryAsset, point)
-      return
-    }
 
     const file = options.browser.readDroppedFile(event)
     if (!file) return

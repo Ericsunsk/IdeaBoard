@@ -19,6 +19,7 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 - `features/search/index.ts` unified public export: exports core models (`SearchResult`, `SearchPage`) and intent-continuation API (`clearPendingSearchAuthAction`).
 - `ports/` (feature-root hexagonal seam): `libraryCoordinatorPort` + `persistencePort` are the only session↔adapter contracts; session and adapters never import each other directly.
 - `SearchPage` the only route page (`meta.public`); pure assembly, lazy-loaded by `workspaceRoutes` via `loadSearchPage`, screen lifetime owned by `session/screenRuntime`.
+- Search result dragging uses Pointer Events for the primary non-touch pointer. The controller and thumbnail ghost are shared with Library asset dragging through `core/interaction`. It directly hands references to Library's registered targets, tracks layout changes while stationary, and cancels on identity/workspace changes or screen disposal. Touch scrolling remains browser-owned.
 - Search viewport components virtualized masonry viewport, save dialog, batch dock; callback props only (`load-next-page`, `scroll-position`), no data ownership.
 - `session/feed` feed factory; `reload` keeps cards via `keepResultsOnNextLoad`.
 - `session/adapters/resource.ts` sole generated-API caller for inspiration search and vision extraction; `inFlightRequests` dedup, query capped at 200 rune.

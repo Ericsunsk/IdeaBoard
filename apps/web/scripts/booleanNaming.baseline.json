@@ -3175,7 +3175,6 @@
     "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts|FunctionDeclaration:createLifecycle|variable:authenticated|1",
     "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts|property:authenticated|property:authenticated|1",
     "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts|property:authenticated|variable:authenticated|1",
-    "src/features/search/ui/browser/dragGhost.ts|FunctionDeclaration:attachSearchDragImage|variable:disposed|1",
     "src/features/search/ui/browser/savePopoverContract.ts|TSTypeAliasDeclaration:SearchSavePopoverRequest|member:authenticated|1",
     "src/features/search/ui/browser/savePopoverContract.ts|TSTypeAliasDeclaration:SearchSavePopoverRequest|member:saved|1",
     "src/features/search/ui/components/SearchLightboxModal.vue|<module>|parameter:open|1",
