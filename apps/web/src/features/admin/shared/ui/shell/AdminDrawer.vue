@@ -12,7 +12,7 @@
         aria-modal="true"
         :aria-busy="hasAriaBusy"
         data-admin-drawer
-        class="fixed inset-y-0 right-0 z-admin-dialog flex h-full w-admin-drawer flex-col border-l border-border bg-card shadow-admin-drawer overlay-drawer-motion"
+        class="fixed inset-y-0 right-0 z-admin-dialog flex h-full w-admin-drawer flex-col border-l border-border bg-admin-card-strong shadow-admin-drawer overlay-drawer-motion"
         @escape-key-down="handleEscape"
         @pointer-down-outside="blockOutsideDismiss"
       >

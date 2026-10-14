@@ -35,6 +35,12 @@ describe('AdminOutboundPolicyCard', () => {
     const allowHostsInput = screen.getByRole('textbox', { name: /允许访问的私有主机/ })
     expect(allowHostsInput).toHaveValue('models.internal')
     expect(screen.getByText('已额外放行 1 项')).toBeVisible()
+    const outboundHint = screen.getByText(
+      '每行一个 hostname、IP 或 host:port。公网 Endpoint 无需添加。',
+    )
+    expect(outboundHint.closest('.justify-between')).toContainElement(
+      screen.getByRole('button', { name: '保存' }),
+    )
     // 方案 A：已额外放行是正常态，走中性（secondary），不用 warn 黄。
     expect(screen.getByText('已额外放行 1 项').closest('[class*="bg-"]')).not.toHaveClass(
       'bg-warning-soft',

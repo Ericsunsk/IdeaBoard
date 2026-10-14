@@ -1,12 +1,23 @@
 import type { Service } from '../../../../core/contracts/imageServices'
 import {
   ADMIN_SERVICE_GROUPS,
+  ADMIN_SERVICE_ORDER,
   getAdminServiceGroupMeta,
   getAdminServiceMeta,
   type AdminServiceGroupKey,
 } from '../../shared'
 
 export type FeatureSlug = Service
+export type FeaturePromptStatus = 'configured' | 'unconfigured' | 'unsupported'
+
+export function getFeaturePromptStatus(
+  slug: FeatureSlug,
+  isConfigured: boolean,
+): FeaturePromptStatus {
+  if (slug === 'cutout') return 'unsupported'
+  return isConfigured ? 'configured' : 'unconfigured'
+}
+
 export interface FeatureItem {
   slug: FeatureSlug
   title: string
@@ -18,14 +29,6 @@ export interface FeatureGroup {
   title: string
   order: number
   items: readonly FeatureItem[]
-}
-
-const PROMPT_CONFIG_FEATURES_BY_GROUP: Readonly<
-  Partial<Record<AdminServiceGroupKey, readonly FeatureSlug[]>>
-> = {
-  image: ['render', 'variations', 'inpaint', 'outpaint', 'upscale'],
-  prompt: ['generation'],
-  fusion: ['fusion'],
 }
 
 function toFeatureItem(slug: FeatureSlug): FeatureItem {
@@ -40,12 +43,12 @@ function toFeatureItem(slug: FeatureSlug): FeatureItem {
 }
 
 export const featureMap = Object.fromEntries(
-  Object.values(PROMPT_CONFIG_FEATURES_BY_GROUP)
-    .flat()
-    .map((slug) => [slug, toFeatureItem(slug)]),
+  ADMIN_SERVICE_ORDER.map((slug) => [slug, toFeatureItem(slug)]),
 ) as Partial<Record<FeatureSlug, FeatureItem>>
 
 export const groupedFeatureGroups: readonly FeatureGroup[] = ADMIN_SERVICE_GROUPS.map((group) => ({
   ...group,
-  items: (PROMPT_CONFIG_FEATURES_BY_GROUP[group.key] ?? []).map((slug) => featureMap[slug]!),
+  items: ADMIN_SERVICE_ORDER.filter(
+    (slug) => getAdminServiceMeta(slug)?.groupKey === group.key,
+  ).map((slug) => featureMap[slug]!),
 }))

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "018ba5d6b252e62451a1cb4864906778b786a770",
+  "checkpointSha": "313ec7b74707ca145f7e82feeb588c17fad34fbe",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -8388,6 +8388,79 @@
       "ownershipScope": ["src/core/components/formFieldContract.ts"],
       "impureRuntimePaths": []
     },
+    "src/core/components/serviceIcons.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/core/components/serviceIcons.unit.spec.ts",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/monitor/ui/columns.ts",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.vue",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/home/ImageActionMenuIcon.vue",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 6,
+      "fanOut": 3,
+      "fanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/vue/index.js",
+        "src/core/contracts/imageServices.ts"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/core/components/serviceIcons.ts",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/serviceIcons.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/core/components/serviceIcons.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 6,
+      "targetFanOut": 3,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/core/components/serviceIcons.ts"],
+      "impureRuntimePaths": []
+    },
     "src/core/composables/useAppClipboard.ts": {
       "consumerEdges": [
         {
@@ -9609,6 +9682,16 @@
     "src/core/contracts/imageServices.ts": {
       "consumerEdges": [
         {
+          "from": "src/core/components/serviceIcons.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/serviceIcons.unit.spec.ts",
+          "to": "src/core/contracts/imageServices.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/contracts/imageServices.unit.spec.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
@@ -9645,11 +9728,6 @@
         },
         {
           "from": "src/features/admin/shared/core/serviceAdminMeta.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
           "to": "src/core/contracts/imageServices.ts",
           "kind": "runtime"
         },
@@ -9754,7 +9832,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 29,
+      "fanIn": 30,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -9762,7 +9840,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 29,
+      "targetFanIn": 30,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13326,9 +13404,14 @@
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
+          "to": "src/core/utils/polling.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13336,7 +13419,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -16060,9 +16143,14 @@
           "from": "src/features/admin/shared/index.ts",
           "to": "src/features/admin/shared/core/serviceAdminMeta.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.vue",
+          "to": "src/features/admin/shared/core/serviceAdminMeta.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 1,
+      "fanIn": 2,
       "fanOut": 1,
       "fanOutTargets": ["src/core/contracts/imageServices.ts"],
       "outboundEdges": [
@@ -16076,7 +16164,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 1,
+      "targetFanIn": 2,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -16942,7 +17030,7 @@
         }
       ],
       "fanIn": 120,
-      "fanOut": 53,
+      "fanOut": 54,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -16981,6 +17069,7 @@
         "src/core/components/RangedLineChartCard.vue",
         "src/core/components/StatusBadge.vue",
         "src/core/components/formFieldContract.ts",
+        "src/core/components/serviceIcons.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -17730,21 +17819,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/shell/AdminDialogActions.component.spec.ts",
           "to": "node_modules/@testing-library/vue/dist/index.js",
           "kind": "runtime"
@@ -17877,6 +17951,36 @@
         {
           "from": "src/features/admin/shared/ui/shell/AdminSurfaceFrame.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.component.spec.ts",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/ui/table/AdminServiceCell.vue",
+          "to": "src/core/components/serviceIcons.ts",
           "kind": "runtime"
         },
         {
@@ -18235,7 +18339,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 120,
-      "targetFanOut": 53,
+      "targetFanOut": 54,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -20323,69 +20427,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue"],
-      "impureRuntimePaths": []
-    },
-    "src/features/admin/shared/ui/serviceIcons.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/features/admin/credits/ui/pricing/BillingServiceCell.vue",
-          "to": "src/features/admin/shared/ui/serviceIcons.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/ui/columns.ts",
-          "to": "src/features/admin/shared/ui/serviceIcons.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue",
-          "to": "src/features/admin/shared/ui/serviceIcons.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/index.ts",
-          "to": "src/features/admin/shared/ui/serviceIcons.ts",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 4,
-      "fanOut": 3,
-      "fanOutTargets": [
-        "node_modules/@iconoir/vue/dist/index.js",
-        "node_modules/vue/index.js",
-        "src/core/contracts/imageServices.ts"
-      ],
-      "outboundEdges": [
-        {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/ui/serviceIcons.ts",
-          "to": "src/core/contracts/imageServices.ts",
-          "kind": "runtime"
-        }
-      ],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "missingDeepImports": [],
-      "targetFanIn": 4,
-      "targetFanOut": 3,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/features/admin/shared/ui/serviceIcons.ts"],
       "impureRuntimePaths": []
     },
     "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue": {
@@ -28762,7 +28803,7 @@
         }
       ],
       "fanIn": 12,
-      "fanOut": 34,
+      "fanOut": 35,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
@@ -28776,6 +28817,7 @@
         "src/core/media/mediaRef.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/imageUploadSupport.ts",
+        "src/core/utils/polling.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/board/ports/testing.ts",
@@ -29058,7 +29100,7 @@
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
           "to": "node_modules/vue/index.js",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
@@ -29068,6 +29110,11 @@
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
+          "to": "src/core/utils/polling.ts",
           "kind": "runtime"
         },
         {
@@ -29518,7 +29565,7 @@
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.unit.spec.ts",
           "to": "src/features/library/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphHistory.ts",
@@ -29796,7 +29843,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 12,
-      "targetFanOut": 34,
+      "targetFanOut": 35,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -32894,7 +32941,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 38,
+      "fanOut": 39,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/jest-dom/vitest.js",
@@ -32905,6 +32952,7 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "src/app/style.css",
+        "src/core/components/serviceIcons.ts",
         "src/core/contracts/generationContract.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/i18n/index.ts",
@@ -33314,6 +33362,11 @@
         {
           "from": "src/features/canvas/ui/nodes/home/ImageActionMenuIcon.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/home/ImageActionMenuIcon.vue",
+          "to": "src/core/components/serviceIcons.ts",
           "kind": "runtime"
         },
         {
@@ -33788,17 +33841,17 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
+          "to": "src/core/components/serviceIcons.ts",
           "kind": "runtime"
         },
         {
@@ -33978,6 +34031,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         },
@@ -34032,7 +34090,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 38,
+      "targetFanOut": 39,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -34590,7 +34648,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 22,
+      "fanOut": 23,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -34598,6 +34656,7 @@
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
+        "src/core/components/serviceIcons.ts",
         "src/core/contracts/generationContract.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/motion/motionPolicy.ts",
@@ -34643,17 +34702,17 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/FusionNode.vue",
+          "to": "src/core/components/serviceIcons.ts",
           "kind": "runtime"
         },
         {
@@ -34858,6 +34917,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
+          "to": "src/core/components/serviceIcons.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/PromptNode.vue",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
         },
@@ -34917,7 +34981,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 22,
+      "targetFanOut": 23,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -36469,7 +36533,7 @@
         {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.unit.spec.ts",
           "to": "src/features/library/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
@@ -36578,7 +36642,7 @@
         }
       ],
       "fanIn": 23,
-      "fanOut": 42,
+      "fanOut": 41,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -36613,7 +36677,6 @@
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/request.ts",
         "src/core/utils/workspaceId.ts",
-        "src/lib/utils.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
@@ -37031,11 +37094,6 @@
         },
         {
           "from": "src/features/library/ui/LibraryFolderDialogs.vue",
-          "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
@@ -37065,7 +37123,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 23,
-      "targetFanOut": 42,
+      "targetFanOut": 41,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SERVICE, SERVICE_SLUGS } from '../../../../core/contracts/imageServices'
-import { featureMap, groupedFeatureGroups } from './featurePromptMeta'
+import { featureMap, getFeaturePromptStatus, groupedFeatureGroups } from './featurePromptMeta'
 
 describe('featurePromptMeta', () => {
   it('keeps prompt configuration labels and grouping within the Admin boundary', () => {
@@ -22,6 +22,7 @@ describe('featurePromptMeta', () => {
           SERVICE.inpaint,
           SERVICE.outpaint,
           SERVICE.upscale,
+          SERVICE.cutout,
         ],
       },
       {
@@ -44,16 +45,15 @@ describe('featurePromptMeta', () => {
     })
   })
 
-  it('covers every catalog service except the prompt-ignored cutout', () => {
-    // Mirrors the backend prompt boundary (all workflow services except
-    // cutout, which carries PromptPolicyIgnored): Admin Prompt reads the
-    // shared SERVICE catalog instead of a local slug list.
-    const configured = new Set(Object.keys(featureMap))
+  it('shows every service while keeping unsupported prompt configuration distinct', () => {
+    expect(new Set(Object.keys(featureMap))).toEqual(new Set(SERVICE_SLUGS))
     for (const slug of SERVICE_SLUGS) {
       if (slug === SERVICE.cutout) {
-        expect(configured.has(slug)).toBe(false)
+        expect(getFeaturePromptStatus(slug, false)).toBe('unsupported')
+        expect(getFeaturePromptStatus(slug, true)).toBe('unsupported')
       } else {
-        expect(configured.has(slug)).toBe(true)
+        expect(getFeaturePromptStatus(slug, false)).toBe('unconfigured')
+        expect(getFeaturePromptStatus(slug, true)).toBe('configured')
       }
     }
   })

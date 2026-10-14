@@ -66,7 +66,7 @@ It does NOT own the Board document contract, repository, or sync fact source (ow
 - `viewModel.imageWorkflow` plus `commands.imageWorkflow` — image workflow deep module in `session/image-workflow`; tools, interactions, `isGenerationAvailable`, `cancelOutpaint`, `hideStrengthControl`; composition root injects graph, execution, Flow Pane, UI adapter, feedback; full Session assembles once inside the workflow.
 - `GRAPH_RUNTIME_DESIGN.md` — Graph Runtime brief in `features/canvas`: normalized graph store, transaction, Vue Flow adapter, canonical mutation path.
 
-Library asset drops use the shared Pointer Events controller and explicit Canvas target registration. Screen coordinates are converted through the current Vue Flow transform before `libraryImport.add`; external image files keep native file-drop handling. Board/Workspace changes, editing locks and disposal cancel active drags. Pending preview decode results are discarded when their Board attachment changes.
+Library asset drops use the shared Pointer Events controller and explicit Canvas target registration. Screen coordinates are converted through the current Vue Flow transform before `libraryImport.add`; external image files keep native file-drop handling. Board/Workspace changes, editing locks and disposal cancel active drags. Pending preview decode results are discarded when their Board attachment changes. After drop, the original node stays loading while `media_not_found` reads wait with capped backoff for up to 90 seconds. Other errors or timeout produce a failed node with explicit retry. Deletion, Board attachment changes and disposal stop readiness reads.
 
 ## Invariants
 

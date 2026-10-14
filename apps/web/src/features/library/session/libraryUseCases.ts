@@ -1,19 +1,6 @@
 import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
-// Workspace-scoped library use cases (issue #844; split from `../workspace`).
-//
-// Save/lookup/materialize orchestration over the transport in
-// `../session/resource`. Pure helpers keep their behavior; transport
-// closes over an explicit workspace id resolved from `features/workspace`
-// (never duplicated here). Display media for materialized assets resolves
-// through the shared workspace media delivery boundary with the caller's
-// explicit workspace.
-//
-// Materialization runs internal-only on the backend: the public
-// create/poll job routes are cut, so there is no job to create or poll
-// here. `materializeLibraryAssetForCanvas` is a poll-free single attempt
-// over the media read path; when the managed asset is not readable yet it
-// rejects and the Canvas pending-fact retry loop (`failLibraryImport` /
-// `retryLibraryImport` / `resumePending`) owns the retry.
+// Workspace-scoped Library use cases and managed media reads.
+// Canvas owns pending-node readiness waits and explicit retries after failure.
 
 import { getWorkspaceMediaAssetMetadata } from '../../../api/mediaAssetDelivery'
 import { withSignal } from '../../../core/utils/request'
@@ -179,14 +166,7 @@ export type LibraryAssetMaterializer = (assetId: string) => Promise<LibraryMater
 
 export type LibraryMaterializeOptions = WorkspaceLibraryRequestOptions
 
-/**
- * Resolves an owned workspace Library asset to managed Media for Canvas:
- * a poll-free single attempt through the shared delivery boundary. The
- * public materialization job API is cut (backend fetcher internal-only,
- * no status route), so when the managed asset is not readable yet this
- * rejects with the import failure and the Canvas pending-fact retry loop
- * surfaces the retry.
- */
+/** Read one owned Library asset through the workspace media delivery boundary. */
 export async function materializeLibraryAssetForCanvas(
   workspaceId: string,
   assetId: string,
@@ -195,13 +175,6 @@ export async function materializeLibraryAssetForCanvas(
   return resolveMaterializedMedia(workspaceId, assertLibraryAssetId(assetId), options)
 }
 
-/**
- * Single managed-media read through the shared delivery boundary. With the
- * public job API cut, the resolved id doubles as the media lookup key: a
- * readable managed asset resolves to display media, anything else (unknown
- * id, not-yet-materialized asset) rejects and the Canvas pending-fact
- * retry loop owns the retry.
- */
 async function resolveMaterializedMedia(
   workspaceId: string,
   assetId: string | undefined,

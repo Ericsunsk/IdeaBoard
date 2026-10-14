@@ -42,7 +42,7 @@
           :data-asset-id="asset.id"
           :style="style"
           :draggable="false"
-          class="group/libcard relative overflow-hidden rounded-panel bg-card/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
+          class="group/libcard relative overflow-hidden rounded-panel bg-popover shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
           @dragstart.prevent
         >
           <button
@@ -57,7 +57,7 @@
             @click="emit('open-asset', asset)"
           >
             <div
-              class="relative overflow-hidden bg-muted/30 backdrop-blur-md"
+              class="relative overflow-hidden bg-muted"
               :style="{
                 aspectRatio: `${asset.width || 1} / ${asset.height || 1}`,
                 minHeight: failedImages.has(asset.id) ? '6rem' : undefined,
@@ -87,7 +87,10 @@
             <div class="flex justify-end gap-1.5 pointer-events-auto">
               <button
                 type="button"
-                :class="[galleryOverlayButtonClass, 'hover:bg-destructive']"
+                :class="[
+                  galleryOverlayButtonClass,
+                  'hover:bg-destructive hover:text-destructive-foreground',
+                ]"
                 :aria-label="t('library.actions.removeSavedReference')"
                 :title="t('library.actions.removeSavedReference')"
                 @click="emit('remove-asset', asset)"
@@ -142,7 +145,7 @@
       <button
         v-if="hasMore"
         type="button"
-        class="mx-auto my-3 block rounded-pill border border-border bg-card/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer"
+        class="mx-auto my-3 block rounded-pill border border-border bg-popover px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer"
         :disabled="isLoading"
         @click="emit('load-more')"
       >
@@ -190,7 +193,7 @@ const scrollAreaRef = ref<HTMLElement | null>(null)
 const failedImages = ref(new Set<string>())
 
 const galleryOverlayButtonClass =
-  'grid size-6 shrink-0 place-items-center rounded-pill bg-black/40 text-white backdrop-blur-md transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer'
+  'grid size-6 shrink-0 place-items-center rounded-pill bg-popover text-popover-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer'
 
 function markImageError(assetID: string) {
   failedImages.value = new Set(failedImages.value).add(assetID)

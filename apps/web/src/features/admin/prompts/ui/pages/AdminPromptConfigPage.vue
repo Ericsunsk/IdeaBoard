@@ -29,18 +29,6 @@
           />
         </div>
       </div>
-
-      <!-- 次级统计提示条：共 X 个工作流模块 -->
-      <div class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="font-medium text-foreground">
-            {{ PROMPTS_MESSAGES.moduleCount(filteredFeatureGroups.length) }}
-          </span>
-          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
-            {{ PROMPTS_MESSAGES.totalCount(featureGroups.length) }}
-          </span>
-        </div>
-      </div>
     </div>
 
     <!-- 2. 错误告警状态 -->
@@ -87,11 +75,8 @@
         :aria-label="PROMPTS_MESSAGES.groupAria(group.title)"
       >
         <!-- 分组标题栏 (1:1 对齐 BillingPricingTable section header) -->
-        <div class="mb-2 flex items-center gap-2">
+        <div class="mb-2 flex items-center">
           <h3 class="text-sm font-bold text-foreground">{{ group.title }}</h3>
-          <span class="text-xs text-muted-foreground">{{
-            PROMPTS_MESSAGES.featureCount(group.items.length)
-          }}</span>
         </div>
 
         <!-- 数据表格壳体 -->
@@ -114,18 +99,7 @@
             <!-- 1. Service (1:1 对齐功能定价页 Service 规范) -->
             <AdminColumn field="service" header="Service" :style="{ width: '200px' }">
               <template #body="{ data }">
-                <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-foreground">
-                  <component
-                    :is="getFeatureIcon(data.slug)"
-                    class="size-4 shrink-0 text-muted-foreground"
-                  />
-                  <div class="flex min-w-0 flex-col">
-                    <span class="truncate text-foreground">{{ data.slug }}</span>
-                    <span class="truncate text-admin-caption text-muted-foreground">{{
-                      group.title
-                    }}</span>
-                  </div>
-                </div>
+                <AdminServiceCell :service="data.slug" />
               </template>
             </AdminColumn>
 
@@ -133,14 +107,16 @@
             <AdminColumn field="status" header="Status" :style="{ width: '105px' }">
               <template #body="{ data }">
                 <AdminStatusPill
+                  v-if="rowView(data.slug).status !== 'unsupported'"
                   :label="
-                    rowView(data.slug).configured
+                    rowView(data.slug).status === 'configured'
                       ? PROMPTS_MESSAGES.configured
                       : PROMPTS_MESSAGES.unconfigured
                   "
-                  :variant="rowView(data.slug).configured ? 'success' : 'info'"
+                  :variant="rowView(data.slug).status === 'configured' ? 'success' : 'info'"
                   size="small"
                 />
+                <span v-else :class="adminTableMutedValueClass">—</span>
               </template>
             </AdminColumn>
 
@@ -151,7 +127,12 @@
               :style="{ width: '220px', minWidth: '180px' }"
             >
               <template #body="{ data }">
-                <div class="flex flex-wrap items-center gap-1">
+                <span
+                  v-if="rowView(data.slug).status === 'unsupported'"
+                  :class="adminTableMutedValueClass"
+                  >—</span
+                >
+                <div v-else class="flex flex-wrap items-center gap-1">
                   <span
                     v-for="variable in rowView(data.slug).vars"
                     :key="variable.key"
@@ -172,8 +153,13 @@
             <!-- 4. 提示词内容预览 (Prompt Preview, 只读已保存值, draft 仅弹窗内可见) -->
             <AdminColumn field="prompt" :header="PROMPTS_MESSAGES.previewColumn">
               <template #body="{ data }">
+                <span
+                  v-if="rowView(data.slug).status === 'unsupported'"
+                  :class="adminTableMutedValueClass"
+                  >—</span
+                >
                 <div
-                  v-if="rowView(data.slug).saved?.trim()"
+                  v-else-if="rowView(data.slug).saved?.trim()"
                   class="line-clamp-1 max-w-xl font-mono text-xs text-muted-foreground"
                   :title="rowView(data.slug).saved"
                 >
@@ -192,14 +178,19 @@
               :style="{ width: '120px' }"
             >
               <template #body="{ data }">
-                <div class="flex items-center gap-2">
+                <span
+                  v-if="rowView(data.slug).status === 'unsupported'"
+                  :class="adminTableMutedValueClass"
+                  >—</span
+                >
+                <div v-else class="flex items-center gap-2">
                   <ActionButton
                     :aria-label="PROMPTS_MESSAGES.configureAria(data.title)"
                     :disabled="isInitialLoading"
                     @click="openEditor(data)"
                   >
                     {{
-                      rowView(data.slug).configured
+                      rowView(data.slug).status === 'configured'
                         ? PROMPTS_MESSAGES.adjust
                         : PROMPTS_MESSAGES.setup
                     }}
@@ -229,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Component } from 'vue'
+import { computed, ref } from 'vue'
 import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../../session/usePromptConfigFeedback'
 import { AdminButton } from '../../../shared'
@@ -237,6 +228,7 @@ import { AdminEmptyState } from '../../../shared'
 import ActionButton from '../../../../../core/components/ActionButton.vue'
 import { AdminTable } from '../../../shared'
 import { AdminColumn } from '../../../shared'
+import { AdminServiceCell } from '../../../shared'
 import { AdminOptionFilter } from '../../../shared'
 import { AdminRefreshButton } from '../../../shared'
 import { AdminStatusPill } from '../../../shared'
@@ -250,15 +242,17 @@ import {
   adminTableClass,
   adminTableFrameClass,
   adminTableStyle,
+  adminTableMutedValueClass,
 } from '../../../shared'
-import { getServiceIcon } from '../../../shared/ui/serviceIcons'
 import { useAdminPromptConfigWorkspace } from '../../session/workspace'
 import type { FeaturePromptVariable } from '../../session/workspace'
 import {
   featureMap,
+  getFeaturePromptStatus,
   groupedFeatureGroups,
   type FeatureGroup,
   type FeatureItem,
+  type FeaturePromptStatus,
   type FeatureSlug,
 } from '../../core/featurePromptMeta'
 import { PROMPTS_MESSAGES } from './messages'
@@ -299,10 +293,6 @@ function isConfigured(slug: FeatureSlug): boolean {
   return getSavedPrompt(slug).trim().length > 0
 }
 
-function getFeatureIcon(slug: string): Component {
-  return getServiceIcon(slug) ?? Spark
-}
-
 const featureGroups = computed<FeatureGroup[]>(() =>
   groupedFeatureGroups.filter((group) => group.items.length > 0),
 )
@@ -321,26 +311,20 @@ const {
   getPromptVariables,
 })
 
-// 行级 view-model: 模板每行只读一次 map, 避免同一单元格内重复调用
-// getSavedPrompt/getVarsForSlug (6 行规模下是可读性问题, 非性能瓶颈)。
-// 方案 A：状态载体统一 AdminStatusPill，variant 由 configured 直映
-// （已配置 success / 未配置 info），不再经 taskMetricTokens 中转。
+type PromptRowView = {
+  saved: string
+  status: FeaturePromptStatus
+  vars: readonly FeaturePromptVariable[]
+}
+
 const rowViewMap = computed(() => {
-  const map: Record<
-    string,
-    {
-      saved: string
-      configured: boolean
-      vars: readonly FeaturePromptVariable[]
-    }
-  > = {}
+  const map: Record<string, PromptRowView> = {}
   for (const group of featureGroups.value) {
     for (const item of group.items) {
       const saved = getSavedPrompt(item.slug)
-      const configured = saved.trim().length > 0
       map[item.slug] = {
         saved,
-        configured,
+        status: getFeaturePromptStatus(item.slug, saved.trim().length > 0),
         vars: getVarsForSlug(item.slug),
       }
     }
@@ -357,9 +341,9 @@ const activeValidation = computed(() =>
 )
 
 // 模板索引安全：map 恒有全量 slug，fallback 仅满足 noUncheckedIndexedAccess。
-const emptyRowView = {
+const emptyRowView: PromptRowView = {
   saved: '',
-  configured: false,
+  status: 'unconfigured',
   vars: [] as readonly FeaturePromptVariable[],
 }
 
@@ -368,6 +352,7 @@ function rowView(slug: string): typeof emptyRowView {
 }
 
 function openEditor(item: FeatureItem) {
+  if (rowView(item.slug).status === 'unsupported') return
   resetDrafts([item.slug])
   activeItem.value = item
 }

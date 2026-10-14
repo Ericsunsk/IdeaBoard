@@ -28,6 +28,7 @@ describe('usePromptConfigFilters', () => {
 
     expect(filters.hasActiveFilter.value).toBe(false)
     expect(filters.filteredFeatureGroups.value).toHaveLength(groupedFeatureGroups.length)
+    expect(selectedSlugs(filters)).toContain('cutout')
   })
 
   it('filters by configuration status', () => {
@@ -40,7 +41,8 @@ describe('usePromptConfigFilters', () => {
     filters.statusFilter.value = 'unconfigured'
     const slugs = selectedSlugs(filters)
     expect(slugs).not.toContain('render')
-    expect(slugs).toHaveLength(groupedFeatureGroups.flatMap((group) => group.items).length - 1)
+    expect(slugs).not.toContain('cutout')
+    expect(slugs).toHaveLength(groupedFeatureGroups.flatMap((group) => group.items).length - 2)
   })
 
   it('matches keyword against slugs and saved templates only', () => {
@@ -51,6 +53,12 @@ describe('usePromptConfigFilters', () => {
 
     filters.searchKeyword.value = 'saved template render'
     expect(selectedSlugs(filters)).toEqual(['render'])
+
+    filters.searchKeyword.value = 'cutout'
+    expect(selectedSlugs(filters)).toEqual(['cutout'])
+
+    filters.searchKeyword.value = '抠图'
+    expect(selectedSlugs(filters)).toEqual(['cutout'])
   })
 
   it('matches keyword against variable keys', () => {

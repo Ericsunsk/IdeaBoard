@@ -7,29 +7,14 @@
 <script setup lang="ts">
 import type { ImageActionMenuIcon } from '../../../core/nodes/imageActionRegistry.ts'
 import { computed, type Component } from 'vue'
-import {
-  AdobePhotoshop,
-  BorderInner,
-  EditPencil,
-  Expand,
-  Palette,
-  Spark,
-  ZoomIn,
-} from '@iconoir/vue'
+import { AdobePhotoshop } from '@iconoir/vue'
+import { getServiceIcon } from '../../../../../core/components/serviceIcons'
 
 const props = defineProps<{
   icon: ImageActionMenuIcon
 }>()
 
-const iconMap: Record<ImageActionMenuIcon, Component> = {
-  cutout: BorderInner,
-  variations: Spark,
-  render: Palette,
-  upscale: ZoomIn,
-  outpaint: Expand,
-  inpaint: EditPencil,
-  retouch: AdobePhotoshop,
-}
-
-const resolvedIcon = computed<Component>(() => iconMap[props.icon])
+const resolvedIcon = computed<Component>(() =>
+  props.icon === 'retouch' ? AdobePhotoshop : getServiceIcon(props.icon),
+)
 </script>

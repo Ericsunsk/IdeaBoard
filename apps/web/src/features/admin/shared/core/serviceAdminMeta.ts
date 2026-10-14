@@ -31,23 +31,30 @@ export interface AdminServiceMeta {
 
 const ADMIN_SERVICE_META: Readonly<Record<Service, AdminServiceMeta>> = {
   [SERVICE.render]: { label: '草图成图', groupKey: ADMIN_SERVICE_GROUP.image },
-  [SERVICE.inpaint]: { label: '局部重绘', groupKey: ADMIN_SERVICE_GROUP.image },
   [SERVICE.variations]: {
     label: '风格延展',
     groupKey: ADMIN_SERVICE_GROUP.image,
   },
-  [SERVICE.fusion]: { label: '多图融合', groupKey: ADMIN_SERVICE_GROUP.fusion },
+  [SERVICE.inpaint]: { label: '局部重绘', groupKey: ADMIN_SERVICE_GROUP.image },
+  [SERVICE.outpaint]: { label: '扩图', groupKey: ADMIN_SERVICE_GROUP.image },
+  [SERVICE.upscale]: { label: 'Upscale', groupKey: ADMIN_SERVICE_GROUP.image },
   [SERVICE.cutout]: { label: '抠图', groupKey: ADMIN_SERVICE_GROUP.image },
   [SERVICE.generation]: {
     label: 'Prompt 生图',
     groupKey: ADMIN_SERVICE_GROUP.prompt,
   },
-  [SERVICE.upscale]: { label: 'Upscale', groupKey: ADMIN_SERVICE_GROUP.image },
-  [SERVICE.outpaint]: { label: '扩图', groupKey: ADMIN_SERVICE_GROUP.image },
+  [SERVICE.fusion]: { label: '多图融合', groupKey: ADMIN_SERVICE_GROUP.fusion },
+}
+
+export const ADMIN_SERVICE_ORDER = Object.keys(ADMIN_SERVICE_META) as readonly Service[]
+
+export function getAdminServiceOrder(slug: string): number {
+  const index = ADMIN_SERVICE_ORDER.findIndex((service) => service === slug)
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER
 }
 
 export function getAdminServiceMeta(slug: string): AdminServiceMeta | null {
-  return ADMIN_SERVICE_META[slug as Service] ?? null
+  return Object.hasOwn(ADMIN_SERVICE_META, slug) ? ADMIN_SERVICE_META[slug as Service] : null
 }
 
 export function getAdminServiceGroupMeta(groupKey: AdminServiceGroupKey): AdminServiceGroupMeta {

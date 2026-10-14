@@ -29,8 +29,11 @@ const items: AdminBillableItemCard[] = [
 describe('BillingPricingTable status column', () => {
   it('locks the Status column and both pills to the fixed slot without ping', () => {
     const { container } = renderWithUser(BillingPricingTable, {
-      props: { items },
+      props: { title: 'Image', items },
     })
+
+    expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
+    expect(screen.queryByText(/共 \d+ 个功能/)).not.toBeInTheDocument()
 
     // 固定槽 84px + 单元格 px-3×2：列锁定 112px，不随 Active(6)→Disabled(8) 顶宽 enabled 列。
     const statusHeader = screen.getByText('Status')

@@ -4,7 +4,7 @@
       v-if="presentation === 'canvas' || open"
       v-show="open"
       v-library-drop
-      class="page-chrome-surface z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      class="border border-page-chrome-border bg-popover shadow-page-chrome z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="[
         isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass,
         isPanelHovered ? 'ring-2 ring-primary' : '',
@@ -130,7 +130,7 @@
       <!-- 错误状态提示 -->
       <div
         v-if="workspace.errorMessage.value"
-        class="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-panel border border-destructive/40 bg-card px-3 py-2 text-xs"
+        class="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-panel border border-destructive/40 bg-popover px-3 py-2 text-xs"
         role="alert"
       >
         <span class="font-semibold">{{ workspace.errorMessage.value }}</span>

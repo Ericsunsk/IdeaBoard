@@ -159,30 +159,3 @@ body.admin-route .font-mono {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
 }
-
-/*
- * Dialog responsive width contract (Dialog and AdminDialogShell share
- * the same five standard sizes). Keyed by stable data-size, not by the exact Tailwind
- * width class strings in dialogWidthClasses, so variant refactors cannot
- * silently detach this block.
- */
-[role='dialog'][data-size='slim'] {
-  width: min(23rem, calc(100vw - 1.5rem)) !important;
-  max-width: 23rem !important;
-}
-[role='dialog'][data-size='compact'] {
-  width: min(30rem, calc(100vw - 1.5rem)) !important;
-  max-width: 30rem !important;
-}
-[role='dialog'][data-size='form'] {
-  width: min(35rem, calc(100vw - 1.5rem)) !important;
-  max-width: 35rem !important;
-}
-[role='dialog'][data-size='medium'] {
-  width: min(46rem, calc(100vw - 1.5rem)) !important;
-  max-width: 46rem !important;
-}
-[role='dialog'][data-size='wide'] {
-  width: min(61.25rem, calc(100vw - 1.5rem)) !important;
-  max-width: 61.25rem !important;
-}

@@ -4,7 +4,7 @@
     <DialogPortal>
       <DialogOverlay :class="ibDialogMaskClass" />
       <DialogContent
-        :class="cn(dialogContentBaseClass, dialogContentClass)"
+        class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
         :aria-label="t('library.dialogs.newFolderTitle')"
         @pointer-down-outside="blockDialogOutsideDismiss"
@@ -68,7 +68,7 @@
     <DialogPortal>
       <DialogOverlay :class="ibDialogMaskClass" />
       <DialogContent
-        :class="cn(dialogContentBaseClass, dialogContentClass)"
+        class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
         :aria-label="t('library.dialogs.renameFolderTitle')"
         @pointer-down-outside="blockDialogOutsideDismiss"
@@ -140,8 +140,6 @@ import {
   DialogPortal,
   DialogRoot,
 } from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 import IbFormField from '../../../core/components/IbFormField.vue'
 import { ibFormInputClass, ibFormInputErrorClass } from '../../../theme/formControls'
 import { ibDialogMaskClass } from '../../../theme/dialogMask'
@@ -162,9 +160,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-const dialogContentClass =
-  'overflow-hidden rounded-overlay border border-border bg-card/80 backdrop-blur-md'
 
 function blockDialogOutsideDismiss(event: Event) {
   event.preventDefault()

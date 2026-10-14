@@ -12,7 +12,7 @@
     @delete="emit('delete')"
   >
     <template #icon>
-      <ChatLines />
+      <component :is="serviceIcon" />
     </template>
     <NodeStageFrame
       variant="prompt"
@@ -82,7 +82,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChatLines, Plus } from '@iconoir/vue'
+import { Plus } from '@iconoir/vue'
+import { getServiceIcon } from '../../../../../core/components/serviceIcons'
 import {
   requireImageNodeOutputCount,
   type PromptNodeItem,
@@ -132,6 +133,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const serviceIcon = getServiceIcon(SERVICE.generation)
 
 const thumbsRef = ref<HTMLElement | null>(null)
 const maxInputImages = 4

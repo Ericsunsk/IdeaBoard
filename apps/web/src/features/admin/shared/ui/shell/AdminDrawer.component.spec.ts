@@ -39,6 +39,7 @@ describe('AdminDrawer', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '诊断详情' })
     expect(dialog).toHaveAttribute('data-admin-drawer')
+    expect(dialog).toHaveClass('bg-admin-card-strong')
     expect(dialog).toHaveClass('inset-y-0', 'right-0')
     expect(within(dialog).getByText('抽屉正文')).toBeInTheDocument()
     expect(dialog.querySelector('[data-admin-drawer-region="header"]')).toBeInTheDocument()

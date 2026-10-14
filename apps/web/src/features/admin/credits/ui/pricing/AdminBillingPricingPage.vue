@@ -31,18 +31,6 @@
           />
         </div>
       </div>
-
-      <!-- 次级统计提示条：共 X 个计费功能 -->
-      <div v-if="!isLoading" class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="font-medium text-foreground">{{
-            BILLING_PRICING_MESSAGES.billingCount(filteredItems.length)
-          }}</span>
-          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
-            {{ BILLING_PRICING_MESSAGES.totalCount(sortedItems.length) }}
-          </span>
-        </div>
-      </div>
     </div>
 
     <!-- 2. 加载中状态 (AdminSpinner 自带 role="progressbar") -->
@@ -143,7 +131,11 @@ import { AdminEmptyState } from '../../../shared'
 import { AdminRefreshButton } from '../../../shared'
 import { AdminSpinner } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
-import { adminDashboardRootClass, adminEmptyStateClass } from '../../../shared'
+import {
+  getAdminServiceOrder,
+  adminDashboardRootClass,
+  adminEmptyStateClass,
+} from '../../../shared'
 import { formatAdminDisplayError, useAdminToast } from '../../../shared'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
@@ -257,8 +249,10 @@ const filteredItems = computed(() => {
 function compareCatalogCards(left: AdminBillableItemCard, right: AdminBillableItemCard) {
   const namespaceDifference = pricingNamespaceRank(left.sku) - pricingNamespaceRank(right.sku)
   if (namespaceDifference !== 0) return namespaceDifference
-  const priorityDifference = catalogCardPriority(left) - catalogCardPriority(right)
-  if (priorityDifference !== 0) return priorityDifference
+  const serviceDifference =
+    getAdminServiceOrder(serviceOfSku(left.sku) ?? '') -
+    getAdminServiceOrder(serviceOfSku(right.sku) ?? '')
+  if (serviceDifference !== 0) return serviceDifference
   if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder
   return left.sku.localeCompare(right.sku)
 }
@@ -276,17 +270,6 @@ const pricedSections = computed(() => {
     }))
     .filter((section) => section.items.length > 0)
 })
-
-function catalogCardPriority(item: AdminBillableItemCard) {
-  if (item.status === 'archived') return 4
-  const hasConfiguredPrice = item.pricingVariants.some(
-    (variant) => item.currentPrices[variant] !== undefined,
-  )
-  if (item.status === 'active' && hasConfiguredPrice) return 0
-  if (item.pricingVariants.length === 1) return 1
-  if (hasConfiguredPrice) return 2
-  return 3
-}
 
 async function loadCatalog() {
   isLoading.value = true

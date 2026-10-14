@@ -57,9 +57,9 @@ export * from './session/collection/useRefetchOnClose'
 // ui — presentational helpers (SFCs follow below)
 export * from './ui/popover/adminPopoverAtoms'
 export * from './ui/table/adminTableAtoms'
+export { default as AdminServiceCell } from './ui/table/AdminServiceCell.vue'
 export * from './ui/tabs/adminTabsAtoms'
 export * from './ui/chart/chart'
-export * from './ui/serviceIcons'
 export {
   storageAlibabaCloudLogo,
   storageAmazonS3Logo,

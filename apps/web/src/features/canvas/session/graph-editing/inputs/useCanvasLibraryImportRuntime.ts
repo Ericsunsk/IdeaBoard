@@ -1,8 +1,8 @@
 import type { Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, type Ref } from 'vue'
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../../board/ports/canvas'
 import { i18n } from '../../../../../core/i18n'
-import { userFacingErrorCopy } from '../../../../../core/errors/errorCatalog'
+import { userErrorCode, userFacingErrorCopy } from '../../../../../core/errors/errorCatalog'
 import type { BoardAttachment } from '../../execution/board-attachment'
 import {
   createPendingLibraryImportFact,
@@ -18,6 +18,7 @@ import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import type { CanvasLibraryImportDescriptor } from '../../../../library'
 import type { LibraryAssetMaterializer } from '../../../../library'
 import { preloadImage } from '../../../session/media/preloadImage'
+import { createPollDelay, sleep } from '../../../../../core/utils/polling'
 
 type UseCanvasLibraryImportRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -47,6 +48,7 @@ type UseCanvasLibraryImportRuntimeOptions = {
 
 type LibraryImportNode = { node: Node; data: FlowNodeData; snapshot: ImageNodeItem }
 
+const LIBRARY_IMPORT_TIMEOUT_MS = 90_000
 const IMPORT_OFFSET = 24
 const IMPORT_OFFSET_CYCLE = 6
 
@@ -85,10 +87,15 @@ function isValidMaterialization(value: {
  */
 export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRuntimeOptions) {
   let addSequence = 0
+  let isDisposed = false
+  if (getCurrentScope())
+    onScopeDispose(() => {
+      isDisposed = true
+    })
   const activeNodeIdsByAttachment = new WeakMap<BoardAttachment, Set<string>>()
 
   function isCurrentAttachment(attachment: BoardAttachment): boolean {
-    return options.readAttachment() === attachment
+    return !isDisposed && options.readAttachment() === attachment
   }
 
   function updateNode(
@@ -178,6 +185,31 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     if (shouldNotify) options.onWarning(message)
   }
 
+  async function waitForMaterializedMedia(
+    nodeId: string,
+    libraryAssetId: string,
+    attachment: BoardAttachment,
+  ) {
+    const deadline = Date.now() + LIBRARY_IMPORT_TIMEOUT_MS
+    const delay = createPollDelay({ initialDelayMs: 500, maxDelayMs: 5_000, backoffFactor: 2 })
+    while (
+      isCurrentAttachment(attachment) &&
+      hasPendingLibraryImport(
+        readLibraryImportNode(options.nodes.value, nodeId)?.snapshot,
+        libraryAssetId,
+      )
+    ) {
+      try {
+        return await options.materialize(libraryAssetId)
+      } catch (error) {
+        if (!isCurrentAttachment(attachment)) return null
+        if (userErrorCode(error) !== 'media_not_found' || Date.now() >= deadline) throw error
+        await sleep(Math.min(delay.next(), deadline - Date.now()))
+      }
+    }
+    return null
+  }
+
   function materializePending(
     nodeId: string,
     libraryAssetId: string,
@@ -197,17 +229,17 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     activeNodeIds.add(nodeId)
     activeNodeIdsByAttachment.set(attachment, activeNodeIds)
 
-    void options
-      .materialize(libraryAssetId)
-      .then((materialized) =>
+    void waitForMaterializedMedia(nodeId, libraryAssetId, attachment)
+      .then((materialized) => {
+        if (!materialized) return
         clearFactWithMaterializedMedia(
           nodeId,
           libraryAssetId,
           attachment,
           materialized,
           fallbackRatio,
-        ),
-      )
+        )
+      })
       .catch((error: unknown) =>
         failImport(nodeId, libraryAssetId, attachment, error, shouldNotifyFailure),
       )
@@ -225,7 +257,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     const isPreviewReady = await (options.preloadImage ?? preloadImage)(candidate.previewUrl).catch(
       () => false,
     )
-    if (options.readAttachment() !== attachment) return null
+    if (isDisposed || options.readAttachment() !== attachment) return null
     if (!isPreviewReady) {
       options.onWarning(i18n.global.t('canvas.session.libraryImportFailed'))
       return null

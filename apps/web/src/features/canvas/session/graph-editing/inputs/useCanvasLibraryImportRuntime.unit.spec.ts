@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@vue-flow/core'
-import { ref, shallowRef } from 'vue'
+import { effectScope, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../../board'
 import type { BoardAttachment } from '../../execution/board-attachment'
@@ -280,6 +280,111 @@ describe('useCanvasLibraryImportRuntime', () => {
       ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport,
     ).toBeUndefined()
   })
+
+  it('keeps a not-yet-materialized node pending and shares the active wait with recovery', async () => {
+    vi.useFakeTimers()
+    try {
+      const harness = createHarness([pendingNode()])
+      harness.materialize
+        .mockRejectedValueOnce(
+          Object.assign(new Error('media_not_found'), { code: 'media_not_found' }),
+        )
+        .mockResolvedValue({
+          mediaAssetId: 'asset_media0042',
+          url: 'https://app.example/media/42',
+          width: 200,
+          height: 100,
+        })
+      expect(harness.imports.resumePending()).toBe(1)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(harness.imports.resumePending()).toBe(0)
+      const snapshot = () =>
+        (harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem
+      expect(snapshot().libraryImport?.state).toBe('pending')
+      expect(harness.onWarning).not.toHaveBeenCalled()
+      expect(harness.materialize).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(500)
+      expect(snapshot().libraryImport).toBeUndefined()
+      expect(snapshot().sourceImageUrl).toBe('https://app.example/media/42')
+      expect(harness.materialize).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports failure only after the readiness deadline and allows an explicit retry', async () => {
+    vi.useFakeTimers()
+    try {
+      const harness = createHarness()
+      harness.materialize.mockRejectedValue(
+        Object.assign(new Error('media_not_found'), { code: 'media_not_found' }),
+      )
+      await harness.imports.start(
+        {
+          assetId: 'lasset_asset0007',
+          title: '',
+          previewUrl: 'https://example.com/preview.png',
+          width: 200,
+          height: 100,
+        },
+        { x: 0, y: 0 },
+      )
+      await vi.advanceTimersByTimeAsync(89_999)
+      expect(harness.onWarning).not.toHaveBeenCalled()
+      expect(
+        ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport
+          ?.state,
+      ).toBe('pending')
+      await vi.advanceTimersByTimeAsync(1)
+      expect(harness.onWarning).toHaveBeenCalledExactlyOnceWith(
+        'Library import failed. Please try again later.',
+      )
+      expect(
+        ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport
+          ?.state,
+      ).toBe('failed')
+      expect(harness.materialize.mock.calls.length).toBeLessThan(25)
+      harness.materialize.mockResolvedValue({
+        mediaAssetId: 'asset_media0042',
+        url: 'https://app.example/media/42',
+        width: 200,
+        height: 100,
+      })
+      expect(harness.imports.retry('image-1')).toBe(true)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(
+        ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem)
+          .libraryImport,
+      ).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['board', 'deleted', 'disposed'])(
+    'stops readiness reads when the node is %s',
+    async (reason) => {
+      vi.useFakeTimers()
+      const scope = effectScope()
+      try {
+        const harness = scope.run(() => createHarness([pendingNode()]))!
+        harness.materialize.mockRejectedValue(
+          Object.assign(new Error('media_not_found'), { code: 'media_not_found' }),
+        )
+        harness.imports.resumePending()
+        await vi.advanceTimersByTimeAsync(0)
+        if (reason === 'board') harness.currentAttachment.value = attachment()
+        else if (reason === 'deleted') harness.nodes.value = []
+        else scope.stop()
+        await vi.advanceTimersByTimeAsync(10_000)
+        expect(harness.materialize).toHaveBeenCalledTimes(1)
+        expect(harness.onWarning).not.toHaveBeenCalled()
+      } finally {
+        scope.stop()
+        vi.useRealTimers()
+      }
+    },
+  )
 
   it('does not apply a late completion after the node is deleted', async () => {
     const harness = createHarness([pendingNode()])

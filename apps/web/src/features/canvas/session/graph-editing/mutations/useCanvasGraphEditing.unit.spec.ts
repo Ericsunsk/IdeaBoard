@@ -17,7 +17,10 @@ import { bindCanvasGraphSessionProjection } from '../../../session/flow-adapter'
 import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'
-import type { CanvasLibraryImportDescriptor } from '../../../../library'
+import {
+  materializeLibraryAssetForCanvas,
+  type CanvasLibraryImportDescriptor,
+} from '../../../../library'
 import {
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
@@ -25,6 +28,12 @@ import {
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
+  getMetadata: vi.fn(),
+}))
+
+vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()),
+  getWorkspaceMediaAssetMetadata: mocks.getMetadata,
 }))
 
 vi.mock('../../../../../core/media/imageAssetPipeline', () => ({
@@ -94,7 +103,7 @@ function createHarness(initialNodes: Node[] = []) {
     },
     isCurrentAttachment: () => true,
   })
-  const materializeLibraryAsset = vi.fn(async () => ({
+  const materializeLibraryAsset = vi.fn(async (_assetId: string) => ({
     mediaAssetId: 'asset_media0043',
     url: 'https://example.com/materialized.png',
     width: 200,
@@ -271,6 +280,59 @@ describe('useCanvasGraphEditing', () => {
         }),
       }),
     )
+  })
+
+  it('finishes the first Library import when read-through initially reports media_not_found', async () => {
+    vi.useFakeTimers()
+    try {
+      const harness = createHarness()
+      mocks.getMetadata
+        .mockReset()
+        .mockRejectedValueOnce(
+          Object.assign(new Error('media_not_found'), { code: 'media_not_found' }),
+        )
+        .mockResolvedValue({
+          asset_id: 'asset_media0043',
+          status: 'ready',
+          width: 200,
+          height: 100,
+          original: {
+            status: 'ready',
+            url: '/api/v1/workspaces/ws_test123/media-assets/asset_media0043/content',
+          },
+          derivatives: {},
+        })
+      harness.materializeLibraryAsset.mockImplementation((assetId) =>
+        materializeLibraryAssetForCanvas('ws_test123', assetId),
+      )
+      await harness.editing.commands.libraryImport.add(
+        {
+          assetId: 'lasset_asset0042',
+          title: 'New Library asset',
+          previewUrl: 'https://example.com/preview.png',
+          width: 200,
+          height: 100,
+        },
+        { x: 100, y: 130 },
+      )
+      await vi.advanceTimersByTimeAsync(0)
+      expect(
+        (harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem).libraryImport?.state,
+      ).toBe('pending')
+      expect(harness.feedback.operationWarning).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(harness.feedback.operationWarning).not.toHaveBeenCalled()
+      expect(harness.nodes.value).toHaveLength(1)
+      const snapshot = harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem
+      expect(snapshot.libraryImport).toBeUndefined()
+      expect(snapshot.sourceImageUrl).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset_media0043/content',
+      )
+      expect(mocks.getMetadata).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('creates a running pending retouch node matching the source node dimensions and ratio', () => {

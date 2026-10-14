@@ -80,7 +80,7 @@ export const adminDialogTitleClass =
 export const adminDialogHeaderClass = '!px-6 !pt-5 !pb-3.5'
 
 export const adminDialogScrollableBodyClass =
-  'app-scrollbar -mr-3 overflow-y-auto overscroll-contain pr-3 [scrollbar-gutter:stable]'
+  'app-scrollbar -mx-3 overflow-y-auto overscroll-contain px-3 [scrollbar-gutter:stable]'
 
 export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
 
@@ -91,9 +91,9 @@ export const adminOverlayMaskClass =
   'fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion'
 
 export const adminDialogChromeClass =
-  'rounded-overlay border border-border bg-card text-card-foreground shadow-admin-dialog'
+  'rounded-overlay border border-border bg-admin-card-strong text-card-foreground shadow-admin-dialog'
 
-export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-card'
+export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-admin-card-strong'
 
 export const adminDialogChromeHeaderSplitClass =
   '!flex-row !items-center !justify-between !gap-2 !pr-0'
@@ -102,9 +102,10 @@ export const adminDialogChromeTitleClass =
   '!text-admin-title !font-bold text-foreground tracking-tight'
 
 export const adminDialogChromeContentClass =
-  '!overflow-hidden !px-6 !py-6 bg-card text-card-foreground'
+  '!overflow-hidden !px-6 !py-6 bg-admin-card-strong text-card-foreground'
 
-export const adminDialogChromeFooterClass = '!px-6 !py-4 border-t border-border bg-card'
+export const adminDialogChromeFooterClass =
+  '!px-6 !py-4 border-t border-border bg-admin-card-strong'
 
 export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-foreground'
 

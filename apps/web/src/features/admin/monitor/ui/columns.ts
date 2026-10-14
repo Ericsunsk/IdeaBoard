@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { getServiceIcon } from '../../shared/ui/serviceIcons'
+import { getServiceIcon } from '../../../../core/components/serviceIcons'
 import type { TaskMetricDefinition } from '../../shared'
 import { getTaskMetricByStatus } from '../../shared'
 import { ADMIN_IDENTITY_EMPTY } from '../../shared'

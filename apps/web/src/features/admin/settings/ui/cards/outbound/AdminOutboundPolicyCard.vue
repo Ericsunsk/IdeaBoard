@@ -22,7 +22,6 @@
           v-slot="{ describedbyId }"
           :label="SETTINGS_MESSAGES.outboundHostsLabel"
           for="outbound-policy-allow-hosts"
-          :hint="SETTINGS_MESSAGES.outboundHostsHint"
         >
           <AdminTextarea
             id="outbound-policy-allow-hosts"
@@ -43,7 +42,13 @@
         :saving="saving"
         @save="save"
         @reset="reset"
-      />
+      >
+        <template #leading>
+          <span class="text-admin-caption text-muted-foreground">
+            {{ SETTINGS_MESSAGES.outboundHostsHint }}
+          </span>
+        </template>
+      </AdminEditorActions>
     </template>
   </SettingEditorCard>
 </template>

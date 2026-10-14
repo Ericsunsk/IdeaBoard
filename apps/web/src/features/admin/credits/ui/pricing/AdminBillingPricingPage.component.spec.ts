@@ -95,15 +95,26 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getAllByText('1')).toHaveLength(3)
     expect(screen.getByRole('heading', { name: 'Image' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Other' })).toBeVisible()
+    expect(screen.queryByText(/共 \d+ 个计费功能/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/共 \d+ 个功能/)).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'ai-search' })).not.toBeInTheDocument()
     // Service 次标题为对应节点（不带“节点”后缀）；表头同名故共 4 处
     expect(screen.getAllByText('Image')).toHaveLength(4)
     expect(screen.queryByRole('button', { name: '新建 SKU' })).not.toBeInTheDocument()
   })
 
-  it('orders namespace tables with images before other', async () => {
+  it('uses the shared service order across catalog states and input order', async () => {
     const items = [
-      ...makeCatalogItems(),
+      ...makeCatalogItems().reverse(),
+      ...['fusion', 'generation', 'outpaint', 'render', 'unknown'].map((slug) => ({
+        sku: `ai-image:${slug}`,
+        namespace: 'ai-image',
+        product_kind: 'workflow-feature',
+        display_name: slug,
+        sort_order: 0,
+        status: 'unpriced',
+        pricing_variants: ['1k'],
+      })),
       {
         sku: 'ai-image:variations',
         namespace: 'ai-image',
@@ -128,7 +139,18 @@ describe('AdminBillingPricingPage', () => {
     renderPricingPage()
 
     expect(await screen.findByText('variations')).toBeVisible()
-    expectTextOrder(['variations', 'cutout', 'inpaint', 'upscale', 'legacy:removed'])
+    expectTextOrder([
+      'render',
+      'variations',
+      'inpaint',
+      'outpaint',
+      'upscale',
+      'cutout',
+      'generation',
+      'fusion',
+      'unknown',
+      'legacy:removed',
+    ])
   })
 
   it('shows an empty state when no products are registered', async () => {
@@ -178,6 +200,7 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置' }))
+    expectTextOrder(['inpaint', 'upscale', 'cutout'])
     const priceInput = screen.getByRole('spinbutton', { name: '1K' })
     await user.type(priceInput, '0')
     expect(priceInput).toHaveValue('0')
@@ -187,7 +210,7 @@ describe('AdminBillingPricingPage', () => {
 
     expect(await screen.findByText('0')).toBeVisible()
     expect(screen.getAllByText('Active')).toHaveLength(2)
-    expectTextOrder(['inpaint', 'cutout'])
+    expectTextOrder(['inpaint', 'upscale', 'cutout'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(publishRequests).toBe(1)
   })
@@ -212,9 +235,11 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     const switchControl = await screen.findByRole('switch', { name: '抠图功能状态' })
+    expectTextOrder(['inpaint', 'upscale', 'cutout'])
     expect(switchControl).toBeChecked()
     await user.click(switchControl)
     await waitFor(() => expect(switchControl).not.toBeChecked())
+    expectTextOrder(['inpaint', 'upscale', 'cutout'])
     await user.click(switchControl)
     await waitFor(() => expect(switchControl).toBeChecked())
     expect(requests).toEqual([false, true])

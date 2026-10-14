@@ -1926,6 +1926,7 @@
     "FormFieldContractProps",
     "FormFieldContractSlotProps"
   ],
+  "src/core/components/serviceIcons.ts": ["getServiceIcon"],
   "src/core/composables/useAppClipboard.ts": ["useAppClipboard"],
   "src/core/composables/useAppToast.ts": ["dismissAppToasts", "useAppToast"],
   "src/core/composables/useAsyncAction.ts": [
@@ -2483,6 +2484,7 @@
     "adminInlineJumpClass",
     "adminMonoClass",
     "adminNumericCellClass",
+    "adminTableMutedValueClass",
     "adminTruncateCellClass"
   ],
   "src/features/admin/shared/core/cellPlaceholders.ts": [
@@ -2515,11 +2517,13 @@
   "src/features/admin/shared/core/secretSchema.ts": ["secretField"],
   "src/features/admin/shared/core/serviceAdminMeta.ts": [
     "ADMIN_SERVICE_GROUPS",
+    "ADMIN_SERVICE_ORDER",
     "AdminServiceGroupKey",
     "AdminServiceGroupMeta",
     "AdminServiceMeta",
     "getAdminServiceGroupMeta",
-    "getAdminServiceMeta"
+    "getAdminServiceMeta",
+    "getAdminServiceOrder"
   ],
   "src/features/admin/shared/core/tableColumns.ts": [
     "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
@@ -2584,6 +2588,7 @@
     "ADMIN_NUMERIC_EMPTY",
     "ADMIN_SELECT_SIDE_OFFSET",
     "ADMIN_SERVICE_GROUPS",
+    "ADMIN_SERVICE_ORDER",
     "ADMIN_TABLE_EXPANDER_COLUMN_WIDTH",
     "ADMIN_TABLE_MORE_COLUMN_WIDTH",
     "ALL_ADMIN_BRAND_LOGOS",
@@ -2641,6 +2646,7 @@
     "AdminRowActionItem",
     "AdminRowActionsPopover",
     "AdminSelect",
+    "AdminServiceCell",
     "AdminServiceGroupKey",
     "AdminServiceGroupMeta",
     "AdminServiceMeta",
@@ -2746,6 +2752,7 @@
     "adminTableClass",
     "adminTableFooterClass",
     "adminTableFrameClass",
+    "adminTableMutedValueClass",
     "adminTableRowActionButtonClass",
     "adminTableStyle",
     "adminTextButtonClass",
@@ -2777,7 +2784,7 @@
     "getAdminChartBubbleRadius",
     "getAdminServiceGroupMeta",
     "getAdminServiceMeta",
-    "getServiceIcon",
+    "getAdminServiceOrder",
     "getTaskMetricByStatus",
     "hydrateAdminBrandLogoOverrides",
     "loadControlSetting",
@@ -2919,7 +2926,6 @@
   "src/features/admin/shared/ui/popover/AdminPopover.vue": ["default"],
   "src/features/admin/shared/ui/popover/AdminPopoverContent.vue": ["default"],
   "src/features/admin/shared/ui/popover/AdminPopoverTrigger.vue": ["default"],
-  "src/features/admin/shared/ui/serviceIcons.ts": ["getServiceIcon"],
   "src/features/admin/shared/ui/shell/AdminCollectionPageShell.vue": ["default"],
   "src/features/admin/shared/ui/shell/AdminDialogActions.vue": ["default"],
   "src/features/admin/shared/ui/shell/AdminDialogShell.vue": [

@@ -86,6 +86,14 @@ describe('AdminDialogShell', () => {
     renderShell()
 
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+    expect(dialog).toHaveClass('bg-admin-card-strong')
+    for (const region of ['header', 'content', 'footer']) {
+      expect(dialog.querySelector(`[data-admin-dialog-region="${region}"]`)).toHaveClass(
+        'bg-admin-card-strong',
+      )
+    }
+    const scrollViewport = dialog.querySelector('[data-admin-dialog-region="content"] > div')
+    expect(scrollViewport).toHaveClass('-mx-3', 'px-3', 'overflow-y-auto')
     const icon = within(dialog)
       .getByRole('button', { name: /close|关闭/i })
       .querySelector('[data-icon="xmark"]')
@@ -242,10 +250,10 @@ describe('AdminDialogShell', () => {
     const content = (await screen.findByRole('button', { name: '第一个操作' })).parentElement
     expect(content).toHaveClass(
       'app-scrollbar',
-      '-mr-3',
+      '-mx-3',
       'overflow-y-auto',
       'overscroll-contain',
-      'pr-3',
+      'px-3',
       'max-h-[min(68dvh,40rem)]',
     )
   })
@@ -268,7 +276,6 @@ describe('AdminDialogShell', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
     expect(dialog).toHaveClass(expectedClass)
-    // style.css 宽度契约以 data-size 键控，不依赖具体 width class 字符串。
     expect(dialog).toHaveAttribute('data-size', size)
   })
 

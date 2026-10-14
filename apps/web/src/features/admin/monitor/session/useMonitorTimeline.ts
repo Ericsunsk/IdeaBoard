@@ -176,26 +176,27 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
         if (!metric.hasChartLine || !metric.status) return false
         return filterStatus.value === null || filterStatus.value === metric.status
       })
-      // 显式标注：字面量推导的宽化类型（borderColor string|undefined、clip boolean）
-      // 通不过 ChartData，有 chartLine 的 metric 必带 chartColor（见 taskMetricTokens）。
-      .map((metric): ChartDataset<'line', number[]> => ({
-        type: 'line',
-        label: metric.label,
-        data: seriesDataMap[metric.status!] ?? [],
-        borderColor: metric.chartColor!,
-        backgroundColor: withAlpha(metric.chartColor!, monitorChartSpecs.fillOpacity),
-        fill: true,
-        tension: monitorChartSpecs.lineTension,
-        borderWidth: monitorChartSpecs.lineWidth,
-        pointStyle: 'circle',
-        pointRadius: monitorChartSpecs.pointRadius,
-        pointHoverRadius: monitorChartSpecs.pointHoverRadius,
-        pointHitRadius: monitorChartSpecs.pointHitRadius,
-        pointBackgroundColor: metric.chartColor!,
-        pointBorderColor: 'transparent',
-        pointBorderWidth: 0,
-        clip: false,
-      }))
+      .map(
+        (metric) =>
+          ({
+            type: 'line',
+            label: metric.label,
+            data: seriesDataMap[metric.status!] ?? [],
+            borderColor: metric.chartColor!,
+            backgroundColor: withAlpha(metric.chartColor!, monitorChartSpecs.fillOpacity),
+            fill: true,
+            tension: monitorChartSpecs.lineTension,
+            borderWidth: monitorChartSpecs.lineWidth,
+            pointStyle: 'circle',
+            pointRadius: monitorChartSpecs.pointRadius,
+            pointHoverRadius: monitorChartSpecs.pointHoverRadius,
+            pointHitRadius: monitorChartSpecs.pointHitRadius,
+            pointBackgroundColor: metric.chartColor!,
+            pointBorderColor: 'transparent',
+            pointBorderWidth: 0,
+            clip: false,
+          }) satisfies ChartDataset<'line', number[]>,
+      )
 
     return {
       labels,

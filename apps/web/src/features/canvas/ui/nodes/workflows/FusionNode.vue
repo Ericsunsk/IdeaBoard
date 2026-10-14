@@ -13,7 +13,7 @@
     @delete="emit('delete')"
   >
     <template #icon>
-      <Keyframes />
+      <component :is="serviceIcon" />
     </template>
     <div
       class="relative box-border flex flex-col gap-2 overflow-visible rounded-[11px] bg-[var(--canvas-node-bg)] p-0"
@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch } from 'vue'
-import { Keyframes } from '@iconoir/vue'
+import { getServiceIcon } from '../../../../../core/components/serviceIcons'
 import {
   requireImageNodeOutputCount,
   type FusionNodeItem,
@@ -100,6 +100,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const serviceIcon = getServiceIcon(SERVICE.fusion)
 
 const promptDraft = ref('')
 const visibleInputImages = computed(() => props.node.inputImages)

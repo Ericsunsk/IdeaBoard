@@ -1,10 +1,7 @@
 <template>
   <section :aria-label="BILLING_PRICING_MESSAGES.tableAria(props.title)">
-    <div v-if="props.title" class="mb-2 flex items-center gap-2">
+    <div v-if="props.title" class="mb-2 flex items-center">
       <h3 class="text-sm font-bold text-foreground">{{ props.title }}</h3>
-      <span class="text-xs text-muted-foreground">{{
-        BILLING_PRICING_MESSAGES.tableCount(props.items.length)
-      }}</span>
     </div>
     <div :class="adminTableCardClass">
       <AdminTable
@@ -148,6 +145,7 @@ import {
   adminTableClass,
   adminTableFrameClass,
   adminTableStyle,
+  adminTableMutedValueClass,
 } from '../../../shared'
 import BillingStatusCell from './BillingStatusCell.vue'
 import {
@@ -191,7 +189,7 @@ const emit = defineEmits<{
 // 「未设置 / —」的档位语义区分保留，不收敛（见 billingPricingColumns.ts）。
 function priceValueClass(value: string): string {
   return value === '—' || value === '未设置'
-    ? 'truncate font-mono text-xs tabular-nums whitespace-nowrap text-muted-foreground'
+    ? adminTableMutedValueClass
     : 'truncate font-mono text-xs font-bold tabular-nums whitespace-nowrap text-foreground'
 }
 </script>

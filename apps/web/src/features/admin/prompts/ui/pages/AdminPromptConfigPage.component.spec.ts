@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { fireEvent } from '@testing-library/vue'
+import { fireEvent, within } from '@testing-library/vue'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminPromptConfigPage from './AdminPromptConfigPage.vue'
@@ -83,34 +83,44 @@ describe('AdminPromptConfigPage', () => {
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getByText('共 3 个工作流模块')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
     })
 
-    // Group headings and item counts should be rendered
+    // Group headings remain visible without redundant counts.
     expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Prompt' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Fusion' })).toBeInTheDocument()
-    expect(screen.getByText('共 5 个功能')).toBeInTheDocument()
-    expect(screen.getAllByText('共 1 个功能')).toHaveLength(2)
+    expect(screen.queryByText(/共 \d+ 个工作流模块/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/共 \d+ 个功能/)).not.toBeInTheDocument()
+  })
+
+  it('shows unsupported cutout with the pricing table placeholders and no edit action', async () => {
+    renderPage()
+
+    const row = await screen.findByRole('row', { name: /cutout/ })
+    expect(within(row).getAllByText('—')).toHaveLength(4)
+    expect(within(row).queryByText('未配置')).not.toBeInTheDocument()
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('filters groups and features by search keyword', async () => {
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getByText('共 3 个工作流模块')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
     })
 
     const searchInput = screen.getByLabelText('搜索提示词')
     await fireEvent.update(searchInput, 'Fusion')
 
-    expect(screen.getByText('共 1 个工作流模块')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Fusion' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Image' })).not.toBeInTheDocument()
 
     // Clear search
     await fireEvent.update(searchInput, '')
-    expect(screen.getByText('共 3 个工作流模块')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prompt' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Fusion' })).toBeInTheDocument()
   })
 
   it('opens editor dialog, inserts variable, and saves successfully', async () => {
@@ -173,10 +183,9 @@ describe('AdminPromptConfigPage', () => {
     renderPage()
 
     // Filtering through the Select portal is covered at browser level; this keeps
-    // the unfiltered baseline honest, since the previous test asserted it while
-    // also driving the filter.
+    // the unfiltered baseline honest, since the preceding test also drives search.
     await waitFor(() => {
-      expect(screen.getByText('共 3 个工作流模块')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
     })
     expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Prompt' })).toBeInTheDocument()

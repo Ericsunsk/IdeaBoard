@@ -1,6 +1,11 @@
 import { computed, ref, type ComputedRef } from 'vue'
 import type { FeaturePromptVariable } from '../session/workspace'
-import type { FeatureGroup, FeatureItem, FeatureSlug } from './featurePromptMeta'
+import {
+  getFeaturePromptStatus,
+  type FeatureGroup,
+  type FeatureItem,
+  type FeatureSlug,
+} from './featurePromptMeta'
 
 export type PromptConfigStatusFilter = 'all' | 'configured' | 'unconfigured'
 
@@ -30,14 +35,15 @@ function matchesItem(
     'isConfigured' | 'getSavedPrompt' | 'getPromptVariables'
   >,
 ): boolean {
-  if (filter === 'configured' && !options.isConfigured(item.slug)) return false
-  if (filter === 'unconfigured' && options.isConfigured(item.slug)) return false
+  const status = getFeaturePromptStatus(item.slug, options.isConfigured(item.slug))
+  if (filter !== 'all' && filter !== status) return false
   if (!query) return true
 
   if (groupTitle.toLowerCase().includes(query)) return true
   if (item.title.toLowerCase().includes(query)) return true
   if (item.label.toLowerCase().includes(query)) return true
   if (item.slug.toLowerCase().includes(query)) return true
+  if (status === 'unsupported') return false
   // 搜索只匹配已保存提示词, 避免未保存 draft 泄漏到表格预览/搜索结果。
   const promptContent = options.getSavedPrompt(item.slug).toLowerCase()
   if (promptContent.includes(query)) return true

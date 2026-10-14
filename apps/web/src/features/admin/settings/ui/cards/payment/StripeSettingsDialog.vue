@@ -65,7 +65,7 @@
           maxlength="255"
           aria-label="Payment Method Configuration ID"
           :disabled="isSaving"
-          :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
+          :is-invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('paymentMethodConfigurationId')"
         />
@@ -88,7 +88,7 @@
           aria-label="Stripe API Key"
           :placeholder="apiKeyPlaceholder"
           :disabled="isSaving"
-          :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
+          :is-invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('apiKey')"
         />
@@ -108,7 +108,7 @@
           :placeholder="PAYMENTS_MESSAGES.taxCodePlaceholder"
           aria-label="Product Tax Code"
           :disabled="isSaving"
-          :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
+          :is-invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('productTaxCode')"
         />
