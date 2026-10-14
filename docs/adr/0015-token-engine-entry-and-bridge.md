@@ -1,5 +1,4 @@
 ---
-status: accepted
 owner: Web
 decision_date: 2026-10-13
 supersedes: none
@@ -49,3 +48,7 @@ Runtime values 与 Tailwind utility keys 的职责不同。Standard semantic uti
   再比较提供的 capture evidence，不作为 CI acceptance gate。
   RGB channel tolerance 为 1/255；geometry、typography、stacking、hit bounds
   和 alpha 必须完全一致。
+
+## Status
+
+Accepted

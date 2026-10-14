@@ -1,5 +1,4 @@
 ---
-status: accepted
 owner: Web
 decision_date: 2026-10-13
 supersedes: none
@@ -7,11 +6,11 @@ supersedes: none
 
 # Token 分层与运行时契约
 
-## 背景
+## Context
 
 共享 UI、Admin 与 Canvas 需要不同的语义 roles，同时保持单一运行时 owner、明确的 light/dark assignments 和可验证的依赖方向。Tailwind utility keys 与运行时 CSS custom properties 的职责必须分开。
 
-## 决策
+## Decision
 
 1. `tokens/primitives.css` 是 mode-blind Tier 1，保存物理颜色、alpha recipes、radius、shadow、motion、type 与 stacking ingredients。Tier 2 负责语义选择；Tier 3 只引用 Tier 2，不保留 primitive consumer 豁免或 raw color pins。
 2. `tokens/semantic.css` 与 `theme.css` bridge 定义共享及 domain Tier 2 roles；`tokens/admin.css` 定义 Admin 专属 roles；`tokens/canvas.css` 定义 Canvas scoped roles。Canvas workspace、tool、text、tooltip 与 progress 使用独立的共享语义角色，避免依赖 action palette。
@@ -21,6 +20,10 @@ supersedes: none
 6. Fine/coarse pointer 使用普通控件的独立 hit-target profiles，precision handles 使用独立 profile。Existing overlays 在 `(pointer: coarse)` 下选择 coarse profile；inline overlays 只扩展 block axis。Compact Admin real-box controls 通过最小尺寸参与布局。
 7. Mode-varying shadows 在消费者处经 `var(--shadow-*)` 解析。Native `shadow-*` 只用于 mode-blind recipes 或保持运行时变量引用的 recipes，防止 build-time snapshot 固定 light paint。
 
-## 结果与约束
+## Consequences
 
 Token ownership、CSS runtime resolution 和治理门形成统一契约。新增颜色须先定义物理 ingredient 与有意义的 Tier 2 role，再由 scoped roles 或组件使用；不得增加 retained-value pins、compatibility aliases 或 component primitive 豁免。代码检查负责静态契约，浏览器视觉验收由人工完成。
+
+## Status
+
+Accepted

@@ -1,5 +1,4 @@
 ---
-status: accepted
 owner: Board
 decision_date: 2026-10-11
 supersedes: none
@@ -71,3 +70,7 @@ npm run test:run -- src/features/board/session/sync
 ## Consequences
 
 Canvas、Search 和 Library 不直接使用 Query，通过 feature ports、stores 和 SSE coordination 消费状态。Key shape、freshness/gc、focus、SSE mapping、revision wire contract 或 draft precedence 的变更必须更新 contract specs 并经过 review；ownership 决策变更通过新 ADR 明确 supersede 本文。
+
+## Status
+
+Accepted

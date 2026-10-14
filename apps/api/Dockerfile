@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Canonical source: apps/api/go.mod 'go' directive (enforced by scripts/handbook-version-contract.sh).
-FROM --platform=$BUILDPLATFORM golang:1.26.6-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.9-bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -12,10 +12,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /src
 
 COPY go.mod go.sum ./
+COPY internal/testdb/go.mod internal/testdb/go.sum ./internal/testdb/
+COPY internal/testsupport/go.mod internal/testsupport/go.sum ./internal/testsupport/
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
     export CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} && \
     go build -trimpath -ldflags="-s -w" -o /out/ideaboard-server ./cmd && \
     go build -trimpath -ldflags="-s -w" -o /out/ideaboard-migrator ./cmd/migrator && \

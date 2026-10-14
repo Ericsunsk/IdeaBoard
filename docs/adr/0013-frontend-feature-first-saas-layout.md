@@ -1,6 +1,5 @@
 # ADR-0013: Frontend feature-first SaaS layout
 
-Status: Accepted
 Owner: Frontend Architecture
 Decision date: 2026-10-10
 Affected contexts: Frontend feature contexts
@@ -29,3 +28,11 @@ Specs 使用 `.(unit|contract|component|browser).spec.ts`，与对应 module 或
 - `features/canvas/core/canvasDomainPurity.unit.spec.ts` 校验 Canvas 各 pure core scopes。
 
 Frontend 结构总契约见 `DESIGN.md`、`apps/web/DESIGN.md` 和对应 feature `CONTEXT.md`。改变 zone ownership、pure dependencies 或 public seams 时需要同步更新 contract specs 与文档。
+
+## Consequences
+
+Feature 内部的计算、编排和 UI ownership 保持明确；跨 scope 消费者依赖稳定的 public seams。新增分区必须改善 ownership，不能仅为保持目录形式一致而增加层级。
+
+## Status
+
+Accepted
